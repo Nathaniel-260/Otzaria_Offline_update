@@ -35,6 +35,10 @@ import 'package:plugins_manager/plugins_manager.dart';
 import 'test_harness.dart';
 import 'test_support.dart';
 
+String _appShellSource() => File(
+      'lib/src/screens/app_shell.dart',
+    ).readAsStringSync().replaceAll('\r\n', '\n');
+
 void main() {
   late Directory tempDir;
   late SettingsController settings;
@@ -483,7 +487,7 @@ void main() {
   // ו-`dart:io` שאינו מסתיים ב-fake-async. הסדר, לעומת זאת, הוא כל התיקון,
   // ולכן הוא מוצמד מהמקור — כמו ב-`faq_test.dart`.
   group('_autoInstallIfEnabled', () {
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
     final start = source.indexOf('_autoInstallIfEnabled() async {');
     final body = source.substring(
       start,
@@ -544,7 +548,7 @@ void main() {
   });
 
   group('_downloadAll', () {
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
     final start = source.indexOf('Future<void> _downloadAll() async {');
     final body = source.substring(
       start,
@@ -606,7 +610,7 @@ void main() {
   // ההחלפה מסתיימת ב-`exit(0)`, ולכן היא נחסמת בזמן פעולה ארוכה — גם
   // כשהכפתור מנוטרל: [downloadLauncherUpdate] מגיע לכאן בלי כפתור בכלל.
   group('installLauncherUpdate', () {
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
     final start = source.indexOf('Future<void> installLauncherUpdate()');
     final body = source.substring(
       start,
@@ -634,7 +638,7 @@ void main() {
   });
 
   group('פעולות שיציאה מהתהליך קוטעת', () {
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
     final start = source.indexOf('bool get _longTaskRunning');
     final getters = source.substring(
       start,
@@ -676,7 +680,7 @@ void main() {
   });
 
   group('_maybeOfferElevation', () {
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
     final start = source.indexOf('Future<void> _maybeOfferElevation()');
     final body = source.substring(
       start,
@@ -720,7 +724,12 @@ void main() {
           source.indexOf('Future<void> _downloadAll()'),
           source.indexOf('setState(() {\n      _isDownloading = true;'),
         );
-        expect('_exitPending'.allMatches(download).length, 2);
+        expect('_longTaskRunning'.allMatches(download).length, 2);
+        final guard = source.substring(
+          source.indexOf('bool get _longTaskRunning'),
+          source.indexOf('bool get _exitPending'),
+        );
+        expect(guard, contains('_exitPending'));
         final wait = source.substring(
           source.indexOf('Future<bool> _waitUntilNoDialog('),
           source.indexOf('Timer? _pauseTimer;'),
@@ -871,7 +880,7 @@ void main() {
       expect(await statusAfterStart(tester), LauncherUpdateStatus.idle);
     });
 
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
 
     test('הבדיקה הידנית ברשת קוראת גם את המראה, לפני ההצצה', () {
       final start = source.indexOf('Future<void> checkOnline() async {');
@@ -885,7 +894,7 @@ void main() {
   });
 
   group('ניקוי המראה מול הורדות שמתחילות אחריו', () {
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
 
     String bodyOf(String signature, String until) {
       final start = source.indexOf(signature);
@@ -936,7 +945,7 @@ void main() {
       );
       final dialog = body.indexOf('showTwoActionsDialog');
       final recheck = body.indexOf(
-        '_isDownloading || _launcherUpdate.isDownloading) return;',
+        '_longTaskRunning || _launcherUpdate.isDownloading) return;',
         dialog,
       );
       expect(dialog, greaterThan(-1));
@@ -967,7 +976,7 @@ void main() {
       expect(LauncherCrashSession.closeGuard, isNull);
     });
 
-    final source = File('lib/src/screens/app_shell.dart').readAsStringSync();
+    final source = _appShellSource();
     final start = source.indexOf('Future<bool> _confirmClose() async {');
     final body = source.substring(start, source.indexOf('\n  }\n', start));
 

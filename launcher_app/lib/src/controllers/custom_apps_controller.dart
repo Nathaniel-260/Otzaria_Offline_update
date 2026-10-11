@@ -318,7 +318,7 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
       _shownScreenshots = shownScreenshots;
       errorMessage = null;
     } catch (e) {
-      AppLogger.instance.warn('טעינת התוכנות המותאמות נכשלה: $e');
+      AppLogger.maybeInstance?.warn('טעינת התוכנות המותאמות נכשלה: $e');
       if (gen != _loadGen) return;
       apps = const [];
       _shownScreenshots = const {};
