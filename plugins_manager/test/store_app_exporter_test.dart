@@ -51,29 +51,30 @@ StorePlugin _plugin({
   String? imagePath,
   List<String> screenshots = const [],
   Map<String, PluginLocalFile> localFiles = const {},
-}) => StorePlugin(
-  id: id,
-  name: name,
-  shortDescription: '',
-  description: '',
-  version: '1.0.0',
-  status: 'stable',
-  author: '',
-  updatedAt: '',
-  originalDate: '',
-  compatibleWith: '',
-  maxAppVersion: null,
-  requiresNetwork: false,
-  tags: const [],
-  homepage: '',
-  downloadCount: 0,
-  supportsDirectInstall: true,
-  isFeatured: false,
-  remoteDownloadUrl: '',
-  imagePath: imagePath,
-  screenshotPaths: screenshots,
-  localFiles: localFiles,
-);
+}) =>
+    StorePlugin(
+      id: id,
+      name: name,
+      shortDescription: '',
+      description: '',
+      version: '1.0.0',
+      status: 'stable',
+      author: '',
+      updatedAt: '',
+      originalDate: '',
+      compatibleWith: '',
+      maxAppVersion: null,
+      requiresNetwork: false,
+      tags: const [],
+      homepage: '',
+      downloadCount: 0,
+      supportsDirectInstall: true,
+      isFeatured: false,
+      remoteDownloadUrl: '',
+      imagePath: imagePath,
+      screenshotPaths: screenshots,
+      localFiles: localFiles,
+    );
 
 void main() {
   late Directory temp;
@@ -359,18 +360,19 @@ void main() {
       String asset = 'Otzaria-Plugin-Store.exe',
       bool draft = false,
       bool prerelease = false,
-    }) => {
-      'tag_name': tag,
-      'draft': draft,
-      'prerelease': prerelease,
-      'assets': [
+    }) =>
         {
-          'name': asset,
-          'browser_download_url': 'https://x/$tag/$asset',
-          'size': 100,
-        },
-      ],
-    };
+          'tag_name': tag,
+          'draft': draft,
+          'prerelease': prerelease,
+          'assets': [
+            {
+              'name': asset,
+              'browser_download_url': 'https://x/$tag/$asset',
+              'size': 100,
+            },
+          ],
+        };
 
     test(
       'fetchLatestStable מדלג על draft, prerelease ו-bundle ובוחר את הגבוה',
@@ -473,12 +475,12 @@ void main() {
     });
 
     StoreAppRelease v7({int? sizeBytes}) => StoreAppRelease(
-      tagName: 'v7',
-      version: 7,
-      assetName: 'Otzaria-Plugin-Store.exe',
-      downloadUrl: 'https://example.invalid/v7.exe',
-      sizeBytes: sizeBytes ?? 'MZ-v7-bytes'.length,
-    );
+          tagName: 'v7',
+          version: 7,
+          assetName: 'Otzaria-Plugin-Store.exe',
+          downloadUrl: 'https://example.invalid/v7.exe',
+          sizeBytes: sizeBytes ?? 'MZ-v7-bytes'.length,
+        );
 
     test('sync מוריד, כותב מטא-דאטה ומנקה את הגרסה הקודמת', () async {
       final mirrorDir = p.join(temp.path, 'mirror', 'store-app');

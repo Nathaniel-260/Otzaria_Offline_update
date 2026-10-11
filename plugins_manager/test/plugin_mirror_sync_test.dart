@@ -59,30 +59,31 @@ Future<void> _ageTargets(String root, Duration age) async {
 /// שכשל בחלק אחד אינו מפיל את השאר.
 class _Site {
   _Site({List<Map<String, dynamic>>? plugins})
-    : plugins = plugins ?? defaultPlugins();
+      : plugins = plugins ?? defaultPlugins();
 
   static List<Map<String, dynamic>> defaultPlugins({
     String versionA = '1.0.0',
     List<String>? screenshots,
-  }) => [
-    {
-      'id': 'a',
-      'name': 'אלף',
-      'version': versionA,
-      'status': 'stable',
-      'isPinned': true,
-      'image': '/api/plugins/a/image',
-      'screenshots': screenshots ?? const [],
-      'downloadUrl': '/api/plugins/a/download',
-    },
-    {
-      'id': 'b',
-      'name': 'בית',
-      'version': '2.0.0',
-      'status': 'beta',
-      'downloadUrl': '/api/plugins/b/download',
-    },
-  ];
+  }) =>
+      [
+        {
+          'id': 'a',
+          'name': 'אלף',
+          'version': versionA,
+          'status': 'stable',
+          'isPinned': true,
+          'image': '/api/plugins/a/image',
+          'screenshots': screenshots ?? const [],
+          'downloadUrl': '/api/plugins/a/download',
+        },
+        {
+          'id': 'b',
+          'name': 'בית',
+          'version': '2.0.0',
+          'status': 'beta',
+          'downloadUrl': '/api/plugins/b/download',
+        },
+      ];
 
   List<Map<String, dynamic>> plugins;
 
@@ -135,40 +136,40 @@ class _Site {
       requests.where((r) => r.endsWith(suffix)).toList();
 
   http.Client build() => MockClient((request) async {
-    final path = request.url.path;
-    requests.add(path);
+        final path = request.url.path;
+        requests.add(path);
 
-    final failure = failures[path];
-    if (failure != null) return http.Response('nope', failure);
-    final body = bodies[path];
-    if (body != null) return http.Response.bytes(body, 200);
+        final failure = failures[path];
+        if (failure != null) return http.Response('nope', failure);
+        final body = bodies[path];
+        if (body != null) return http.Response.bytes(body, 200);
 
-    if (stalls.contains(path)) {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    }
-    if (beforeResponse != null) await beforeResponse!(path);
+        if (stalls.contains(path)) {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        }
+        if (beforeResponse != null) await beforeResponse!(path);
 
-    if (path == '/api/plugins') return jsonResponse(plugins);
-    if (path == '/api/plugins/store-home') return jsonResponse(storeHome);
-    if (path.startsWith('/api/plugins/categories/')) {
-      return jsonResponse(category);
-    }
-    if (path.endsWith('/download')) {
-      return http.Response.bytes(
-        pluginBytes('{"id":"manifest-${path.split('/')[3]}"}'),
-        200,
-        headers: {
-          'content-disposition':
-              "attachment; filename*=UTF-8''$downloadFileName",
-        },
-      );
-    }
-    return http.Response.bytes(
-      const [137, 80, 78, 71],
-      200,
-      headers: {'content-type': 'image/png'},
-    );
-  });
+        if (path == '/api/plugins') return jsonResponse(plugins);
+        if (path == '/api/plugins/store-home') return jsonResponse(storeHome);
+        if (path.startsWith('/api/plugins/categories/')) {
+          return jsonResponse(category);
+        }
+        if (path.endsWith('/download')) {
+          return http.Response.bytes(
+            pluginBytes('{"id":"manifest-${path.split('/')[3]}"}'),
+            200,
+            headers: {
+              'content-disposition':
+                  "attachment; filename*=UTF-8''$downloadFileName",
+            },
+          );
+        }
+        return http.Response.bytes(
+          const [137, 80, 78, 71],
+          200,
+          headers: {'content-type': 'image/png'},
+        );
+      });
 }
 
 void main() {
@@ -179,39 +180,42 @@ void main() {
   tearDown(() => deleteTempDir(temp));
 
   PluginsManager manager(_Site site) => PluginsManager(
-    resolveMirrorDir: () async => temp.path,
-    resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
-    baseUrl: 'https://otzaria.test',
-    httpClient: site.build(),
-  );
+        resolveMirrorDir: () async => temp.path,
+        resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
+        baseUrl: 'https://otzaria.test',
+        httpClient: site.build(),
+      );
 
   List<String> warningsOf(List<PluginSyncProgress> events) => [
-    for (final e in events)
-      if (e.phase == PluginSyncPhase.warning) e.message,
-  ];
+        for (final e in events)
+          if (e.phase == PluginSyncPhase.warning) e.message,
+      ];
 
   Future<PluginSyncOutcome> syncOutcome(
     _Site site, {
     List<PluginSyncProgress>? events,
     bool Function()? isCancelled,
     List<String> appVersions = const [],
-  }) => manager(site).sync(
-    appVersions: appVersions,
-    onProgress: events?.add,
-    isCancelled: isCancelled,
-  );
+  }) =>
+      manager(site).sync(
+        appVersions: appVersions,
+        onProgress: events?.add,
+        isCancelled: isCancelled,
+      );
 
   Future<PluginCatalog> sync(
     _Site site, {
     List<PluginSyncProgress>? events,
     bool Function()? isCancelled,
     List<String> appVersions = const [],
-  }) async => (await syncOutcome(
-    site,
-    events: events,
-    isCancelled: isCancelled,
-    appVersions: appVersions,
-  )).catalog;
+  }) async =>
+      (await syncOutcome(
+        site,
+        events: events,
+        isCancelled: isCancelled,
+        appVersions: appVersions,
+      ))
+          .catalog;
 
   group('סנכרון מלא', () {
     test('מושך תוספים, קטגוריות וטקסטים של דף הבית', () async {
@@ -394,8 +398,8 @@ void main() {
   group('כשל ברשימת התוספים עצמה כן עוצר', () {
     test('סטטוס שגיאה ב-/api/plugins זורק ואינו נוגע בקטלוג הקיים', () async {
       await sync(_Site());
-      final before = File(PluginMirrorStore(temp.path).catalogPath)
-          .readAsStringSync();
+      final before =
+          File(PluginMirrorStore(temp.path).catalogPath).readAsStringSync();
 
       final site = _Site()..failures['/api/plugins'] = 503;
 
@@ -860,9 +864,8 @@ void main() {
         await sync(original);
         final failing = _Site()
           ..plugins.first['version'] = changedUrl ? '1.0.0' : '1.1.0'
-          ..plugins.first['image'] = changedUrl
-              ? '/api/plugins/a/new-image'
-              : '/api/plugins/a/image';
+          ..plugins.first['image'] =
+              changedUrl ? '/api/plugins/a/new-image' : '/api/plugins/a/image';
         failing.failures[failing.plugins.first['image'] as String] = 500;
         final afterFailure = await sync(failing);
         expect(afterFailure.plugins.first.imagePath, 'files/a/image.png');
@@ -1108,21 +1111,21 @@ void main() {
     });
 
     List<Map<String, dynamic>> sized(int size) => [
-      {
-        'id': 'a',
-        'name': 'אלף',
-        'version': '1.0.0',
-        'downloadUrl': '/api/plugins/a/download',
-        'versions': [
           {
+            'id': 'a',
+            'name': 'אלף',
             'version': '1.0.0',
             'downloadUrl': '/api/plugins/a/download',
-            'pluginFileSize': size,
-            'isLatest': true,
+            'versions': [
+              {
+                'version': '1.0.0',
+                'downloadUrl': '/api/plugins/a/download',
+                'pluginFileSize': size,
+                'isLatest': true,
+              },
+            ],
           },
-        ],
-      },
-    ];
+        ];
 
     test('הגודל שהאתר מצהיר עליו קובע אם הבילד שבמראה תקין', () async {
       await sync(_Site(plugins: sized(0)));
@@ -1356,27 +1359,27 @@ void main() {
   group('תאימות לגרסת אוצריא', () {
     /// תוסף אחד עם שני בילדים: החדש דורש אוצריא 0.9.97, הישן 0.9.95.
     List<Map<String, dynamic>> versioned() => [
-      {
-        'id': 'a',
-        'name': 'אלף',
-        'version': '2.0.0',
-        'compatibleWith': '0.9.97',
-        'downloadUrl': '/api/plugins/a/download',
-        'versions': [
           {
+            'id': 'a',
+            'name': 'אלף',
             'version': '2.0.0',
             'compatibleWith': '0.9.97',
             'downloadUrl': '/api/plugins/a/download',
-            'isLatest': true,
+            'versions': [
+              {
+                'version': '2.0.0',
+                'compatibleWith': '0.9.97',
+                'downloadUrl': '/api/plugins/a/download',
+                'isLatest': true,
+              },
+              {
+                'version': '1.5.0',
+                'compatibleWith': '0.9.95',
+                'downloadUrl': '/api/plugins/a@1.5.0/download',
+              },
+            ],
           },
-          {
-            'version': '1.5.0',
-            'compatibleWith': '0.9.95',
-            'downloadUrl': '/api/plugins/a@1.5.0/download',
-          },
-        ],
-      },
-    ];
+        ];
 
     test('אוצריא ישנה מקבלת את הבילד הישן, ולא את האחרון שפורסם', () async {
       final site = _Site(plugins: versioned());
@@ -1714,8 +1717,8 @@ void main() {
         },
       ];
       final site = _Site(plugins: moved);
-      final status = await manager(site)
-          .peekOnlineUpdates(appVersions: ['0.9.97']);
+      final status =
+          await manager(site).peekOnlineUpdates(appVersions: ['0.9.97']);
       expect(status.hasUpdates, isFalse);
 
       final catalog = await sync(site, appVersions: ['0.9.97']);

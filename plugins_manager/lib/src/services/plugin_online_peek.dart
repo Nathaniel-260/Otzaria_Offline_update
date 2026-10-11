@@ -99,8 +99,7 @@ class PluginOnlinePeek {
       }
 
       final have = presentBuilds[plugin.id] ?? const <String>{};
-      final needsWork =
-          pendingMedia.contains(plugin.id) ||
+      final needsWork = pendingMedia.contains(plugin.id) ||
           targets.any((target) => _needsFetch(target, known, have));
       if (!needsWork) continue;
 

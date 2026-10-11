@@ -330,7 +330,8 @@ void main() {
             'isPinned': true,
             'downloadCount': 42,
             'downloadUrl': '/api/plugins/abc/download',
-          }, 'https://otzaria.org').copyWith(
+          }, 'https://otzaria.org')
+              .copyWith(
             imagePath: 'files/abc/image.png',
             screenshotPaths: ['files/abc/screenshot-0.png'],
             localFiles: const {

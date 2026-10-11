@@ -22,7 +22,8 @@ void main() {
         'id': id,
         'name': name,
         'version': '1.0.0',
-      }, 'https://otzaria.org').copyWith(
+      }, 'https://otzaria.org')
+          .copyWith(
         localFiles: relativePath == null
             ? const {}
             : {

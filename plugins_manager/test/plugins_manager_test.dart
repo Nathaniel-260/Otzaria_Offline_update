@@ -22,21 +22,28 @@ void main() {
   tearDown(() => deleteTempDir(temp));
 
   PluginsManager manager({http.Client? client}) => PluginsManager(
-    resolveMirrorDir: () async => temp.path,
-    resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
-    baseUrl: 'https://otzaria.test',
-    httpClient: client ?? MockClient((_) async => http.Response('', 404)),
-  );
+        resolveMirrorDir: () async => temp.path,
+        resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
+        baseUrl: 'https://otzaria.test',
+        httpClient: client ?? MockClient((_) async => http.Response('', 404)),
+      );
 
   StorePlugin plugin({
     String id = 'a',
     String name = 'אלף',
     String downloadUrl = '',
     PluginLocalFile? localFile,
-  }) => StorePlugin.fromApi(
-    {'id': id, 'name': name, 'version': '1.0.0', 'downloadUrl': downloadUrl},
-    'https://otzaria.test',
-  ).copyWith(localFiles: localFile == null ? const {} : {'1.0.0': localFile});
+  }) =>
+      StorePlugin.fromApi(
+        {
+          'id': id,
+          'name': name,
+          'version': '1.0.0',
+          'downloadUrl': downloadUrl
+        },
+        'https://otzaria.test',
+      ).copyWith(
+          localFiles: localFile == null ? const {} : {'1.0.0': localFile});
 
   /// כותב קובץ `.otzplugin` אמיתי במראה ומחזיר את הרשומה שמצביעה עליו.
   StorePlugin withLocalFile({String id = 'a'}) {
@@ -113,11 +120,11 @@ void main() {
     }
 
     PluginsManager portableManager(String exe) => PluginsManager(
-      resolveMirrorDir: () async => temp.path,
-      otzariaLaunchPath: () async => exe,
-      baseUrl: 'https://otzaria.test',
-      httpClient: MockClient((_) async => http.Response('', 404)),
-    );
+          resolveMirrorDir: () async => temp.path,
+          otzariaLaunchPath: () async => exe,
+          baseUrl: 'https://otzaria.test',
+          httpClient: MockClient((_) async => http.Response('', 404)),
+        );
 
     test(
       'בלי נתיב מפורש הסריקה נגזרת מההתקנה שזוהתה, לא מ-%APPDATA%',
@@ -227,13 +234,12 @@ void main() {
 
     test('כשל בהשלמת הקובץ החסר מוחזר ככשל ולא כחריג', () async {
       final reported = <StorePlugin>[];
-      final result =
-          await manager(
-            client: MockClient((_) async => http.Response('nope', 500)),
-          ).directInstall(
-            plugin(downloadUrl: '/api/plugins/a/download'),
-            onPluginUpdated: reported.add,
-          );
+      final result = await manager(
+        client: MockClient((_) async => http.Response('nope', 500)),
+      ).directInstall(
+        plugin(downloadUrl: '/api/plugins/a/download'),
+        onPluginUpdated: reported.add,
+      );
 
       expect(result.success, isFalse);
       expect(result.error, strings.pluginFileNotAvailable);

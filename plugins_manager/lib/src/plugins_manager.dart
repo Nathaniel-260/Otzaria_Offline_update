@@ -102,10 +102,10 @@ class PluginsManager {
   }
 
   Future<Map<String, String>> scanInstalled() async => InstalledPluginsScanner(
-    customPluginsDir: await resolvePluginsDir?.call(),
-    otzariaLaunchPath: await otzariaLaunchPath?.call(),
-    locatePluginsDb: locatePluginsDb,
-  ).scan();
+        customPluginsDir: await resolvePluginsDir?.call(),
+        otzariaLaunchPath: await otzariaLaunchPath?.call(),
+        locatePluginsDb: locatePluginsDb,
+      ).scan();
 
   /// מסנכרן את הקטלוג והקבצים מהאתר אל המראה. דורש אינטרנט. מוריד **רק**
   /// את מה שחסר או השתנה — ראו [PluginSyncOutcome].
@@ -133,18 +133,19 @@ class PluginsManager {
   /// [appVersions] חייבות להיות אותן גרסאות ש-[sync] יקבל.
   Future<PluginsOnlineStatus> peekOnlineUpdates({
     List<String> appVersions = const [],
-  }) async => PluginOnlinePeek(
-    client: _client,
-    store: await _store(),
-  ).peek(appVersions: appVersions);
+  }) async =>
+      PluginOnlinePeek(
+        client: _client,
+        store: await _store(),
+      ).peek(appVersions: appVersions);
 
   static String storeAppDirIn(String mirrorRootDir) =>
       p.join(mirrorRootDir, 'store-app');
 
   static List<String> mirrorDirsIn(String mirrorRootDir) => [
-    PluginMirrorStore(mirrorRootDir).pluginsDir,
-    storeAppDirIn(mirrorRootDir),
-  ];
+        PluginMirrorStore(mirrorRootDir).pluginsDir,
+        storeAppDirIn(mirrorRootDir),
+      ];
 
   Future<StoreAppMirror> _appMirror() async =>
       StoreAppMirror(mirrorDir: storeAppDirIn(await resolveMirrorDir()));
@@ -250,7 +251,7 @@ class PluginsManager {
   String suggestedFileName(StorePlugin plugin, {String? appVersion}) {
     final local =
         plugin.localFileFor(plugin.installTarget(appVersion)?.version) ??
-        plugin.anyLocalFile;
+            plugin.anyLocalFile;
     return local?.fileName ?? '${plugin.name}${local?.ext ?? '.otzplugin'}';
   }
 

@@ -126,14 +126,15 @@ class StoreAppExporter {
       String message, [
       int? current,
       int? total,
-    ]) => onProgress?.call(
-      StoreAppExportProgress(
-        phase: phase,
-        message: message,
-        current: current,
-        total: total,
-      ),
-    );
+    ]) =>
+        onProgress?.call(
+          StoreAppExportProgress(
+            phase: phase,
+            message: message,
+            current: current,
+            total: total,
+          ),
+        );
 
     report(StoreAppExportPhase.start, strings.exportPreparing);
 

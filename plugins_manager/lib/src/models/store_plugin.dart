@@ -37,13 +37,14 @@ class PluginLocalFile extends Equatable {
       );
 
   Map<String, dynamic> toJson() => {
-    'path': relativePath,
-    'fileName': fileName,
-    'ext': ext,
-    'size': size,
-    if (sourceUrl != null) 'sourceUrl': sourceUrl,
-    if (targetedAt != null) 'targetedAt': targetedAt!.toUtc().toIso8601String(),
-  };
+        'path': relativePath,
+        'fileName': fileName,
+        'ext': ext,
+        'size': size,
+        if (sourceUrl != null) 'sourceUrl': sourceUrl,
+        if (targetedAt != null)
+          'targetedAt': targetedAt!.toUtc().toIso8601String(),
+      };
 
   static PluginLocalFile? fromJson(Object? json) {
     if (json is! Map) return null;
@@ -54,9 +55,8 @@ class PluginLocalFile extends Equatable {
       fileName: json['fileName'] is String ? json['fileName'] as String : path,
       ext: json['ext'] is String ? json['ext'] as String : '',
       size: json['size'] is int ? json['size'] as int : 0,
-      sourceUrl: json['sourceUrl'] is String
-          ? json['sourceUrl'] as String
-          : null,
+      sourceUrl:
+          json['sourceUrl'] is String ? json['sourceUrl'] as String : null,
       targetedAt: json['targetedAt'] is String
           ? DateTime.tryParse(json['targetedAt'] as String)
           : null,
@@ -65,13 +65,13 @@ class PluginLocalFile extends Equatable {
 
   @override
   List<Object?> get props => [
-    relativePath,
-    fileName,
-    ext,
-    size,
-    sourceUrl,
-    targetedAt,
-  ];
+        relativePath,
+        fileName,
+        ext,
+        size,
+        sourceUrl,
+        targetedAt,
+      ];
 }
 
 /// תוסף בקטלוג המקומי — מיזוג של המטא-דאטה מ-`/api/plugins` עם הנתיבים
@@ -195,15 +195,15 @@ class StorePlugin extends Equatable {
       versions.isNotEmpty ? versions : [_liveEntry];
 
   PluginVersionEntry get _liveEntry => PluginVersionEntry(
-    version: version,
-    status: status,
-    compatibleWith: compatibleWith,
-    maxAppVersion: maxAppVersion,
-    downloadUrl: remoteDownloadUrl,
-    requiresNetwork: requiresNetwork,
-    supportsDirectInstall: supportsDirectInstall,
-    isLatest: true,
-  );
+        version: version,
+        status: status,
+        compatibleWith: compatibleWith,
+        maxAppVersion: maxAppVersion,
+        downloadUrl: remoteDownloadUrl,
+        requiresNetwork: requiresNetwork,
+        supportsDirectInstall: supportsDirectInstall,
+        isLatest: true,
+      );
 
   /// הקובץ שירד עבור בילד מסוים, או null אם הבילד הזה אינו במראה.
   PluginLocalFile? localFileFor(String? version) =>
@@ -344,9 +344,8 @@ class StorePlugin extends Equatable {
       requiresNetwork: json['requiresNetwork'] == true,
       tags: _stringList(json['tags']),
       homepage: _string(json['homepage']),
-      downloadCount: json['downloadCount'] is int
-          ? json['downloadCount'] as int
-          : 0,
+      downloadCount:
+          json['downloadCount'] is int ? json['downloadCount'] as int : 0,
       supportsDirectInstall: json['supportsDirectInstall'] == true,
       isFeatured: json['isPinned'] == true,
       ratingAvg: _double(json['ratingAvg']),
@@ -368,41 +367,42 @@ class StorePlugin extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'shortDescription': shortDescription,
-    'description': description,
-    'version': version,
-    'status': status,
-    'author': author,
-    'updatedAt': updatedAt,
-    'originalDate': originalDate,
-    'compatibleWith': compatibleWith,
-    'maxAppVersion': maxAppVersion,
-    'requiresNetwork': requiresNetwork,
-    'tags': tags,
-    'homepage': homepage,
-    'downloadCount': downloadCount,
-    'supportsDirectInstall': supportsDirectInstall,
-    'isFeatured': isFeatured,
-    'ratingAvg': ratingAvg,
-    'ratingCount': ratingCount,
-    'ratingVerifiedCount': ratingVerifiedCount,
-    'ratingBreakdown': ratingBreakdown,
-    'remoteDownloadUrl': remoteDownloadUrl,
-    'remoteImageUrl': remoteImageUrl,
-    'remoteScreenshotUrls': remoteScreenshotUrls,
-    'mediaVersion': mediaVersion,
-    'screenshotsMediaVersion': screenshotsMediaVersion,
-    'image': imagePath,
-    'screenshots': screenshotPaths,
-    'categories': categorySlugs,
-    'versions': [for (final entry in versions) entry.toJson()],
-    'localFiles': {
-      for (final entry in localFiles.entries) entry.key: entry.value.toJson(),
-    },
-    'manifestId': manifestId,
-  };
+        'id': id,
+        'name': name,
+        'shortDescription': shortDescription,
+        'description': description,
+        'version': version,
+        'status': status,
+        'author': author,
+        'updatedAt': updatedAt,
+        'originalDate': originalDate,
+        'compatibleWith': compatibleWith,
+        'maxAppVersion': maxAppVersion,
+        'requiresNetwork': requiresNetwork,
+        'tags': tags,
+        'homepage': homepage,
+        'downloadCount': downloadCount,
+        'supportsDirectInstall': supportsDirectInstall,
+        'isFeatured': isFeatured,
+        'ratingAvg': ratingAvg,
+        'ratingCount': ratingCount,
+        'ratingVerifiedCount': ratingVerifiedCount,
+        'ratingBreakdown': ratingBreakdown,
+        'remoteDownloadUrl': remoteDownloadUrl,
+        'remoteImageUrl': remoteImageUrl,
+        'remoteScreenshotUrls': remoteScreenshotUrls,
+        'mediaVersion': mediaVersion,
+        'screenshotsMediaVersion': screenshotsMediaVersion,
+        'image': imagePath,
+        'screenshots': screenshotPaths,
+        'categories': categorySlugs,
+        'versions': [for (final entry in versions) entry.toJson()],
+        'localFiles': {
+          for (final entry in localFiles.entries)
+            entry.key: entry.value.toJson(),
+        },
+        'manifestId': manifestId,
+      };
 
   /// קורא רשומה מהקטלוג השמור. שדה חסר או פגום נופל לברירת המחדל שלו,
   /// כדי שקטלוג שנפגם חלקית לא יאבד את כל התוספים.
@@ -425,9 +425,8 @@ class StorePlugin extends Equatable {
       requiresNetwork: json['requiresNetwork'] == true,
       tags: _stringList(json['tags']),
       homepage: _string(json['homepage']),
-      downloadCount: json['downloadCount'] is int
-          ? json['downloadCount'] as int
-          : 0,
+      downloadCount:
+          json['downloadCount'] is int ? json['downloadCount'] as int : 0,
       supportsDirectInstall: json['supportsDirectInstall'] == true,
       // `isPinned` — קטלוג שנכתב לפני שהאתר שינה את המשמעות ל"נבחר".
       isFeatured: json['isFeatured'] == true || json['isPinned'] == true,
@@ -445,8 +444,7 @@ class StorePlugin extends Equatable {
       categorySlugs: _stringList(json['categories']),
       versions: _sortedDescending(_versions(json['versions'], '')),
       localFiles: _localFiles(json, version),
-      manifestId:
-          json['manifestId'] is String &&
+      manifestId: json['manifestId'] is String &&
               (json['manifestId'] as String).isNotEmpty
           ? json['manifestId'] as String
           : null,
@@ -526,12 +524,12 @@ class StorePlugin extends Equatable {
 
   @override
   List<Object?> get props => [
-    id,
-    version,
-    manifestId,
-    localFiles,
-    imagePath,
-    categorySlugs,
-    versions,
-  ];
+        id,
+        version,
+        manifestId,
+        localFiles,
+        imagePath,
+        categorySlugs,
+        versions,
+      ];
 }

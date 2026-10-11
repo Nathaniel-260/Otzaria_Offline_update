@@ -21,11 +21,12 @@ void main() {
   PluginStoreClient clientFor(
     Future<http.Response> Function(http.Request request) handler, {
     Duration timeout = const Duration(seconds: 20),
-  }) => PluginStoreClient(
-    baseUrl: 'https://otzaria.test',
-    client: MockClient(handler),
-    timeout: timeout,
-  );
+  }) =>
+      PluginStoreClient(
+        baseUrl: 'https://otzaria.test',
+        client: MockClient(handler),
+        timeout: timeout,
+      );
 
   group('כתובות', () {
     test('המשך אוטומטי משמר את הסיומת ואת העותק הישן עד להשלמה', () async {
@@ -305,18 +306,20 @@ void main() {
     PluginStoreClient streamingClientFor(
       Stream<List<int>> body, {
       required Duration stallTimeout,
-    }) => PluginStoreClient(
-      baseUrl: 'https://otzaria.test',
-      client: MockClient.streaming(
-        (_, __) async => http.StreamedResponse(body, 200),
-      ),
-      stallTimeout: stallTimeout,
-    );
+    }) =>
+        PluginStoreClient(
+          baseUrl: 'https://otzaria.test',
+          client: MockClient.streaming(
+            (_, __) async => http.StreamedResponse(body, 200),
+          ),
+          stallTimeout: stallTimeout,
+        );
 
     test('הסיומת נלקחת מ-Content-Disposition, כולל שם עברי', () async {
       final client = clientFor(
         (_) async => asset(pluginBytes('{"id":"x"}'), {
-          'content-disposition': "attachment; filename*=UTF-8''%D7%9E%D7%A4%D7%A8%D7%A9%D7%99%D7%9D.otzplugin",
+          'content-disposition':
+              "attachment; filename*=UTF-8''%D7%9E%D7%A4%D7%A8%D7%A9%D7%99%D7%9D.otzplugin",
         }),
       );
 
@@ -407,7 +410,8 @@ void main() {
           '/x',
           p.join(temp.path, 'a'),
           preferredExt: '.otzplugin',
-        )).ext,
+        ))
+            .ext,
         '.otzplugin',
       );
       expect(

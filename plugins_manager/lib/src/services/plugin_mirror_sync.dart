@@ -238,11 +238,9 @@ class PluginMirrorSync {
     return _PluginPlan(
       plugin: plugin,
       previous: previous,
-      needsImage:
-          plugin.remoteImageUrl.isNotEmpty &&
+      needsImage: plugin.remoteImageUrl.isNotEmpty &&
           !await _imageUnchanged(plugin, previous),
-      needsScreenshots:
-          plugin.remoteScreenshotUrls.isNotEmpty &&
+      needsScreenshots: plugin.remoteScreenshotUrls.isNotEmpty &&
           !await _screenshotsUnchanged(plugin, previous),
       missingBuilds: missing,
       isIncompatible: targets.isEmpty && plugin.remoteDownloadUrl.isNotEmpty,
@@ -461,8 +459,8 @@ class PluginMirrorSync {
 
   static String screenshotsStampOf(StorePlugin plugin) =>
       plugin.screenshotsMediaVersion.isNotEmpty
-      ? plugin.screenshotsMediaVersion
-      : mediaStampOf(plugin);
+          ? plugin.screenshotsMediaVersion
+          : mediaStampOf(plugin);
 
   /// כתובת ריקה בצד הקודם היא **קטלוג ישן** שנכתב לפני שהשדה נוסף, לא
   /// כתובת שהשתנתה. בלי החריג הזה הסנכרון הראשון אחרי העדכון היה מוריד את
@@ -616,8 +614,7 @@ class PluginMirrorSync {
         if (files.containsKey(entry.key)) continue;
         if (await store.hasAsset(entry.value.relativePath)) {
           files[entry.key] = entry.value.copyWith(
-            sourceUrl:
-                entry.value.sourceUrl ??
+            sourceUrl: entry.value.sourceUrl ??
                 previous.versionEntries
                     .where((version) => version.version == entry.key)
                     .firstOrNull

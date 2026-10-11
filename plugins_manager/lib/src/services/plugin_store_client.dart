@@ -29,8 +29,8 @@ class PluginStoreClient {
     http.Client? client,
     this.timeout = const Duration(seconds: 20),
     this.stallTimeout = const Duration(seconds: 30),
-  }) : baseUrl = _trimTrailingSlash(baseUrl),
-       _client = client ?? http.Client();
+  })  : baseUrl = _trimTrailingSlash(baseUrl),
+        _client = client ?? http.Client();
 
   static const String defaultBaseUrl = 'https://otzaria.org';
 
@@ -66,20 +66,20 @@ class PluginStoreClient {
   /// שולף את דף הבית האצור של החנות — טקסטים, תוספים נבחרים וסיכומי
   /// הקטגוריות, הכול בקריאה אחת.
   Future<Map<String, dynamic>> fetchStoreHome() async => _asMap(
-    await _getJson(
-      '/api/plugins/store-home',
-      AppL10n.strings.pluginsDomain.whatStoreStructure,
-    ),
-  );
+        await _getJson(
+          '/api/plugins/store-home',
+          AppL10n.strings.pluginsDomain.whatStoreStructure,
+        ),
+      );
 
   /// שולף דף קטגוריה שלם — כל התוספים המשובצים בה, בסדר שנקבע באתר.
   /// בלי `limit` האתר מחזיר את כל הרשימה, וזה מה שנדרש למראה.
   Future<Map<String, dynamic>> fetchCategory(String slug) async => _asMap(
-    await _getJson(
-      '/api/plugins/categories/${Uri.encodeComponent(slug)}',
-      AppL10n.strings.pluginsDomain.whatCategory(slug),
-    ),
-  );
+        await _getJson(
+          '/api/plugins/categories/${Uri.encodeComponent(slug)}',
+          AppL10n.strings.pluginsDomain.whatCategory(slug),
+        ),
+      );
 
   /// GET + פענוח JSON עם הודעות שגיאה למשתמש. [what] נכנס להודעה.
   Future<Object?> _getJson(String path, String what) async {
@@ -141,10 +141,8 @@ class PluginStoreClient {
     final fromDisposition = parseContentDisposition(
       response.headers['content-disposition'],
     );
-    final contentType = (response.headers['content-type'] ?? '')
-        .split(';')
-        .first
-        .trim();
+    final contentType =
+        (response.headers['content-type'] ?? '').split(';').first.trim();
 
     var ext = preferredExt ?? '';
     String? originalName;
@@ -179,8 +177,8 @@ class PluginStoreClient {
 
   String absolute(String url) =>
       (url.startsWith('http://') || url.startsWith('https://'))
-      ? url
-      : '$baseUrl$url';
+          ? url
+          : '$baseUrl$url';
 
   void dispose() => _client.close();
 
