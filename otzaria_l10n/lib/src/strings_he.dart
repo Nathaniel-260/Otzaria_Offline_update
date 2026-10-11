@@ -268,6 +268,8 @@ class _Home extends HomeStrings {
   String onlineMissingPlugins(int count) =>
       '$count תוספים חסרים בתיקייה — קובץ ההתקנה שלהם אינו שם';
   @override
+  String onlineRemovedPlugins(int count) => '$count תוספים הוסרו מהחנות';
+  @override
   String onlineStoreAppUpdate(String version) =>
       'גרסה $version של תוכנת חנות התוספים';
   @override

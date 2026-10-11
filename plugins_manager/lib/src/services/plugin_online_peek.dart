@@ -70,9 +70,11 @@ class PluginOnlinePeek {
     final fresh = <String>[];
     final updated = <String>[];
     final missing = <String>[];
+    final remoteIds = <String>{};
 
     for (final raw in remote) {
       final plugin = StorePlugin.fromApi(raw, baseUrl);
+      remoteIds.add(plugin.id);
       if (plugin.id.isEmpty) continue;
 
       final targets = [
@@ -112,10 +114,17 @@ class PluginOnlinePeek {
       }
     }
 
+    final removed = [
+      if (remote.isNotEmpty)
+        for (final plugin in local.plugins)
+          if (!remoteIds.contains(plugin.id)) plugin.name,
+    ];
+
     return PluginsOnlineStatus(
       newPlugins: fresh,
       updatedPlugins: updated,
       missingPlugins: missing,
+      removedPlugins: removed,
       totalOnline: remote.length,
     );
   }
