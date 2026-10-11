@@ -1,15 +1,11 @@
 name: CI
 
-# בדיקות בלבד — ריצה כאן לעולם אינה מפרסמת גרסה. הפרסום יזום, ב-release.yml,
-# שמפעיל את ה-workflow הזה (`workflow_call`) ומעלה release מהארטיפקטים שלו:
-# מה שמופץ הוא בדיוק מה שנבדק, ובלי לבנות את הלאנצ'ר פעמיים על אותו קומיט.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
-  # נקרא מ-release.yml. ההרשאות מגיעות משם, ומספר הגרסה חוזר אליו.
   workflow_call:
     outputs:
       version:
@@ -22,30 +18,24 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  # מספר הגרסה של הריצה הזאת — הצעד הבא אחרי מה שב-pubspec, ואם התג הזה
-  # כבר קיים (ריצה חוזרת, או פרסום שכבר קרה) מתקדמים לפנוי הבא. הג'ובים
-  # שבונים את הלאנצ'ר מציבים אותו בקוד לפני הבנייה, כך שהקובץ המופץ מדווח
-  # על עצמו את אותו מספר שבתג.
   version:
     name: next version
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.next.outputs.version }}
       tag: ${{ steps.next.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # התגים נחוצים כדי לדעת מה כבר פורסם
+          fetch-depth: 0
       - id: next
         run: |
-          # הגרסה היא בת שני חלקים (`0.2`) ורק החלק השני עולה. ב-pubspec
-          # יושב `0.2.0` — pub דורש שלושה חלקים — ולכן קוראים רק את השניים
-          # הראשונים ומתעלמים מהשארית.
-          #
-          # ⚠️ התג נשאר בן שלושה חלקים (`v0.2.0`) ואינו הולך אחרי המספר
-          # המוצג. כל לאנצ'ר שכבר בשטח פוסל תג שאינו `vX.Y.Z` בדיוק, ולכן
-          # `v0.2` היה release שאיש מהמשתמשים הקיימים אינו יכול למצוא.
           current="$(sed -n 's/^version:[[:space:]]*//p' launcher_app/pubspec.yaml | head -1 | cut -d+ -f1 | tr -d '[:space:]')"
           major="${current%%.*}"; rest="${current#*.}"
           minor="${rest%%.*}"
@@ -60,101 +50,58 @@ jobs:
   seforim_library_updater:
     name: seforim_library_updater (analyze + test)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-root
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
 
-  otzaria_downloads:
-    name: otzaria_downloads (analyze + test)
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    defaults:
-      run:
-        working-directory: otzaria_downloads
+  dart_packages:
+    name: dart packages (analyze + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - run: dart pub get
-      - run: dart analyze
-      # ב-Windows הבדיקות רצות בג'וב coverage — כאן רק analyze.
-      - if: runner.os != 'Windows'
-        run: dart test
+      - id: dart
+        uses: dart-lang/setup-dart@v1
+      - name: otzaria_l10n
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: otzaria_l10n
+        run: dart pub get && dart analyze && dart test
+      - name: otzaria_downloads
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: otzaria_downloads
+        run: dart pub get && dart analyze && dart test
+      - name: otzaria_manager
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: otzaria_manager
+        run: dart pub get && dart analyze && dart test
+      - name: plugins_manager
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: plugins_manager
+        run: dart pub get && dart analyze && dart test
+      - name: custom_apps_manager
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: custom_apps_manager
+        run: dart pub get && dart analyze && dart test
+      - name: error_reports_manager
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: error_reports_manager
+        run: dart pub get && dart analyze && dart test
 
-  otzaria_manager:
-    name: otzaria_manager (analyze + test)
-    # רץ גם על macOS: המסלול של macOS ב-otzaria_manager מריץ כלי מערכת
-    # אמיתיים (plutil, ditto, open), ולכן חלק מהבדיקות משמעותיות רק שם.
-    # אלה שדורשות macOS מסומנות ב-@TestOn/testOn ומדולגות בשקט בלינוקס.
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+  otzaria_manager_macos:
+    name: otzaria_manager (analyze + test) (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: otzaria_manager
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - run: dart pub get
-      - run: dart analyze
-      - run: dart test
-
-  # ה-analyze של השורש מחריג את החבילה הזאת (ראו analysis_options.yaml), ולכן
-  # בלי הג'וב הזה היא לא נבדקת בשרת בכלל — ובה יושב כל המלל של התוכנה.
-  otzaria_l10n:
-    name: otzaria_l10n (analyze + test)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: otzaria_l10n
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - run: dart pub get
-      - run: dart analyze
-      - run: dart test
-
-  plugins_manager:
-    name: plugins_manager (analyze + test)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: plugins_manager
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - run: dart pub get
-      - run: dart analyze
-      - run: dart test
-
-  custom_apps_manager:
-    name: custom_apps_manager (analyze + test)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: custom_apps_manager
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - run: dart pub get
-      - run: dart analyze
-      - run: dart test
-
-  error_reports_manager:
-    name: error_reports_manager (analyze + test)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: error_reports_manager
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
@@ -168,11 +115,14 @@ jobs:
     defaults:
       run:
         working-directory: library_manager
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-library_manager
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
@@ -181,30 +131,26 @@ jobs:
     name: launcher_app (analyze + windows build)
     needs: version
     runs-on: windows-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: launcher_app
     steps:
       - uses: actions/checkout@v4
-      # לפני הכול: הגרסה של הריצה הזאת נכנסת ל-pubspec ול-launcher_version.dart,
-      # ומשם ל-exe עצמו (`launcherVersion`, המרקר `.ready`, משאב הגרסה).
       - name: Set the release version
         shell: bash
         run: bash ../tool/set_launcher_version.sh "${{ needs.version.outputs.version }}"
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+          cache-key: flutter-:os:-:channel:-:version:-:arch:-:hash:-build
+          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-build
       - run: flutter config --enable-windows-desktop
-      # תיקיית windows/ (ה-runner) עדיין לא הופקה מקומית (נכתב בסביבה בלי
-      # Flutter SDK) — משלימים אותה כאן; לא אמור לגעת ב-lib/ או ב-pubspec.yaml.
       - run: flutter create --platforms=windows .
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
-      # הבדיקות של הלאנצ'ר ב-Windows רצות בג'וב coverage.
       - run: flutter build windows --release
-      # אין מתקין — exe בודד ונייד (זהה ל-build-exe.yml): ה-stub נושא את
-      # ערמת הקבצים כ-resource ומחלץ אותה ל-app-files לידו בהרצה הראשונה,
-      # כי Flutter ל-Windows לא מייצר exe יחיד בלאו הכי.
       - name: Package portable build
         shell: pwsh
         run: .\windows_stub\package.ps1
@@ -218,6 +164,7 @@ jobs:
     name: launcher_app (analyze + macos build)
     needs: version
     runs-on: macos-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: launcher_app
@@ -228,16 +175,10 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
       - run: flutter config --enable-macos-desktop
-      # אין כאן `flutter create` בכוונה — תיקיית macos/ נשמרת בגיט (ראו
-      # ההערה ב-build-macos.yml), ויצירה מחדש הייתה דורסת את ההתאמות שבה.
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
-      # ⚠️ אין כאן `flutter test` בכוונה. מערך הבדיקות של הלאנצ'ר רץ במלואו
-      # בג'וב ה-coverage של ווינדוס, והוא גם היעד האמיתי של החלקים תלויי-הפלטפורמה שבו
-      # (סריקת `exe`, הרישום, `tasklist`) — ב-macOS הם מחזירים null ומפילים
-      # את הג'וב על משהו שאינו מייצג תקלה. הג'וב הזה קיים כדי **לבנות**.
-      # ה-.app הוא ההפצה עצמה — אין מתקין ל-macOS (גוררים ל-Applications).
       - run: flutter build macos --release
       - name: Zip the .app bundle
         run: |
@@ -251,21 +192,53 @@ jobs:
           path: launcher_app/launcher_app-macos.zip
           if-no-files-found: error
 
-  # כל הבדיקות של הפרויקט ב-Windows, עם מדידת כיסוי ורף מינימום. הוא
-  # מחליף את coverage.yml הנפרד, שהריץ את אותן בדיקות פעם שנייה.
   coverage:
-    name: tests + coverage (windows)
+    name: tests + coverage (windows, ${{ matrix.shard }})
     runs-on: windows-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: launcher_app
+            packages: launcher_app,otzaria_l10n,otzaria_downloads
+          - shard: packages
+            packages: .,otzaria_manager,plugins_manager,custom_apps_manager,error_reports_manager,library_manager
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-coverage-${{ matrix.shard }}
       - run: dart pub global activate coverage 1.15.1
-      - run: dart tool/coverage.dart --collect --min=60 --target=80
+      - run: dart tool/coverage.dart --collect "--packages=${{ matrix.packages }}" --min=60 --target=0
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-${{ matrix.shard }}
+          path: |
+            build/coverage/lcov.info
+            build/coverage/run.log
+            */build/coverage/lcov.info
+            */build/coverage/run.log
+          if-no-files-found: error
+
+  coverage_total:
+    name: tests + coverage (total)
+    needs: coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+      - run: dart tool/coverage.dart --min=60 --target=80
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
           name: test-coverage
           path: |

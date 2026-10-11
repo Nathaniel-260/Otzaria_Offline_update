@@ -242,8 +242,11 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
   side; with `core.autocrlf=true` it arrived as CRLF and the contract test failed
   on every Windows machine.
 - **Favor layered tests over manual checks.** `.github/workflows/ci.yml` runs the
-  full suite across every package on every push and PR — the only trigger (the
-  weekly `cron` was removed 2026-08-11).
+  full suite across every package on every PR and every push to `main` — a branch
+  without a PR gets no CI, and a newer push to a PR cancels its older run. The
+  weekly `cron` was removed 2026-08-11. The Windows coverage runs as two shards
+  (`--packages=`), and `tests + coverage (total)` merges their reports and
+  enforces the thresholds over all nine packages.
 - **Publishing is a deliberate click, not a push.** A push to `main` only runs
   `ci.yml`. A release comes from Actions → **Release** → *Run workflow* (`main`
   only): `release.yml` runs the whole of `ci.yml` via `workflow_call`, then its

@@ -42,6 +42,51 @@ void main() {
     expect(parsed.values.single, {1: 1, 2: 0});
   });
 
+  test('Windows package-relative paths resolve on any host', () {
+    final parsed = coverage.parseLcov(
+        'SF:lib\\src\\example.dart\nDA:1,1\nend_of_record\nSF:lib/src/example.dart\nDA:2,0\nend_of_record\n',
+        directory);
+    expect(parsed, hasLength(1));
+    expect(parsed.keys.single,
+        File.fromUri(directory.uri.resolve('lib/src/example.dart')).path);
+  });
+
+  test('a report from another machine cannot pass as this package', () async {
+    final temporary =
+        await Directory.systemTemp.createTemp('coverage-foreign-');
+    addTearDown(() => temporary.delete(recursive: true));
+    await Directory.fromUri(temporary.uri.resolve('lib/'))
+        .create(recursive: true);
+    final report =
+        File.fromUri(temporary.uri.resolve('build/coverage/lcov.info'));
+    await report.parent.create(recursive: true);
+    await report.writeAsString(
+        r'SF:Q:\elsewhere\lib\example.dart' '\nDA:1,1\nend_of_record\n');
+    final result = await Process.run(
+        'dart',
+        [
+          File('tool/coverage.dart').absolute.path,
+          '--packages=.',
+          '--target=0'
+        ],
+        workingDirectory: temporary.path,
+        runInShell: Platform.isWindows);
+    expect(result.exitCode, 1, reason: '${result.stdout}\n${result.stderr}');
+  });
+
+  test('coverage CLI refuses a repeated package list', () async {
+    final result = await Process.run(
+        'dart',
+        [
+          File('tool/coverage.dart').absolute.path,
+          '--packages=.',
+          '--packages=launcher_app'
+        ],
+        workingDirectory: Directory.systemTemp.path,
+        runInShell: Platform.isWindows);
+    expect(result.exitCode, 64);
+  });
+
   for (final record in [
     'DA:1,1',
     'SF:lib/a.dart\nDA:0,1',
@@ -93,6 +138,43 @@ void main() {
       expect(json['total']['percent'], greaterThan(80));
       expect(json['minimumPerPackage'], 60);
       expect(json['targetOverall'], 80);
+    });
+  }
+
+  test('coverage CLI measures only the packages it was asked for', () async {
+    final temporary = await Directory.systemTemp.createTemp('coverage-subset-');
+    addTearDown(() => temporary.delete(recursive: true));
+    for (final package in ['.', 'launcher_app']) {
+      final directory = package == '.'
+          ? temporary
+          : Directory.fromUri(temporary.uri.resolve('$package/'));
+      await Directory.fromUri(directory.uri.resolve('lib/'))
+          .create(recursive: true);
+      final report =
+          File.fromUri(directory.uri.resolve('build/coverage/lcov.info'));
+      await report.parent.create(recursive: true);
+      await report.writeAsString(
+          'SF:lib/example.dart\nDA:1,1\nDA:2,1\nend_of_record\n');
+    }
+    final result = await Process.run('dart',
+        [File('tool/coverage.dart').absolute.path, '--packages=launcher_app,.'],
+        workingDirectory: temporary.path, runInShell: Platform.isWindows);
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final json = jsonDecode(
+        await File.fromUri(temporary.uri.resolve('build/coverage/summary.json'))
+            .readAsString()) as Map;
+    expect([for (final row in json['packages'] as List) row['package']],
+        ['.', 'launcher_app']);
+    expect(json['total']['found'], 4);
+  });
+
+  for (final packages in ['launcher_app,unknown', '']) {
+    test('coverage CLI refuses an unknown package list: "$packages"', () async {
+      final result = await Process.run('dart',
+          [File('tool/coverage.dart').absolute.path, '--packages=$packages'],
+          workingDirectory: Directory.systemTemp.path,
+          runInShell: Platform.isWindows);
+      expect(result.exitCode, 64);
     });
   }
 }

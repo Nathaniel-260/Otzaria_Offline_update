@@ -1,12 +1,6 @@
 name: Build macOS app (launcher_app only)
 
-# מקבילה ל-build-exe.yml: ריצה מהירה של build ל-macOS בלבד, בלי
-# analyze/test על שאר החבילות. ה-CI המלא (ci.yml) עדיין רץ בנפרד.
-#
-# ⚠️ ארטיפקט לבדיקה בלבד — ההפצה למשתמשים נבנית ב-ci.yml ומפורסמת ב-release.yml.
 on:
-  push:
-    branches: ["**"]
   workflow_dispatch:
 
 jobs:
@@ -22,14 +16,8 @@ jobs:
         with:
           channel: stable
       - run: flutter config --enable-macos-desktop
-      # בשונה מ-windows/, תיקיית macos/ **כן** נשמרת בגיט — היא מכילה
-      # התאמות שאינן ברירת מחדל (bundle id, entitlements בלי sandbox,
-      # CFBundleDisplayName בעברית), ו-`flutter create` היה דורס אותן.
       - run: flutter pub get
       - run: flutter build macos --release
-      # אין מתקין — אורזים את ה-.app עצמו. חובה ditto (ולא zip רגיל): רק
-      # הוא שומר symlinks/xattrs של ה-bundle, כך שהחתימה לא נשברת בדרך
-      # ואפשר פשוט לגרור את התוצאה ל-Applications.
       - name: Zip the .app bundle
         run: |
           cd build/macos/Build/Products/Release

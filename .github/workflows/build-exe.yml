@@ -1,14 +1,6 @@
 name: Build EXE (launcher_app only)
 
-# ריצה מהירה: רק build windows ל-launcher_app, בלי analyze/test על שאר
-# החבילות. ה-CI המלא (ci.yml) עדיין רץ בנפרד על כל push/PR.
-#
-# ⚠️ זהו ארטיפקט לבדיקה בלבד. מה שמופץ למשתמשים נבנה ב-ci.yml ומפורסם
-# ב-release.yml, ורק שם הגרסה מוצבת לפי הריצה — ה-exe שנוצר כאן נושא את
-# המספר שכתוב ב-pubspec.yaml ולא את מספר ה-release.
 on:
-  push:
-    branches: ["**"]
   workflow_dispatch:
 
 jobs:
@@ -24,23 +16,14 @@ jobs:
         with:
           channel: stable
       - run: flutter config --enable-windows-desktop
-      # תיקיית windows/ (ה-runner) עדיין לא הופקה מקומית — משלימים אותה
-      # כאן; לא אמור לגעת ב-lib/ או ב-pubspec.yaml.
       - run: flutter create --platforms=windows .
       - run: flutter pub get
       - run: flutter build windows --release
-      # אין מתקין — אפליקציית "portable" בקובץ exe בודד: ה-stub נושא את
-      # ערמת הקבצים כ-resource ומחלץ אותה לידו בהרצה הראשונה
-      # (ראו windows_stub/).
       - name: Package portable build
         shell: pwsh
         run: .\windows_stub\package.ps1
-        # הגרסה כאן זהה לזו שכבר מותקנת, ובלי הקומיט במרקר ה-stub לא היה
-        # מחלץ את הבנייה החדשה ומריץ את הקוד הישן.
         env:
           PAYLOAD_BUILD_ID: ${{ github.sha }}
-      # glob ולא השם המלא: הקובץ הוא "עדכוני אוצריא.exe", ואין טעם לתלות
-      # את ה-workflow בקידוד של שם עברי.
       - uses: actions/upload-artifact@v4
         with:
           name: launcher_app-windows-portable

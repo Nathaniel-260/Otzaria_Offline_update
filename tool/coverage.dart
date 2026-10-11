@@ -13,7 +13,6 @@ const packages = <String, bool>{
   'launcher_app': true,
 };
 
-// מיזוג לפי שורה מונע ספירה כפולה של אותו קובץ בכמה דוחות.
 Map<String, Map<int, int>> parseLcov(String text, Directory package) {
   final files = <String, Map<int, int>>{};
   Map<int, int>? current;
@@ -99,7 +98,6 @@ Future<void> collect(Directory directory, bool flutter) async {
         file.absolute.uri.path.substring(directory.absolute.uri.path.length);
     return "import 'package:$packageName/${relative.substring(4)}';";
   });
-  // טעינה בלבד: קוד שלא נבדק נכלל במכנה באפס פגיעות; אינו מופעל כאן.
   await inventory.writeAsString([
     '// ignore_for_file: unused_import',
     "import 'package:${flutter ? 'flutter_test/flutter_test' : 'test/test'}.dart';",
@@ -129,7 +127,8 @@ Future<void> collect(Directory directory, bool flutter) async {
         '--in=build/coverage/raw',
         '--out=build/coverage/lcov.info',
         '--report-on=lib',
-        '--package=.'
+        '--package=.',
+        '--base-directory=.'
       ]);
     }
   } finally {
@@ -141,10 +140,18 @@ Future<void> main(List<String> args) async {
   final unknown = args.where((arg) =>
       arg != '--collect' &&
       !arg.startsWith('--min=') &&
-      !arg.startsWith('--target='));
-  if (unknown.isNotEmpty) {
-    stderr.writeln(
-        'dart tool/coverage.dart [--collect] [--min=60] [--target=80]');
+      !arg.startsWith('--target=') &&
+      !arg.startsWith('--packages='));
+  final selectedArgs =
+      args.where((arg) => arg.startsWith('--packages=')).toList();
+  final selected = selectedArgs.isEmpty
+      ? packages.keys.toSet()
+      : selectedArgs.last.substring('--packages='.length).split(',').toSet();
+  if (unknown.isNotEmpty ||
+      selectedArgs.length > 1 ||
+      !packages.keys.toSet().containsAll(selected)) {
+    stderr.writeln('dart tool/coverage.dart [--collect] [--min=60] '
+        '[--target=80] [--packages=.,launcher_app]');
     exitCode = 64;
     return;
   }
@@ -162,7 +169,8 @@ Future<void> main(List<String> args) async {
   final rows = <Map<String, Object?>>[];
   final all = <String, Map<int, int>>{};
   var failed = false;
-  for (final entry in packages.entries) {
+  for (final entry
+      in packages.entries.where((entry) => selected.contains(entry.key))) {
     final directory = entry.key == '.'
         ? root
         : Directory.fromUri(root.uri.resolve('${entry.key}/'));
