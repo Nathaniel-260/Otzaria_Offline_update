@@ -24,6 +24,11 @@ void main() {
   PluginsManager manager({http.Client? client}) => PluginsManager(
         resolveMirrorDir: () async => temp.path,
         resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
+        otzariaLaunchPath: () async {
+          final stub = File(p.join(temp.path, 'otzaria-stub.txt'));
+          if (!stub.existsSync()) stub.writeAsStringSync('');
+          return stub.path;
+        },
         baseUrl: 'https://otzaria.test',
         httpClient: client ?? MockClient((_) async => http.Response('', 404)),
       );
