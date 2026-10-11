@@ -376,8 +376,6 @@ class _AppScreen extends AppScreenStrings {
   String get processTitle => 'תהליך אוצריא';
   @override
   String get processRunning => 'פתוחה כרגע — עדכון מסד חסום עד לסגירתה';
-  @override
-  String get processStopped => 'סגורה';
 
   @override
   String get installingProgress => 'מתקין את אוצריא...';
@@ -1178,8 +1176,6 @@ class _Plugins extends PluginsStrings {
   String get updatesDialogSentLabel => 'נשלח לאוצריא';
   @override
   String get updatesDialogDoneLabel => 'עודכן';
-  @override
-  String get updatesDialogManualOnly => 'התקנה מדף התוסף';
   @override
   String get updatesDialogPendingNote =>
       'ההתקנה עצמה מתבצעת בחלון של אוצריא. הרשימה כאן מתעדכנת מאליה '
@@ -2460,8 +2456,6 @@ class _PluginsDomain extends PluginsDomainStrings {
   String syncPlugin(String name, int done, int total) =>
       'מסנכרן: $name ($done/$total)';
   @override
-  String get syncDone => 'הסנכרון הושלם';
-  @override
   String syncDoneCounts(int fetched, int skipped) =>
       'הסנכרון הושלם: $fetched תוספים עודכנו, $skipped כבר היו מעודכנים';
   @override
@@ -2559,9 +2553,6 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'המזהה "$id" אינו תקין. מותרים אותיות לועזיות קטנות, ספרות, נקודה, '
       'מקף וקו תחתון בלבד';
   @override
-  String descriptorUnknownInstallerKind(String found, String allowed) =>
-      'סוג ההתקנה "$found" אינו נתמך. הסוגים הנתמכים: $allowed';
-  @override
   String descriptorUnknownSourceKind(String found, String allowed) =>
       'מקור הגרסאות "$found" אינו נתמך. המקורות הנתמכים: $allowed';
 
@@ -2650,8 +2641,6 @@ class _CustomApps extends CustomAppsStrings {
   String get infoPanelTitle => 'מידע כללי';
   @override
   String get screenshotsPanelTitle => 'צילומי מסך';
-  @override
-  String get categoriesPanelTitle => 'קטגוריות';
   @override
   String get infoSource => 'מקור';
   @override
@@ -2837,10 +2826,6 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get fetchAssetsButton => 'הצגת הקבצים';
   @override
-  String get fetchingAssets => 'מביא את רשימת הקבצים...';
-  @override
-  String get assetLabel => 'איזה קובץ להוריד';
-  @override
   String get assetHint =>
       'בגרסה אחת יש בדרך כלל כמה קבצים. בחרו את זה שמתאים למחשב שלכם.';
   @override
@@ -2852,8 +2837,6 @@ class _CustomApps extends CustomAppsStrings {
   String get pickInstallerButton => 'בחירת קובץ';
   @override
   String get pickInstallerDialogTitle => 'בחירת קובץ ההתקנה';
-  @override
-  String get installerKindLabel => 'סוג ההתקנה';
   @override
   String installerKindSniffed(String kind) => 'זוהה מהקובץ: $kind';
   @override
@@ -2981,8 +2964,6 @@ class _CustomApps extends CustomAppsStrings {
   String get onlineUpToDate => 'מה שעל הכונן הוא הגרסה האחרונה';
   @override
   String get onlineUnavailable => 'אין חיבור לרשת כרגע';
-  @override
-  String get replaceInstallerButton => 'החלפת הקובץ';
   @override
   String get pickLocationButton => 'בחירת מיקום ידנית';
   @override
