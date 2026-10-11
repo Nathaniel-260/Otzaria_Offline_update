@@ -308,6 +308,7 @@ class PluginsManager {
       );
 
       final catalog = await store.load();
+      if (!catalog.plugins.any((entry) => entry.id == updated.id)) return file;
       await store.save(PluginCatalog(
         lastSync: catalog.lastSync,
         plugins: [
