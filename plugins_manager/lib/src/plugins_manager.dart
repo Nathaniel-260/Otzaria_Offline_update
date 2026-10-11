@@ -290,6 +290,8 @@ class PluginsManager {
         target.downloadUrl,
         store.pluginFilePathNoExt(plugin.id, target.version),
         preferredExt: '.otzplugin',
+        expectedSize: target.fileSize,
+        isValid: (path) => PluginManifestReader.read(path) != null,
       );
 
       final file = PluginLocalFile(
