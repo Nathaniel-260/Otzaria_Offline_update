@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
+import '../search_feedback/search_feedback_backoff.dart';
 import '../search_feedback/search_feedback_events.dart';
 import '../search_feedback/search_feedback_identity.dart';
 import '../search_feedback/search_feedback_queue.dart';
@@ -172,37 +173,23 @@ class SearchFeedbackTransport {
         if (_stopped) return;
         _stopped = true;
         _backoffStep++;
-        var delay = outcome.retryAfter;
-        if (outcome.strike == SearchFeedbackStrike.filtered) {
-          var previous = 0;
-          if (await filteredFile.exists()) {
-            final block = jsonDecode(await filteredFile.readAsString()) as Map;
-            previous = block['delaySeconds'] as int? ?? 0;
-          }
-          delay ??= Duration(seconds: previous == 0 ? 21600 : previous * 2);
-          if (delay > const Duration(hours: 24)) {
-            delay = const Duration(hours: 24);
-          }
-          if (outcome.retryAfter == null && delay < const Duration(hours: 6)) {
-            delay = const Duration(hours: 6);
-          }
-          await filteredFile.writeAsString(
+        final filtered = outcome.strike == SearchFeedbackStrike.filtered;
+        final delay = searchFeedbackRetryDelay(
+          strike: outcome.strike,
+          retryAfter: outcome.retryAfter,
+          backoffStep: _backoffStep,
+          previousFilteredSeconds:
+              filtered ? await _filteredDelaySeconds(filteredFile) : 0,
+        );
+        if (filtered) {
+          await _replace(
+            filteredFile,
             jsonEncode({'delaySeconds': delay.inSeconds}),
-            flush: true,
           );
-        } else if (delay == null) {
-          final factor = 1 << (_backoffStep > 21 ? 20 : _backoffStep - 1);
-          delay = Duration(seconds: 30 * factor);
-          if (delay > const Duration(hours: 6)) {
-            delay = const Duration(hours: 6);
-          }
         }
-        if (delay > const Duration(hours: 24)) {
-          delay = const Duration(hours: 24);
-        }
-        await retryFile.writeAsString(
+        await _replace(
+          retryFile,
           DateTime.now().add(delay).toUtc().toIso8601String(),
-          flush: true,
         );
       }
 
@@ -304,9 +291,7 @@ class SearchFeedbackTransport {
                   outcome.strike.name,
                   DateTime.now(),
                 );
-                if (record.count >= 5 &&
-                    DateTime.now().difference(record.firstAt) >=
-                        const Duration(hours: 24)) {
+                if (searchFeedbackStrikesExhausted(record, DateTime.now())) {
                   rejected += batch.eventLines.length;
                   await queue.remove(claimed);
                 }
@@ -320,5 +305,19 @@ class SearchFeedbackTransport {
     } finally {
       await lock.release();
     }
+  }
+
+  static Future<int> _filteredDelaySeconds(File file) async {
+    try {
+      return searchFeedbackFilteredDelaySeconds(await file.readAsString());
+    } on FileSystemException {
+      return 0;
+    }
+  }
+
+  static Future<void> _replace(File file, String contents) async {
+    final temp = File('${file.path}.tmp');
+    await temp.writeAsString(contents, flush: true);
+    await temp.rename(file.path);
   }
 }
