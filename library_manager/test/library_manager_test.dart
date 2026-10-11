@@ -716,7 +716,7 @@ void main() {
           dataDir: dataDir,
           operatingSystem: 'linux',
           environment: {'HOME': home},
-          otzariaLaunchPath: () async => p.join(exeDir, 'otzaria'),
+          otzariaLaunchPath: () async => p.posix.join(exeDir, 'otzaria'),
         );
         addTearDown(manager.dispose);
         expect(await manager.installDbPath(), isNot(livedAt));
