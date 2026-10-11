@@ -110,7 +110,6 @@ Future<void> collect(Directory directory, bool flutter) async {
     if (flutter) {
       await command(directory, 'flutter', [
         'test',
-        '--concurrency=1',
         '--coverage',
         '--coverage-path=build/coverage/lcov.info',
         '--reporter=expanded'

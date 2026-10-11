@@ -189,7 +189,6 @@ jobs:
       - run: flutter config --enable-macos-desktop
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
-      - run: flutter test
       - run: flutter build macos --release
       - name: Zip the .app bundle
         run: |
@@ -203,6 +202,26 @@ jobs:
           path: launcher_app/launcher_app-macos.zip
           if-no-files-found: error
 
+  launcher_app_macos_test:
+    name: launcher_app (test) (macos-latest)
+    needs: version
+    runs-on: macos-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: launcher_app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set the release version
+        if: inputs.release
+        run: bash ../tool/set_launcher_version.sh "${{ needs.version.outputs.version }}"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+
   coverage:
     name: tests + coverage (windows, ${{ matrix.shard }})
     runs-on: windows-latest
@@ -212,17 +231,29 @@ jobs:
       matrix:
         include:
           - shard: launcher_app
-            packages: launcher_app,otzaria_l10n,otzaria_downloads
-          - shard: packages
-            packages: .,otzaria_manager,plugins_manager,custom_apps_manager,error_reports_manager,library_manager
+            packages: launcher_app
+            flutter: true
+          - shard: flutter_packages
+            packages: .,library_manager
+            flutter: true
+          - shard: dart_a
+            packages: otzaria_manager,otzaria_l10n,otzaria_downloads
+            flutter: false
+          - shard: dart_b
+            packages: plugins_manager,custom_apps_manager,error_reports_manager
+            flutter: false
     steps:
       - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        if: ${{ !matrix.flutter }}
       - uses: subosito/flutter-action@v2
+        if: ${{ matrix.flutter }}
         with:
           channel: stable
           cache: true
           pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-coverage-${{ matrix.shard }}
       - run: dart pub global activate coverage 1.15.1
+        if: ${{ !matrix.flutter }}
       - run: dart tool/coverage.dart --collect "--packages=${{ matrix.packages }}" --min=60 --target=0
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
