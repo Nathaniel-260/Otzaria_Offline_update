@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -953,8 +953,11 @@ void main() {
 
     test('הרשומה בזיכרון מתעדכנת גם כשהמסירה נכשלה', () async {
       fileName = 'plugin.zip';
+      final notExecutable = p.join(tempDir.path, 'not-otzaria.txt');
+      File(notExecutable).writeAsStringSync('not a program');
       final c = PluginsModuleController(
         mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        otzariaLaunchPath: () async => notExecutable,
       );
       addTearDown(c.dispose);
       await saveCatalog(PluginCatalog(plugins: [remote()]));
@@ -965,6 +968,10 @@ void main() {
       final result = await c.directInstall(stale);
 
       expect(result.success, isFalse);
+      expect(
+        result.error,
+        startsWith(AppL10n.strings.pluginsDomain.otzariaOpenFailed('')),
+      );
       final fresh = c.byId('remote')!;
       expect(c.hasFileFor(fresh), isTrue);
       expect(fresh.manifestId, manifestId);

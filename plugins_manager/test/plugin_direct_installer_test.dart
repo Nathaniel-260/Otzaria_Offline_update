@@ -243,6 +243,8 @@ void main() {
       expect(File(later).existsSync(), isTrue);
       expect(handoff.listSync(), hasLength(1));
     });
+  });
+
   group('openProtocolUrl', () {
     test(
       'runs the known install from its own folder, not the launcher working dir',

@@ -79,12 +79,13 @@ void main() {
   OtzariaModuleController controllerFor({
     bool preferPrerelease = false,
     RunningOtzariaLocator runningLocator = const _NeverRunningLocator(),
+    OtzariaTargetPlatform platform = OtzariaTargetPlatform.windows,
   }) {
     final controller = OtzariaModuleController(
       dataDir: tempDir.path,
       preferPrerelease: preferPrerelease,
       runningLocator: runningLocator,
-      platform: OtzariaTargetPlatform.windows,
+      platform: platform,
     );
     addTearDown(controller.dispose);
     return controller;
@@ -93,6 +94,9 @@ void main() {
   final hostInstallerKind = Platform.isMacOS
       ? OtzariaInstallerKind.macAppZip
       : OtzariaInstallerKind.windowsSetupExe;
+  final hostPlatform = Platform.isMacOS
+      ? OtzariaTargetPlatform.macos
+      : OtzariaTargetPlatform.windows;
 
   group('checkForUpdate — מהתיקייה המקומית בלבד', () {
     test('מראה ריקה = needsDownload, וזה לא מצב שגיאה', () async {
@@ -232,7 +236,7 @@ void main() {
         installerKind: hostInstallerKind,
       );
       final locator = _GatedLocator();
-      final c = controllerFor(runningLocator: locator);
+      final c = controllerFor(runningLocator: locator, platform: hostPlatform);
 
       final check = c.checkForUpdate();
       final firstProbe = await locator.next();
@@ -288,7 +292,10 @@ void main() {
           installerKind: OtzariaInstallerKind.macAppZip,
         );
         final locator = _GatedLocator();
-        final c = controllerFor(runningLocator: locator);
+        final c = controllerFor(
+          runningLocator: locator,
+          platform: OtzariaTargetPlatform.macos,
+        );
         final initial = c.checkForUpdate();
         (await locator.next()).complete(false);
         await initial;
@@ -330,7 +337,10 @@ void main() {
           installerKind: OtzariaInstallerKind.macAppZip,
         );
         final locator = _GatedLocator();
-        final c = controllerFor(runningLocator: locator);
+        final c = controllerFor(
+          runningLocator: locator,
+          platform: OtzariaTargetPlatform.macos,
+        );
         final initial = c.checkForUpdate();
         (await locator.next()).complete(false);
         await initial;
@@ -426,6 +436,7 @@ void main() {
       final delivered = <bool>[];
       final controller = OtzariaModuleController(
         dataDir: tempDir.path,
+        runningLocator: const _NeverRunningLocator(),
         launcher: launcher,
         pendingLaunchUri: () async => uri,
         onLaunchUriDelivered: () async => delivered.add(true),

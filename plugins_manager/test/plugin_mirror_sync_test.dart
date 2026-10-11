@@ -1231,7 +1231,8 @@ void main() {
       expect(warningsOf(events), isEmpty);
       final a = outcome.catalog.plugins.firstWhere((p) => p.id == 'a');
       expect(a.screenshotPaths, previousShots);
-      expect(a.mediaVersion, '1.0.0');
+      expect(PluginMirrorSync.screenshotsStampOf(a), '1.0.0');
+      expect(a.mediaVersion, '1.1.0');
       final store = PluginMirrorStore(temp.path);
       for (final path in previousShots) {
         expect(File(store.absolutePath(path)).existsSync(), isTrue);
@@ -1511,6 +1512,8 @@ void main() {
       final before = (await store.load()).plugins.single;
       expect(before.localFiles.keys, ['2.0.0']);
 
+      final notExecutable = p.join(temp.path, 'not-otzaria.txt');
+      File(notExecutable).writeAsStringSync('not a program');
       final onDemand = PluginsManager(
         resolveMirrorDir: () async => temp.path,
         resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
@@ -1524,13 +1527,16 @@ void main() {
             },
           ),
         ),
+        otzariaLaunchPath: () async => notExecutable,
       );
       final result = await onDemand.directInstall(before, appVersion: '0.9.96');
-      expect(result.error, strings.badPluginExtension);
+      expect(result.success, isFalse);
+      expect(result.error, startsWith(strings.otzariaOpenFailed('')));
 
       final fetched = (await store.load()).plugins.single.localFiles['1.5.0'];
       expect(fetched?.targetedAt, isNotNull);
-      final file = File(store.absolutePath(fetched!.relativePath));
+      expect(fetched!.relativePath, endsWith('.otzplugin'));
+      final file = File(store.absolutePath(fetched.relativePath));
       expect(file.existsSync(), isTrue);
 
       final atOffice = _Site(plugins: versioned());
