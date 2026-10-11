@@ -533,8 +533,9 @@ class OtzariaManager {
         isSharedDir: candidate.sharedDir,
         verifyIdentity: candidate.verifyIdentity,
       );
-      if (detected != null && (accept == null || accept(detected)))
+      if (detected != null && (accept == null || accept(detected))) {
         return detected;
+      }
     }
     return null;
   }

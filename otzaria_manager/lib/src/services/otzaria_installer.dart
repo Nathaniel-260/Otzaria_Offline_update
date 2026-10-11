@@ -304,7 +304,9 @@ class OtzariaInstaller {
           );
         }
       }
-      final found = await locateInstalled();
+      final found = await locateInstalled(
+        (candidate) => !isStale(candidate.launchPath),
+      );
       return found != null && isStale(found.launchPath) ? null : found;
     }
 

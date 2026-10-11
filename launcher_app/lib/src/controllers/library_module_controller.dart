@@ -314,10 +314,6 @@ class LibraryModuleController extends ChangeNotifier with ProgressNotifier {
       _hasOnlineDbUpdate ||
       onlinePendingCompanions.isNotEmpty;
 
-      downloadNeedsRetry ||
-      _hasOnlineDbUpdate ||
-      onlinePendingCompanions.isNotEmpty;
-
   bool get _hasOnlineDbUpdate {
     final online = onlineLatestVersion;
     if (online == null) return false;
