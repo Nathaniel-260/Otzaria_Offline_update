@@ -51,87 +51,76 @@ jobs:
           echo "tag=v$major.$minor.0" >> "$GITHUB_OUTPUT"
           echo "מ-$current אל $major.$minor (תג v$major.$minor.0)"
 
-  seforim_library_updater:
-    name: seforim_library_updater (analyze + test)
+  linux_checks:
+    name: analyze + native zstd (linux)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      REQUIRE_NATIVE_ZSTD: "1"
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - id: flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-root
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos
-      - run: flutter test
+          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-linux_checks
+      - name: seforim_library_updater
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        run: flutter pub get && flutter analyze --no-fatal-infos
+      - name: library_manager
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: library_manager
+        run: flutter pub get && flutter analyze --no-fatal-infos && flutter test
+      - name: otzaria_l10n
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: otzaria_l10n
+        run: dart pub get && dart analyze
+      - name: otzaria_downloads
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: otzaria_downloads
+        run: dart pub get && dart analyze
+      - name: otzaria_manager
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: otzaria_manager
+        run: dart pub get && dart analyze
+      - name: plugins_manager
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: plugins_manager
+        run: dart pub get && dart analyze
+      - name: custom_apps_manager
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: custom_apps_manager
+        run: dart pub get && dart analyze
+      - name: error_reports_manager
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: error_reports_manager
+        run: dart pub get && dart analyze
 
-  dart_packages:
-    name: dart packages (analyze + test)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  dart_packages_macos:
+    name: dart packages (test) (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - id: dart
         uses: dart-lang/setup-dart@v1
-      - name: otzaria_l10n
-        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
-        working-directory: otzaria_l10n
-        run: dart pub get && dart analyze && dart test
-      - name: otzaria_downloads
-        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
-        working-directory: otzaria_downloads
-        run: dart pub get && dart analyze && dart test
       - name: otzaria_manager
         if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
         working-directory: otzaria_manager
-        run: dart pub get && dart analyze && dart test
-      - name: plugins_manager
-        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
-        working-directory: plugins_manager
-        run: dart pub get && dart analyze && dart test
-      - name: custom_apps_manager
-        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
-        working-directory: custom_apps_manager
-        run: dart pub get && dart analyze && dart test
+        run: dart pub get && dart test
       - name: error_reports_manager
         if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
         working-directory: error_reports_manager
-        run: dart pub get && dart analyze && dart test
-
-  otzaria_manager_macos:
-    name: otzaria_manager (analyze + test) (macos-latest)
-    runs-on: macos-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: otzaria_manager
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - run: dart pub get
-      - run: dart analyze
-      - run: dart test
-
-  library_manager:
-    name: library_manager (analyze + test)
-    runs-on: ubuntu-latest
-    env:
-      REQUIRE_NATIVE_ZSTD: "1"
-    defaults:
-      run:
-        working-directory: library_manager
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-library_manager
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos
-      - run: flutter test
+        run: dart pub get && dart test
+      - name: plugins_manager
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: plugins_manager
+        run: dart pub get && dart test
+      - name: custom_apps_manager
+        if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
+        working-directory: custom_apps_manager
+        run: dart pub get && dart test
 
   launcher_app:
     name: launcher_app (analyze + windows build)
@@ -203,7 +192,7 @@ jobs:
           if-no-files-found: error
 
   launcher_app_macos_test:
-    name: launcher_app (test) (macos-latest)
+    name: launcher_app + flutter packages (test) (macos-latest)
     needs: version
     runs-on: macos-latest
     timeout-minutes: 20
@@ -215,12 +204,21 @@ jobs:
       - name: Set the release version
         if: inputs.release
         run: bash ../tool/set_launcher_version.sh "${{ needs.version.outputs.version }}"
-      - uses: subosito/flutter-action@v2
+      - id: flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
       - run: flutter pub get
       - run: flutter test
+      - name: library_manager
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: library_manager
+        run: flutter pub get && flutter test
+      - name: seforim_library_updater
+        if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
+        working-directory: .
+        run: flutter pub get && flutter test
 
   coverage:
     name: tests + coverage (windows, ${{ matrix.shard }})
