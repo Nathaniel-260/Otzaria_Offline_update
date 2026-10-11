@@ -14,16 +14,16 @@ const Duration _fastPoll = Duration(milliseconds: 20);
 const String _assetName = 'otzaria-0.9.96-windows.exe';
 
 OtzariaRelease _release({int? size, String tag = _tag}) => OtzariaRelease(
-  tagName: tag,
-  name: 'Otzaria $tag',
-  isPrerelease: false,
-  isDraft: false,
-  publishedAt: null,
-  installerKind: OtzariaInstallerKind.windowsSetupExe,
-  installerAssetName: _assetName,
-  installerDownloadUrl: 'https://example/$_assetName',
-  installerSizeBytes: size ?? _installerBytes.length,
-);
+      tagName: tag,
+      name: 'Otzaria $tag',
+      isPrerelease: false,
+      isDraft: false,
+      publishedAt: null,
+      installerKind: OtzariaInstallerKind.windowsSetupExe,
+      installerAssetName: _assetName,
+      installerDownloadUrl: 'https://example/$_assetName',
+      installerSizeBytes: size ?? _installerBytes.length,
+    );
 
 void main() {
   late Directory tempDir;
@@ -41,12 +41,12 @@ void main() {
   });
 
   OtzariaInstaller installerWith(http.Client client) => OtzariaInstaller(
-    cacheDir: cacheDir,
-    httpClient: client,
-    appLocator: const OtzariaAppLocator(
-      platform: OtzariaTargetPlatform.windows,
-    ),
-  );
+        cacheDir: cacheDir,
+        httpClient: client,
+        appLocator: const OtzariaAppLocator(
+          platform: OtzariaTargetPlatform.windows,
+        ),
+      );
 
   http.Client mockDownload(String body, {int status = 200}) =>
       MockClient((_) async {
@@ -56,9 +56,9 @@ void main() {
 
   /// לקוח שכל פנייה אליו היא כישלון הבדיקה — כך "לא ניגשנו לרשת" נאכף.
   http.Client mustNotBeUsed() => MockClient((_) async {
-    requests++;
-    fail('לא הייתה אמורה להיות פנייה לרשת');
-  });
+        requests++;
+        fail('לא הייתה אמורה להיות פנייה לרשת');
+      });
 
   String cachedPath() => p.join(cacheDir, _tag, _assetName);
 
@@ -190,7 +190,8 @@ void main() {
 
       final remaining = Directory(
         cacheDir,
-      ).listSync().map((e) => p.basename(e.path)).toList()..sort();
+      ).listSync().map((e) => p.basename(e.path)).toList()
+        ..sort();
       expect(remaining, ['0.9.96+736', '0.9.97']);
     });
 
@@ -628,10 +629,10 @@ void main() {
     late String exe;
 
     OtzariaInstallState installedAt(String launchPath) => OtzariaInstallState(
-      installedTagName: _tag,
-      installDir: p.dirname(launchPath),
-      launchPath: launchPath,
-    );
+          installedTagName: _tag,
+          installDir: p.dirname(launchPath),
+          launchPath: launchPath,
+        );
 
     setUp(() async {
       installer = OtzariaInstaller(
@@ -1332,9 +1333,8 @@ Future<String> _writeExitScript(
     return path;
   }
   final path = p.join(dir, 'fake-setup.sh');
-  final write = writePath == null
-      ? ''
-      : "printf '%s' '$content' > '$writePath'\n";
+  final write =
+      writePath == null ? '' : "printf '%s' '$content' > '$writePath'\n";
   await File(path).writeAsString('#!/bin/sh\n${write}exit $exitCode\n');
   await Process.run('chmod', ['+x', path]);
   return path;

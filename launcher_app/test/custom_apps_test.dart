@@ -735,31 +735,32 @@ void main() {
       String? exeName = 'demo.exe',
       String? installedVersion,
       bool isInstalled = false,
-    }) => CustomAppView(
-      entry: CustomAppEntry(
-        descriptor: AppDescriptor(
-          id: 'a',
-          name: 'תוכנה',
-          sourceKind: AppSourceKind.manual,
-          detect: AppDetectRules(exeName: exeName),
-        ),
-        installer: storedVersion == null
-            ? null
-            : StoredInstaller(
-                fileName: 'App.exe',
-                version: storedVersion,
-                sizeBytes: 1,
-                addedAt: DateTime(2026),
-              ),
-      ),
-      installed: isInstalled
-          ? CustomAppInstallState(
-              version: installedVersion,
-              installDir: r'C:\App',
-              launchPath: r'C:\App\demo.exe',
-            )
-          : null,
-    );
+    }) =>
+        CustomAppView(
+          entry: CustomAppEntry(
+            descriptor: AppDescriptor(
+              id: 'a',
+              name: 'תוכנה',
+              sourceKind: AppSourceKind.manual,
+              detect: AppDetectRules(exeName: exeName),
+            ),
+            installer: storedVersion == null
+                ? null
+                : StoredInstaller(
+                    fileName: 'App.exe',
+                    version: storedVersion,
+                    sizeBytes: 1,
+                    addedAt: DateTime(2026),
+                  ),
+          ),
+          installed: isInstalled
+              ? CustomAppInstallState(
+                  version: installedVersion,
+                  installDir: r'C:\App',
+                  launchPath: r'C:\App\demo.exe',
+                )
+              : null,
+        );
 
     test('קובץ על הכונן שאינו מותקן כאן — תוכנה חדשה', () {
       expect(
@@ -902,9 +903,9 @@ void main() {
   // מכריזה על עצמה שוב בהרצה הבאה, גם כשהיא עדיין אינה מותקנת.
   group('הודעה פעם אחת בכל מחשב', () {
     CustomAppsController persisting() => CustomAppsController(
-      mirrorRootDir: p.join(tempDir.path, 'mirror'),
-      stateDir: tempDir.path,
-    );
+          mirrorRootDir: p.join(tempDir.path, 'mirror'),
+          stateDir: tempDir.path,
+        );
 
     test('הרישום נשמר לפי שם המחשב', () async {
       final store = AnnouncedAppsStore(tempDir.path, hostName: 'PC-A');
@@ -1046,7 +1047,7 @@ void main() {
     /// קונטרולר שהרשת שלו מזויפת — הדרך היחידה לבדוק הורדה מרוכזת בלי
     /// לצאת לגיטהאב.
     Future<({CustomAppsController controller, _FakeManager fake})>
-    fakeController(
+        fakeController(
       Map<String, String> online, {
       required List<String> ids,
       String storedVersion = '1.4.2',
@@ -1288,14 +1289,14 @@ void main() {
 
   group('זיהוי ההתקנות', () {
     AppDescriptor detectable(String id, {String? exeName}) => AppDescriptor(
-      id: id,
-      name: id,
-      sourceKind: AppSourceKind.manual,
-      detect: AppDetectRules(
-        exeName: exeName ?? '$id.exe',
-        registryDisplayName: '^$id\\b',
-      ),
-    );
+          id: id,
+          name: id,
+          sourceKind: AppSourceKind.manual,
+          detect: AppDetectRules(
+            exeName: exeName ?? '$id.exe',
+            registryDisplayName: '^$id\\b',
+          ),
+        );
 
     test('צילום אחד של התהליכים ושל הרג\'יסטרי לכל טעינה', () async {
       final root = p.join(tempDir.path, 'mirror');
@@ -1597,8 +1598,7 @@ void main() {
               expect(
                 tester.takeException(),
                 isNull,
-                reason:
-                    'הכרטיס גלש ברוחב $width, שפה $language, '
+                reason: 'הכרטיס גלש ברוחב $width, שפה $language, '
                     'הגדלה $scale, ניהול $manage',
               );
             }
@@ -1810,10 +1810,10 @@ void main() {
 
 class _GatedManager extends CustomAppsManager {
   _GatedManager(String mirrorRootDir)
-    : super(
-        resolveMirrorDir: () async => mirrorRootDir,
-        readVersion: _FakeManager._noVersion,
-      );
+      : super(
+          resolveMirrorDir: () async => mirrorRootDir,
+          readVersion: _FakeManager._noVersion,
+        );
 
   Completer<void>? gate;
   int calls = 0;
@@ -1842,9 +1842,9 @@ class _FakeManager extends CustomAppsManager {
     required this.online,
     required this.sourceFile,
   }) : super(
-         resolveMirrorDir: () async => mirrorRootDir,
-         readVersion: _noVersion,
-       );
+          resolveMirrorDir: () async => mirrorRootDir,
+          readVersion: _noVersion,
+        );
 
   /// הגרסה שכל תוכנה "תמצא" ברשת, לפי מזהה.
   final Map<String, String> online;
@@ -1901,10 +1901,10 @@ class _FakeManager extends CustomAppsManager {
 
 class _CountingManager extends CustomAppsManager {
   _CountingManager({required String mirrorRootDir})
-    : super(
-        resolveMirrorDir: () async => mirrorRootDir,
-        readVersion: _noVersion,
-      );
+      : super(
+          resolveMirrorDir: () async => mirrorRootDir,
+          readVersion: _noVersion,
+        );
 
   final List<String> detected = [];
 
@@ -1926,10 +1926,10 @@ final Uint8List _onePixelPng = base64Decode(
 
 class _GatedLoadManager extends CustomAppsManager {
   _GatedLoadManager({required String mirrorRootDir})
-    : super(
-        resolveMirrorDir: () async => mirrorRootDir,
-        readVersion: (_) => null,
-      );
+      : super(
+          resolveMirrorDir: () async => mirrorRootDir,
+          readVersion: (_) => null,
+        );
 
   final List<Completer<void>> gates = [];
 

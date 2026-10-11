@@ -42,12 +42,11 @@ class OtzariaAppMirror {
     required OtzariaInstaller installer,
     OtzariaChangelogClient? changelogClient,
     OtzariaTargetPlatform? platform,
-  }) : _releaseClient = releaseClient,
-       _installer = installer,
-       _changelogClient = changelogClient ?? OtzariaChangelogClient(),
-       _platform =
-           platform ??
-           OtzariaTargetPlatform.detectOrNull(Platform.operatingSystem);
+  })  : _releaseClient = releaseClient,
+        _installer = installer,
+        _changelogClient = changelogClient ?? OtzariaChangelogClient(),
+        _platform = platform ??
+            OtzariaTargetPlatform.detectOrNull(Platform.operatingSystem);
 
   /// הפלטפורמה שהמראה נקראת בה — ראו [load]. `null` = פלטפורמה שאין לה
   /// מסלול התקנה (לינוקס, שם רצות הבדיקות ב-CI), ואז אין סינון בכלל.
@@ -105,9 +104,8 @@ class OtzariaAppMirror {
 
   Map<String, dynamic> _ownChannels(Map<String, dynamic> decoded) {
     final platforms = decoded[_platformsKey];
-    final own = platforms is Map<String, dynamic>
-        ? platforms[_platform?.name]
-        : null;
+    final own =
+        platforms is Map<String, dynamic> ? platforms[_platform?.name] : null;
     return own is Map<String, dynamic> ? own : decoded;
   }
 
@@ -161,15 +159,15 @@ class OtzariaAppMirror {
   static MirroredOtzariaReleases _withoutStalePrerelease({
     MirroredOtzariaRelease? stable,
     MirroredOtzariaRelease? prerelease,
-  }) => MirroredOtzariaReleases(
-    stable: stable,
-    prerelease:
-        stable != null &&
-            prerelease != null &&
-            _isStalePrerelease(stable, prerelease)
-        ? null
-        : prerelease,
-  );
+  }) =>
+      MirroredOtzariaReleases(
+        stable: stable,
+        prerelease: stable != null &&
+                prerelease != null &&
+                _isStalePrerelease(stable, prerelease)
+            ? null
+            : prerelease,
+      );
 
   static bool _isStalePrerelease(
     MirroredOtzariaRelease stable,
@@ -254,8 +252,7 @@ class OtzariaAppMirror {
     online ??= await _releaseClient.fetchChannelReleases();
 
     final existing = await load();
-    final here =
-        _platform ??
+    final here = _platform ??
         (online.stable ??
                 online.prerelease ??
                 existing.stable?.release ??
@@ -322,9 +319,8 @@ class OtzariaAppMirror {
     bool Function()? isCancelled,
   ) async {
     final notes = await _changelogClient.notesFor(release.tagName);
-    final withNotes = notes == null
-        ? release
-        : release.copyWithReleaseNotes(notes);
+    final withNotes =
+        notes == null ? release : release.copyWithReleaseNotes(notes);
 
     final installerPath = await _installer.ensureCached(
       release: withNotes,

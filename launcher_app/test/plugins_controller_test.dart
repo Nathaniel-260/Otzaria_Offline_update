@@ -29,16 +29,18 @@ void main() {
     String shortDescription = '',
     String author = '',
     String? manifestId,
-  }) => StorePlugin.fromApi({
-    'id': id,
-    'name': name,
-    'status': status,
-    'version': version,
-    'tags': tags,
-    'isPinned': featured,
-    'shortDescription': shortDescription,
-    'author': author,
-  }, 'https://otzaria.org').copyWith(manifestId: manifestId);
+  }) =>
+      StorePlugin.fromApi({
+        'id': id,
+        'name': name,
+        'status': status,
+        'version': version,
+        'tags': tags,
+        'isPinned': featured,
+        'shortDescription': shortDescription,
+        'author': author,
+      }, 'https://otzaria.org')
+          .copyWith(manifestId: manifestId);
 
   Future<void> saveCatalog(PluginCatalog catalog) =>
       PluginMirrorStore(p.join(tempDir.path, 'mirror')).save(catalog);
@@ -65,9 +67,9 @@ void main() {
 
   group('תוספים חדשים — פעם אחת בכל מחשב', () {
     PluginsModuleController withState() => PluginsModuleController(
-      mirrorRootDir: p.join(tempDir.path, 'mirror'),
-      stateDir: p.join(tempDir.path, 'state'),
-    );
+          mirrorRootDir: p.join(tempDir.path, 'mirror'),
+          stateDir: p.join(tempDir.path, 'state'),
+        );
 
     test('הטעינה הראשונה קובעת נקודת התחלה: שום דבר אינו חדש', () async {
       await saveCatalog(
@@ -660,16 +662,16 @@ void main() {
       File(p.join(dir, InstalledPluginsScanner.portableMarkerFileName))
           .writeAsStringSync('');
       File(
-          p.join(
-            dir,
-            InstalledPluginsScanner.portableDataFolderName,
-            'plugins',
-            'installed',
-            pluginId,
-            'current',
-            'manifest.json',
-          ),
-        )
+        p.join(
+          dir,
+          InstalledPluginsScanner.portableDataFolderName,
+          'plugins',
+          'installed',
+          pluginId,
+          'current',
+          'manifest.json',
+        ),
+      )
         ..createSync(recursive: true)
         ..writeAsStringSync('{"id":"$pluginId","version":"1.4.0"}');
       launchPath = null;
@@ -942,12 +944,12 @@ void main() {
     tearDown(() => server.close(force: true));
 
     StorePlugin remote() => StorePlugin.fromApi({
-      'id': 'remote',
-      'name': 'תוסף מרוחק',
-      'version': '1.0.0',
-      'supportsDirectInstall': true,
-      'downloadUrl': 'http://127.0.0.1:${server.port}/download',
-    }, 'https://otzaria.org');
+          'id': 'remote',
+          'name': 'תוסף מרוחק',
+          'version': '1.0.0',
+          'supportsDirectInstall': true,
+          'downloadUrl': 'http://127.0.0.1:${server.port}/download',
+        }, 'https://otzaria.org');
 
     test('הרשומה בזיכרון מתעדכנת גם כשהמסירה נכשלה', () async {
       fileName = 'plugin.zip';
@@ -1154,7 +1156,8 @@ void main() {
               'downloadUrl': '/api/plugins/db-1@1.5.0/download',
             },
           ],
-        }, 'https://otzaria.org').copyWith(
+        }, 'https://otzaria.org')
+            .copyWith(
           manifestId: 'com.example.one',
           localFiles: {
             for (final entry in files.entries)
@@ -1345,9 +1348,9 @@ void main() {
 
     group('זכירת תיקיית החנות', () {
       PluginsModuleController withState() => PluginsModuleController(
-        mirrorRootDir: p.join(tempDir.path, 'mirror'),
-        stateDir: p.join(tempDir.path, 'state'),
-      );
+            mirrorRootDir: p.join(tempDir.path, 'mirror'),
+            stateDir: p.join(tempDir.path, 'state'),
+          );
 
       Future<String> exportOnce(PluginsModuleController c) async {
         await seedStoreApp();
@@ -1418,8 +1421,8 @@ void main() {
 List<int> _le16(int value) => [value & 0xff, (value >> 8) & 0xff];
 
 List<int> _le32(int value) => [
-  value & 0xff,
-  (value >> 8) & 0xff,
-  (value >> 16) & 0xff,
-  (value >> 24) & 0xff,
-];
+      value & 0xff,
+      (value >> 8) & 0xff,
+      (value >> 16) & 0xff,
+      (value >> 24) & 0xff,
+    ];

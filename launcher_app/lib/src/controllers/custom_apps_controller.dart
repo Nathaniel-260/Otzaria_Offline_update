@@ -113,8 +113,7 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
     _announced = stateDir == null ? null : AnnouncedAppsStore(stateDir);
     _newDetectionSnapshot =
         detectionSnapshot ?? CustomAppDetectionSnapshot.live;
-    _manager =
-        manager ??
+    _manager = manager ??
         CustomAppsManager(
           resolveMirrorDir: () async => mirrorRootDir,
           readVersion: _readInstalledVersion,
@@ -174,17 +173,17 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
 
   /// התוכנות שיש להן מה להציע למחשב הזה — ראו [CustomAppView.pending].
   List<CustomAppView> get pendingApps => [
-    for (final app in apps)
-      if (app.pending != CustomAppPending.none) app,
-  ];
+        for (final app in apps)
+          if (app.pending != CustomAppPending.none) app,
+      ];
 
   /// מתוכן — אלה שההודעה עליהן **עוד לא נאמרה במחשב הזה**, והן היחידות
   /// שפותחות אותה. תוכנה שכבר הוכרזה כאן שותקת מכאן ואילך: הכרטיס שבמסך
   /// ממילא אומר את אותו הדבר בכל כניסה, וחלון קופץ שחוזר הוא נדנוד.
   List<CustomAppView> get unannouncedApps => [
-    for (final app in pendingApps)
-      if (!_announcedIds.contains(app.descriptor.id)) app,
-  ];
+        for (final app in pendingApps)
+          if (!_announcedIds.contains(app.descriptor.id)) app,
+      ];
 
   /// רושם שההודעה על [shown] נאמרה במחשב הזה, כדי שלא תיאמר בו שוב.
   Future<void> markAnnounced(Iterable<CustomAppView> shown) async {
@@ -253,10 +252,11 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
     String dir,
     List<String> nameHints, {
     OtzariaTargetPlatform? platform,
-  }) => OtzariaAppLocator(platform: platform).findIn(
-    dir,
-    nameMatches: (candidate) => _nameMatchesHint(candidate, nameHints),
-  );
+  }) =>
+      OtzariaAppLocator(platform: platform).findIn(
+        dir,
+        nameMatches: (candidate) => _nameMatchesHint(candidate, nameHints),
+      );
 
   static bool _nameMatchesHint(String candidatePath, List<String> hints) {
     final name = InstallLearner.normalize(
@@ -349,7 +349,7 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
   final Set<String> onlineUnavailable = {};
 
   final Map<String, ({GithubSource source, GithubRelease release})>
-  _onlineReleases = {};
+      _onlineReleases = {};
 
   /// המזהה של התוכנה שמורידה כרגע, או `null`. הורדה אחת בכל רגע: כולן
   /// חולקות את אותו רוחב פס, ובמקביל הן רק היו מאטות זו את זו.
@@ -462,11 +462,11 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
   }
 
   bool _isCurrentSource(String id, GithubSource source) => apps.any(
-    (app) =>
-        app.descriptor.id == id &&
-        app.descriptor.sourceKind == AppSourceKind.github &&
-        app.descriptor.github == source,
-  );
+        (app) =>
+            app.descriptor.id == id &&
+            app.descriptor.sourceKind == AppSourceKind.github &&
+            app.descriptor.github == source,
+      );
 
   /// כמה תוכנות כבר נבדקו בסבב "בדיקה לכולן", ומתוך כמה. `null` כשאין סבב.
   int? checkAllDone;
@@ -478,9 +478,9 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
   bool get hasOnlineSources => _onlineApps.isNotEmpty;
 
   List<CustomAppView> get _onlineApps => [
-    for (final app in apps)
-      if (app.descriptor.sourceKind == AppSourceKind.github) app,
-  ];
+        for (final app in apps)
+          if (app.descriptor.sourceKind == AppSourceKind.github) app,
+      ];
 
   bool _hasNewerOnline(CustomAppView app) {
     final id = app.descriptor.id;
@@ -494,9 +494,9 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
   /// התוכנות שיש להן ברשת גרסה חדשה מזו שעל הכונן — אלה ואלה בלבד שההורדה
   /// המרוכזת נוגעת בהן.
   List<CustomAppView> get outdatedApps => [
-    for (final app in apps)
-      if (_hasNewerOnline(app)) app,
-  ];
+        for (final app in apps)
+          if (_hasNewerOnline(app)) app,
+      ];
 
   /// בודק ברשת את **כל** התוכנות שיש להן מקור מקוון, במקום ללחוץ על כל
   /// כרטיס בנפרד.
@@ -556,7 +556,7 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
   /// הורדה אחת בכל רגע, מאותה סיבה שב-[download]: כולן חולקות את אותו
   /// רוחב פס, ובמקביל הן רק היו מאטות זו את זו.
   Future<({int checked, int downloaded, int failed, int notChecked})>
-  downloadAllOutdated() async {
+      downloadAllOutdated() async {
     const nothing = (checked: 0, downloaded: 0, failed: 0, notChecked: 0);
     if (isCheckingAll || isDownloadingAll || downloadingId != null) {
       return nothing;
@@ -674,16 +674,16 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
   Set<String> _folderIds = const {};
 
   Set<String> get takenIds => {
-    ..._folderIds,
-    for (final app in apps) app.descriptor.id,
-  };
+        ..._folderIds,
+        for (final app in apps) app.descriptor.id,
+      };
 
   // ── מדיה: אייקון וצילומי מסך ──────────────────────────────────────────
 
   /// נבנה בכל קריאה מחדש ולא נשמר: הוא עולה כלום, והשורש קבוע כל ההרצה.
   CustomAppMedia _mediaOf(String id) => CustomAppMedia(
-    appDir: CustomAppStore(mirrorRootDir: _mirrorRootDir).dirFor(id),
-  );
+        appDir: CustomAppStore(mirrorRootDir: _mirrorRootDir).dirFor(id),
+      );
 
   /// חילוץ האייקון מקובץ הרצה. תפר לבדיקות — האמיתי מריץ PowerShell.
   late final ExeIconExtraction _extractIcon;
@@ -845,9 +845,9 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
   Set<String> get _knownSlugs => {for (final c in categories) c.slug};
 
   List<CustomAppView> appsIn(String slug) => [
-    for (final app in apps)
-      if (app.descriptor.categorySlugs.contains(slug)) app,
-  ];
+        for (final app in apps)
+          if (app.descriptor.categorySlugs.contains(slug)) app,
+      ];
 
   /// מה שאינו שייך לשום קטגוריה **קיימת**. שיוך לקטגוריה שנמחקה מכונן
   /// אחר נחשב כאן כאילו אינו — אחרת התוכנה הייתה נעלמת מכל הרשימות.
@@ -861,11 +861,11 @@ class CustomAppsController extends ChangeNotifier with ProgressNotifier {
 
   /// מה שמוצג כרגע, לפי [page].
   List<CustomAppView> get visibleApps => switch (page) {
-    CustomAppsPage.all => apps,
-    CustomAppsPage.uncategorized => uncategorizedApps,
-    CustomAppsPage.category =>
-      openCategorySlug == null ? apps : appsIn(openCategorySlug!),
-  };
+        CustomAppsPage.all => apps,
+        CustomAppsPage.uncategorized => uncategorizedApps,
+        CustomAppsPage.category =>
+          openCategorySlug == null ? apps : appsIn(openCategorySlug!),
+      };
 
   /// שם הקטגוריה לפי slug, או ה-slug עצמו כשאינה מוכרת — כך תגית של
   /// קטגוריה שהגיעה מכונן אחר עדיין אומרת משהו.

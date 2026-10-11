@@ -37,8 +37,8 @@ class LauncherUpdateMirror {
     String? operatingSystem,
     this.connectTimeout = const Duration(seconds: 20),
     this.stallTimeout = const Duration(seconds: 30),
-  }) : _httpClient = httpClient ?? http.Client(),
-       _operatingSystem = operatingSystem ?? Platform.operatingSystem;
+  })  : _httpClient = httpClient ?? http.Client(),
+        _operatingSystem = operatingSystem ?? Platform.operatingSystem;
 
   /// הפלטפורמה שהמראה נקראת בה — ראו [load]. מוזרקת בבדיקות.
   final String _operatingSystem;
@@ -100,8 +100,7 @@ class LauncherUpdateMirror {
     final file = File(filePath);
     final expected = release.sha256;
 
-    final alreadyThere =
-        await file.exists() &&
+    final alreadyThere = await file.exists() &&
         await file.length() == release.sizeBytes &&
         (expected == null || await _sha256Of(filePath) == expected);
     if (!alreadyThere) {
@@ -159,9 +158,8 @@ class LauncherUpdateMirror {
 
   Map<String, dynamic> _ownEntry(Map<String, dynamic> decoded) {
     final platforms = decoded[_platformsKey];
-    final own = platforms is Map<String, dynamic>
-        ? platforms[_operatingSystem]
-        : null;
+    final own =
+        platforms is Map<String, dynamic> ? platforms[_operatingSystem] : null;
     return own is Map<String, dynamic> ? own : decoded;
   }
 

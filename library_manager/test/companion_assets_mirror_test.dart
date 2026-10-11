@@ -183,8 +183,9 @@ void main() {
     final reloaded = await CompanionMirrorManifest.load(destDir);
     expect(reloaded!.entries.length, 3);
     expect(
-      File(p.join(destDir, '${CompanionMirrorManifest.fileName}.tmp'))
-          .existsSync(),
+      File(
+        p.join(destDir, '${CompanionMirrorManifest.fileName}.tmp'),
+      ).existsSync(),
       isFalse,
     );
   });
@@ -230,8 +231,9 @@ void main() {
     final first = buildMirror();
     addTearDown(first.mirror.dispose);
     final before = await first.mirror.sync(destDir: destDir);
-    File(p.join(destDir, before.entries[CompanionAsset.talmud]!.fileName))
-        .deleteSync();
+    File(
+      p.join(destDir, before.entries[CompanionAsset.talmud]!.fileName),
+    ).deleteSync();
 
     final second = buildMirror(omit: {'talmud'});
     addTearDown(second.mirror.dispose);
@@ -471,8 +473,9 @@ void main() {
       final built = buildMirror();
       addTearDown(built.mirror.dispose);
       final manifest = await built.mirror.sync(destDir: destDir);
-      File(p.join(destDir, manifest.entries[CompanionAsset.talmud]!.fileName))
-          .deleteSync();
+      File(
+        p.join(destDir, manifest.entries[CompanionAsset.talmud]!.fileName),
+      ).deleteSync();
 
       expect(await built.mirror.peekPending(destDir: destDir), {
         CompanionAsset.talmud,
@@ -495,8 +498,9 @@ void main() {
         final first = buildMirror();
         addTearDown(first.mirror.dispose);
         final manifest = await first.mirror.sync(destDir: destDir);
-        File(p.join(destDir, manifest.entries[CompanionAsset.talmud]!.fileName))
-            .deleteSync();
+        File(
+          p.join(destDir, manifest.entries[CompanionAsset.talmud]!.fileName),
+        ).deleteSync();
 
         final built = buildMirror(apiDownFor: {'SeforimMagicIndexer'});
         addTearDown(built.mirror.dispose);

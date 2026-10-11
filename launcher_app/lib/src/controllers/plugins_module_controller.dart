@@ -49,16 +49,15 @@ class PluginsModuleController extends ChangeNotifier with ProgressNotifier {
     this.ensureAppVersionsKnown,
     this.installWatchInterval = const Duration(seconds: 1),
     this.installWatchTimeout = const Duration(minutes: 5),
-  }) : _manager = PluginsManager(
-         resolveMirrorDir: () async => mirrorRootDir,
-         otzariaLaunchPath: otzariaLaunchPath,
-         locatePluginsDb: locatePluginsDb,
-       ),
-       mirrorDirs = PluginsManager.mirrorDirsIn(mirrorRootDir),
-       _known = stateDir == null ? null : KnownPluginsStore(stateDir),
-       _destination = stateDir == null
-           ? null
-           : StoreAppDestinationStore(stateDir);
+  })  : _manager = PluginsManager(
+          resolveMirrorDir: () async => mirrorRootDir,
+          otzariaLaunchPath: otzariaLaunchPath,
+          locatePluginsDb: locatePluginsDb,
+        ),
+        mirrorDirs = PluginsManager.mirrorDirsIn(mirrorRootDir),
+        _known = stateDir == null ? null : KnownPluginsStore(stateDir),
+        _destination =
+            stateDir == null ? null : StoreAppDestinationStore(stateDir);
 
   static Future<String?> locateOtzariaPluginsDb(String dataRoot) async {
     final settings = await const OtzariaSettingsReader().read(dataRoot);
@@ -219,10 +218,10 @@ class PluginsModuleController extends ChangeNotifier with ProgressNotifier {
   bool get hasOnlineUpdate => hasCatalogOnlineUpdate || hasStoreAppOnlineUpdate;
 
   PluginsCatalogOnlineAnswers get catalogOnlineAnswers => (
-    status: onlineStatus,
-    checkError: onlineCheckError,
-    checkedAt: onlineCheckedAt,
-  );
+        status: onlineStatus,
+        checkError: onlineCheckError,
+        checkedAt: onlineCheckedAt,
+      );
 
   void restoreCatalogOnlineAnswers(PluginsCatalogOnlineAnswers answers) {
     onlineStatus = answers.status;
@@ -232,10 +231,10 @@ class PluginsModuleController extends ChangeNotifier with ProgressNotifier {
   }
 
   StoreAppOnlineAnswers get storeAppOnlineAnswers => (
-    release: storeAppOnline,
-    checkError: storeAppCheckError,
-    checkedAt: storeAppCheckedAt,
-  );
+        release: storeAppOnline,
+        checkError: storeAppCheckError,
+        checkedAt: storeAppCheckedAt,
+      );
 
   void restoreStoreAppOnlineAnswers(StoreAppOnlineAnswers answers) {
     storeAppOnline = answers.release;
@@ -749,8 +748,7 @@ class PluginsModuleController extends ChangeNotifier with ProgressNotifier {
       !hideInstalled || statusOf(plugin) != PluginInstallStatus.upToDate;
 
   /// "כל התוספים" — חיפוש, סטטוס ותגית, מעל מתג ההתקנה.
-  List<StorePlugin> get filtered => _filtered ??= plugins
-      .where((plugin) {
+  List<StorePlugin> get filtered => _filtered ??= plugins.where((plugin) {
         if (!plugin.matchesQuery(search)) return false;
         if (statusFilter != PluginStatusFilter.all &&
             plugin.status != statusFilter.name) {
@@ -758,8 +756,7 @@ class PluginsModuleController extends ChangeNotifier with ProgressNotifier {
         }
         if (tagFilter != null && !plugin.tags.contains(tagFilter)) return false;
         return _passesInstalledFilter(plugin);
-      })
-      .toList(growable: false);
+      }).toList(growable: false);
 
   Map<String, StorePlugin> get _pluginsById =>
       _byId ??= {for (final plugin in plugins.reversed) plugin.id: plugin};
@@ -774,15 +771,15 @@ class PluginsModuleController extends ChangeNotifier with ProgressNotifier {
   /// ממוזן כמו שאר התוצרים: הוא מריץ [pluginsIn] לכל קטגוריה, ודף הבית קורא
   /// לו מ-`build` — כלומר גם בכל דיווח התקדמות של סנכרון.
   List<PluginStoreCategory> get homeCategories => _homeCategories ??= [
-    for (final category in categories)
-      if (category.showOnHome && pluginsIn(category).isNotEmpty) category,
-  ];
+        for (final category in categories)
+          if (category.showOnHome && pluginsIn(category).isNotEmpty) category,
+      ];
 
   /// האם **קיים** דף בית אצור. נמדד על המבנה עצמו ולא על מה שנשאר אחרי
   /// הסינון — אחרת כיבוי כל הכרטיסים ע"י המתג היה נראה כמו חנות ריקה.
-  bool get hasCuratedHome => _hasCuratedHome ??=
-      plugins.any((p) => p.isFeatured) ||
-      categories.any((c) => c.showOnHome && c.pluginIds.isNotEmpty);
+  bool get hasCuratedHome =>
+      _hasCuratedHome ??= plugins.any((p) => p.isFeatured) ||
+          categories.any((c) => c.showOnHome && c.pluginIds.isNotEmpty);
 
   PluginStoreCategory? get openCategory {
     final slug = openCategorySlug;
@@ -824,12 +821,12 @@ class PluginsModuleController extends ChangeNotifier with ProgressNotifier {
       : home.subtitle;
 
   List<String> get allTags => _allTags ??= () {
-    final tags = <String>{};
-    for (final plugin in plugins) {
-      tags.addAll(plugin.tags);
-    }
-    return tags.toList()..sort();
-  }();
+        final tags = <String>{};
+        for (final plugin in plugins) {
+          tags.addAll(plugin.tags);
+        }
+        return tags.toList()..sort();
+      }();
 
   // ── תוספים חדשים ──────────────────────────────────────────────────────────
 

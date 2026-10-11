@@ -105,8 +105,8 @@ PatchEdge buildSchema2PatchEdge(
           compression: 'zstd',
           sha256: sha256Override ?? sha256.convert(compressed).toString(),
           size: compressed.length,
-          uncompressedSha256: uncompressedSha256Override ??
-              sha256.convert(rawBytes).toString(),
+          uncompressedSha256:
+              uncompressedSha256Override ?? sha256.convert(rawBytes).toString(),
           uncompressedSize: uncompressedSizeOverride ?? rawBytes.length,
         ),
       ],

@@ -33,8 +33,9 @@ class _FakeGithub {
       requests.where((u) => u.path.endsWith('/version.txt')).length;
 
   Uint8List _body(String name) {
-    final match = RegExp(r'^patch-v(\d+)-v(\d+)\.db\.zst\.manifest\.json$')
-        .firstMatch(name);
+    final match = RegExp(
+      r'^patch-v(\d+)-v(\d+)\.db\.zst\.manifest\.json$',
+    ).firstMatch(name);
     if (match != null) {
       final from = int.parse(match.group(1)!);
       final to = int.parse(match.group(2)!);

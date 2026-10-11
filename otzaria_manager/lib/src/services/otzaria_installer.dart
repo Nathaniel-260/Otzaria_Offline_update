@@ -85,9 +85,9 @@ class OtzariaInstaller {
     this.connectTimeout = const Duration(seconds: 20),
     this.stallTimeout = const Duration(seconds: 30),
     this.pollInterval = const Duration(seconds: 2),
-  }) : _httpClient = httpClient ?? http.Client(),
-       _appLocator = appLocator ?? const OtzariaAppLocator(),
-       _versionReader = versionReader ?? const WindowsExeVersionReader();
+  })  : _httpClient = httpClient ?? http.Client(),
+        _appLocator = appLocator ?? const OtzariaAppLocator(),
+        _versionReader = versionReader ?? const WindowsExeVersionReader();
 
   /// זמן קצוב לפתיחת החיבור, ולשקט בין צ'אנקים. בלעדיהם הורדת ה-installer
   /// (~70MB) הייתה יכולה להישאר תלויה לנצח על חיבור שנפל באמצע, והמשתמש היה
@@ -130,14 +130,15 @@ class OtzariaInstaller {
     required OtzariaRelease release,
     void Function(int received, int total)? onDownloadProgress,
     bool Function()? isCancelled,
-  }) => ensureAssetCached(
-    tagName: release.tagName,
-    assetName: release.installerAssetName,
-    downloadUrl: release.installerDownloadUrl,
-    sizeBytes: release.installerSizeBytes,
-    onDownloadProgress: onDownloadProgress,
-    isCancelled: isCancelled,
-  );
+  }) =>
+      ensureAssetCached(
+        tagName: release.tagName,
+        assetName: release.installerAssetName,
+        downloadUrl: release.installerDownloadUrl,
+        sizeBytes: release.installerSizeBytes,
+        onDownloadProgress: onDownloadProgress,
+        isCancelled: isCancelled,
+      );
 
   /// היכן יושב אסט של [tagName] ב-cache — בלי להוריד ובלי לבדוק קיום.
   String assetPathFor(String tagName, String assetName) =>
@@ -237,8 +238,7 @@ class OtzariaInstaller {
     required String installerPath,
     required Future<OtzariaInstallState?> Function(
       bool Function(OtzariaInstallState candidate) accept,
-    )
-    locateInstalled,
+    ) locateInstalled,
     String? installDir,
     Duration detectTimeout = wizardDetectTimeout,
   }) async {
@@ -269,15 +269,13 @@ class OtzariaInstaller {
         _deleteQuietly(logPath);
     }
 
-    final staleVersion =
-        previousVersion != null &&
+    final staleVersion = previousVersion != null &&
             _isOlderBase(previousVersion, release.tagName)
         ? previousVersion
         : null;
 
-    final unconfirmedExe = outcome == OtzariaWizardOutcome.relaunched
-        ? previousExe
-        : null;
+    final unconfirmedExe =
+        outcome == OtzariaWizardOutcome.relaunched ? previousExe : null;
 
     bool isStale(String launchPath) {
       if (staleVersion != null) {
@@ -461,18 +459,19 @@ class OtzariaInstaller {
     required String? installDir,
     required String logPath,
     OtzariaWindowsInstallScope scope = OtzariaWindowsInstallScope.currentUser,
-  }) => [
-    '/VERYSILENT',
-    '/SUPPRESSMSGBOXES',
-    '/NORESTART',
-    '/NOLAUNCH=1',
-    if (installDir != null) '/DIR=$installDir',
-    if (scope == OtzariaWindowsInstallScope.portable) '/PORTABLE',
-    if (scope == OtzariaWindowsInstallScope.allUsers) '/ALLUSERS',
-    if (scope != OtzariaWindowsInstallScope.portable)
-      '/MERGETASKS=$_desktopIconTask',
-    '/LOG=$logPath',
-  ];
+  }) =>
+      [
+        '/VERYSILENT',
+        '/SUPPRESSMSGBOXES',
+        '/NORESTART',
+        '/NOLAUNCH=1',
+        if (installDir != null) '/DIR=$installDir',
+        if (scope == OtzariaWindowsInstallScope.portable) '/PORTABLE',
+        if (scope == OtzariaWindowsInstallScope.allUsers) '/ALLUSERS',
+        if (scope != OtzariaWindowsInstallScope.portable)
+          '/MERGETASKS=$_desktopIconTask',
+        '/LOG=$logPath',
+      ];
 
   static const String portableMarkerFileName = 'portable.marker';
   static const String systemInstallMarkerFileName = 'system_install.marker';

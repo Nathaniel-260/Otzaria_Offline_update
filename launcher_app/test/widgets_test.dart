@@ -26,33 +26,34 @@ Widget wrap(
   Widget child, {
   AppLanguage language = AppLanguage.hebrew,
   double textScale = 1.0,
-}) => MaterialApp(
-  navigatorKey: navigatorKey,
-  localizationsDelegates: const [
-    GlobalCupertinoLocalizations.delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ],
-  supportedLocales: const [Locale('he', 'IL'), Locale('en')],
-  locale: language == AppLanguage.hebrew
-      ? const Locale('he', 'IL')
-      : const Locale('en'),
-  theme: AppThemeData.light(
-    AppThemeData.createColorScheme(
-      AppSeedColors.defaultLight,
-      Brightness.light,
-    ),
-  ),
-  builder: (context, navigator) => AppStringsScope(
-    strings: AppL10n.stringsFor(language),
-    child: MediaQuery.withClampedTextScaling(
-      minScaleFactor: textScale,
-      maxScaleFactor: textScale,
-      child: navigator ?? const SizedBox.shrink(),
-    ),
-  ),
-  home: Scaffold(body: child),
-);
+}) =>
+    MaterialApp(
+      navigatorKey: navigatorKey,
+      localizationsDelegates: const [
+        GlobalCupertinoLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('he', 'IL'), Locale('en')],
+      locale: language == AppLanguage.hebrew
+          ? const Locale('he', 'IL')
+          : const Locale('en'),
+      theme: AppThemeData.light(
+        AppThemeData.createColorScheme(
+          AppSeedColors.defaultLight,
+          Brightness.light,
+        ),
+      ),
+      builder: (context, navigator) => AppStringsScope(
+        strings: AppL10n.stringsFor(language),
+        child: MediaQuery.withClampedTextScaling(
+          minScaleFactor: textScale,
+          maxScaleFactor: textScale,
+          child: navigator ?? const SizedBox.shrink(),
+        ),
+      ),
+      home: Scaffold(body: child),
+    );
 
 /// הגדלות הטקסט שנבדקות — 2.0 הוא המקסימום שמערכות ההפעלה מציעות.
 const List<double> textScales = [1.0, 1.3, 2.0];
@@ -525,8 +526,7 @@ void main() {
         ),
       );
 
-      final gap =
-          tester.getTopLeft(find.byKey(const Key('b'))).dy -
+      final gap = tester.getTopLeft(find.byKey(const Key('b'))).dy -
           tester.getBottomLeft(find.byKey(const Key('a'))).dy;
       expect(gap, AppCard.sectionSpacing);
     });
@@ -684,16 +684,17 @@ void main() {
       tester,
     ) async {
       Widget tile() => SettingsCard(
-        children: [
-          SettingsActionTile.text(
-            icon: FluentIcons.arrow_download_24_regular,
-            title: he.settings.personalModeTitle,
-            actions: [
-              ActionButton.neutral(text: he.common.install, onPressed: () {}),
+            children: [
+              SettingsActionTile.text(
+                icon: FluentIcons.arrow_download_24_regular,
+                title: he.settings.personalModeTitle,
+                actions: [
+                  ActionButton.neutral(
+                      text: he.common.install, onPressed: () {}),
+                ],
+              ),
             ],
-          ),
-        ],
-      );
+          );
 
       await tester.pumpWidget(wrap(SizedBox(width: 700, child: tile())));
       expect(find.byType(ListTile), findsOneWidget);
@@ -707,19 +708,20 @@ void main() {
 
     testWidgets('בדיקת הגלישה מתחשבת בהגדלת הטקסט', (tester) async {
       Widget tile() => Material(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            width: 498,
-            child: SettingsActionTile.text(
-              title: 'abcdefghij',
-              actions: [
-                ActionButton.neutral(text: he.common.install, onPressed: () {}),
-              ],
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: 498,
+                child: SettingsActionTile.text(
+                  title: 'abcdefghij',
+                  actions: [
+                    ActionButton.neutral(
+                        text: he.common.install, onPressed: () {}),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-      );
+          );
 
       await tester.pumpWidget(wrap(tile()));
       expect(find.byType(ListTile), findsOneWidget);
@@ -853,13 +855,13 @@ void main() {
     ) async {
       var taps = 0;
       Widget item(bool selected) => NavRailItem(
-        icon: FluentIcons.home_24_regular,
-        iconFilled: FluentIcons.home_24_filled,
-        label: he.shell.navHome,
-        isSelected: selected,
-        tooltip: he.shell.navHome,
-        onTap: () => taps++,
-      );
+            icon: FluentIcons.home_24_regular,
+            iconFilled: FluentIcons.home_24_filled,
+            label: he.shell.navHome,
+            isSelected: selected,
+            tooltip: he.shell.navHome,
+            onTap: () => taps++,
+          );
 
       await tester.pumpWidget(wrap(item(false)));
       expect(find.text(he.shell.navHome), findsOneWidget);
@@ -1482,22 +1484,22 @@ void main() {
 
     testWidgets('שורת סימון מרובה עם ארבע תוויות', (tester) async {
       Widget card() => SettingsCard(
-        children: [
-          SettingsActionTile.multiSegmentedTile<int>(
-            icon: FluentIcons.cloud_arrow_down_24_regular,
-            title: he.settings.syncTargetsTitle,
-            hint: he.settings.syncTargetsHint,
-            selected: const {1, 2},
-            onToggled: (_) {},
-            options: [
-              SegmentOption(value: 0, label: he.settings.syncTargetAll),
-              SegmentOption(value: 1, label: he.settings.syncTargetApp),
-              SegmentOption(value: 2, label: he.settings.syncTargetLibrary),
-              SegmentOption(value: 3, label: he.settings.syncTargetPlugins),
+            children: [
+              SettingsActionTile.multiSegmentedTile<int>(
+                icon: FluentIcons.cloud_arrow_down_24_regular,
+                title: he.settings.syncTargetsTitle,
+                hint: he.settings.syncTargetsHint,
+                selected: const {1, 2},
+                onToggled: (_) {},
+                options: [
+                  SegmentOption(value: 0, label: he.settings.syncTargetAll),
+                  SegmentOption(value: 1, label: he.settings.syncTargetApp),
+                  SegmentOption(value: 2, label: he.settings.syncTargetLibrary),
+                  SegmentOption(value: 3, label: he.settings.syncTargetPlugins),
+                ],
+              ),
             ],
-          ),
-        ],
-      );
+          );
 
       // 380 הוא הפריסה האנכית, ו-700 הוא זו שבה הפקד יושב לצד הכותרת —
       // דווקא שם ארבע תוויות ותווית ארוכה יכולות להידחס.
@@ -1565,15 +1567,15 @@ void main() {
 
     /// שורת המצב עם [StatusChip] — הרוחב 380 הוא כרטיס בחלון צר סביר.
     Widget statusRow(AppStrings s) => SettingsCard(
-      children: [
-        InfoStatusRow(
-          icon: FluentIcons.database_24_regular,
-          title: s.libraryScreen.stateRowTitle,
-          kind: StatusKind.updateAvailable,
-          label: s.common.updateAvailable,
-        ),
-      ],
-    );
+          children: [
+            InfoStatusRow(
+              icon: FluentIcons.database_24_regular,
+              title: s.libraryScreen.stateRowTitle,
+              kind: StatusKind.updateAvailable,
+              label: s.common.updateAvailable,
+            ),
+          ],
+        );
 
     testWidgets('שורת מצב בהגדלות שהאפליקציה עצמה מציעה', (tester) async {
       // ההגדרות מגבילות ל-0.9/1.0/1.15 בלבד (`MediaQuery.withClampedTextScaling`
@@ -1771,19 +1773,19 @@ class _LanguageSwitcherState extends State<_LanguageSwitcher> {
 
   @override
   Widget build(BuildContext context) => AppStringsScope(
-    strings: AppL10n.stringsFor(_language),
-    child: Scaffold(
-      body: Column(
-        children: [
-          GestureDetector(
-            key: const Key('toggle'),
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _language = widget.toggleTo),
-            child: const SizedBox(width: 100, height: 40),
+        strings: AppL10n.stringsFor(_language),
+        child: Scaffold(
+          body: Column(
+            children: [
+              GestureDetector(
+                key: const Key('toggle'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _language = widget.toggleTo),
+                child: const SizedBox(width: 100, height: 40),
+              ),
+              const _ConstLabel(),
+            ],
           ),
-          const _ConstLabel(),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }

@@ -162,7 +162,6 @@ class LauncherSelfInstaller {
     return true;
   }
 
-
   Future<void> _replaceMacBundle({
     required LauncherInstallLayout layout,
     required String zipPath,

@@ -279,9 +279,9 @@ class LibraryManager {
   /// `true` אם כבר בוצעה הורדה מוצלחת אחת לפחות. בודק ספציפית את
   /// `releases.json`, שנכתב רק בסוף הורדה מוצלחת — התיקייה עצמה נוצרת מיד
   /// בתחילתה, ולכן קיומה לבדו לא מבטיח תוכן שלם.
-  Future<bool> get hasMirror =>
-      File(p.join(mirrorDir, LocalMirrorLibraryReleaseClient.manifestFileName))
-          .exists();
+  Future<bool> get hasMirror => File(
+    p.join(mirrorDir, LocalMirrorLibraryReleaseClient.manifestFileName),
+  ).exists();
 
   /// מוריד את עדכוני הספרייה מ-GitHub אל [mirrorDir] — **הפעולה הכבדה**
   /// שנוגעת ברשת (המסד המלא ~1GB + קובצי העדכון). מביא את ה-release

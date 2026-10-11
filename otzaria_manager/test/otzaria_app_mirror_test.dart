@@ -13,17 +13,18 @@ OtzariaRelease _release({
   bool isPrerelease = true,
   DateTime? publishedAt,
   bool unknownDate = false,
-}) => OtzariaRelease(
-  tagName: tagName,
-  name: 'Otzaria $tagName',
-  isPrerelease: isPrerelease,
-  isDraft: false,
-  publishedAt: unknownDate ? null : publishedAt ?? DateTime.utc(2026, 1, 1),
-  installerKind: OtzariaInstallerKind.windowsSetupExe,
-  installerAssetName: 'otzaria-$tagName-windows.exe',
-  installerDownloadUrl: 'https://example/otzaria-$tagName-windows.exe',
-  installerSizeBytes: size,
-);
+}) =>
+    OtzariaRelease(
+      tagName: tagName,
+      name: 'Otzaria $tagName',
+      isPrerelease: isPrerelease,
+      isDraft: false,
+      publishedAt: unknownDate ? null : publishedAt ?? DateTime.utc(2026, 1, 1),
+      installerKind: OtzariaInstallerKind.windowsSetupExe,
+      installerAssetName: 'otzaria-$tagName-windows.exe',
+      installerDownloadUrl: 'https://example/otzaria-$tagName-windows.exe',
+      installerSizeBytes: size,
+    );
 
 /// רשומת ערוץ אחת בקובץ המטא־דאטה, אחרי כתיבת קובץ ההתקנה שלה.
 Future<Map<String, dynamic>> _writeInstaller(
@@ -368,35 +369,36 @@ void main() {
       String body = '',
       String publishedAt = '2026-01-01T00:00:00Z',
       bool withMac = false,
-    }) => {
-      'tag_name': tag,
-      'name': 'Otzaria $tag',
-      'prerelease': prerelease,
-      'draft': false,
-      'published_at': publishedAt,
-      'body': body,
-      'assets': [
+    }) =>
         {
-          'name': 'otzaria-$tag-windows.exe',
-          'browser_download_url': 'https://example/installer-$tag.exe',
-          'size': installerBytes.length,
-        },
-        if (withMac)
-          {
-            'name': 'otzaria-$tag-macos.zip',
-            'browser_download_url': 'https://example/installer-$tag.zip',
-            'size': installerBytes.length,
-          },
-      ],
-    };
+          'tag_name': tag,
+          'name': 'Otzaria $tag',
+          'prerelease': prerelease,
+          'draft': false,
+          'published_at': publishedAt,
+          'body': body,
+          'assets': [
+            {
+              'name': 'otzaria-$tag-windows.exe',
+              'browser_download_url': 'https://example/installer-$tag.exe',
+              'size': installerBytes.length,
+            },
+            if (withMac)
+              {
+                'name': 'otzaria-$tag-macos.zip',
+                'browser_download_url': 'https://example/installer-$tag.zip',
+                'size': installerBytes.length,
+              },
+          ],
+        };
 
     http.Client mockReleases(List<Map<String, dynamic>> releases) => MockClient(
-      (_) async => http.Response(
-        jsonEncode(releases),
-        200,
-        headers: const {'content-type': 'application/json; charset=utf-8'},
-      ),
-    );
+          (_) async => http.Response(
+            jsonEncode(releases),
+            200,
+            headers: const {'content-type': 'application/json; charset=utf-8'},
+          ),
+        );
 
     http.Client mockReleaseWithBody(String body) =>
         mockReleases([releaseJson('0.9.96', prerelease: false, body: body)]);
@@ -606,7 +608,8 @@ void main() {
 
       final kept = Directory(
         p.join(tempDir.path, 'installers'),
-      ).listSync().map((e) => p.basename(e.path)).toList()..sort();
+      ).listSync().map((e) => p.basename(e.path)).toList()
+        ..sort();
       expect(kept, ['0.9.90', '0.9.97']);
       expect(stale.existsSync(), isFalse);
     });
@@ -970,15 +973,16 @@ void main() {
       tearDown(() => tempDir.delete(recursive: true));
 
       Future<OtzariaAppMirror> on(OtzariaTargetPlatform platform) => mirrorFor(
-        releasesHttpClient: mockReleases(releases),
-        changelogHttpClient: MockClient((_) async => http.Response('', 404)),
-        installerHttpClient: MockClient((_) async {
-          downloads++;
-          return http.Response(installerBytes, 200);
-        }),
-        tempDir: tempDir,
-        platform: platform,
-      );
+            releasesHttpClient: mockReleases(releases),
+            changelogHttpClient:
+                MockClient((_) async => http.Response('', 404)),
+            installerHttpClient: MockClient((_) async {
+              downloads++;
+              return http.Response(installerBytes, 200);
+            }),
+            tempDir: tempDir,
+            platform: platform,
+          );
 
       Future<void> expectBothUsable(
         OtzariaAppMirror windows,
@@ -1014,9 +1018,9 @@ void main() {
           final windows = await on(OtzariaTargetPlatform.windows);
           await windows.sync();
           final metadata = File(p.join(tempDir.path, 'latest-release.json'));
-          final legacy =
-              jsonDecode(await metadata.readAsString()) as Map<String, dynamic>
-                ..remove('platforms');
+          final legacy = jsonDecode(await metadata.readAsString())
+              as Map<String, dynamic>
+            ..remove('platforms');
           await metadata.writeAsString(jsonEncode(legacy));
 
           final mac = await on(OtzariaTargetPlatform.macos);

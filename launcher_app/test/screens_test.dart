@@ -70,30 +70,31 @@ void main() {
     Future<void> Function()? onCancelDownload,
     bool readOnly = false,
     bool driveFull = false,
-  }) => HomeScreen(
-    readOnly: readOnly,
-    driveFull: driveFull,
-    otzaria: otzaria,
-    library: library,
-    plugins: plugins,
-    launcherUpdate: launcherUpdate,
-    settings: settings,
-    otzariaIsRunning: otzariaIsRunning,
-    onCloseOtzaria: onCloseOtzaria ?? () async => true,
-    isDownloading: isDownloading,
-    isCancellingDownload: isCancellingDownload,
-    isCheckingOnline: isCheckingOnline,
-    longTaskRunning: longTaskRunning,
-    onProcessStateChanged: onProcessStateChanged ?? () async => false,
-    onCheckOnline: () async {},
-    onDownloadAll: () async {},
-    onCancelDownload: onCancelDownload ?? () async {},
-    onDownloadLauncherUpdate: () async {},
-    onInstallLauncherUpdate: () async {},
-    onRequestReindex: () async {},
-    onGoToOtzaria: () {},
-    onGoToLibrary: () {},
-  );
+  }) =>
+      HomeScreen(
+        readOnly: readOnly,
+        driveFull: driveFull,
+        otzaria: otzaria,
+        library: library,
+        plugins: plugins,
+        launcherUpdate: launcherUpdate,
+        settings: settings,
+        otzariaIsRunning: otzariaIsRunning,
+        onCloseOtzaria: onCloseOtzaria ?? () async => true,
+        isDownloading: isDownloading,
+        isCancellingDownload: isCancellingDownload,
+        isCheckingOnline: isCheckingOnline,
+        longTaskRunning: longTaskRunning,
+        onProcessStateChanged: onProcessStateChanged ?? () async => false,
+        onCheckOnline: () async {},
+        onDownloadAll: () async {},
+        onCancelDownload: onCancelDownload ?? () async {},
+        onDownloadLauncherUpdate: () async {},
+        onInstallLauncherUpdate: () async {},
+        onRequestReindex: () async {},
+        onGoToOtzaria: () {},
+        onGoToLibrary: () {},
+      );
 
   tearDown(() {
     otzaria.dispose();
@@ -1052,9 +1053,9 @@ void main() {
     tester,
   ) async {
     Finder actionsInsideCard() => find.descendant(
-      of: find.byType(AppCard),
-      matching: find.byType(CardActionsRow),
-    );
+          of: find.byType(AppCard),
+          matching: find.byType(CardActionsRow),
+        );
 
     await pumpScreen(
       tester,
@@ -1253,17 +1254,17 @@ void main() {
     var requests = 0;
 
     Future<void> pumpLibrary() => pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async => false,
-        onRequestReindex: () async => requests++,
-        onGoToSettings: () {},
-      ),
-    );
+          tester,
+          LibraryScreen(
+            library: library,
+            otzariaIsRunning: false,
+            onCloseOtzaria: () async => true,
+            isDownloading: false,
+            onProcessStateChanged: () async => false,
+            onRequestReindex: () async => requests++,
+            onGoToSettings: () {},
+          ),
+        );
 
     await pumpLibrary();
     expect(find.text(t.reindexTitle), findsNothing);
@@ -1393,7 +1394,7 @@ void main() {
                 'name': 'שם ארוך במיוחד לתוסף שנועד לתפוס שתי שורות שלמות',
                 'shortDescription':
                     'תקציר ארוך שנמשך על פני כמה שורות כדי לבדוק שהכרטיס '
-                    'אינו גולש גם כשהטקסט מגיע למקסימום השורות המותר בו',
+                        'אינו גולש גם כשהטקסט מגיע למקסימום השורות המותר בו',
                 'version': '10.20.30',
                 'status': 'experimental',
                 'downloadCount': 123456,
@@ -1408,9 +1409,9 @@ void main() {
                 ],
                 'supportsDirectInstall': true,
               }, 'https://otzaria.org')
-              // התוסף האחרון נשאר בלי manifestId: קובץ שטרם הורד מדווח
-              // PluginInstallStatus.unknown, וזה מצב תקין ולא שגיאה.
-              .copyWith(manifestId: i == 4 ? null : 'id-$i'),
+                  // התוסף האחרון נשאר בלי manifestId: קובץ שטרם הורד מדווח
+                  // PluginInstallStatus.unknown, וזה מצב תקין ולא שגיאה.
+                  .copyWith(manifestId: i == 4 ? null : 'id-$i'),
           ],
         ),
       ),
@@ -1477,7 +1478,8 @@ void main() {
               'version': '1.0.0',
               'status': 'stable',
               'isPinned': true,
-            }, 'https://otzaria.org').copyWith(manifestId: 'id-a'),
+            }, 'https://otzaria.org')
+                .copyWith(manifestId: 'id-a'),
             StorePlugin.fromApi(const {
               'id': 'b',
               'name': 'תוסף שאינו מותקן',
@@ -1543,9 +1545,8 @@ void main() {
         .widgetList<PluginStoreCard>(find.byType(PluginStoreCard))
         .toList();
     expect(cards.length, greaterThanOrEqualTo(3));
-    final firstRowTop = tester
-        .getTopLeft(find.byType(PluginStoreCard).first)
-        .dy;
+    final firstRowTop =
+        tester.getTopLeft(find.byType(PluginStoreCard).first).dy;
     final inFirstRow = [
       for (var i = 0; i < cards.length; i++)
         if (tester.getTopLeft(find.byType(PluginStoreCard).at(i)).dy ==
@@ -1563,12 +1564,14 @@ void main() {
       String name, {
       bool featured = false,
       List<String> categories = const [],
-    }) => StorePlugin.fromApi({
-      'id': id,
-      'name': name,
-      'status': 'stable',
-      'isPinned': featured,
-    }, 'https://otzaria.org').copyWith(categorySlugs: categories);
+    }) =>
+        StorePlugin.fromApi({
+          'id': id,
+          'name': name,
+          'status': 'stable',
+          'isPinned': featured,
+        }, 'https://otzaria.org')
+            .copyWith(categorySlugs: categories);
 
     final store = PluginMirrorStore(tempDir.path);
     await tester.runAsync(
@@ -2171,14 +2174,14 @@ void main() {
     final t = stringsOf().libraryScreen;
 
     Widget screen() => LibraryScreen(
-      library: library,
-      otzariaIsRunning: false,
-      onCloseOtzaria: () async => true,
-      isDownloading: false,
-      onProcessStateChanged: () async => false,
-      onRequestReindex: () async {},
-      onGoToSettings: () {},
-    );
+          library: library,
+          otzariaIsRunning: false,
+          onCloseOtzaria: () async => true,
+          isDownloading: false,
+          onProcessStateChanged: () async => false,
+          onRequestReindex: () async {},
+          onGoToSettings: () {},
+        );
 
     await pumpScreen(tester, screen());
     expect(find.text(t.personalVersionTitle), findsNothing);

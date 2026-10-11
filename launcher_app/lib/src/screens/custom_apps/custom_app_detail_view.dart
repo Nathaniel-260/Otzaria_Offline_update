@@ -237,7 +237,7 @@ class CustomAppDetailView extends StatelessWidget {
               stage: t.downloadingLabel,
               progress: (controller.downloadTotal ?? 0) > 0
                   ? (controller.downloadReceived ?? 0) /
-                        controller.downloadTotal!
+                      controller.downloadTotal!
                   : null,
               detail: formatBytesProgress(
                 controller.downloadReceived,
@@ -288,8 +288,8 @@ class CustomAppDetailView extends StatelessWidget {
             isLoading: _isDownloading,
             onPressed:
                 controller.downloadingId != null || controller.isDownloadingAll
-                ? null
-                : onDownload,
+                    ? null
+                    : onDownload,
           ),
           ActionButton.ghost(
             text: t.checkOnlineButton,
@@ -340,7 +340,7 @@ class CustomAppDetailView extends StatelessWidget {
           final columns = constraints.maxWidth < 420 ? 1 : 2;
           final cellWidth =
               (constraints.maxWidth - AppTokens.spaceSM * (columns - 1)) /
-              columns;
+                  columns;
 
           return Wrap(
             spacing: AppTokens.spaceSM,

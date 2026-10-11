@@ -361,8 +361,9 @@ class SemanticSearchAssets {
           },
       ]);
       _cancel(isCancelled);
-      await File(p.join(generation, 'vectors', manifestName))
-          .writeAsBytes(manifestBytes, flush: true);
+      await File(
+        p.join(generation, 'vectors', manifestName),
+      ).writeAsBytes(manifestBytes, flush: true);
       final metadataFile = File(p.join(mirrorDir, '$manifestFileName.tmp'));
       await metadataFile.writeAsString(jsonEncode(metadata), flush: true);
       _cancel(isCancelled);
@@ -515,9 +516,9 @@ class SemanticSearchAssets {
         return null;
       }
       if (int.tryParse(
-            RegExp(r'^v(\d+)-')
-                    .firstMatch(value['libraryTag'] as String)
-                    ?.group(1) ??
+            RegExp(
+                  r'^v(\d+)-',
+                ).firstMatch(value['libraryTag'] as String)?.group(1) ??
                 '',
           ) !=
           value['libraryVersion']) {
@@ -642,12 +643,14 @@ class SemanticSearchAssets {
             pointer['set'] is! String ||
             pointer['set_sha256'] is! String ||
             pointer['generation'] is! int ||
-            !RegExp(r'^gen-[0-9]+/set\.json$')
-                .hasMatch(pointer['set'] as String)) {
+            !RegExp(
+              r'^gen-[0-9]+/set\.json$',
+            ).hasMatch(pointer['set'] as String)) {
           continue;
         }
-        final bytes = await File(p.join(vectors, pointer['set'] as String))
-            .readAsBytes();
+        final bytes = await File(
+          p.join(vectors, pointer['set'] as String),
+        ).readAsBytes();
         if (Sha256Stream.ofBytes(bytes) != pointer['set_sha256']) continue;
         final set = jsonDecode(utf8.decode(bytes));
         if (set is! Map ||
@@ -664,8 +667,9 @@ class SemanticSearchAssets {
         for (final segment in set['segments'] as List) {
           if (segment is! Map ||
               segment['file'] is! String ||
-              !RegExp(r'^segments/[0-9a-f]{32}\.oxv$')
-                  .hasMatch(segment['file'] as String) ||
+              !RegExp(
+                r'^segments/[0-9a-f]{32}\.oxv$',
+              ).hasMatch(segment['file'] as String) ||
               segment['size'] is! int) {
             complete = false;
             break;
@@ -782,8 +786,9 @@ class SemanticSearchAssets {
         await File(temporary).rename(target);
       }
       _cancel(isCancelled);
-      await File(p.join(p.dirname(dbPath), modelFolder, '.otzaria-semantic'))
-          .writeAsString('');
+      await File(
+        p.join(p.dirname(dbPath), modelFolder, '.otzaria-semantic'),
+      ).writeAsString('');
       final manifestJson = await File(
         p.join(generation, 'vectors', data.metadata['manifestName'] as String),
       ).readAsString();

@@ -581,7 +581,6 @@ final class _LockedDriveIOOverrides extends IOOverrides {
     if (!_onDrive(path)) return _realFile(path);
     if (p.basename(path).startsWith('.write-test')) {
       return _UnwritableFile(path, 'The media is write protected', osError);
-
     }
     return _realFile(_mapped(path));
   }

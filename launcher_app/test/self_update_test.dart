@@ -42,22 +42,23 @@ Map<String, dynamic> _releaseJson({
   String assetName = 'עדכוני.אוצריא.exe',
   int size = 4,
   String? digest,
-}) => {
-  'tag_name': tag ?? _newerTag,
-  'name': 'Otzaria Updates ${tag ?? _newerTag}',
-  'prerelease': prerelease,
-  'draft': draft,
-  'published_at': '2026-08-01T10:00:00Z',
-  'body': 'מה התחדש',
-  'assets': [
+}) =>
     {
-      'name': assetName,
-      'browser_download_url': 'https://example/$assetName',
-      'size': size,
-      if (digest != null) 'digest': digest,
-    },
-  ],
-};
+      'tag_name': tag ?? _newerTag,
+      'name': 'Otzaria Updates ${tag ?? _newerTag}',
+      'prerelease': prerelease,
+      'draft': draft,
+      'published_at': '2026-08-01T10:00:00Z',
+      'body': 'מה התחדש',
+      'assets': [
+        {
+          'name': assetName,
+          'browser_download_url': 'https://example/$assetName',
+          'size': size,
+          if (digest != null) 'digest': digest,
+        },
+      ],
+    };
 
 LauncherRelease _release({String? tag, int size = 4, String? sha256}) =>
     _releaseFor(tag ?? _newerTag, size, sha256);
@@ -537,7 +538,8 @@ void main() {
       expect(
         (await MirrorJunkSweeper(
           dataDir: temp.path,
-        ).find()).map((junk) => junk.path),
+        ).find())
+            .map((junk) => junk.path),
         isEmpty,
       );
     });
@@ -558,7 +560,8 @@ void main() {
           downloadUrl: 'https://example/launcher.zip',
           sizeBytes: 4,
         ),
-      )).filePath;
+      ))
+          .filePath;
       final oldWindows = (await mirror.sync(_release(tag: 'v0.2.0'))).filePath;
       await mirror.sync(_release(tag: 'v0.3.0'));
 
@@ -587,17 +590,17 @@ void main() {
     });
 
     List<int> utf16(String text) => [
-      for (final unit in text.codeUnits) ...[unit, 0],
-    ];
+          for (final unit in text.codeUnits) ...[unit, 0],
+        ];
 
     List<int> stubVersionInfo() => [
-      ...utf16('InternalName'),
-      0,
-      0,
-      ...utf16(LauncherInstallLayout.stubInternalName),
-      0,
-      0,
-    ];
+          ...utf16('InternalName'),
+          0,
+          0,
+          ...utf16(LauncherInstallLayout.stubInternalName),
+          0,
+          0,
+        ];
 
     Uint8List portableExecutable({
       required List<int> payload,
@@ -700,7 +703,8 @@ void main() {
       expect(await other.readAsString(), 'MZ installer launcher_stub');
     });
 
-    test('בלי המשתנה — exe זר שמחרוזת ה-stub מופיעה בו מחוץ ל-VERSIONINFO '
+    test(
+        'בלי המשתנה — exe זר שמחרוזת ה-stub מופיעה בו מחוץ ל-VERSIONINFO '
         'אינו נבחר', () async {
       final temp = await Directory.systemTemp.createTemp('launcher-layout');
       addTearDown(() => deleteTempDir(temp));
@@ -974,16 +978,16 @@ void main() {
       await deleteTempDir(temp);
     });
 
-    test('חבילה קודמת שאי אפשר למחוק אינה הופכת החלפה שהצליחה לכישלון, '
+    test(
+        'חבילה קודמת שאי אפשר למחוק אינה הופכת החלפה שהצליחה לכישלון, '
         'וה-quarantine מוסר', () async {
-      final restarted =
-          await LauncherSelfInstaller(
-            startDetached: (_, __) async {},
-            quit: () {},
-          ).apply(
-            layout: LauncherInstallLayout(executablePath: bundle.path),
-            downloadedFilePath: zip.path,
-          );
+      final restarted = await LauncherSelfInstaller(
+        startDetached: (_, __) async {},
+        quit: () {},
+      ).apply(
+        layout: LauncherInstallLayout(executablePath: bundle.path),
+        downloadedFilePath: zip.path,
+      );
 
       expect(restarted, isFalse);
       final newFile = File(p.join(bundle.path, 'Contents', 'new.txt'));
@@ -1171,8 +1175,7 @@ void main() {
         final controller = LauncherUpdateController(
           dataDir: temp.path,
           updater: updater(
-            changelog:
-                '  - עוד לא יצא\n\n* **$newer**\n  - חדש\n\n'
+            changelog: '  - עוד לא יצא\n\n* **$newer**\n  - חדש\n\n'
                 '* **$launcherVersion**\n  - מה שכבר רץ',
           ),
         );
@@ -1303,7 +1306,8 @@ class _FailingInstaller extends LauncherSelfInstaller {
   Future<bool> apply({
     required LauncherInstallLayout layout,
     required String downloadedFilePath,
-  }) async => throw const LauncherUpdateException('החלפה נכשלה');
+  }) async =>
+      throw const LauncherUpdateException('החלפה נכשלה');
 
   int cleanupCalls = 0;
 
@@ -1319,7 +1323,8 @@ class _NoRestartInstaller extends LauncherSelfInstaller {
   Future<bool> apply({
     required LauncherInstallLayout layout,
     required String downloadedFilePath,
-  }) async => false;
+  }) async =>
+      false;
 
   @override
   Future<void> cleanupLeftovers(LauncherInstallLayout layout) async {}

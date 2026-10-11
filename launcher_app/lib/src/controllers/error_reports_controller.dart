@@ -18,8 +18,8 @@ class ErrorReportsController extends ChangeNotifier {
     required this.outbox,
     required Future<OtzariaReportQueue?> Function() resolveQueue,
     ErrorReportUploader? uploader,
-  }) : _resolveQueue = resolveQueue,
-       _uploader = uploader ?? ErrorReportUploader();
+  })  : _resolveQueue = resolveQueue,
+        _uploader = uploader ?? ErrorReportUploader();
 
   factory ErrorReportsController.forDrive({
     required String stateDir,

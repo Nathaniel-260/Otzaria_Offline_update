@@ -8,7 +8,8 @@ bool provenUpToDateOnline({
   required DateTime? checkedAt,
   required String? error,
   required bool hasUpdate,
-}) => checkedAt != null && error == null && !hasUpdate;
+}) =>
+    checkedAt != null && error == null && !hasUpdate;
 
 const Duration onlineCheckMaxAge = Duration(minutes: 15);
 

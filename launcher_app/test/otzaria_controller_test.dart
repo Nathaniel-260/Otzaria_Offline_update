@@ -426,7 +426,7 @@ void main() {
       final delivered = <bool>[];
       final controller = OtzariaModuleController(
         dataDir: tempDir.path,
-          launcher: launcher,
+        launcher: launcher,
         pendingLaunchUri: () async => uri,
         onLaunchUriDelivered: () async => delivered.add(true),
       );

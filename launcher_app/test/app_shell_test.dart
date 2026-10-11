@@ -74,8 +74,7 @@ void main() {
           driveFull: driveFull,
           // ברירת המחדל: ההסבר החד-פעמי כבר הוצג, כדי שלא יצוץ באמצע בדיקה
           // שאינה שלו.
-          noticesStore:
-              notices ??
+          noticesStore: notices ??
               MemoryNoticesStore(seen: {NoticesSeenStore.errorReportsIntro}),
           // כפתורי החלון מדברים עם ערוץ פלטפורמה שאינו קיים בבדיקות widget.
           showWindowButtons: false,
@@ -754,14 +753,14 @@ void main() {
     /// מפעיל את הנעילה על ההגדרות שהמסגרת כבר מחזיקה. `runAsync` כי הכתיבה
     /// לדיסק אינה מסתיימת בתוך ה-fake-async.
     Future<void> lockSettings(WidgetTester tester) => tester.runAsync(
-      () => settings.update(
-        AppSettings(
-          autoCheckUpdates: false,
-          saferModeEnabled: true,
-          saferModePassword: SaferModePassword.encode('1234'),
-        ),
-      ),
-    );
+          () => settings.update(
+            AppSettings(
+              autoCheckUpdates: false,
+              saferModeEnabled: true,
+              saferModePassword: SaferModePassword.encode('1234'),
+            ),
+          ),
+        );
 
     testWidgets('לחיצה על ההגדרות פותחת דיאלוג סיסמה ואינה בונה את המסך', (
       tester,
@@ -849,11 +848,9 @@ void main() {
     Future<LauncherUpdateStatus> statusAfterStart(WidgetTester tester) async {
       LauncherUpdateController launcher() =>
           tester.widget<HomeScreen>(screen(HomeScreen)).launcherUpdate;
-      for (
-        var i = 0;
-        i < 40 && launcher().status == LauncherUpdateStatus.idle;
-        i++
-      ) {
+      for (var i = 0;
+          i < 40 && launcher().status == LauncherUpdateStatus.idle;
+          i++) {
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 20)),
         );

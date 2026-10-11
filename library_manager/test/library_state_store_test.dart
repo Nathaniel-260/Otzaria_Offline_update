@@ -318,9 +318,9 @@ void main() {
       await Directory(p.dirname(mine)).create(recursive: true);
       await store.saveCustomDbPath(mine);
 
-      final json = jsonDecode(
-        await File(statePath).readAsString(),
-      ) as Map<String, dynamic>;
+      final json =
+          jsonDecode(await File(statePath).readAsString())
+              as Map<String, dynamic>;
       json['customDbPath'] = p.join(tempDir.path, 'legacy', 'seforim.db');
       await Directory(p.join(tempDir.path, 'legacy')).create(recursive: true);
       await File(statePath).writeAsString(jsonEncode(json));
@@ -334,8 +334,9 @@ void main() {
       final onDrive = p.join(dataDir, 'library', 'seforim.db');
       await Directory(p.dirname(onDrive)).create(recursive: true);
       await File(logsState).parent.create(recursive: true);
-      await File(logsState)
-          .writeAsString(jsonEncode({'customDbPath': onDrive}));
+      await File(
+        logsState,
+      ).writeAsString(jsonEncode({'customDbPath': onDrive}));
 
       final drive = LibraryStateStore(logsState, dataDir: dataDir);
       expect(drive.isInsideDataDir(onDrive), isTrue);
@@ -348,8 +349,9 @@ void main() {
       final elsewhere = p.join(tempDir.path, 'books', 'seforim.db');
       await Directory(p.dirname(elsewhere)).create(recursive: true);
       await File(logsState).parent.create(recursive: true);
-      await File(logsState)
-          .writeAsString(jsonEncode({'customDbPath': elsewhere}));
+      await File(
+        logsState,
+      ).writeAsString(jsonEncode({'customDbPath': elsewhere}));
 
       expect(
         await LibraryStateStore(logsState, dataDir: dataDir).loadCustomDbPath(),
@@ -799,8 +801,9 @@ void main() {
 
     test('ערכים פגומים בקובץ מסוננים ואינם מפילים את הקריאה', () async {
       await File(statePath).parent.create(recursive: true);
-      await File(statePath)
-          .writeAsString('{"knownDbVersions": {"a": 0, "b": "x", "c": 18}}');
+      await File(
+        statePath,
+      ).writeAsString('{"knownDbVersions": {"a": 0, "b": "x", "c": 18}}');
 
       expect(await store.loadKnownDbVersions(), {'c': 18});
       expect(await store.lowestKnownDbVersion(), 18);

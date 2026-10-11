@@ -108,7 +108,8 @@ void main() {
       },
     );
 
-    test('only a write-protected location offers elevation, not a hot '
+    test(
+        'only a write-protected location offers elevation, not a hot '
         'journal the read-only reader hit or a lock', () {
       bool offers(LocalDbUnreadableReason reason) =>
           LibraryModuleController.unreadableDbNeedsElevation(
@@ -123,7 +124,8 @@ void main() {
       );
     });
 
-    test('a hot journal offers elevation only when the read-write health '
+    test(
+        'a hot journal offers elevation only when the read-write health '
         'check hit it on a write-protected DB', () {
       final crashed = _hotJournalDb(tempDir);
       Object thrownBy(void Function() body) {
@@ -618,12 +620,13 @@ void main() {
     /// כותב סימון "אמיתי" — דרך אותו שירות שכותב אותו ב-`applyUpdate`.
     Future<void> writeNotice({
       String route = ExternalUpdateNotice.routeDelta,
-    }) => const ExternalUpdateNotice().write(
-      dbPath: fakeDb.path,
-      route: route,
-      booksTouched: {4, 11},
-      dbVersion: 30,
-    );
+    }) =>
+        const ExternalUpdateNotice().write(
+          dbPath: fakeDb.path,
+          route: route,
+          booksTouched: {4, 11},
+          dbVersion: 30,
+        );
 
     test('בלי סימון אין בקשה ממתינה', () async {
       await controller.setCustomDbPath(fakeDb.path);
@@ -778,11 +781,11 @@ void main() {
   group('עדכון אישי שנבנה למחשב אחר', () {
     /// מראה של עדכון אישי: קובצי עדכון מגרסה 30 בלבד, בלי מסד מלא.
     void writePersonalMirror() => _writeMirror(
-      tempDir,
-      releases: [
-        const _MirrorRelease('v31', patches: [_MirrorPatch(30, 31)]),
-      ],
-    );
+          tempDir,
+          releases: [
+            const _MirrorRelease('v31', patches: [_MirrorPatch(30, 31)]),
+          ],
+        );
 
     test('מחשב שלא נרשם מקבל מצב מוסבר, לא שגיאה', () async {
       controller.personalUpdateMode = true;
@@ -944,23 +947,23 @@ void main() {
 }
 
 LibraryUpdateCheckResult _deltaWithFallback() => LibraryUpdateCheckResult(
-  dbPath: '/db/seforim.db',
-  plan: LibraryUpdatePlan.delta(
-    localVersion: 1,
-    targetVersion: 2,
-    steps: const [],
-    fullDownloadFallback: LibraryUpdatePlan.fullDownload(
-      localVersion: 1,
-      targetVersion: 2,
-      asset: const ReleaseAsset(
-        name: 'seforim.db.zst',
-        downloadUrl: 'seforim.db.zst',
-        size: 10,
+      dbPath: '/db/seforim.db',
+      plan: LibraryUpdatePlan.delta(
+        localVersion: 1,
+        targetVersion: 2,
+        steps: const [],
+        fullDownloadFallback: LibraryUpdatePlan.fullDownload(
+          localVersion: 1,
+          targetVersion: 2,
+          asset: const ReleaseAsset(
+            name: 'seforim.db.zst',
+            downloadUrl: 'seforim.db.zst',
+            size: 10,
+          ),
+          releaseTag: 'v2',
+        ),
       ),
-      releaseTag: 'v2',
-    ),
-  ),
-);
+    );
 
 class _ApplyManager extends LibraryManager {
   _ApplyManager(String dataDir) : super(dataDir: dataDir);
@@ -1035,7 +1038,7 @@ class _DownloadManager extends LibraryManager {
 
 class _ConcurrentPeekManager extends LibraryManager {
   _ConcurrentPeekManager(String dataDir, {this.fail = false})
-    : super(dataDir: dataDir);
+      : super(dataDir: dataDir);
 
   final bool fail;
   final _versionStarted = Completer<void>();

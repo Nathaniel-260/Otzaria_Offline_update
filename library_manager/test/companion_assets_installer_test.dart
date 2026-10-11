@@ -56,14 +56,15 @@ void main() {
   )).pending;
 
   Future<void> writeManifest(Map<String, dynamic> entries) async {
-    await File(p.join(mirrorDir, CompanionMirrorManifest.fileName))
-        .writeAsString(
-          jsonEncode({
-            'formatVersion': 1,
-            'exportedAt': '2026-08-09T00:00:00.000Z',
-            ...entries,
-          }),
-        );
+    await File(
+      p.join(mirrorDir, CompanionMirrorManifest.fileName),
+    ).writeAsString(
+      jsonEncode({
+        'formatVersion': 1,
+        'exportedAt': '2026-08-09T00:00:00.000Z',
+        ...entries,
+      }),
+    );
   }
 
   test('אין מראה — דיווח ריק ואין עבודה ממתינה', () async {
@@ -135,8 +136,9 @@ void main() {
         },
       });
       await File(p.join(libraryDir, 'lexical.db')).writeAsString('NEWER');
-      await File(p.join(libraryDir, 'lexical.db.version'))
-          .writeAsString('otzaria-digest');
+      await File(
+        p.join(libraryDir, 'lexical.db.version'),
+      ).writeAsString('otzaria-digest');
 
       expect(await pending(), {CompanionAsset.dictionary});
       expect(await pending(report.delivered), isEmpty);
@@ -228,8 +230,9 @@ void main() {
         },
       });
       await File(p.join(libraryDir, 'lexical.db')).writeAsString('CURRENT');
-      await File(p.join(libraryDir, 'lexical.db.version'))
-          .writeAsString(digest);
+      await File(
+        p.join(libraryDir, 'lexical.db.version'),
+      ).writeAsString(digest);
       expect(await pending(), isEmpty);
       final report = await installer.install(
         mirrorDir: mirrorDir,
@@ -418,7 +421,8 @@ void main() {
           'fileName': 'otzar-HB_catalog.db.zst',
           'size': mirrorSize('otzar-HB_catalog.db.zst'),
           'version': 42,
-          'sha256': 'e3cc57e193d6512e6debf0e925febe757e87e85d66150a2f212aa8641940b027',
+          'sha256':
+              'e3cc57e193d6512e6debf0e925febe757e87e85d66150a2f212aa8641940b027',
           'compressed': true,
         },
       });
@@ -489,10 +493,9 @@ void main() {
       expect(File(p.join(talmudDir, '.version')).readAsStringSync(), digest);
       // אין שאריות של ה-tar הזמני.
       expect(
-        Directory(libraryDir)
-            .listSync()
-            .whereType<File>()
-            .map((f) => p.basename(f.path)),
+        Directory(
+          libraryDir,
+        ).listSync().whereType<File>().map((f) => p.basename(f.path)),
         isNot(contains('talmud_bavli_latest.tar.zst.tar')),
       );
 
@@ -567,8 +570,9 @@ void main() {
       });
       final talmudDir = Directory(p.join(libraryDir, 'תלמוד בבלי'));
       await talmudDir.create(recursive: true);
-      await File(p.join(talmudDir.path, '.version'))
-          .writeAsString('installing');
+      await File(
+        p.join(talmudDir.path, '.version'),
+      ).writeAsString('installing');
 
       expect(await pending(), {CompanionAsset.talmud});
       final report = await installer.install(
@@ -625,8 +629,9 @@ void main() {
       await talmudDir.create(recursive: true);
       await File(p.join(talmudDir.path, 'ברכות.pdf')).writeAsString('ישן');
       await File(p.join(talmudDir.path, '.version')).writeAsString('old');
-      await File(p.join(mirrorDir, 'talmud_bavli_latest.tar.zst'))
-          .writeAsString('זה בכלל לא zstd');
+      await File(
+        p.join(mirrorDir, 'talmud_bavli_latest.tar.zst'),
+      ).writeAsString('זה בכלל לא zstd');
       await writeManifest({
         'talmud': {
           'fileName': 'talmud_bavli_latest.tar.zst',
@@ -700,8 +705,9 @@ void main() {
         'old',
       );
       expect(
-        File(p.join(libraryDir, 'talmud_bavli_latest.tar.zst.tar'))
-            .existsSync(),
+        File(
+          p.join(libraryDir, 'talmud_bavli_latest.tar.zst.tar'),
+        ).existsSync(),
         isFalse,
       );
     });
@@ -727,8 +733,9 @@ void main() {
       await talmudDir.create(recursive: true);
       await File(p.join(talmudDir.path, 'ברכות.pdf')).writeAsString('ישן');
       await File(p.join(talmudDir.path, '.version')).writeAsString('old');
-      await File(p.join(talmudDir.path, 'שבת.pdf', 'חוסם'))
-          .create(recursive: true);
+      await File(
+        p.join(talmudDir.path, 'שבת.pdf', 'חוסם'),
+      ).create(recursive: true);
 
       final report = await installer.install(
         mirrorDir: mirrorDir,
@@ -754,8 +761,9 @@ void main() {
         isFalse,
       );
       expect(
-        File(p.join(libraryDir, 'talmud_bavli_latest.tar.zst.tar'))
-            .existsSync(),
+        File(
+          p.join(libraryDir, 'talmud_bavli_latest.tar.zst.tar'),
+        ).existsSync(),
         isFalse,
       );
       expect(await pending(), contains(CompanionAsset.talmud));
@@ -848,8 +856,9 @@ void main() {
 
       setUp(() async {
         // לא ארכיון אמיתי: הבדיקה הזו נוגעת רק בפרדיקט, ואינה מחלצת.
-        await File(p.join(mirrorDir, 'talmud_bavli_latest.tar.zst'))
-            .writeAsBytes(Uint8List(archiveBytes));
+        await File(
+          p.join(mirrorDir, 'talmud_bavli_latest.tar.zst'),
+        ).writeAsBytes(Uint8List(archiveBytes));
         await writeManifest({
           'talmud': {
             'fileName': 'talmud_bavli_latest.tar.zst',
@@ -863,8 +872,9 @@ void main() {
       Future<void> seedTalmudFolder(int bytes) async {
         final dir = Directory(p.join(libraryDir, 'תלמוד בבלי'));
         await dir.create(recursive: true);
-        await File(p.join(dir.path, 'בבא בתרא.pdf'))
-            .writeAsBytes(Uint8List(bytes));
+        await File(
+          p.join(dir.path, 'בבא בתרא.pdf'),
+        ).writeAsBytes(Uint8List(bytes));
         await File(p.join(dir.path, '.version')).writeAsString('abc123');
       }
 
@@ -926,8 +936,9 @@ void main() {
         final delivered = {CompanionAsset.dictionary: 'v2'};
 
         // אוצריא הורידה מהרשת מילון אחר וכתבה סימון משלה.
-        await File(p.join(libraryDir, 'lexical.db.version'))
-            .writeAsString('v7');
+        await File(
+          p.join(libraryDir, 'lexical.db.version'),
+        ).writeAsString('v7');
 
         // בלי הרשומה זו הייתה הצעה שחוזרת בכל פתיחה — ולחיצה עליה הייתה
         // מורידה את המילון בחזרה ל-v2.
@@ -1048,7 +1059,8 @@ void main() {
           'fileName': 'lexical.db',
           'size': 7,
           'tag': 'v2',
-          'sha256': 'e3cc57e193d6512e6debf0e925febe757e87e85d66150a2f212aa8641940b027',
+          'sha256':
+              'e3cc57e193d6512e6debf0e925febe757e87e85d66150a2f212aa8641940b027',
         },
       });
 
@@ -1088,14 +1100,16 @@ void main() {
     });
 
     test('קטלוג שתוכנו אינו תואם את ה-sha256 אינו מותקן', () async {
-      await File(p.join(mirrorDir, 'otzar-HB_catalog.db'))
-          .writeAsString('CATALOG');
+      await File(
+        p.join(mirrorDir, 'otzar-HB_catalog.db'),
+      ).writeAsString('CATALOG');
       await writeManifest({
         'catalog': {
           'fileName': 'otzar-HB_catalog.db',
           'size': 7,
           'version': 42,
-          'sha256': 'e3cc57e193d6512e6debf0e925febe757e87e85d66150a2f212aa8641940b027',
+          'sha256':
+              'e3cc57e193d6512e6debf0e925febe757e87e85d66150a2f212aa8641940b027',
         },
       });
 
