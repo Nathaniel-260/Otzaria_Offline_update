@@ -112,7 +112,7 @@ void main() {
 
     test('פרסום מחדש בתג אחר ובאותו digest אינו מוצע שוב', () async {
       const digest =
-          'b42e36626802629fed178068e8cf11f0f034d6f24ae3b72ac9999b9311bf299f';
+          'e2f31a1891597072286637d1978390dd35f8a6ca1f3dfe07fb232baccb07d1d2';
       await writeManifest({
         'dictionary': {
           'fileName': 'lexical.db',
@@ -518,11 +518,12 @@ void main() {
         'ברכות.pdf',
         'שבת.pdf',
       ]);
+      final digest = mirrorSha256('talmud_bavli_latest.tar.zst');
       await writeManifest({
         'talmud': {
           'fileName': 'talmud_bavli_latest.tar.zst',
           'size': mirrorSize('talmud_bavli_latest.tar.zst'),
-          'sha256': 'abc123',
+          'sha256': digest,
           'compressed': true,
         },
       });
@@ -549,7 +550,7 @@ void main() {
       );
 
       leftover.deleteSync();
-      expect(await pending(const {CompanionAsset.talmud: 'abc123'}), isEmpty);
+      expect(await pending({CompanionAsset.talmud: digest}), isEmpty);
     });
 
     test('סימון "installing" שנשאר מהתקנה שנקטעה מפעיל התקנה מחדש', () async {

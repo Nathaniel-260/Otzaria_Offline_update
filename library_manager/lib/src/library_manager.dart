@@ -283,20 +283,6 @@ class LibraryManager {
     p.join(mirrorDir, LocalMirrorLibraryReleaseClient.manifestFileName),
   ).exists();
 
-  /// מוריד את עדכוני הספרייה מ-GitHub אל [mirrorDir] — **הפעולה הכבדה**
-  /// שנוגעת ברשת (המסד המלא ~1GB + קובצי העדכון). מביא את ה-release
-  /// האחרון בערוץ הנבחר.
-  ///
-  /// [onCompanionWarning] מקבל כשל בקובץ נלווה בודד — פעולה best-effort
-  /// שאינה מפילה את ההורדה, אך גם אינה אמורה להיעלם בשקט: בלעדיה המשתמש
-  /// היה מגלה רק במחשב הלא-מקוון שהתלמוד לא נסע איתו.
-  ///
-  /// [onWarning] מקבל אזהרה מהייצוא עצמו — למשל manifest שאינו קריא ולכן
-  /// ה-edge שלו דולג. כשל **רשת** אינו אזהרה אלא זריקה, ראו `export`.
-  ///
-  /// [onCompanionStage] הוא ערוץ נפרד בכוונה: שני השלבים רצים במקביל, וכשהם
-  /// כתבו לאותה שורת מצב היא קפצה בין "מוריד תלמוד" ל"מוריד מסד" בזמן שהמד
-  /// מתאר את שניהם יחד. בלעדיו הם חוזרים לערוץ אחד, כמקודם.
   Future<MirrorDownloadOutcome> downloadToMirror({
     bool includeSemanticSearch = false,
     void Function(String stage)? onStage,
@@ -310,14 +296,10 @@ class LibraryManager {
     final fromVersion = personalUpdateMode
         ? await recordedPersonalDbVersion()
         : null;
-    // מצב אישי בלי גרסה מזוהה נופל להורדה הרגילה במקום להיכשל — מוטב מסד
-    // מלא מכונן שאין בו כלום. ה-stage אומר זאת, וגם ה-[MirrorDownloadOutcome].
     if (personalUpdateMode && fromVersion == null) {
       onStage?.call(AppL10n.strings.libraryDomain.exportPersonalVersionUnknown);
     }
 
-    // מונה בייטים אחד לשני השלבים, כי הם רצים יחד — ראו למטה. בלעדיו
-    // הייצוא והקבצים הנלווים היו כותבים לסירוגין למד ההתקדמות.
     final bytes = ByteProgressAggregator(onProgress: onBytesProgress);
     final exportBytes = bytes.slot();
     final companionBytes = bytes.slot();
@@ -328,10 +310,6 @@ class LibraryManager {
       scheduler: _scheduler,
     );
 
-    // **שני השלבים רצים בו-זמנית.** הקבצים הנלווים הם ~509MB שלא היה להם
-    // שום קשר לנכסי הספרייה, והם המתינו בתור להורדת המסד (~1.5GB) שסיימה
-    // אותם. הם חולקים את אותה תקרת חיבורים ([_scheduler]), ולכן זה לא מוסיף
-    // עומס — רק ממלא את הזמן שבו רק המסד הגדול רץ.
     final exportFuture = () async {
       try {
         exported = await exporter.export(
@@ -352,9 +330,6 @@ class LibraryManager {
       }
     }();
 
-    // הקבצים הנלווים הם חלק מאותה הורדה: באוצריא הם מתרעננים מהרשת בכל
-    // עדכון ספרייה, ובלעדיהם המחשב הלא-מקוון מקבל מסד חדש עם תלמוד/קטלוג/
-    // מילון ישנים. כשל בהם אינו מפיל את ההורדה — ראו [CompanionAssetsMirror].
     final companionsFuture = _companionsMirror.sync(
       destDir: companionsMirrorDir,
       onStage: (stage) {
@@ -369,9 +344,6 @@ class LibraryManager {
       isCancelled: isCancelled,
     );
 
-    // `Future.wait` ממתין לשניהם גם כשאחד נכשל, ואז מפיץ את השגיאה הראשונה.
-    // ההמתנה חשובה: שלב שנשאר רץ ברקע ממשיך לכתוב אל המראה אחרי שהמבטל כבר
-    // ניקה אותה (ראו `MirrorDownloadUndo`).
     await Future.wait<void>([exportFuture, companionsFuture]);
 
     if (includeSemanticSearch) {
@@ -386,8 +358,9 @@ class LibraryManager {
           ).discover(allowPrerelease: allowPrerelease);
           tag = discovery.newestReleaseTag;
         } else {
-          await peekLatestOnlineVersion();
-          tag = _onlineLibraryTag;
+          final latest = _latestOnline(await _cloudClient.fetchReleases());
+          _onlineLibraryTag = latest.tag;
+          tag = latest.tag;
         }
         if (tag == null) {
           throw StateError(
@@ -500,14 +473,6 @@ class LibraryManager {
     return LocalMirrorLibraryReleaseClient(mirrorDir: mirrorDir);
   }
 
-  /// בודק אם יש עדכון זמין.
-  ///
-  /// אם לא נמצא DB בכלל (לא בנתיב מותאם אישית ולא בברירת המחדל של
-  /// אוצריא) — **לא** חוסם ומבקש בחירה ידנית; במקום זה מצביע על מיקום
-  /// ההתקנה ([installDbPath]) וממשיך לתוכנית הורדה מלאה, בדיוק כמו שהתקנה
-  /// ראשונה של אוצריא עצמה עובדת. ראו
-  /// [LibraryUpdateCheckResult.isFreshInstall]. בחירה ידנית של קובץ DB
-  /// קיים עדיין אפשרית מרצון דרך [setCustomDbPath].
   Future<LibraryUpdateCheckResult> checkForUpdate() async {
     final locator = _snapshotLocator();
     var dbPath = await locator.resolveDbPath();
@@ -563,13 +528,8 @@ class LibraryManager {
     );
     final mirrorDownloadIncomplete = await _mirrorDownloadIncomplete(releases);
 
-    // מאיזה release התוכן שעל **המחשב הזה** הגיע, ובאיזו גרסה — בלי זה,
-    // release שמפרסם מסד מתוקן באותו db_version נראה כ"מעודכן".
     final applied = await _stateStore.loadAppliedRelease();
 
-    // מה שכבר נמסר למחשב הזה מהמראה — בלעדיו קובץ נלווה שאוצריא עצמה רעננה
-    // מהרשת נראה כישן, וההצעה חוזרת בכל פתיחה. ראו
-    // `CompanionAssetsInstaller.pendingWork`.
     final companions = await _companionsInstaller.pendingWork(
       mirrorDir: companionsMirrorDir,
       dbPath: dbPath,
@@ -621,7 +581,7 @@ class LibraryManager {
       unavailableCompanions: companions.unavailable,
       mirroredCompanions: companions.mirrored,
       semanticPending: semanticPending,
-      semanticConsentGranted: await semanticConsentGranted(),
+      semanticConsentGranted: settings?.searchFeedbackGranted ?? false,
       mirrorDownloadIncomplete: mirrorDownloadIncomplete,
     );
   }
