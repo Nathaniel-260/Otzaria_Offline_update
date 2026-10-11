@@ -668,8 +668,8 @@ void main() {
       await File(exe).writeAsString('0.9.90+90900');
       final fakeInstaller = await _writeExitScript(tempDir.path, exitCode: 1);
       var replaced = false;
-      Future<void>.delayed(const Duration(milliseconds: 100), () async {
-        await File(exe).writeAsString('0.9.96+99600');
+      Future<void>.delayed(const Duration(milliseconds: 300), () {
+        File(exe).writeAsStringSync('0.9.96+99600');
         replaced = true;
       });
 
@@ -763,8 +763,8 @@ void main() {
       () async {
         await File(exe).writeAsString('0.9.90+90900');
         final fakeInstaller = await _writeExitScript(tempDir.path, exitCode: 1);
-        Future<void>.delayed(const Duration(milliseconds: 100), () async {
-          await File(exe).writeAsString('?');
+        Future<void>.delayed(const Duration(milliseconds: 100), () {
+          File(exe).writeAsStringSync('?');
         });
 
         await expectLater(
@@ -773,7 +773,7 @@ void main() {
             installerPath: fakeInstaller,
             installDir: installDir,
             locateInstalled: (_) async => null,
-            detectTimeout: const Duration(milliseconds: 100),
+            detectTimeout: const Duration(milliseconds: 300),
           ),
           throwsA(isA<OtzariaWizardStillOpen>()),
         );
@@ -855,8 +855,8 @@ void main() {
     test('same-base hotfix - done once the exe build changes', () async {
       await File(exe).writeAsString('0.9.97+99701');
       final fakeInstaller = await _writeExitScript(tempDir.path, exitCode: 1);
-      Future<void>.delayed(const Duration(milliseconds: 100), () async {
-        await File(exe).writeAsString('0.9.97+99702');
+      Future<void>.delayed(const Duration(milliseconds: 100), () {
+        File(exe).writeAsStringSync('0.9.97+99702');
       });
 
       final state = await installer.installWithWizard(
@@ -1264,7 +1264,6 @@ Future<String> _writePartialDownload(String cacheDir, String tag) async {
   return partial;
 }
 
-/// Reads the "version" from the fake exe's text content.
 class _FileContentVersionReader implements InstalledVersionReader {
   const _FileContentVersionReader();
 
@@ -1273,7 +1272,6 @@ class _FileContentVersionReader implements InstalledVersionReader {
     final file = File(launchPath);
     if (!file.existsSync()) return null;
     final content = file.readAsStringSync().trim();
-    // '?' stands for an exe whose version resource cannot be read yet.
     return content == '?' ? null : content;
   }
 }

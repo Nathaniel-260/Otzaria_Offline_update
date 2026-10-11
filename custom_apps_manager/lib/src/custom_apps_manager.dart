@@ -358,7 +358,8 @@ class CustomAppsManager {
     }
 
     var latest = releaseSource == source ? release : null;
-    var asset = latest == null ? null : _usableAsset(latest, source.assetPattern);
+    var asset =
+        latest == null ? null : _usableAsset(latest, source.assetPattern);
     if (latest == null || asset == null) {
       latest = await peekLatestOnline(entry.descriptor);
       if (latest == null) throw AppDescriptorException(t.githubNoReleases);

@@ -19,9 +19,8 @@ class AppliedRelease {
 class LibraryStateStore {
   const LibraryStateStore(this.stateFilePath, {this.dataDir});
 
-  LibraryStateStore.inDir(String dir)
-    : stateFilePath = p.join(dir, fileName),
-      dataDir = null;
+  LibraryStateStore.inDir(String dir, {this.dataDir})
+    : stateFilePath = p.join(dir, fileName);
 
   static const String fileName = 'library_state.json';
 

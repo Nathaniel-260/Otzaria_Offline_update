@@ -32,8 +32,9 @@ class LibraryDbLocator {
   factory LibraryDbLocator.forLaunch({
     required String stateDir,
     required String launchPath,
+    String? dataDir,
   }) => LibraryDbLocator(
-    stateStore: LibraryStateStore.inDir(stateDir),
+    stateStore: LibraryStateStore.inDir(stateDir, dataDir: dataDir),
     otzariaLaunchPath: () async => launchPath,
   );
 

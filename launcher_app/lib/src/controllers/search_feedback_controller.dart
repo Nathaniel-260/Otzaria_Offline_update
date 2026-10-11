@@ -28,12 +28,10 @@ class SearchFeedbackController extends ChangeNotifier {
       if ((await runningLocator.probe()).isRunning) return null;
       final launch = await launchPath();
       if (launch == null) return null;
-      final locator = LibraryDbLocator(
-        stateStore: LibraryStateStore(
-          p.join(stateFilesDir ?? stateDir, LibraryStateStore.fileName),
-          dataDir: dataDir,
-        ),
-        otzariaLaunchPath: () async => launch,
+      final locator = LibraryDbLocator.forLaunch(
+        stateDir: stateFilesDir ?? stateDir,
+        launchPath: launch,
+        dataDir: dataDir,
       );
       final root = await locator.otzariaSettingsRoot(launch);
       return root == null ? null : (locator: locator, root: root);

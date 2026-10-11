@@ -258,7 +258,6 @@ class OtzariaManager {
                   sharedDir: true,
                   verifyIdentity: false
                 ),
-                // שתי היעדים שאליהם אנחנו מתקינים, בסדר שבו נבחרים ביניהם.
                 if (_userApplicationsDir case final dir?)
                   (dir: dir, sharedDir: true, verifyIdentity: false),
               ],

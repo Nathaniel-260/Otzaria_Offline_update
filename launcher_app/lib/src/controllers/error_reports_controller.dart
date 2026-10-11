@@ -38,12 +38,10 @@ class ErrorReportsController extends ChangeNotifier {
         if (launch == null) return null;
         return resolveOtzariaReportQueue(
           launchPath: launch,
-          locator: LibraryDbLocator(
-            stateStore: LibraryStateStore(
-              p.join(stateFilesDir ?? stateDir, LibraryStateStore.fileName),
-              dataDir: dataDir ?? stateDir,
-            ),
-            otzariaLaunchPath: () async => launch,
+          locator: LibraryDbLocator.forLaunch(
+            stateDir: stateFilesDir ?? stateDir,
+            launchPath: launch,
+            dataDir: dataDir ?? stateDir,
           ),
         );
       },
