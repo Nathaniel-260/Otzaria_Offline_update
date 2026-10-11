@@ -53,13 +53,53 @@ void main() {
     });
 
     test('מזהה בעברית או עם רווחים עובר round-trip', () {
-      for (final id in ['מפרשים', 'a b', 'שם עם רווח']) {
+      for (final id in ['my-plugin', 'a.b_c', 'X1']) {
         final absolute = p.join(store.pluginDir(id), 'plugin.otzplugin');
         final relative = store.relativePath(absolute);
 
         expect(relative, 'files/$id/plugin.otzplugin');
         expect(store.absolutePath(relative), absolute);
       }
+    });
+
+    test('מזהה תוסף לא בטוח נדחה כמקטע נתיב', () {
+      for (final id in [
+        '',
+        '..',
+        'a..b',
+        '../x',
+        'a/b',
+        'a\\b',
+        'C:',
+        'מפרשים',
+        'a b',
+        'x' * 65,
+      ]) {
+        expect(StorePlugin.isValidId(id), isFalse, reason: id);
+        expect(() => store.pluginDir(id), throwsArgumentError, reason: id);
+      }
+      expect(StorePlugin.isValidId('x' * 64), isTrue);
+    });
+
+    test('resolveAgainst דוחה בריחה מהשורש', () {
+      for (final path in [
+        '../outside',
+        'files/../../outside',
+        '/etc/passwd/../../x',
+        'files\\..\\x',
+        'C:/x',
+      ]) {
+        expect(
+          () => PluginMirrorStore.resolveAgainst('/root', path),
+          throwsArgumentError,
+          reason: path,
+        );
+        expect(() => store.absolutePath(path), throwsArgumentError);
+      }
+    });
+
+    test('hasAsset מחזיר false לנתיב בורח במקום לזרוק', () async {
+      expect(await store.hasAsset('../../x'), isFalse);
     });
 
     test('resolveAgainst מתעלם ממקטעים ריקים בנתיב היחסי', () {
@@ -178,6 +218,34 @@ void main() {
       final text = File(store.catalogPath).readAsStringSync();
       expect(text, contains('מפרשים'));
       expect(jsonDecode(text), isA<Map<String, dynamic>>());
+    });
+
+    test('ניקוי מוחק תמונה וצילומי מסך מיושנים ושומר את הרשומים בקטלוג',
+        () async {
+      final entry = plugin('abc').copyWith(
+        imagePath: 'files/abc/image.jpg',
+        screenshotPaths: ['files/abc/screenshot-0.png'],
+      );
+      final dir = Directory(store.pluginDir('abc'))
+        ..createSync(recursive: true);
+      for (final name in [
+        'image.jpg',
+        'image.png',
+        'image.exe',
+        'screenshot-0.png',
+        'screenshot-0.gif',
+        'screenshot-3.png',
+        'notes.txt',
+      ]) {
+        File(p.join(dir.path, name)).writeAsStringSync('x');
+      }
+
+      expect(await store.pruneUnusedFiles(entry), 4);
+
+      expect(
+        dir.listSync().map((e) => p.basename(e.path)).toSet(),
+        {'image.jpg', 'screenshot-0.png', 'notes.txt'},
+      );
     });
   });
 

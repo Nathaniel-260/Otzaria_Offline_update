@@ -73,6 +73,25 @@ void main() {
     expect(names(), ['state.json']);
   });
 
+  test('writeBytesAtomically writes the bytes and leaves no temporary file',
+      () async {
+    await File(target).writeAsString('old');
+
+    await writeBytesAtomically(target, [0, 1, 2, 255]);
+
+    expect(File(target).readAsBytesSync(), [0, 1, 2, 255]);
+    expect(names(), ['state.json']);
+  });
+
+  test('concurrent byte writes to one path all succeed', () async {
+    await Future.wait([
+      for (var i = 0; i < 20; i++) writeBytesAtomically(target, [i]),
+    ]);
+
+    expect(File(target).readAsBytesSync().single, inInclusiveRange(0, 19));
+    expect(names(), ['state.json']);
+  });
+
   test('every write gets its own temporary file name', () {
     final names = {for (var i = 0; i < 100; i++) uniqueTempPath(target)};
 

@@ -75,7 +75,7 @@ class LibraryApplyException implements Exception {
   final String message;
   const LibraryApplyException(this.message);
   @override
-  String toString() => 'LibraryApplyException: $message';
+  String toString() => message;
 }
 
 typedef ZstdFileStreamer =
@@ -119,8 +119,7 @@ class LibraryUpdateApplier {
        _streamFile = streamFile ?? ZstdFileDecompressor.decompressFileToFile,
        _downloader = PatchDownloader(
          decompress: decompress ?? const ZstdDecompressor().call,
-       ),
-       _decompress = decompress ?? const ZstdDecompressor().call;
+       );
 
   final OtzariaProcessGuard _processGuard;
   final LibraryDbRecoveryService _recovery;
@@ -128,7 +127,6 @@ class LibraryUpdateApplier {
   final ZstdFileStreamer _streamFile;
   final int? Function(String path) _freeBytesFor;
   final PatchDownloader _downloader;
-  final Future<Uint8List?> Function(Uint8List) _decompress;
 
   /// שם קובץ ה-hint לסך-הבתים של אימות ה-hash — ראו [applyDelta].
   static const String _verifyHintFileName = 'verify_total_bytes.txt';
@@ -163,9 +161,7 @@ class LibraryUpdateApplier {
     bool Function()? isCancelled,
   }) async {
     if (plan.kind != LibraryUpdatePlanKind.delta) {
-      throw const LibraryApplyException(
-        'applyDelta נקרא על תוכנית שאינה delta',
-      );
+      throw StateError('applyDelta נקרא על תוכנית שאינה delta');
     }
     await _guardOtzariaNotRunning();
 
@@ -398,8 +394,6 @@ class LibraryUpdateApplier {
   /// ההורדה והחילוץ שניהם **בזרימה**: הקובץ הדחוס יורד ישר לדיסק
   /// ([PatchDownloader.downloadToFile]), ומשם מחולץ קובץ-לקובץ דרך
   /// [ZstdFileDecompressor] — שיא הזיכרון הוא חוצצים בודדים, לא ~1.1GB של DB.
-  /// אם ה-streaming אינו זמין בפלטפורמה (אין ספריית zstd לטעינה) נופלים
-  /// למסלול הזיכרון הקודם, שנשאר כגיבוי ב-[_decompressInMemoryTo].
   Future<void> applyFullDownload({
     required LibraryUpdatePlan plan,
     required String dbPath,
@@ -407,9 +401,7 @@ class LibraryUpdateApplier {
     bool Function()? isCancelled,
   }) async {
     if (plan.kind != LibraryUpdatePlanKind.fullDownload) {
-      throw const LibraryApplyException(
-        'applyFullDownload נקרא על תוכנית שאינה fullDownload',
-      );
+      throw StateError('applyFullDownload נקרא על תוכנית שאינה fullDownload');
     }
     final asset = plan.fullDbAsset;
     if (asset == null) {
@@ -518,7 +510,7 @@ class LibraryUpdateApplier {
     }
     String? sourceDigest;
     try {
-      if (!await _streamFile(
+      final streamed = await _streamFile(
         compressedPath,
         newFilePath,
         onProgress: (read, total) => onProgress?.call(
@@ -533,13 +525,13 @@ class LibraryUpdateApplier {
             ? (hex) => sourceDigest = hex
             : null,
         isCancelled: isCancelled,
-      )) {
-        await _decompressInMemoryTo(
-          compressedPath,
-          newFilePath,
-          expectedSha256: verifiesWhileExtracting ? expectedSha256 : null,
+      );
+      if (!streamed) {
+        throw LibraryApplyException(
+          AppL10n.strings.libraryDomain.fullDbNeedsNativeZstd,
         );
-      } else if (verifiesWhileExtracting &&
+      }
+      if (verifiesWhileExtracting &&
           sourceDigest?.toLowerCase() != expectedSha256.toLowerCase()) {
         throw PatchDownloadException(
           AppL10n.strings.libraryDomain.localFileHashMismatch(compressedPath),
@@ -593,6 +585,10 @@ class LibraryUpdateApplier {
       _deleteQuietly(newFilePath);
       deleteStaged();
       rethrow;
+    }
+    if (isCancelled?.call() ?? false) {
+      _deleteQuietly(newFilePath);
+      deleteStaged();
     }
     _throwIfCancelled(isCancelled);
 
@@ -813,37 +809,6 @@ class LibraryUpdateApplier {
     );
   }
 
-  /// מסלול הגיבוי לחילוץ, לפלטפורמה שאין בה ספריית zstd לטעינה ישירה: כל
-  /// ה-DB עובר דרך ה-RAM. נשמר בכוונה — עדיף חילוץ יקר בזיכרון מכשל מוחלט —
-  /// אבל **אינו** המסלול הרגיל, ראו [ZstdFileDecompressor].
-  ///
-  /// הכתיבה היא `writeAsBytes` אסינכרוני ולא `Isolate.run`: שליחת `Uint8List`
-  /// ל-isolate מעתיקה אותו, כלומר עוד ~1.1GB, בעוד ש-`writeAsBytes` כבר מבצע
-  /// את ה-I/O מחוץ ל-isolate הראשי.
-  Future<void> _decompressInMemoryTo(
-    String compressedPath,
-    String destPath, {
-    String? expectedSha256,
-  }) async {
-    final compressed = await File(compressedPath).readAsBytes();
-    // חילוץ ישיר מהמראה עוקף את ההעתקה שאימתה את ה-sha256 — כאן, במסלול
-    // שאין בו זרימה, האימות נעשה על המטען שכבר בזיכרון.
-    if (expectedSha256 != null &&
-        Sha256Stream.ofBytes(compressed).toLowerCase() !=
-            expectedSha256.toLowerCase()) {
-      throw PatchDownloadException(
-        AppL10n.strings.libraryDomain.localFileHashMismatch(compressedPath),
-      );
-    }
-    final extracted = await _decompress(compressed);
-    if (extracted == null || extracted.isEmpty) {
-      throw LibraryApplyException(
-        AppL10n.strings.libraryDomain.fullDbExtractionFailed,
-      );
-    }
-    await File(destPath).writeAsBytes(extracted, flush: true);
-  }
-
   Future<void> _guardOtzariaNotRunning() async {
     // הבדיקה עצמה תלויית-פלטפורמה (tasklist/pgrep) ומטופלת בתוך ה-guard;
     // כאן רק מחליטים מה לעשות עם התשובה. שים לב שבלינוקס אין מסלול התקנה
@@ -870,8 +835,8 @@ class LibraryUpdateApplier {
     throw LibraryApplyException(
       AppL10n.strings.libraryDomain.notEnoughDiskSpace(
         dir,
-        _formatBytes(needed),
-        _formatBytes(free),
+        DiskSpaceProbe.formatBytes(needed),
+        DiskSpaceProbe.formatBytes(free),
       ),
     );
   }
@@ -887,14 +852,6 @@ class LibraryUpdateApplier {
   static bool _isFileTooLargeError(Object error) =>
       error is FileSystemException &&
       error.osError?.errorCode == (Platform.isWindows ? 223 : 27);
-
-  /// גדלים בג'יגה-בייט בעברית קריאה — ההודעה נועדה לומר לאדם כמה לפנות.
-  static String _formatBytes(int bytes) {
-    const gb = 1 << 30;
-    const mb = 1 << 20;
-    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(1)} GB';
-    return '${(bytes / mb).round()} MB';
-  }
 
   String? _sha256FromDigest(String? digest) {
     const prefix = 'sha256:';

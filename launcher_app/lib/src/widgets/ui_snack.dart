@@ -44,6 +44,12 @@ class UiSnack {
         FluentIcons.error_circle_24_regular,
       );
 
+  static void showFailure(String? message) => showError(
+        message == null || message.isEmpty
+            ? AppL10n.strings.common.error
+            : message,
+      );
+
   static void _show(String message, _SnackVariant variant, IconData icon) {
     final overlay = navigatorKey.currentState?.overlay;
     if (overlay == null) {

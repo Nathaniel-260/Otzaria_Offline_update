@@ -7,6 +7,7 @@ import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
+import '../services/app_logger.dart';
 import 'launcher_release.dart';
 import 'launcher_release_client.dart';
 
@@ -73,6 +74,7 @@ class LauncherUpdateMirror {
       final relative = own['filePath'];
       if (relative is! String || relative.isEmpty) return null;
       filePath = p.joinAll([mirrorDir, ...relative.split(RegExp(r'[/\\]'))]);
+      if (!p.isWithin(mirrorDir, filePath)) return null;
     } catch (_) {
       return null;
     }
@@ -132,7 +134,12 @@ class LauncherUpdateMirror {
 
   Future<void> verify(MirroredLauncherRelease mirrored) async {
     final expected = mirrored.release.sha256;
-    if (expected == null) return;
+    if (expected == null) {
+      AppLogger.maybeInstance?.warn(
+        'launcher update asset has no sha256 digest: ${mirrored.release.assetName}',
+      );
+      return;
+    }
     if (await _sha256Of(mirrored.filePath) == expected) return;
     try {
       await File(mirrored.filePath).delete();

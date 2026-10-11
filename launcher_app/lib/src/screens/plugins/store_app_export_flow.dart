@@ -25,9 +25,14 @@ import '../../widgets/widgets_exports.dart';
 /// **ווינדוס בלבד**: הנכס היחיד שמפורסם הוא `.exe`, ומק אינו יכול להריץ
 /// אותו. ראו [StoreAppExportButton.isSupported].
 class StoreAppExportButton extends StatelessWidget {
-  const StoreAppExportButton({super.key, required this.controller});
+  const StoreAppExportButton({
+    super.key,
+    required this.controller,
+    this.busyElsewhere = false,
+  });
 
   final PluginsModuleController controller;
+  final bool busyElsewhere;
 
   /// הפלטפורמות שיש להן מה לעשות עם קובץ ההרצה. מוחזק כאן כדי ששורת
   /// הסנכרון תוכל להשמיט את הכפתור לגמרי במקום להציג אותו מושבת לנצח.
@@ -36,7 +41,10 @@ class StoreAppExportButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.strings.plugins;
-    final enabled = controller.canExportStoreApp && !controller.isExporting;
+    final enabled = controller.canExportStoreApp &&
+        !controller.isExporting &&
+        !controller.isSyncing &&
+        !busyElsewhere;
 
     // כפתור מושבת בלי מילה נקרא כתקלה — ולכן לכל סיבה יש נוסח משלה.
     final tooltip = controller.storeApp == null

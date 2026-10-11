@@ -1440,15 +1440,72 @@ void main() {
       expect(settings?.resolveDbPath(path: p.context), dbPath);
     });
 
-    // בחירה קיימת של המשתמש אינה נדרסת — אבל אז היא גם מצביעה למקום אחר,
-    // וזה בדיוק המצב שבו צריך לומר לו להצביע ידנית.
-    test('הגדרה קיימת שמצביעה למקום אחר מייצרת התרעה ולא נדרסת', () async {
+    test(
+      'הגדרה שמצביעה על ספרייה קיימת מייצרת התרעה עם סיבה ולא נדרסת',
+      () async {
+        if (!await canApply()) return;
+        await Directory(otzariaRoot).create(recursive: true);
+        final other = p.join(tempDir.path, 'old-library', 'books');
+        await Directory(other).create(recursive: true);
+        await File(p.join(other, 'seforim.db')).writeAsString('x');
+        await const OtzariaSettingsWriter().pointLibraryAt(
+          dataRootPath: otzariaRoot,
+          dbPath: p.join(other, 'seforim.db'),
+        );
+
+        final dbPath = p.join(tempDir.path, 'usb', 'seforim.db');
+        await Directory(p.dirname(dbPath)).create(recursive: true);
+
+        final notSet = <String>[];
+        final reasons = <String>[];
+        await manager.applyUpdate(
+          freshCheck(dbPath),
+          onLibraryLocationNotSet: notSet.add,
+          onLibraryLocationFailure: reasons.add,
+        );
+
+        expect(notSet, [dbPath]);
+        expect(reasons, hasLength(1));
+        expect(reasons.single, contains(p.join(other, 'seforim.db')));
+        final settings = await const OtzariaSettingsReader().read(otzariaRoot);
+        expect(settings?.libraryPath, other);
+      },
+    );
+
+    test('הגדרה שמצביעה למיקום שאינו זמין אינה נדרסת', () async {
       if (!await canApply()) return;
       await Directory(otzariaRoot).create(recursive: true);
-      final other = p.join(tempDir.path, 'old-library', 'books');
+      final gone = p.join(tempDir.path, 'unplugged', 'books');
       await const OtzariaSettingsWriter().pointLibraryAt(
         dataRootPath: otzariaRoot,
-        dbPath: p.join(other, 'seforim.db'),
+        dbPath: p.join(gone, 'seforim.db'),
+      );
+
+      final dbPath = p.join(tempDir.path, 'usb', 'seforim.db');
+      await Directory(p.dirname(dbPath)).create(recursive: true);
+
+      final notSet = <String>[];
+      final reasons = <String>[];
+      await manager.applyUpdate(
+        freshCheck(dbPath),
+        onLibraryLocationNotSet: notSet.add,
+        onLibraryLocationFailure: reasons.add,
+      );
+
+      expect(notSet, [dbPath]);
+      expect(reasons.single, contains(gone));
+      final settings = await const OtzariaSettingsReader().read(otzariaRoot);
+      expect(settings?.libraryPath, gone);
+    });
+
+    test('הגדרה שמצביעה למקום ריק מכוונת מחדש אל הספרייה שהותקנה', () async {
+      if (!await canApply()) return;
+      await Directory(otzariaRoot).create(recursive: true);
+      final empty = p.join(tempDir.path, 'empty-library', 'books');
+      await Directory(empty).create(recursive: true);
+      await const OtzariaSettingsWriter().pointLibraryAt(
+        dataRootPath: otzariaRoot,
+        dbPath: p.join(empty, 'seforim.db'),
       );
 
       final dbPath = p.join(tempDir.path, 'usb', 'seforim.db');
@@ -1460,13 +1517,11 @@ void main() {
         onLibraryLocationNotSet: notSet.add,
       );
 
-      expect(notSet, [dbPath]);
+      expect(notSet, isEmpty);
       final settings = await const OtzariaSettingsReader().read(otzariaRoot);
-      expect(settings?.libraryPath, other);
+      expect(settings?.resolveDbPath(path: p.context), dbPath);
     });
 
-    // קופסה פגומה/מוצפנת מוחזרת מהקורא כ-`null`, בדיוק כמו קופסה שאינה
-    // קיימת. כתיבה לתוכה עלולה להחמיר, ולכן היא נחסמת.
     test('קופסה שלא ניתן לקרוא אינה נכתבת', () async {
       if (!await canApply()) return;
       await Directory(otzariaRoot).create(recursive: true);
@@ -1478,12 +1533,16 @@ void main() {
       await Directory(p.dirname(dbPath)).create(recursive: true);
 
       final notSet = <String>[];
+      final reasons = <String>[];
       await manager.applyUpdate(
         freshCheck(dbPath),
         onLibraryLocationNotSet: notSet.add,
+        onLibraryLocationFailure: reasons.add,
       );
 
       expect(notSet, [dbPath]);
+      expect(reasons, hasLength(1));
+      expect(reasons.single, contains(otzariaRoot));
       expect(await boxFile.readAsString(), before);
     });
 

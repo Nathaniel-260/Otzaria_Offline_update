@@ -15,20 +15,25 @@ import 'github_fetch.dart';
 
 typedef SemanticAsset = ({String name, int size, String sha256});
 
-/// מתקין את נתוני החיפוש בנתיבי אוצריא, בלי לשנות את ההסכמה שלה.
 class SemanticSearchAssets {
   SemanticSearchAssets({
     http.Client? httpClient,
     ExternalLibrary? nativeLibrary,
     DownloadScheduler? scheduler,
-  }) : _client = httpClient ?? http.Client(),
+    int? Function(String)? freeBytesFor,
+  }) : _injectedClient = httpClient,
        _nativeLibrary = nativeLibrary,
        _scheduler = scheduler ?? DownloadScheduler(),
+       _freeBytesFor = freeBytesFor ?? DiskSpaceProbe.freeBytesFor,
        _ownsClient = httpClient == null;
 
-  final http.Client _client;
+  final http.Client? _injectedClient;
+  http.Client? _createdClient;
+  http.Client get _client =>
+      _injectedClient ?? (_createdClient ??= http.Client());
   Duration timeout = const Duration(seconds: 30);
   final DownloadScheduler _scheduler;
+  final int? Function(String) _freeBytesFor;
   final bool _ownsClient;
   final ExternalLibrary? _nativeLibrary;
   static Future<void>? _nativeInitialization;
@@ -74,12 +79,11 @@ class SemanticSearchAssets {
   );
 
   Never _httpFailure(int status) => throw FormatException(
-    '${AppL10n.strings.libraryDomain.companionAssetMissingInRelease(_name)}'
-    ' (HTTP $status)',
+    AppL10n.strings.libraryDomain.companionAssetHttpFailure(_name, status),
   );
 
   void dispose() {
-    if (_ownsClient) _client.close();
+    if (_ownsClient) _createdClient?.close();
   }
 
   static void _cancel(bool Function()? isCancelled) {
@@ -409,8 +413,6 @@ class SemanticSearchAssets {
   }
 
   static final _generationName = RegExp(r'^v\d+-[A-Za-z0-9._+-]+$');
-
-  /// קובץ מודל תקין (גודל+sha) בדור הנוכחי או בדור קודם, או `null`. פומבי לטסטים.
   Future<String?> reusableModelSource({
     required String mirrorDir,
     required String libraryTag,
@@ -435,8 +437,6 @@ class SemanticSearchAssets {
     return null;
   }
 
-  /// מוחק דורות ישנים אחרי sync מוצלח; כשל מחיקה (כונן לקריאה בלבד) אינו כשל.
-  /// פומבי לטסטים.
   Future<void> pruneOldGenerations(String mirrorDir, String keepTag) async {
     try {
       await for (final entry in Directory(mirrorDir).list(followLinks: false)) {
@@ -464,7 +464,8 @@ class SemanticSearchAssets {
         manifest['libraryReleaseTag'] != tag ||
         manifest['files'] is! List ||
         manifest['segment'] is! Map ||
-        (manifest['segment'] as Map)['size'] is! int) {
+        (manifest['segment'] as Map)['size'] is! int ||
+        ((manifest['segment'] as Map)['size'] as int) < 0) {
       _invalid();
     }
     final files = <SemanticAsset>[];
@@ -572,10 +573,14 @@ class SemanticSearchAssets {
     }
   }
 
-  Future<({Map<String, dynamic> metadata, List<SemanticAsset> files})?> _load(
-    String mirrorDir,
-    int version,
-  ) async {
+  Future<
+    ({
+      Map<String, dynamic> metadata,
+      List<SemanticAsset> files,
+      int segmentSize,
+    })?
+  >
+  _load(String mirrorDir, int version) async {
     final meta = await _metadata(mirrorDir);
     if (meta == null || meta['libraryVersion'] != version) return null;
     final tag = meta['libraryTag'] as String;
@@ -587,11 +592,8 @@ class SemanticSearchAssets {
     final path = p.join(mirrorDir, tag, 'vectors', manifestFile.name);
     if (!await _matches(path, manifestFile)) return null;
     try {
-      final files = _vectors(
-        jsonDecode(await File(path).readAsString()),
-        tag,
-        version,
-      );
+      final manifest = jsonDecode(await File(path).readAsString());
+      final files = _vectors(manifest, tag, version);
       for (final group in [(modelFolder, modelFiles), ('vectors', files)]) {
         for (final file in group.$2) {
           final source = File(p.join(mirrorDir, tag, group.$1, file.name));
@@ -600,7 +602,11 @@ class SemanticSearchAssets {
           }
         }
       }
-      return (metadata: meta, files: [...files, manifestFile]);
+      return (
+        metadata: meta,
+        files: [...files, manifestFile],
+        segmentSize: (manifest['segment'] as Map)['size'] as int,
+      );
     } on FileSystemException {
       return null;
     } on FormatException {
@@ -633,7 +639,6 @@ class SemanticSearchAssets {
     return false;
   }
 
-  /// מצביע הדור והמניפסט תואמים למבנה segment_set של מנוע אוצריא.
   Future<bool> _activeMatches(String vectors, Map<String, dynamic> meta) async {
     for (final pointerName in const ['CURRENT', 'PREVIOUS']) {
       try {
@@ -737,6 +742,19 @@ class SemanticSearchAssets {
     return segmentPath;
   }
 
+  void _ensureSpace(String path, int needed) {
+    final free = _freeBytesFor(path);
+    if (free == null || free >= needed) return;
+    throw FileSystemException(
+      AppL10n.strings.libraryDomain.notEnoughDiskSpace(
+        path,
+        DiskSpaceProbe.formatBytes(needed),
+        DiskSpaceProbe.formatBytes(free),
+      ),
+      path,
+    );
+  }
+
   Future<void> install({
     required String mirrorDir,
     required String dbPath,
@@ -758,6 +776,13 @@ class SemanticSearchAssets {
         .where((file) => file.name != data.metadata['manifestName'])
         .toList();
     final concatenated = parts.length > 1 ? parts : const <SemanticAsset>[];
+    _ensureSpace(p.join(root, 'vectors'), data.segmentSize);
+    if (concatenated.isNotEmpty) {
+      _ensureSpace(
+        Directory.systemTemp.path,
+        concatenated.fold(0, (size, file) => size + file.size),
+      );
+    }
     for (final group in [(modelFolder, modelFiles), ('vectors', data.files)]) {
       for (final file in group.$2) {
         if (concatenated.contains(file)) continue;
@@ -792,6 +817,7 @@ class SemanticSearchAssets {
         final source = p.join(generation, modelFolder, file.name);
         final target = p.join(p.dirname(dbPath), modelFolder, file.name);
         if (await _matches(target, file, isCancelled)) continue;
+        _ensureSpace(p.dirname(target), file.size);
         await Directory(p.dirname(target)).create(recursive: true);
         final temporary = '$target.tmp';
         await File(source).copy(temporary);
@@ -821,6 +847,7 @@ class SemanticSearchAssets {
       });
       await beforeActivate?.call();
       _cancel(isCancelled);
+      _ensureSpace(p.join(root, 'vectors'), data.segmentSize);
       await engine.installSemanticVectors(
         input: SemanticVectorsInstallInput(
           vectorsDir: p.join(root, 'vectors'),

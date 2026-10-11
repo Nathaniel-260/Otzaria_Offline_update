@@ -37,7 +37,12 @@ class PluginMirrorStore {
   String get filesDir => p.join(pluginsDir, 'files');
   String get catalogPath => p.join(pluginsDir, catalogFileName);
 
-  String pluginDir(String pluginId) => p.join(filesDir, pluginId);
+  String pluginDir(String pluginId) {
+    if (!StorePlugin.isValidId(pluginId)) {
+      throw ArgumentError.value(pluginId, 'pluginId');
+    }
+    return p.join(filesDir, pluginId);
+  }
 
   /// נתיב מוחלט לנכס שנשמר בקטלוג כנתיב יחסי.
   String absolutePath(String relativePath) =>
@@ -50,8 +55,20 @@ class PluginMirrorStore {
 
   /// מרכיב נתיב מוחלט מנתיב יחסי בסגנון POSIX שנשמר בקטלוג. חשוף כ-static
   /// כדי שגם שכבת ה-UI תוכל לבנות נתיבי תמונות בלי לגשת לדיסק.
-  static String resolveAgainst(String root, String relativePath) =>
-      p.joinAll([root, ...relativePath.split('/').where((s) => s.isNotEmpty)]);
+  static String resolveAgainst(String root, String relativePath) {
+    if (!isSafeRelative(relativePath)) {
+      throw ArgumentError.value(relativePath, 'relativePath');
+    }
+    return p.joinAll([
+      root,
+      ...relativePath.split('/').where((s) => s.isNotEmpty),
+    ]);
+  }
+
+  static bool isSafeRelative(String relativePath) =>
+      !relativePath.contains('\\') &&
+      !relativePath.contains(':') &&
+      !relativePath.split('/').contains('..');
 
   Future<void> ensureDirs() async {
     await Directory(filesDir).create(recursive: true);
@@ -83,6 +100,7 @@ class PluginMirrorStore {
   Future<bool> hasAsset(String? relativePath) async =>
       relativePath != null &&
       relativePath.isNotEmpty &&
+      isSafeRelative(relativePath) &&
       await File(absolutePath(relativePath)).exists();
 
   Future<bool> hasFileFor(StorePlugin plugin, String? version) async {
@@ -119,13 +137,21 @@ class PluginMirrorStore {
       for (final path in await pendingFilesFor(plugin))
         p.normalize(path).toLowerCase(),
       for (final file in plugin.localFiles.values)
-        p.normalize(absolutePath(file.relativePath)).toLowerCase(),
+        if (isSafeRelative(file.relativePath))
+          p.normalize(absolutePath(file.relativePath)).toLowerCase(),
+      for (final media in [plugin.imagePath, ...plugin.screenshotPaths])
+        if (media != null && isSafeRelative(media))
+          p.normalize(absolutePath(media)).toLowerCase(),
     };
     var removed = 0;
     await for (final entry in dir.list()) {
       if (entry is! File) continue;
       final name = p.basename(entry.path).toLowerCase();
-      if (!name.startsWith('plugin')) continue;
+      if (!name.startsWith('plugin') &&
+          !name.startsWith('image.') &&
+          !name.startsWith('screenshot-')) {
+        continue;
+      }
       if (keep.contains(p.normalize(entry.path).toLowerCase())) continue;
       try {
         await entry.delete();

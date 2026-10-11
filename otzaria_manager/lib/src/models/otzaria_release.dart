@@ -89,6 +89,7 @@ class OtzariaRelease extends Equatable {
     required this.installerAssetName,
     required this.installerDownloadUrl,
     required this.installerSizeBytes,
+    this.installerSha256,
     this.releaseNotes,
   });
 
@@ -111,6 +112,7 @@ class OtzariaRelease extends Equatable {
   final String installerAssetName;
   final String installerDownloadUrl;
   final int installerSizeBytes;
+  final String? installerSha256;
 
   /// עותק עם [releaseNotes] מוחלף — משמש להעדיף פסקה מיומן השינויים
   /// המרוכז (ראו `OtzariaChangelogClient`) על פני תיאור ה-release הגולמי.
@@ -124,6 +126,7 @@ class OtzariaRelease extends Equatable {
         installerAssetName: installerAssetName,
         installerDownloadUrl: installerDownloadUrl,
         installerSizeBytes: installerSizeBytes,
+        installerSha256: installerSha256,
         releaseNotes: releaseNotes,
       );
 
@@ -137,8 +140,15 @@ class OtzariaRelease extends Equatable {
         'installerAssetName': installerAssetName,
         'installerDownloadUrl': installerDownloadUrl,
         'installerSizeBytes': installerSizeBytes,
+        if (installerSha256 != null) 'installerSha256': installerSha256,
         'releaseNotes': releaseNotes,
       };
+
+  static String? normalizedSha256(Object? raw) {
+    if (raw is! String) return null;
+    final hex = raw.trim().toLowerCase().replaceFirst('sha256:', '');
+    return RegExp(r'^[0-9a-f]{64}$').hasMatch(hex) ? hex : null;
+  }
 
   /// זורק [FormatException] על JSON חסר/פגום — הקורא מתייחס לזה כ"אין מראה
   /// תקינה" ומבקש הורדה מחדש.
@@ -166,6 +176,7 @@ class OtzariaRelease extends Equatable {
       installerAssetName: json['installerAssetName'] as String,
       installerDownloadUrl: (json['installerDownloadUrl'] as String?) ?? '',
       installerSizeBytes: json['installerSizeBytes'] as int,
+      installerSha256: normalizedSha256(json['installerSha256']),
       releaseNotes: json['releaseNotes'] as String?,
     );
   }
@@ -181,6 +192,7 @@ class OtzariaRelease extends Equatable {
         installerAssetName,
         installerDownloadUrl,
         installerSizeBytes,
+        installerSha256,
         releaseNotes,
       ];
 }

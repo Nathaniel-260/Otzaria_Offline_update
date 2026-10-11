@@ -138,14 +138,14 @@ class ZstdStreamException implements Exception {
   const ZstdStreamException(this.message);
   final String message;
   @override
-  String toString() => 'ZstdStreamException: $message';
+  String toString() => message;
 }
 
 class ZstdOutputLimitExceeded extends ZstdStreamException {
   const ZstdOutputLimitExceeded(this.limit, super.message);
   final int limit;
   @override
-  String toString() => 'ZstdOutputLimitExceeded: $message';
+  String toString() => message;
 }
 
 DynamicLibrary? _openLibrary() {

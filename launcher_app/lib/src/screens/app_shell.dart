@@ -647,7 +647,15 @@ class _AppShellState extends State<AppShell> {
       _customApps.isLearning ||
       _customApps.isDownloadingAll ||
       _plugins.isExporting ||
+      _plugins.isSyncing ||
       _exitPending;
+
+  bool get _pluginSyncBlockedElsewhere =>
+      _downloads.isDownloading ||
+      _library.isApplying ||
+      _library.status == LibraryModuleStatus.updating ||
+      _otzaria.status == OtzariaModuleStatus.installing ||
+      _customApps.isBusy;
 
   bool get _exitPending => _elevationPending || _launcherUpdate.isInstalling;
 
@@ -948,6 +956,7 @@ class _AppShellState extends State<AppShell> {
             onRequestFocus: () => _goTo(LauncherScreen.plugins),
             readOnly: widget.readOnly,
             driveFull: widget.driveFull,
+            busyElsewhere: _pluginSyncBlockedElsewhere,
           ),
         LauncherScreen.settings => SettingsScreen(
             controller: widget.settings,
@@ -1073,9 +1082,23 @@ class _ShellDownloadHost implements MirrorDownloadHost {
   void stateChanged() => _shell._rebuild();
 
   @override
-  void downloadCancelled() {
+  void downloadSnapshotFailed(Object error) {
+    AppLogger.instance.info('mirror snapshot failed: $error');
+    UiSnack.show(AppL10n.strings.home.downloadSnapshotFailedSnack);
+  }
+
+  @override
+  void downloadCancelled({Object? revertError}) {
+    if (revertError != null) {
+      AppLogger.instance
+          .info('revert after cancelled download failed: $revertError');
+    }
     unawaited(_shell._maybeOfferElevation());
-    UiSnack.show(AppL10n.strings.home.downloadCancelledSnack);
+    UiSnack.show(
+      revertError == null
+          ? AppL10n.strings.home.downloadCancelledSnack
+          : AppL10n.strings.home.downloadCancelRevertFailedSnack,
+    );
   }
 
   @override

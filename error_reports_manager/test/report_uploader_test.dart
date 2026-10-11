@@ -181,6 +181,73 @@ void main() {
     expect((await sender.upload(outbox)).sent, 1);
   });
 
+  test('200 בלי success על דיווח אחד אינו חוסם לנצח את שאר התיבה', () async {
+    final outbox = MemoryOutbox(['a', 'b']);
+    final sender = uploader((req) async {
+      final id = (jsonDecode(req.body) as Map)['id'];
+      return id == 'a'
+          ? http.Response('<html>blocked</html>', 200)
+          : http.Response(_ok, 200);
+    });
+
+    for (var run = 1; run < ErrorReportUploader.maxUnconfirmedAnswers; run++) {
+      final result = await sender.upload(outbox);
+      expect(result.error, isNotNull);
+      expect(result.sent, 0);
+    }
+    final result = await sender.upload(outbox);
+
+    expect(result.error, isNotNull);
+    expect(result.sent, 1);
+    expect(outbox.reports.map((r) => r.reportId), ['a']);
+  });
+
+  test('דיווח שדולג אינו נשלח שוב לפני חלון ההמתנה', () async {
+    final outbox = MemoryOutbox(['a']);
+    var posts = 0;
+    final sender = uploader((_) async {
+      posts++;
+      return http.Response('<html>blocked</html>', 200);
+    });
+    for (var run = 0; run < ErrorReportUploader.maxUnconfirmedAnswers; run++) {
+      await sender.upload(outbox);
+    }
+    final before = posts;
+
+    final result = await sender.upload(outbox);
+
+    expect(posts, before);
+    expect(result.remaining, 1);
+    expect(result.error, isNotNull);
+  });
+
+  test('דיווח שדולג נשלח אחרי חלון המתנה כשהשרת התאושש', () async {
+    final outbox = MemoryOutbox(['a', 'b']);
+    var recovered = false;
+    final requests = <String>[];
+    final sender = uploader((req) async {
+      final id = (jsonDecode(req.body) as Map)['id'] as String;
+      requests.add(id);
+      return http.Response(
+          id == 'a' && !recovered ? '<html>blocked</html>' : _ok, 200);
+    });
+    addTearDown(sender.close);
+    for (var run = 0; run < ErrorReportUploader.maxUnconfirmedAnswers; run++) {
+      await sender.upload(outbox);
+    }
+    expect(outbox.reports.map((r) => r.reportId), ['a']);
+
+    recovered = true;
+    time.now = time.now.add(sender.batchInterval);
+    final result = await sender.upload(outbox);
+
+    expect(requests.where((id) => id == 'a'), hasLength(4));
+    expect(result.sent, 1);
+    expect(result.remaining, 0);
+    expect(result.error, isNull);
+    expect(outbox.reports, isEmpty);
+  });
+
   Future<MemoryOutbox> dumpOutbox({bool withLog = true}) async {
     final outbox = MemoryOutbox([]);
     await outbox.write(

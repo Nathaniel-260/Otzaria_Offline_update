@@ -692,11 +692,42 @@ void main() {
       expect(await service.getPendingReportsCount(), 1);
       expect(await service.getSentReports(), isEmpty);
 
+      final old = DateTime.now().subtract(const Duration(days: 2));
+      tmpSent.setLastModifiedSync(old);
+      tmpPending.setLastModifiedSync(old);
       await service.cleanupStaleTemp();
       expect(tmpSent.existsSync(), isFalse);
       expect(tmpPending.existsSync(), isFalse);
       expect(bad.existsSync(), isTrue);
       expect(await service.getPendingReportsCount(), 1);
+    });
+
+    test('ניקוי בעלייה משאיר קובץ זמני טרי של כתיבה שעוד רצה', () async {
+      final service = build(MockClient((_) async => http.Response('', 503)));
+      await service.queueReport(_report());
+      final dir = AppReportService.dirIn(tmp.path);
+      final inFlight = File(p.join(dir, 'sent.json.123-4-5.tmp'))
+        ..writeAsStringSync('{"tot');
+
+      await service.cleanupStaleTemp();
+
+      expect(inFlight.existsSync(), isTrue);
+    });
+
+    test('כתיבות מקבילות של אותו דיווח אינן מאבדות אותו', () async {
+      final service = build(MockClient((_) async => http.Response('', 503)));
+      final report = _report();
+
+      await Future.wait([
+        for (var i = 0; i < 10; i++) service.queueReport(report),
+        service.cleanupStaleTemp(),
+      ]);
+
+      expect(await service.getPendingReportsCount(), 1);
+      final pending = Directory(
+        p.join(AppReportService.dirIn(tmp.path), 'pending'),
+      ).listSync().map((e) => p.basename(e.path));
+      expect(pending.where((n) => n.endsWith('.tmp')), isEmpty);
     });
 
     test('כשל בכתיבת הרשומה לא נרשם כשגיאה שלא נתפסה אלא דרך log', () async {
@@ -832,6 +863,34 @@ void main() {
       Directory(dir).listSync().where((e) => e.path.endsWith('.bad')),
       hasLength(1),
     );
+  });
+
+  test('קובץ היסטוריה פגום שקורא מחזיק זמנית עדיין מועבר ל-.bad', () async {
+    final dir = AppReportService.dirIn(tmp.path);
+    Directory(dir).createSync(recursive: true);
+    final sentFile = File(p.join(dir, 'sent.json'))
+      ..writeAsStringSync('{corrupt');
+    final handle = sentFile.openSync();
+    var released = false;
+    final service = AppReportService(
+      directory: dir,
+      client: MockClient((_) async => _json(200, {'success': true})),
+      log: (message) {
+        if (released || !message.contains('corrupt')) return;
+        released = true;
+        Timer(const Duration(milliseconds: 80), handle.closeSync);
+      },
+    );
+    services.add(service);
+
+    await service.send(_report());
+    expect(released, isTrue);
+
+    expect(
+      Directory(dir).listSync().where((e) => e.path.endsWith('.bad')),
+      hasLength(1),
+    );
+    expect(await service.getSentReports(), hasLength(1));
   });
 
   test('submitPendingReport על רשומה שכבר אינה בתור: notPending, בלי שליחה',

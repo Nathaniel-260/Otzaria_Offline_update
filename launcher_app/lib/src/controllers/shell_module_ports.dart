@@ -190,12 +190,15 @@ class CancelledDownloadRollback implements DownloadRollback {
 
   @override
   Future<void> rollback() async {
-    await _undo.revert();
-    await refreshAfterCancelledDownload(
-      otzaria: _otzaria,
-      library: _library,
-      plugins: _plugins,
-      before: _before,
-    );
+    try {
+      await _undo.revert();
+    } finally {
+      await refreshAfterCancelledDownload(
+        otzaria: _otzaria,
+        library: _library,
+        plugins: _plugins,
+        before: _before,
+      );
+    }
   }
 }

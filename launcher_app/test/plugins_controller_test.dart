@@ -1048,6 +1048,27 @@ void main() {
       expect(controller.lastSyncFailed, isTrue);
     });
 
+    test('isSyncing is already true in the first notification', () async {
+      final seen = <bool>[];
+      controller.addListener(() => seen.add(controller.isSyncing));
+
+      final run = controller.sync();
+      await run;
+
+      expect(seen, isNotEmpty);
+      expect(seen.first, isTrue);
+      expect(controller.isSyncing, isFalse);
+    });
+
+    test('a second sync while one runs joins the same run', () async {
+      final first = controller.sync();
+      final second = controller.sync();
+
+      expect(identical(first, second), isTrue);
+      await first;
+      expect(controller.isSyncing, isFalse);
+    });
+
     test('a new sync drops the previous outcome', () async {
       controller.lastSyncOutcome = const PluginSyncOutcome(
         catalog: PluginCatalog.empty,

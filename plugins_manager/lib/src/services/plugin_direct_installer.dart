@@ -127,6 +127,23 @@ abstract final class PluginDirectInstaller {
   static String installLocalUrl(String pluginFilePath) =>
       'otzaria://plugin/install-local?path=${Uri.encodeComponent(pluginFilePath)}';
 
+  static bool isSafeExternalUrl(String url) {
+    if (url.runes.any((r) => r < 0x21 || r == 0x7f)) return false;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    final scheme = uri.scheme.toLowerCase();
+    return (scheme == 'http' || scheme == 'https') && uri.host.isNotEmpty;
+  }
+
+  static Future<PluginInstallResult> openExternalUrl(String url) async {
+    if (!isSafeExternalUrl(url)) {
+      return PluginInstallResult.failure(
+        AppL10n.strings.pluginsDomain.otzariaOpenFailed(url),
+      );
+    }
+    return openProtocolUrl(url);
+  }
+
   /// פותח כתובת דרך מטפל הפרוטוקול של מערכת ההפעלה. לא נעשה שימוש ב-
   /// `url_launcher` מאותה סיבה כמו ב-`FileReveal`: כאן רוצים בדיוק דבר
   /// אחד — למסור את ה-URL למערכת — וזה שונה בין הפלטפורמות.
@@ -145,9 +162,10 @@ abstract final class PluginDirectInstaller {
       if (direct != null) return direct;
 
       if (Platform.isWindows) {
-        // הארגומנט הריק הראשון הוא הכותרת של החלון עבור `start`; בלעדיו
-        // `start` מפרש URL במרכאות ככותרת ולא פותח כלום.
-        final result = await Process.run('cmd', ['/c', 'start', '', url]);
+        final result = await Process.run('rundll32', [
+          'url.dll,FileProtocolHandler',
+          url,
+        ]);
         if (result.exitCode != 0) {
           return PluginInstallResult.failure(
             '${strings.otzariaOpenFailedHint}(${result.stderr})',

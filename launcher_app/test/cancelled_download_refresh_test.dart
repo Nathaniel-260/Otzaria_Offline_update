@@ -141,6 +141,21 @@ void main() {
     await deleteTempDir(tempDir);
   });
 
+  test('the refresh runs even when the revert throws', () {
+    final source =
+        File('lib/src/controllers/shell_module_ports.dart').readAsStringSync();
+    final start = source.indexOf('Future<void> rollback() async {');
+    final body = source.substring(start);
+    final revert = body.indexOf('await _undo.revert()');
+    final finallyAt = body.indexOf('finally {', revert);
+    final refresh = body.indexOf('refreshAfterCancelledDownload(', finallyAt);
+
+    expect(start, greaterThan(-1));
+    expect(body.lastIndexOf('try {', revert), greaterThan(-1));
+    expect(finallyAt, greaterThan(revert));
+    expect(refresh, greaterThan(finallyAt));
+  });
+
   test('a reverted app download is no longer proven up to date', () async {
     writeAppMirror();
     await otzaria.checkForUpdate();

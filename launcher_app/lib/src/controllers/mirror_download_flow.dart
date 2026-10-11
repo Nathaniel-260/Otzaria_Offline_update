@@ -42,7 +42,8 @@ abstract interface class MirrorDownloadHost {
   Future<DownloadRollback> captureRollback();
   Future<void> sweepMirror();
   void stateChanged();
-  void downloadCancelled();
+  void downloadSnapshotFailed(Object error);
+  void downloadCancelled({Object? revertError});
   void downloadEnded();
   void downloadFinished({
     required List<MirrorComponent> failed,
@@ -141,50 +142,72 @@ class MirrorDownloadFlow {
     _cancelRequested = false;
     host.stateChanged();
 
-    final rollback = await host.captureRollback();
-    bool cancelled() => _cancelRequested;
+    try {
+      final DownloadRollback rollback;
+      try {
+        rollback = await host.captureRollback();
+      } catch (error) {
+        _isDownloading = false;
+        _cancelRequested = false;
+        host.stateChanged();
+        host.downloadSnapshotFailed(error);
+        return;
+      }
+      bool cancelled() => _cancelRequested;
 
-    if (plan.runsApp(s)) await app.download(isCancelled: cancelled);
-    if (!cancelled() && plan.runsLibrary(s)) {
-      await library.download(
-        includeSemanticSearch: includeSemanticSearch,
-        isCancelled: cancelled,
-      );
-    }
-    if (!cancelled() && plan.runsPlugins(s)) {
-      await plugins.sync(isCancelled: cancelled);
-    }
-    if (!cancelled() && plan.runsStoreApp(s)) {
-      await plugins.syncStoreApp();
-    }
+      if (plan.runsApp(s)) await app.download(isCancelled: cancelled);
+      if (!cancelled() && plan.runsLibrary(s)) {
+        await library.download(
+          includeSemanticSearch: includeSemanticSearch,
+          isCancelled: cancelled,
+        );
+      }
+      if (!cancelled() && plan.runsPlugins(s)) {
+        await plugins.sync(isCancelled: cancelled);
+      }
+      if (!cancelled() && plan.runsStoreApp(s)) {
+        await plugins.syncStoreApp();
+      }
 
-    if (cancelled()) {
-      await rollback.rollback();
+      if (cancelled()) {
+        Object? revertError;
+        try {
+          await rollback.rollback();
+        } catch (error) {
+          revertError = error;
+        }
+        if (!host.isActive) return;
+        _isDownloading = false;
+        _cancelRequested = false;
+        host.stateChanged();
+        host.downloadCancelled(revertError: revertError);
+        return;
+      }
       if (!host.isActive) return;
+
       _isDownloading = false;
-      _cancelRequested = false;
       host.stateChanged();
-      host.downloadCancelled();
-      return;
-    }
-    if (!host.isActive) return;
+      host.downloadEnded();
 
-    _isDownloading = false;
-    host.stateChanged();
-    host.downloadEnded();
-
-    final failed = plan.failed(
-      s,
-      appFailed: app.downloadFailed,
-      libraryFailed: library.downloadFailed,
-      pluginsFailed: plugins.lastSyncFailed,
-    );
-    if (failed.isEmpty &&
-        !library.downloadNeedsRetry &&
-        !host.launcherDownloading) {
-      _sweep = _sweepMirror();
+      final failed = plan.failed(
+        s,
+        appFailed: app.downloadFailed,
+        libraryFailed: library.downloadFailed,
+        pluginsFailed: plugins.lastSyncFailed,
+      );
+      if (failed.isEmpty &&
+          !library.downloadNeedsRetry &&
+          !host.launcherDownloading) {
+        _sweep = _sweepMirror();
+      }
+      host.downloadFinished(failed: failed, skipped: plan.skipped);
+    } finally {
+      if (_isDownloading) {
+        _isDownloading = false;
+        _cancelRequested = false;
+        if (host.isActive) host.stateChanged();
+      }
     }
-    host.downloadFinished(failed: failed, skipped: plan.skipped);
   }
 
   Future<void> _sweepMirror() async {

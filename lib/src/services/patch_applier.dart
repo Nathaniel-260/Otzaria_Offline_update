@@ -87,7 +87,7 @@ class PatchApplyException implements Exception {
   final String message;
   const PatchApplyException(this.message);
   @override
-  String toString() => 'PatchApplyException: $message';
+  String toString() => message;
 }
 
 /// בוחר את סדר ה-hash לפי גרסת הסכמה, מתוך [kHashTableOrderBySchemaVersion].

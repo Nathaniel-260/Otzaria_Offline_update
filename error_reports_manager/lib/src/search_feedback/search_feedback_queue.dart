@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:path/path.dart' as p;
 import 'search_feedback_events.dart';
 import 'search_feedback_queue_lock.dart';
@@ -387,7 +388,10 @@ Future<void> _recoverPurge(String path) async {
             name == 'strikes.json' ||
             name == 'strikes.json.tmp' ||
             name == 'queue-state.json' ||
-            name == 'queue-state.json.tmp')) {
+            name == 'queue-state.json.tmp' ||
+            isAtomicTempNameOf(name, 'strikes.json') ||
+            isAtomicTempNameOf(name, 'queue-state.json') ||
+            (name.endsWith('.tmp') && name.contains('.jsonl.')))) {
       await entity.delete();
     }
   }

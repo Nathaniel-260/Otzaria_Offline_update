@@ -7,6 +7,7 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/app_descriptor.dart';
+import '../models/app_descriptor_id.dart';
 import '../models/stored_installer.dart';
 import 'file_digest.dart';
 import 'known_locations_store.dart';
@@ -44,7 +45,10 @@ class CustomAppStore {
 
   String get appsDir => p.join(mirrorRootDir, 'apps');
 
-  String dirFor(String id) => p.join(appsDir, id);
+  String dirFor(String id) {
+    if (!AppDescriptorId.isValid(id)) throw ArgumentError.value(id, 'id');
+    return p.join(appsDir, id);
+  }
 
   String descriptorPathFor(String id) =>
       p.join(dirFor(id), _descriptorFileName);
@@ -166,6 +170,7 @@ class CustomAppStore {
   /// עצמה** — הסרה כאן פירושה "אל תנהל לי אותה יותר", לא "הסר אותה מהמחשב",
   /// והדיאלוג בממשק חייב לומר זאת.
   Future<void> remove(String id) async {
+    if (!AppDescriptorId.isValid(id)) return;
     final dir = Directory(dirFor(id));
     if (await dir.exists()) await dir.delete(recursive: true);
   }

@@ -15,10 +15,16 @@ bool isAtomicTempNameOf(String fileName, String target) {
   return name.startsWith('${target.toLowerCase()}.') && name.endsWith('.tmp');
 }
 
-Future<void> writeStringAtomically(String path, String contents) {
+Future<void> writeStringAtomically(String path, String contents) =>
+    _enqueue(path, (temp) => temp.writeAsString(contents, flush: true));
+
+Future<void> writeBytesAtomically(String path, List<int> bytes) =>
+    _enqueue(path, (temp) => temp.writeAsBytes(bytes, flush: true));
+
+Future<void> _enqueue(String path, Future<void> Function(File temp) write) {
   final key = _atomicWriteKey(path);
   final previous = _atomicWriteQueues[key] ?? Future<void>.value();
-  final result = previous.then((_) => _writeStringAtomically(path, contents));
+  final result = previous.then((_) => _writeAtomically(path, write));
   final tail = result.then<void>((_) {}, onError: (Object _) {});
   _atomicWriteQueues[key] = tail;
   tail.whenComplete(() {
@@ -36,10 +42,13 @@ String _atomicWriteKey(String path) {
       : absolute;
 }
 
-Future<void> _writeStringAtomically(String path, String contents) async {
+Future<void> _writeAtomically(
+  String path,
+  Future<void> Function(File temp) write,
+) async {
   final temp = File(atomicTempPathFor(path));
   try {
-    await temp.writeAsString(contents, flush: true);
+    await write(temp);
     await renameRetryingTransient(() => temp.rename(path));
   } catch (_) {
     try {

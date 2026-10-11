@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../services/app_logger.dart';
+import '../services/serial_queue.dart';
 import '../settings/faq_customization.dart';
 
 /// מחזיק את ההתאמות שהמשתמש עשה להדרכה וכותב אותן לדיסק. אותה כתיבה אטומית
@@ -31,10 +32,12 @@ class FaqController extends ChangeNotifier {
     }
   }
 
-  Future<void> update(FaqCustomization next) async {
+  final SerialQueue _queue = SerialQueue();
+
+  Future<void> update(FaqCustomization next) {
     _value = next;
     notifyListeners();
-    await _save();
+    return _queue.run(_save);
   }
 
   Future<void> _save() async {

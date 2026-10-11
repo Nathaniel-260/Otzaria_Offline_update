@@ -1224,10 +1224,10 @@ void main() {
         isCancelled: () => cancelled,
       );
 
-      expect(site.requests.where((r) => r.contains('shot-')), [
-        '/api/plugins/a/shot-0',
-        '/api/plugins/a/shot-1',
-      ]);
+      expect(
+        site.requests.where((r) => r.contains('shot-')),
+        contains('/api/plugins/a/shot-1'),
+      );
       expect(warningsOf(events), isEmpty);
       final a = outcome.catalog.plugins.firstWhere((p) => p.id == 'a');
       expect(a.screenshotPaths, previousShots);
@@ -1856,6 +1856,99 @@ void main() {
       final second = await syncOutcome(site, isCancelled: () => cancelled);
       expect(second.fetched, 0);
       expect(site.requestsMatching('/download'), hasLength(6));
+    });
+  });
+
+  group('הקשחה', () {
+    test('מזהה תוסף שאינו בטוח כמקטע נתיב מדולג ואינו נוגע בדיסק', () async {
+      final plugins = _Site.defaultPlugins();
+      for (final id in ['../evil', 'a/b', '', 'אלף']) {
+        plugins.add({
+          'id': id,
+          'name': 'רע',
+          'version': '1.0.0',
+          'downloadUrl': '/api/plugins/evil/download',
+        });
+      }
+      final site = _Site(plugins: plugins);
+
+      final outcome = await syncOutcome(site);
+
+      expect(outcome.catalog.plugins.map((e) => e.id), ['a', 'b']);
+      expect(site.requestsMatching('/evil/download'), isEmpty);
+      expect(
+        Directory(p.join(temp.path, 'plugins', 'files'))
+            .listSync()
+            .map((e) => p.basename(e.path))
+            .toSet(),
+        {'a', 'b'},
+      );
+      expect(Directory(p.join(temp.path, 'evil')).existsSync(), isFalse);
+    });
+
+    test('תוסף שכבר במראה ומזההו נדחה עכשיו נשמר בקטלוג עם קבציו ועם אזהרה',
+        () async {
+      final store = PluginMirrorStore(temp.path);
+      await store.ensureDirs();
+      final file = File(store.absolutePath('files/alef/plugin-1.0.0.otzplugin'))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(pluginBytes('{"id":"alef"}'));
+      final seeded = StorePlugin.fromApi(
+        {'id': 'אלף', 'name': 'אלף ישן', 'version': '1.0.0'},
+        'https://otzaria.test',
+      ).copyWith(
+        localFiles: {
+          '1.0.0': PluginLocalFile(
+            relativePath: 'files/alef/plugin-1.0.0.otzplugin',
+            fileName: 'plugin.otzplugin',
+            ext: '.otzplugin',
+            size: file.lengthSync(),
+          ),
+        },
+      );
+      await store.save(PluginCatalog(
+        lastSync: DateTime.now(),
+        plugins: [seeded],
+      ));
+      final plugins = _Site.defaultPlugins()
+        ..add({
+          'id': 'אלף',
+          'name': 'אלף',
+          'version': '2.0.0',
+          'downloadUrl': '/api/plugins/evil/download',
+        });
+      final site = _Site(plugins: plugins);
+      final events = <PluginSyncProgress>[];
+
+      final outcome = await syncOutcome(site, events: events);
+
+      expect(outcome.catalog.plugins.map((e) => e.id), ['a', 'b', 'אלף']);
+      final kept = outcome.catalog.plugins.last;
+      expect(kept.localFiles.keys, ['1.0.0']);
+      expect(file.existsSync(), isTrue);
+      expect(site.requestsMatching('/evil/download'), isEmpty);
+      expect(warningsOf(events),
+          contains(strings.syncPluginFileFailed('אלף ישן', 'אלף')));
+    });
+
+    test('צילומי מסך של תוסף יורדים במקביל ונשמרים בסדר המקורי', () async {
+      final shots = [for (var i = 0; i < 3; i++) '/api/plugins/a/shot-$i'];
+      final site = _Site(plugins: _Site.defaultPlugins(screenshots: shots));
+      final allStarted = Completer<void>();
+      var started = 0;
+      site.beforeResponse = (path) async {
+        if (!path.contains('/shot-')) return;
+        if (++started == 3) allStarted.complete();
+        await allStarted.future.timeout(const Duration(seconds: 5));
+      };
+
+      final catalog = await sync(site);
+
+      expect(catalog.plugins.first.screenshotPaths, [
+        'files/a/screenshot-0.png',
+        'files/a/screenshot-1.png',
+        'files/a/screenshot-2.png',
+      ]);
     });
   });
 }

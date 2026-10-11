@@ -72,9 +72,6 @@ class LibraryModuleController extends ChangeNotifier
               otzariaLaunchPath: otzariaLaunchPath,
             );
 
-  /// מחליף ערוץ גרסאות — נכנס לתוקף בבדיקה/הורדה הבאה.
-  set allowPrerelease(bool value) => _manager.allowPrerelease = value;
-
   set personalUpdateMode(bool value) {
     if (_manager.personalUpdateMode == value) return;
     _manager.personalUpdateMode = value;
@@ -753,6 +750,8 @@ class LibraryModuleController extends ChangeNotifier
           },
           onStateWarning: (error) => AppLogger.instance
               .warn('רישום מצב העדכון נכשל — הבדיקה הבאה תציע שוב: $error'),
+          onLibraryLocationFailure: (reason) => AppLogger.instance
+              .warn('סיבת הכשל בכתיבת מיקום הספרייה: $reason'),
           onLibraryLocationNotSet: (dbPath) {
             locationNotSetFor = dbPath;
             AppLogger.instance

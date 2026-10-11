@@ -258,4 +258,17 @@ void main() {
   test('הסרה של מה שאינו קיים אינה שגיאה', () async {
     await store.remove('אין-כזה');
   });
+
+  test('מזהה שאינו תקין אינו מוחק דבר ואינו הופך לנתיב', () async {
+    await store.add(descriptor());
+    final outside = writeFile(p.join(root, 'keep.txt'));
+
+    for (final id in ['..', '.', '', '../apps', 'a/b', r'a\b']) {
+      await store.remove(id);
+      expect(() => store.dirFor(id), throwsArgumentError, reason: id);
+    }
+
+    expect(File(outside).existsSync(), isTrue);
+    expect(await store.load('org.example.app'), isNotNull);
+  });
 }

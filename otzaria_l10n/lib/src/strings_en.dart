@@ -310,6 +310,12 @@ class _Home extends HomeStrings {
   String get downloadCancelledSnack =>
       'The download was cancelled, and what it had fetched was deleted';
   @override
+  String get downloadSnapshotFailedSnack =>
+      'The download did not start: the mirror state could not be saved beforehand, so a cancel could not restore it';
+  @override
+  String get downloadCancelRevertFailedSnack =>
+      'The download was cancelled, but deleting what it fetched failed. Partial files may remain in the mirror';
+  @override
   String downloadSkippedSnack(String components) =>
       'Skipped $components — nothing new for them online';
   @override
@@ -2316,6 +2322,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get fullDbExtractionFailed =>
       'Extracting the full database failed or produced nothing';
   @override
+  String get fullDbNeedsNativeZstd =>
+      'Extracting the full database requires the zstd library, which is not available on this computer';
+  @override
   String versionMismatchAfterWrite(int? actual, int? expected) =>
       'After writing the full database, the version read back ($actual) does '
       'not match the target ($expected) — it was rolled back.';
@@ -2434,6 +2443,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String companionAssetMissingInRelease(String name) =>
       'No file for $name was found in the latest release';
+  @override
+  String companionAssetHttpFailure(String name, int status) =>
+      'No file for $name was found in the latest release (HTTP $status)';
   @override
   String companionExtractionFailed(String name) => 'Extracting $name failed';
   @override

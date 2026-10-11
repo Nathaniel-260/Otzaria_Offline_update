@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:path/path.dart' as p;
 
 import '../port/app_report.dart';
@@ -442,7 +443,7 @@ class AppReportService {
         if (!await dir.exists()) continue;
         await for (final entity in dir.list()) {
           if (entity is File && entity.path.endsWith('.tmp')) {
-            await _deleteQuietly(entity);
+            await _deleteIfStale(entity);
           }
         }
       }
@@ -513,12 +514,22 @@ class AppReportService {
     final error = result.error;
     if (error != null) {
       log?.call('App report queue file unreadable, set aside: $error');
-      try {
-        await File(meta.path).rename('${meta.path}.bad');
-      } catch (_) {}
+      await _renameWithRetry(File(meta.path), '${meta.path}.bad');
       return null;
     }
     return result.read;
+  }
+
+  static Future<void> _renameWithRetry(File file, String target) async {
+    for (var attempt = 0; attempt < 5; attempt++) {
+      try {
+        await file.rename(target);
+        return;
+      } on FileSystemException {
+        if (!await file.exists()) return;
+        await Future<void>.delayed(Duration(milliseconds: 50 * (attempt + 1)));
+      }
+    }
   }
 
   static Future<List<_PendingDecoded>> _decodeManyInIsolate(
@@ -568,6 +579,17 @@ class AppReportService {
     if (meta != null) await _deleteQuietly(File(meta.path));
   }
 
+  static const Duration staleTempAge = Duration(hours: 1);
+
+  static Future<void> _deleteIfStale(File temp) async {
+    try {
+      final age = DateTime.now().difference(await temp.lastModified());
+      if (age > staleTempAge) await temp.delete();
+    } on FileSystemException {
+      return;
+    }
+  }
+
   static Future<void> _deleteQuietly(File file) async {
     try {
       if (await file.exists()) await file.delete();
@@ -579,9 +601,7 @@ class AppReportService {
   /// קובץ זמני ואז `rename`, כדי שכשל באמצע לא ישאיר JSON חתוך.
   static Future<void> _writeAtomic(File file, String content) async {
     await file.parent.create(recursive: true);
-    final temp = File('${file.path}.tmp');
-    await temp.writeAsString(content, flush: true);
-    await temp.rename(file.path);
+    await writeStringAtomically(file.path, content);
   }
 
   /// קריאת ההיסטוריה לתצוגה: אינה מסודרת ב-`_sentTail`, ולכן **אינה נוגעת
@@ -612,11 +632,7 @@ class AppReportService {
         // כל שגיאת פענוח (גם TypeError משדה בסוג שגוי) היא קובץ פגום — אחרת
         // כל כתיבה נכשלת, ודיווחים שנשלחו נשלחים שוב כשכפילויות.
         log?.call('App report history corrupt: $error');
-        if (setAside) {
-          try {
-            await file.rename('${file.path}.bad');
-          } catch (_) {}
-        }
+        if (setAside) await _renameWithRetry(file, '${file.path}.bad');
         return _SentHistory(0, []);
       }
     }

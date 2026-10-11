@@ -11,6 +11,7 @@ import '../services/app_logger.dart';
 import '../services/coalescing_loader.dart';
 import '../services/custom_app_detection_snapshot.dart';
 import '../services/exe_icon_extractor.dart';
+import '../services/serial_queue.dart';
 import 'dispose_guard.dart';
 import 'progress_notifier.dart';
 
@@ -159,7 +160,9 @@ class CustomAppsController extends ChangeNotifier
   /// הן תוספת, והמסך מסתדר בלעדיהן לגמרי.
   List<CustomAppCategory> categories = const [];
 
-  bool isBusy = false;
+  int _busyCount = 0;
+  bool get isBusy => _busyCount > 0;
+  final SerialQueue _mediaQueue = SerialQueue();
   String? errorMessage;
 
   /// דולק כל זמן שממתינים לרישום ההסרה אחרי התקנה — עד דקה, כי קוד יציאה 0
@@ -733,18 +736,19 @@ class CustomAppsController extends ChangeNotifier
     String id, {
     String? iconSource,
     List<String> screenshotSources = const [],
-  }) async {
-    final saved = await _guard(
-      () => _manager.saveMedia(
-        id,
-        iconSource: iconSource,
-        screenshotSources: screenshotSources,
-      ),
-    );
-    if (saved == null) return false;
-    await load();
-    return true;
-  }
+  }) =>
+      _mediaQueue.run(() async {
+        final saved = await _guard(
+          () => _manager.saveMedia(
+            id,
+            iconSource: iconSource,
+            screenshotSources: screenshotSources,
+          ),
+        );
+        if (saved == null) return false;
+        await load();
+        return true;
+      });
 
   /// מאיזה קובץ הרצה אפשר לחלץ אייקון לתוכנה הזו, או `null` כשאין.
   ///
@@ -778,6 +782,21 @@ class CustomAppsController extends ChangeNotifier
     if (filled) await load();
   }
 
+  Future<bool> _saveFilledIcon(String id, String extracted) async {
+    final live = apps.where((a) => a.descriptor.id == id).firstOrNull;
+    if (live == null ||
+        live.descriptor.iconFile != null ||
+        !live.descriptor.autoIcon) {
+      return false;
+    }
+    await _manager.saveMedia(
+      id,
+      iconSource: extracted,
+      screenshotSources: screenshotPathsOf(live.descriptor),
+    );
+    return true;
+  }
+
   Future<bool> _fillIcon(CustomAppView app) async {
     final descriptor = app.descriptor;
     // אייקון שכבר יש, או משתמש שהסיר אחד במפורש — לא נוגעים.
@@ -790,14 +809,8 @@ class CustomAppsController extends ChangeNotifier
     if (extracted == null) return false;
 
     try {
-      // ⚠️ צילומי המסך נמסרים שוב: `saveMedia` כותב את **כל** המדיה
-      // מחדש, ובלעדיהם מילוי האייקון היה מוחק אותם.
-      await _manager.saveMedia(
-        descriptor.id,
-        iconSource: extracted,
-        screenshotSources: screenshotPathsOf(descriptor),
-      );
-      return true;
+      return await _mediaQueue
+          .run(() => _saveFilledIcon(descriptor.id, extracted));
     } catch (e) {
       AppLogger.instance.warn('שמירת האייקון של ${descriptor.id} נכשלה: $e');
       return false;
@@ -938,7 +951,7 @@ class CustomAppsController extends ChangeNotifier
 
   /// מריץ פעולה, מסמן עסוק, ולוכד את ההודעה המתורגמת של החבילה.
   Future<T?> _guard<T>(Future<T> Function() action) async {
-    isBusy = true;
+    _busyCount++;
     errorMessage = null;
     notifyListeners();
     try {
@@ -952,7 +965,7 @@ class CustomAppsController extends ChangeNotifier
       errorMessage = '$e';
       return null;
     } finally {
-      isBusy = false;
+      _busyCount--;
       notifyListeners();
     }
   }

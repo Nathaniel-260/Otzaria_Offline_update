@@ -5,6 +5,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:path/path.dart' as p;
 import 'package:pinenacl/ed25519.dart' as ed;
 
@@ -104,15 +105,18 @@ class SearchFeedbackIdentityStore {
   Future<void> save(SearchFeedbackIdentity identity) async {
     final file = await _file();
     await file.parent.create(recursive: true);
-    final temp = File('${file.path}.tmp');
-    await temp.writeAsString(jsonEncode(identity.toJson()), flush: true);
-    await temp.rename(file.path);
+    await writeStringAtomically(file.path, jsonEncode(identity.toJson()));
   }
 
   Future<void> delete() async {
     final file = await _file();
-    for (final target in [file, File('${file.path}.tmp')]) {
-      if (await target.exists()) await target.delete();
+    if (await file.exists()) await file.delete();
+    if (!await file.parent.exists()) return;
+    await for (final entity in file.parent.list()) {
+      if (entity is File &&
+          isAtomicTempNameOf(p.basename(entity.path), p.basename(file.path))) {
+        await entity.delete();
+      }
     }
   }
 }

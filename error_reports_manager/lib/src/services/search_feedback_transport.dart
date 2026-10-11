@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:path/path.dart' as p;
 
 import '../search_feedback/search_feedback_backoff.dart';
@@ -124,12 +125,10 @@ class SearchFeedbackTransport {
           await File(p.join(destination, '.dirty'))
               .writeAsString('', flush: true);
           final target = File(p.join(destination, claimed));
-          final temp = File('${target.path}.tmp');
-          await temp.writeAsString(
+          await writeStringAtomically(
+            target.path,
             '${batch.contextJson}\n${batch.eventLines.join('\n')}\n',
-            flush: true,
           );
-          await temp.rename(target.path);
         } finally {
           await lock.release();
         }
@@ -316,8 +315,6 @@ class SearchFeedbackTransport {
   }
 
   static Future<void> _replace(File file, String contents) async {
-    final temp = File('${file.path}.tmp');
-    await temp.writeAsString(contents, flush: true);
-    await temp.rename(file.path);
+    await writeStringAtomically(file.path, contents);
   }
 }

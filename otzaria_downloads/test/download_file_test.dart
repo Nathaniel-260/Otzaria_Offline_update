@@ -376,4 +376,48 @@ void main() {
     expect(requests, 2);
     expect(await File(target).readAsString(), 'abcdef');
   });
+
+  test('a redirect from https to http is refused and leaves no file', () async {
+    final client = _FinalUrlClient(Uri.parse('http://example.test/app.exe'));
+    addTearDown(client.close);
+
+    await expectLater(download(client), throwsA(isA<StateError>()));
+
+    expect(await File(target).exists(), isFalse);
+    expect(await File('$target.part').exists(), isFalse);
+  });
+
+  test('a redirect that stays on https is followed', () async {
+    final client =
+        _FinalUrlClient(Uri.parse('https://cdn.example.test/app.exe'));
+    addTearDown(client.close);
+
+    await download(client);
+
+    expect(await File(target).readAsString(), 'abcdef');
+  });
+}
+
+class _FinalUrlClient extends http.BaseClient {
+  _FinalUrlClient(this.finalUrl);
+
+  final Uri finalUrl;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      _FinalUrlResponse(
+        Stream.value(utf8.encode('abcdef')),
+        200,
+        url: finalUrl,
+        contentLength: 6,
+      );
+}
+
+class _FinalUrlResponse extends http.StreamedResponse
+    implements http.BaseResponseWithUrl {
+  _FinalUrlResponse(super.stream, super.statusCode,
+      {required this.url, super.contentLength});
+
+  @override
+  final Uri url;
 }

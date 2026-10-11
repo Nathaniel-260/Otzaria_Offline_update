@@ -845,12 +845,14 @@ invisible to it (forum post 39342). `OtzariaSettingsWriter.pointLibraryAt` write
 the library location only after a **fresh** install: the box is
 opened in place (there is no other way), `key-library-path` is set to the DB's
 folder with an empty `key-library-folder-name` — exactly what `EmptyLibraryBloc`
-writes — and **only when the setting is still empty**. An existing value is the
-user's choice and is never overwritten; it is also what decided where we
-installed, so it already points here unless the user picked a different target.
-A failure returns `false`, `applyUpdate` reports it through
-`onLibraryLocationNotSet`, and the UI tells the user to point Otzaria at the
-folder. Reading stays copy-only — do not turn the reader into an in-place open.
+writes — when the setting is empty, **or** when it points at a reachable folder
+that holds no `seforim.db` (Otzaria wrote its own default while a long install
+was running). A value that points at an existing library, a relative path, or a
+folder whose parent is missing (unplugged drive) is the user's choice and is
+never overwritten. A failure makes `_pointOtzariaAtFreshDb` return a reason:
+`applyUpdate` passes it to `onLibraryLocationFailure` (logged by the launcher),
+then calls `onLibraryLocationNotSet`, and the UI tells the user to point Otzaria
+at the folder. Reading stays copy-only — do not turn the reader into an in-place open.
 The writer also records smart-search consent only after its explicit dialog;
 the same Hive safeguards below apply (`grantSearchFeedbackConsent`).
 Five things make that in-place open safe, and each one is a bug that the review

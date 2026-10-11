@@ -6,3 +6,49 @@ import 'package:crypto/crypto.dart';
 /// קורא בזרם, כי קובץ התקנה יכול להיות מאות MB.
 Future<String> sha256OfFile(String path) async =>
     (await sha256.bind(File(path).openRead()).first).toString();
+
+class _DigestCapture implements Sink<Digest> {
+  late final Digest value;
+
+  @override
+  void add(Digest data) => value = data;
+
+  @override
+  void close() {}
+}
+
+const copyFlushThreshold = 4 << 20;
+
+Future<String> copyFileWithSha256(String from, String to) =>
+    copyStreamWithSha256(File(from).openRead(), File(to).openWrite());
+
+Future<String> copyStreamWithSha256(
+  Stream<List<int>> source,
+  IOSink out, {
+  int flushEvery = copyFlushThreshold,
+}) async {
+  final capture = _DigestCapture();
+  final hasher = sha256.startChunkedConversion(capture);
+  var succeeded = false;
+  try {
+    var buffered = 0;
+    await for (final chunk in source) {
+      hasher.add(chunk);
+      out.add(chunk);
+      buffered += chunk.length;
+      if (buffered >= flushEvery) {
+        await out.flush();
+        buffered = 0;
+      }
+    }
+    hasher.close();
+    succeeded = true;
+  } finally {
+    try {
+      await out.close();
+    } catch (_) {
+      if (succeeded) rethrow;
+    }
+  }
+  return capture.value.toString();
+}

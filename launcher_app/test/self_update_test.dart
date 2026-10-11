@@ -406,6 +406,25 @@ void main() {
       expect(await mirror.load(), isNull);
     });
 
+    test('נתיב קובץ שיוצא מתיקיית המראה נחשב "אין מראה"', () async {
+      final synced = await mirror.sync(_release());
+      final outside = File(p.join(temp.path, 'outside.exe'))
+        ..writeAsStringSync('abcd');
+      final metadata = File(p.join(mirror.mirrorDir, 'latest-release.json'));
+      final json =
+          jsonDecode(await metadata.readAsString()) as Map<String, dynamic>;
+      final platforms = json['platforms'];
+      final own =
+          platforms is Map<String, dynamic> ? platforms['windows'] : null;
+      (own is Map<String, dynamic> ? own : json)['filePath'] =
+          '../../outside.exe';
+      await metadata.writeAsString(jsonEncode(json));
+
+      expect(outside.existsSync(), isTrue);
+      expect(synced.filePath, isNotEmpty);
+      expect(await mirror.load(), isNull);
+    });
+
     test('מטא-דאטה פגומה נחשבת "אין מראה"', () async {
       await Directory(mirror.mirrorDir).create(recursive: true);
       await File(p.join(mirror.mirrorDir, 'latest-release.json'))

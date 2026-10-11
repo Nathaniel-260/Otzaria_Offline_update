@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'serial_queue.dart';
+
 /// זוכר על אילו תוכנות נוספות כבר קפצה הודעת "ממתינות על הכונן"
 /// **במחשב הזה**, כדי שהיא תיאמר פעם אחת בלבד ולא בכל הרצה.
 ///
@@ -18,6 +20,8 @@ class AnnouncedAppsStore {
 
   final File _file;
   final String _host;
+
+  late final SerialQueue _queue = SerialQueue.forKey(_file.path);
 
   /// המזהים שכבר הוצגו במחשב הזה. קובץ חסר או פגום = "עוד לא הוצג כלום",
   /// וזו גם התשובה הנכונה: הודעה כפולה עדיפה על הודעה שלא נאמרה מעולם.
@@ -41,8 +45,12 @@ class AnnouncedAppsStore {
 
   /// מוסיף מזהים לרשימת המוצגים של המחשב הזה. כשל כתיבה אינו שגיאה שמוצגת
   /// למשתמש — לכל היותר ההודעה תחזור בהרצה הבאה.
-  Future<void> record(Iterable<String> ids) async {
-    if (ids.isEmpty) return;
+  Future<void> record(Iterable<String> ids) {
+    if (ids.isEmpty) return Future<void>.value();
+    return _queue.run(() => _recordNow(ids));
+  }
+
+  Future<void> _recordNow(Iterable<String> ids) async {
     try {
       final all = await _loadAll();
       final existing = all[_host] ?? const <String>[];

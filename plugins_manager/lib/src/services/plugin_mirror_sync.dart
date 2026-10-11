@@ -22,7 +22,11 @@ class PluginMirrorSync {
     required this.client,
     required this.store,
     this.maxConcurrentPlugins = defaultMaxConcurrentPlugins,
+    this.maxConcurrentScreenshots = defaultMaxConcurrentScreenshots,
+    this.catalogGuard,
   });
+
+  static const int defaultMaxConcurrentScreenshots = 3;
 
   /// ארבעה תוספים בו-זמנית. ראו [runPooled]: הקבצים כאן קטנים והזמן הולך
   /// על סיבובי הלוך-חזור, ולכן זה בדיוק המקום שבו מקביליות משתלמת.
@@ -32,10 +36,10 @@ class PluginMirrorSync {
 
   final PluginStoreClient client;
   final PluginMirrorStore store;
+  final Future<T> Function<T>(Future<T> Function() action)? catalogGuard;
 
-  /// כמה תוספים מסונכרנים בו-זמנית. כל אחד מהם עדיין מוריד את הנכסים שלו
-  /// בטור, כך שהתקרה חוסמת גם את מספר החיבורים בפועל.
   final int maxConcurrentPlugins;
+  final int maxConcurrentScreenshots;
 
   Future<bool> hasPendingMedia(
     StorePlugin plugin,
@@ -78,8 +82,24 @@ class PluginMirrorSync {
 
     final now = DateTime.now();
     final plans = [
-      for (final raw in remote) await _plan(raw, existing, appVersions, now),
+      for (final raw in remote)
+        if (StorePlugin.isValidId(
+            raw['id'] is String ? raw['id'] as String : ''))
+          await _plan(raw, existing, appVersions, now),
     ];
+    final keptInvalid = <StorePlugin>[];
+    for (final raw in remote) {
+      final rawId = raw['id'] is String ? raw['id'] as String : '';
+      final kept = StorePlugin.isValidId(rawId) ? null : existing[rawId];
+      if (kept == null) continue;
+      keptInvalid.add(kept);
+      report(
+        PluginSyncProgress(
+          phase: PluginSyncPhase.warning,
+          message: strings.syncPluginFileFailed(kept.name, rawId),
+        ),
+      );
+    }
     final todo = [
       for (final plan in plans)
         if (plan.hasWork) plan,
@@ -132,6 +152,7 @@ class PluginMirrorSync {
             (cancelled && plan.hasWork
                 ? (plan.previous ?? plan.plugin)
                 : plan.plugin),
+      ...keptInvalid,
     ];
     final syncedIds = {for (final plugin in plugins) plugin.id};
 
@@ -142,7 +163,7 @@ class PluginMirrorSync {
           )
         : await _syncStructure(syncedIds, previousCatalog, report);
 
-    final catalog = PluginCatalog(
+    final built = PluginCatalog(
       lastSync: DateTime.now(),
       plugins: [
         for (final plugin in plugins)
@@ -151,10 +172,23 @@ class PluginMirrorSync {
       categories: structure.categories,
       home: structure.home,
     );
-    await store.save(catalog);
+    Future<PluginCatalog> saveMerged() async {
+      final merged = _mergeConcurrentAdditions(
+        built,
+        previousCatalog,
+        await store.load(),
+      );
+      await store.save(merged);
+      return merged;
+    }
+
+    final guard = catalogGuard;
+    final catalog =
+        guard == null ? await saveMerged() : await guard(saveMerged);
 
     if (!cancelled) {
       for (final plugin in catalog.plugins) {
+        if (!plugin.hasValidId) continue;
         await store.pruneUnusedFiles(plugin);
       }
     }
@@ -178,6 +212,46 @@ class PluginMirrorSync {
           if (plan.isIncompatible)
             '${plan.plugin.name} (${plan.plugin.lowestSupportedApp ?? '?'})',
       ],
+    );
+  }
+
+  static PluginCatalog _mergeConcurrentAdditions(
+    PluginCatalog built,
+    PluginCatalog started,
+    PluginCatalog latest,
+  ) {
+    final startedById = {
+      for (final plugin in started.plugins) plugin.id: plugin
+    };
+    final latestById = {for (final plugin in latest.plugins) plugin.id: plugin};
+    return PluginCatalog(
+      lastSync: built.lastSync,
+      categories: built.categories,
+      home: built.home,
+      plugins: [
+        for (final plugin in built.plugins)
+          _withAddedFiles(
+              plugin, startedById[plugin.id], latestById[plugin.id]),
+      ],
+    );
+  }
+
+  static StorePlugin _withAddedFiles(
+    StorePlugin built,
+    StorePlugin? started,
+    StorePlugin? latest,
+  ) {
+    if (latest == null) return built;
+    final added = {
+      for (final entry in latest.localFiles.entries)
+        if (!built.localFiles.containsKey(entry.key) &&
+            started?.localFiles[entry.key] != entry.value)
+          entry.key: entry.value,
+    };
+    if (added.isEmpty && built.manifestId != null) return built;
+    return built.copyWith(
+      localFiles: {...built.localFiles, ...added},
+      manifestId: built.manifestId ?? latest.manifestId,
     );
   }
 
@@ -397,36 +471,45 @@ class PluginMirrorSync {
 
     if (plan.needsScreenshots) {
       final shotUrls = plugin.remoteScreenshotUrls;
-      final shots = <String>[];
+      final downloaded = List<String?>.filled(shotUrls.length, null);
       var interrupted = false;
-      for (var i = 0; i < shotUrls.length; i++) {
-        try {
-          final asset = await client.downloadAsset(
-            shotUrls[i],
-            p.join(dir, 'screenshot-$i'),
-            checkCancelled: () => _throwIfCancelled(cancelled),
-          );
-          shots.add(store.relativePath(asset.path));
-        } catch (e) {
-          result = result.copyWith(
-            screenshotsMediaVersion: plan.previousScreenshotsMediaVersion,
-            remoteScreenshotUrls: plan.previous?.remoteScreenshotUrls,
-          );
-          if (cancelled()) {
-            interrupted = true;
-            break;
-          }
-          report(
-            PluginSyncProgress(
-              phase: PluginSyncPhase.warning,
-              message: AppL10n.strings.pluginsDomain.syncScreenshotFailed(
-                plugin.name,
-                PluginStoreClient.describeError(e),
-              ),
-            ),
-          );
-        }
+      var failedAny = false;
+      await runPooled([
+        for (var i = 0; i < shotUrls.length; i++)
+          () async {
+            if (interrupted) return;
+            try {
+              final asset = await client.downloadAsset(
+                shotUrls[i],
+                p.join(dir, 'screenshot-$i'),
+                checkCancelled: () => _throwIfCancelled(cancelled),
+              );
+              downloaded[i] = store.relativePath(asset.path);
+            } catch (e) {
+              failedAny = true;
+              if (cancelled()) {
+                interrupted = true;
+                return;
+              }
+              report(
+                PluginSyncProgress(
+                  phase: PluginSyncPhase.warning,
+                  message: AppL10n.strings.pluginsDomain.syncScreenshotFailed(
+                    plugin.name,
+                    PluginStoreClient.describeError(e),
+                  ),
+                ),
+              );
+            }
+          },
+      ], maxConcurrent: maxConcurrentScreenshots);
+      if (failedAny) {
+        result = result.copyWith(
+          screenshotsMediaVersion: plan.previousScreenshotsMediaVersion,
+          remoteScreenshotUrls: plan.previous?.remoteScreenshotUrls,
+        );
       }
+      final shots = downloaded.whereType<String>().toList();
       if (shots.isNotEmpty && !interrupted) {
         result = result.copyWith(screenshotPaths: shots);
       }
@@ -571,6 +654,7 @@ class PluginMirrorSync {
     var interrupted = false;
 
     for (final target in plan.missingBuilds) {
+      Map<String, dynamic>? manifest;
       try {
         final asset = await client.downloadAsset(
           target.downloadUrl,
@@ -579,7 +663,10 @@ class PluginMirrorSync {
           requiredExt: PluginMirrorStore.pluginFileExt,
           expectedSize: target.fileSize,
           checkCancelled: () => _throwIfCancelled(cancelled),
-          isValid: (path) => PluginManifestReader.read(path) != null,
+          isValid: (path) {
+            manifest = PluginManifestReader.read(path);
+            return manifest != null;
+          },
         );
         files[target.version] = PluginLocalFile(
           relativePath: store.relativePath(asset.path),
@@ -589,7 +676,7 @@ class PluginMirrorSync {
           sourceUrl: target.downloadUrl,
           targetedAt: now,
         );
-        manifestId ??= PluginManifestReader.readId(asset.path);
+        manifestId ??= PluginManifestReader.idOf(manifest);
       } catch (e) {
         if (cancelled()) {
           interrupted = true;

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:seforim_library_updater/src/services/disk_space_probe.dart';
 import 'package:test/test.dart';
 
@@ -59,6 +60,22 @@ void main() {
     final tmp = Directory.systemTemp.createTempSync('fat_probe_test');
     addTearDown(() => tmp.deleteSync(recursive: true));
     expect(DiskSpaceProbe.isKnownFat('${tmp.path}/seforim.db'), isFalse);
+  });
+
+  test('formatBytes משתמש ביחידות המתורגמות ולא ב-GB/MB קבועים', () {
+    addTearDown(() => AppL10n.use(AppLanguage.hebrew));
+    AppL10n.use(AppLanguage.hebrew);
+    expect(
+      DiskSpaceProbe.formatBytes(3 << 20),
+      AppL10n.strings.units.megabytes('3'),
+    );
+    expect(
+      DiskSpaceProbe.formatBytes(3 << 30),
+      AppL10n.strings.units.gigabytes('3.0'),
+    );
+    expect(DiskSpaceProbe.formatBytes(3 << 20), isNot(contains('MB')));
+    AppL10n.use(AppLanguage.english);
+    expect(DiskSpaceProbe.formatBytes(3 << 20), '3 MB');
   });
 
   test('המגבלה היא 4GiB פחות בית', () {

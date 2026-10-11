@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'serial_queue.dart';
+
 /// זוכר אילו הודעות חד-פעמיות כבר הוצגו **במחשב הזה**, כדי שכל הודעה תיאמר
 /// פעם אחת בלבד ולא בכל הרצה. הודעה חדשה = מפתח חדש, בלי קובץ חדש.
 ///
@@ -21,13 +23,17 @@ class NoticesSeenStore {
   final File _file;
   final String _host;
 
+  late final SerialQueue _queue = SerialQueue.forKey(_file.path);
+
   /// קובץ חסר או פגום = "עוד לא הוצג כלום": הודעה כפולה עדיפה על הודעה
   /// שלא נאמרה מעולם.
   Future<bool> hasSeen(String key) async =>
       ((await _loadAll())[_host] ?? const <String>[]).contains(key);
 
   /// כשל כתיבה אינו שגיאה שמוצגת למשתמש — לכל היותר ההודעה תחזור בהרצה הבאה.
-  Future<void> markSeen(String key) async {
+  Future<void> markSeen(String key) => _queue.run(() => _markSeenNow(key));
+
+  Future<void> _markSeenNow(String key) async {
     try {
       final all = await _loadAll();
       final existing = all[_host] ?? const <String>[];

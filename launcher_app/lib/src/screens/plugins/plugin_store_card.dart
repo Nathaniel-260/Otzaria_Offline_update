@@ -56,9 +56,9 @@ class PluginStoreCard extends StatelessWidget {
                 StoreThumbnail(
                     imagePath: controller.assetPath(plugin.imagePath)),
                 if (plugin.isFeatured)
-                  Positioned(
+                  PositionedDirectional(
                     top: AppTokens.spaceSM,
-                    right: AppTokens.spaceSM,
+                    start: AppTokens.spaceSM,
                     child: StoreBadge(
                       label: t.badgeFeaturedShort,
                       icon: FluentIcons.star_24_regular,

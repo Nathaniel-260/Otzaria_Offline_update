@@ -323,4 +323,43 @@ void main() {
       );
     });
   });
+
+  group('openExternalUrl', () {
+    test('רק http ו-https עם מארח נחשבים בטוחים', () {
+      for (final url in [
+        'https://otzaria.org/plugin?a=1&b=2',
+        'http://example.com/a|b^c%20d',
+        'HTTPS://Example.com',
+      ]) {
+        expect(PluginDirectInstaller.isSafeExternalUrl(url), isTrue,
+            reason: url);
+      }
+      for (final url in [
+        'javascript:alert(1)',
+        'file:///c:/windows/system32/calc.exe',
+        'ftp://example.com/x',
+        'otzaria://plugin/install-local?path=x',
+        'https://',
+        'https:///x',
+        '//example.com',
+        'example.com',
+        '',
+        'https://example.com/ & calc',
+        'https://example.com/\ncalc',
+        '-a Calculator',
+      ]) {
+        expect(PluginDirectInstaller.isSafeExternalUrl(url), isFalse,
+            reason: url);
+      }
+    });
+
+    test('כתובת לא בטוחה נדחית ככשל בלי להפעיל תהליך', () async {
+      final result = await PluginDirectInstaller.openExternalUrl(
+        'file:///c:/windows/system32/calc.exe',
+      );
+
+      expect(result.success, isFalse);
+      expect(result.error, isNotEmpty);
+    });
+  });
 }

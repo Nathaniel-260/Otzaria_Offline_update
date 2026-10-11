@@ -38,6 +38,27 @@ void main() {
       expectParsed('  https://github.com/a/b  ', 'a', 'b');
     });
 
+    test('תווים שאינם חוקיים בשם בעלים או ריפו נדחים', () {
+      for (final raw in [
+        'a b/c',
+        'a/b c',
+        'a/..',
+        'a/.',
+        '-a/b',
+        'a_b/c',
+        'a%2F/b',
+        r'a\b/c',
+        'ow ner/repo',
+      ]) {
+        expect(GithubSource.parseUrl(raw), isNull, reason: raw);
+      }
+    });
+
+    test('שאילתה ועוגן בסוף הכתובת אינם חלק מהשם', () {
+      expectParsed('https://github.com/a/b?tab=readme', 'a', 'b');
+      expectParsed('https://github.com/a/b#readme', 'a', 'b');
+    });
+
     test('קלט שאינו ריפו נדחה', () {
       for (final raw in ['', '   ', 'github.com', 'https://example.com', 'a']) {
         expect(GithubSource.parseUrl(raw), isNull, reason: raw);

@@ -51,10 +51,15 @@ class GithubSource {
   /// מפרק כתובת GitHub שהמשתמש הדביק. מקבל גם `https://github.com/a/b`,
   /// גם עם `/releases` בסוף, גם עם `.git`, וגם `a/b` יבש — כי זה מה
   /// שאנשים מדביקים בפועל.
+  static final RegExp _ownerPattern =
+      RegExp(r'^[A-Za-z0-9][A-Za-z0-9-]{0,38}$');
+  static final RegExp _repoPattern = RegExp(r'^[A-Za-z0-9._-]{1,100}$');
+
   static ({String owner, String repo})? parseUrl(String raw) {
     var text = raw.trim();
     if (text.isEmpty) return null;
 
+    text = text.replaceFirst(RegExp(r'[?#].*$'), '');
     text = text.replaceFirst(RegExp(r'^https?://'), '');
     text = text.replaceFirst(RegExp(r'^(www\.)?github\.com/'), '');
     text = text.replaceFirst(RegExp(r'\.git$'), '');
@@ -68,7 +73,10 @@ class GithubSource {
     // הכול שאחרי `owner/repo` (releases, tree/main…) אינו מעניין אותנו.
     final owner = parts[0];
     final repo = parts[1];
-    if (owner.isEmpty || repo.isEmpty) return null;
+    if (!_ownerPattern.hasMatch(owner) || !_repoPattern.hasMatch(repo)) {
+      return null;
+    }
+    if (repo == '.' || repo == '..') return null;
     return (owner: owner, repo: repo);
   }
 }

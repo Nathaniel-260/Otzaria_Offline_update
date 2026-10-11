@@ -40,6 +40,7 @@ class PluginOnlinePeek {
     final sync = PluginMirrorSync(client: client, store: store);
     for (final raw in remote) {
       final plugin = StorePlugin.fromApi(raw, client.baseUrl);
+      if (!plugin.hasValidId) continue;
       if (await sync.hasPendingMedia(plugin, mirrored[plugin.id])) {
         pendingMedia.add(plugin.id);
       }
@@ -78,7 +79,7 @@ class PluginOnlinePeek {
     for (final raw in remote) {
       final plugin = StorePlugin.fromApi(raw, baseUrl);
       remoteIds.add(plugin.id);
-      if (plugin.id.isEmpty) continue;
+      if (!plugin.hasValidId) continue;
 
       final targets = [
         // תוסף שאין לו קובץ להוריד בכלל אינו "חסר" — אין מה להביא לו.

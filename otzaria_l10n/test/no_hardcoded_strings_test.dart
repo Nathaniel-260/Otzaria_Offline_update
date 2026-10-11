@@ -53,15 +53,7 @@ final _developerContext = RegExp(
 
 /// הפרות ידועות שטרם תוקנו — מוצמדות לרשימה סגורה כדי שיישארו גלויות
 /// ולא יגדלו.
-///
-/// שתיהן שמירות-שפיות פנימיות: הן נזרקות רק אם הלאנצ'ר עצמו קורא
-/// לפונקציה עם תוכנית מהסוג הלא נכון, ולכן המשתמש לעולם לא אמור לראות
-/// אותן. עדיין `LibraryApplyException`, ולכן הן נשארות ברשימה ולא בפטור.
 const _knownViolations = <String>{
-  'library_manager/lib/src/services/library_update_applier.dart|'
-      'applyDelta נקרא על תוכנית שאינה delta',
-  'library_manager/lib/src/services/library_update_applier.dart|'
-      'applyFullDownload נקרא על תוכנית שאינה fullDownload',
   // הודעת אבחון ליומן, לא מלל שמוצג במסך — היומן נקרא על ידי מי שמתחזק,
   // ותרגומו היה מקשה על השוואת דיווחים.
   'launcher_app/lib/src/services/startup_diagnostics.dart|'

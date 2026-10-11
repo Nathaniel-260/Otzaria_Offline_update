@@ -294,6 +294,12 @@ class _Home extends HomeStrings {
   @override
   String get downloadCancelledSnack => 'ההורדה בוטלה, ומה שירד בה נמחק';
   @override
+  String get downloadSnapshotFailedSnack =>
+      'ההורדה לא התחילה: לא ניתן היה לשמור את מצב המראה לפני ההורדה, ולכן ביטול לא היה יכול לשחזר אותו';
+  @override
+  String get downloadCancelRevertFailedSnack =>
+      'ההורדה בוטלה, אך מחיקת מה שירד בה נכשלה. ייתכנו קבצים חלקיים במראה';
+  @override
   String downloadSkippedSnack(String components) =>
       'דולג על $components — אין בהם שום דבר חדש ברשת';
   @override
@@ -2158,6 +2164,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get fullDbExtractionFailed => 'חילוץ ה-DB המלא נכשל או החזיר ריק';
   @override
+  String get fullDbNeedsNativeZstd =>
+      'חילוץ ה-DB המלא דורש את ספריית zstd, והיא אינה זמינה במחשב הזה';
+  @override
   String versionMismatchAfterWrite(int? actual, int? expected) =>
       'אחרי כתיבת ה-DB המלא, הגרסה שנקראה ($actual) לא תואמת ליעד '
       '($expected) — בוצע שחזור.';
@@ -2267,6 +2276,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String companionAssetMissingInRelease(String name) =>
       'לא נמצא קובץ של $name ב-release האחרון';
+  @override
+  String companionAssetHttpFailure(String name, int status) =>
+      'לא נמצא קובץ של $name ב-release האחרון (HTTP $status)';
   @override
   String companionExtractionFailed(String name) => 'חילוץ $name נכשל';
   @override

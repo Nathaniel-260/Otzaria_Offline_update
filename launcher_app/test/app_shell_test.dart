@@ -618,6 +618,31 @@ void main() {
     });
   });
 
+  group('חסימת הסנכרון והייצוא בזמן פעולה אחרת', () {
+    final source = _appShellSource();
+    final start = source.indexOf('bool get _pluginSyncBlockedElsewhere');
+    final getter = source.substring(
+      start,
+      source.indexOf('bool get _exitPending', start),
+    );
+
+    test('הגטר כולל הורדה, החלפת מסד, התקנת אוצריא ותוכנות מותאמות', () {
+      expect(start, greaterThan(-1));
+      expect(getter, contains('_downloads.isDownloading'));
+      expect(getter, contains('_library.isApplying'));
+      expect(getter, contains('LibraryModuleStatus.updating'));
+      expect(getter, contains('OtzariaModuleStatus.installing'));
+      expect(getter, contains('_customApps.isBusy'));
+    });
+
+    test('מסך התוספים מקבל אותו', () {
+      final screen = source.substring(source.indexOf('PluginsScreen('));
+      final args =
+          screen.substring(0, screen.indexOf('LauncherScreen.settings'));
+      expect(args, contains('busyElsewhere: _pluginSyncBlockedElsewhere'));
+    });
+  });
+
   group('_maybeOfferElevation', () {
     final source = _appShellSource();
     final start = source.indexOf('Future<void> _maybeOfferElevation()');
@@ -700,7 +725,7 @@ void main() {
         source.indexOf('class _ShellLauncherHost'),
       );
       final cancelled = host.substring(
-        host.indexOf('void downloadCancelled()'),
+        host.indexOf('void downloadCancelled('),
         host.indexOf('void downloadEnded()'),
       );
       final ended = host.substring(

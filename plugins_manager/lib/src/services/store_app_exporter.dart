@@ -307,7 +307,11 @@ class StoreAppExporter {
   /// רשומה שמצביעה מחוץ ל-`files/`. האחרון קורה רק בקטלוג פגום או שנערך
   /// ביד, ודילוג עליו עדיף על העתקת קובץ שרירותי מהכונן אל תיקיית היעד.
   Future<_CopiedAsset?> _copyAsset(String? relative, String pluginsDir) async {
-    if (relative == null || relative.isEmpty) return null;
+    if (relative == null ||
+        relative.isEmpty ||
+        !PluginMirrorStore.isSafeRelative(relative)) {
+      return null;
+    }
 
     final source = p.normalize(store.absolutePath(relative));
     final within = p.relative(source, from: p.normalize(store.filesDir));

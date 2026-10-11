@@ -34,7 +34,7 @@ class StoreAppMirror {
     http.Client? httpClient,
     this.connectTimeout = const Duration(seconds: 20),
     this.stallTimeout = const Duration(seconds: 30),
-  }) : _httpClient = httpClient ?? http.Client();
+  }) : _injectedClient = httpClient;
 
   /// `<dataDir>/mirror/store-app` — נוסע עם התוכנה על הכונן הנייד.
   final String mirrorDir;
@@ -42,7 +42,9 @@ class StoreAppMirror {
   Duration connectTimeout;
   Duration stallTimeout;
 
-  final http.Client _httpClient;
+  final http.Client? _injectedClient;
+  http.Client? _httpClient;
+  http.Client get _client => _httpClient ??= _injectedClient ?? http.Client();
 
   static const String _metadataFileName = 'latest-release.json';
   static const String _filesDirName = 'files';
@@ -198,7 +200,7 @@ class StoreAppMirror {
     void Function(int received, int total)? onProgress,
   }) async {
     return downloadFile(
-      client: _httpClient,
+      client: _client,
       url: url,
       destinationPath: destinationPath,
       expectedSize: expectedSizeBytes,
@@ -213,5 +215,5 @@ class StoreAppMirror {
     );
   }
 
-  void dispose() => _httpClient.close();
+  void dispose() => (_httpClient ?? _injectedClient)?.close();
 }

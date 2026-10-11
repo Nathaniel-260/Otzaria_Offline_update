@@ -44,6 +44,21 @@ void main() {
     expect(await store.loadNotified(), isNull);
   });
 
+  test('רישומים במקביל אינם מאבדים זה את זה', () async {
+    final a = KnownPluginsStore(tempDir.path, hostName: 'a');
+    final b = KnownPluginsStore(tempDir.path, hostName: 'a');
+
+    await Future.wait([
+      a.recordSeen(['1']),
+      b.recordNotified(['2']),
+      a.recordSeen(['3']),
+      b.recordNotified(['4']),
+    ]);
+
+    expect(await a.loadSeen(), {'1', '3'});
+    expect(await a.loadNotified(), {'2', '4'});
+  });
+
   test('כל מחשב רואה את הרשימה שלו בלבד', () async {
     await KnownPluginsStore(tempDir.path, hostName: 'a').recordSeen(['1']);
 

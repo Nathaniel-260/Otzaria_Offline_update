@@ -5,7 +5,8 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
-export 'src/atomic_file.dart' show isAtomicTempNameOf, writeStringAtomically;
+export 'src/atomic_file.dart'
+    show isAtomicTempNameOf, writeBytesAtomically, writeStringAtomically;
 export 'src/github_api.dart';
 
 class FileDownloadResult {
@@ -138,6 +139,12 @@ Future<FileDownloadResult> _downloadFile({
         }
       }, onError: (Object _) {}));
       final response = await pending.timeout(connectTimeout);
+      if (response case http.BaseResponseWithUrl(url: final finalUrl)) {
+        if (request.url.scheme == 'https' && finalUrl.scheme != 'https') {
+          await response.stream.listen((_) {}).cancel();
+          throw statusError(response.statusCode);
+        }
+      }
       if (offset > 0 && response.statusCode == 416) {
         await response.stream.listen((_) {}).cancel();
         await _delete(part);

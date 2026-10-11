@@ -376,18 +376,39 @@ class CompanionAssetsMirror {
     required String identity,
     required ByteProgressSlot progress,
     bool Function()? isCancelled,
-  }) {
-    return _downloader.downloadToFile(
+  }) async {
+    var target = destPath;
+    if (File(destPath).existsSync() &&
+        _downloader.storedResumeToken(destPath) != identity) {
+      final sameContent =
+          sha256 != null &&
+          size > 0 &&
+          await _downloader.verifyExistingFile(
+            destPath: destPath,
+            expectedSize: size,
+            expectedSha256: sha256,
+            resumeToken: identity,
+            isCancelled: isCancelled,
+          );
+      if (!sameContent) target = '$destPath.new';
+    }
+    await _downloader.downloadToFile(
       url: url,
-      destPath: destPath,
+      destPath: target,
       expectedSize: size > 0 ? size : null,
       expectedSha256: sha256,
       resumeToken: identity,
       onProgress: progress.report,
-      // קובץ נלווה שכבר על הכונן אינו יורד — ואינו נספר במד.
       onExistingBytes: progress.markExisting,
       isCancelled: isCancelled,
     );
+    if (target != destPath) {
+      await File(target).rename(destPath);
+      final stagedSidecar = File(PatchDownloader.resumeSidecarPath(target));
+      if (stagedSidecar.existsSync()) {
+        await stagedSidecar.rename(PatchDownloader.resumeSidecarPath(destPath));
+      }
+    }
   }
 
   /// ה-release העדכני שמכיל את נכס התלמוד: קודם `releases/latest`, ואם הנכס

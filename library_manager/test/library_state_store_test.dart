@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -489,8 +490,54 @@ void main() {
     });
   });
 
-  // נקודת המוצא של ההורדה במצב "עדכון אישי". הרשומה נוסעת על הכונן בין
-  // מחשבים, ולכן היא מפתח-לכל-מחשב והמינימום הוא מה שנקרא.
+  test('כתיבה שנתקעה בקובץ אחד אינה חוסמת קובץ state אחר', () async {
+    final stuck = LibraryStateStore.inDir(p.join(tempDir.path, 'stuck'));
+    unawaited(
+      runZoned(
+        () => stuck.saveAppliedRelease(tag: 'v1', dbVersion: 1),
+        zoneSpecification: ZoneSpecification(
+          scheduleMicrotask: (self, parent, zone, f) {},
+        ),
+      ),
+    );
+
+    final other = LibraryStateStore.inDir(p.join(tempDir.path, 'other'));
+    await other
+        .saveAppliedRelease(tag: 'v2', dbVersion: 2)
+        .timeout(const Duration(seconds: 10));
+
+    expect((await other.loadAppliedRelease())?.tag, 'v2');
+  });
+
+  test('שני מופעים על אותו קובץ מסתדרים בתור, בלי לאבד עדכון', () async {
+    final a = LibraryStateStore(statePath);
+    final b = LibraryStateStore(statePath);
+
+    await Future.wait([
+      a.saveDeliveredCompanions({'x': '1'}),
+      b.saveDeliveredCompanions({'y': '2'}),
+      a.recordKnownDbVersion('m1', 3),
+      b.recordKnownDbVersion('m2', 4),
+    ]);
+
+    expect(await a.loadDeliveredCompanions(), {'x': '1', 'y': '2'});
+    expect(await b.loadKnownDbVersions(), {'m1': 3, 'm2': 4});
+  });
+
+  test('כתיבות מקבילות של שדות שונים אינן דורסות זו את זו', () async {
+    await Future.wait([
+      store.saveAppliedRelease(tag: 'v7', dbVersion: 7),
+      store.saveDeliveredCompanions({'talmud': 'a'}),
+      store.recordKnownDbVersion('machine-a', 7),
+      store.recordKnownDbVersion('machine-b', 9),
+      store.saveCustomDbPath(p.join(tempDir.path, 'books', 'seforim.db')),
+    ]);
+
+    expect((await store.loadAppliedRelease())?.tag, 'v7');
+    expect(await store.loadDeliveredCompanions(), {'talmud': 'a'});
+    expect(await store.loadKnownDbVersions(), {'machine-a': 7, 'machine-b': 9});
+  });
+
   group('LibraryStateStore — גרסאות המסד שנרשמו', () {
     test('בלי רשומות — null, בלי לזרוק', () async {
       expect(await store.loadKnownDbVersions(), isEmpty);

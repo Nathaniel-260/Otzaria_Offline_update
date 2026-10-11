@@ -223,6 +223,99 @@ void main() {
     expect(requests, 0);
   });
 
+  test('installation checks unpacked vector space before writing', () async {
+    await writeMirror();
+    final root = p.dirname(p.dirname(db));
+    final checked = <String>[];
+    final installer = SemanticSearchAssets(
+      freeBytesFor: (path) {
+        checked.add(path);
+        return 2;
+      },
+    );
+    try {
+      await expectLater(
+        installer.install(mirrorDir: mirror, dbPath: db, libraryVersion: 30),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(checked, contains(p.join(root, 'vectors')));
+      expect(await Directory(root).exists(), isFalse);
+      expect(requests, 0);
+    } finally {
+      installer.dispose();
+    }
+  });
+
+  test('unknown free space does not block artifact verification', () async {
+    await writeMirror();
+    final installer = SemanticSearchAssets(freeBytesFor: (_) => null);
+    try {
+      await expectLater(
+        installer.install(mirrorDir: mirror, dbPath: db, libraryVersion: 30),
+        throwsFormatException,
+      );
+      expect(await Directory(p.dirname(db)).exists(), isFalse);
+      expect(requests, 0);
+    } finally {
+      installer.dispose();
+    }
+  });
+
+  test(
+    'split vectors require space for every part in the work volume',
+    () async {
+      await writeMirror();
+      final value = manifest();
+      final files = value['files'] as List;
+      files.add({
+        'file': 'segment.oxv.zst.part-2',
+        'size': 3,
+        'sha256': Sha256Stream.ofBytes([4, 5, 6]),
+      });
+      final vectors = p.join(mirror, tag, 'vectors');
+      await File(
+        p.join(vectors, 'segment.oxv.zst.part-2'),
+      ).writeAsBytes([4, 5, 6]);
+      final bytes = utf8.encode(jsonEncode(value));
+      await File(p.join(vectors, manifestName)).writeAsBytes(bytes);
+      await File(
+        p.join(mirror, SemanticSearchAssets.manifestFileName),
+      ).writeAsString(
+        jsonEncode({
+          'libraryTag': tag,
+          'libraryVersion': 30,
+          'manifestName': manifestName,
+          'manifestSize': bytes.length,
+          'manifestSha256': Sha256Stream.ofBytes(bytes),
+        }),
+      );
+      final installer = SemanticSearchAssets(
+        freeBytesFor: (path) => path == Directory.systemTemp.path ? 5 : 100,
+      );
+      try {
+        await expectLater(
+          installer.install(mirrorDir: mirror, dbPath: db, libraryVersion: 30),
+          throwsA(
+            isA<FileSystemException>().having(
+              (error) => error.path,
+              'work volume',
+              Directory.systemTemp.path,
+            ),
+          ),
+        );
+        expect(await Directory(p.dirname(p.dirname(db))).exists(), isFalse);
+        expect(await File(p.join(vectors, 'segment.oxv.zst')).readAsBytes(), [
+          1,
+          2,
+          3,
+        ]);
+        expect(requests, 0);
+      } finally {
+        installer.dispose();
+      }
+    },
+  );
+
   test('a mirror cannot offer vectors for another installed library', () async {
     await writeMirror();
     expect(
@@ -1449,5 +1542,106 @@ void main() {
         throwsA(isA<PatchDownloadCancelled>()),
       );
     });
+  });
+
+  test(
+    'model copy checks free space in the model folder before writing',
+    () async {
+      await writePartedMirror();
+      final root = p.join(temp.path, 'library-parent');
+      final modelDir = p.join(p.dirname(db), SemanticSearchAssets.modelFolder);
+      final checked = <String>[];
+      final installer = SemanticSearchAssets(
+        freeBytesFor: (path) {
+          checked.add(path);
+          return path == modelDir ? 1 : 1 << 40;
+        },
+      );
+      try {
+        await expectLater(
+          installer.install(
+            mirrorDir: mirror,
+            dbPath: db,
+            libraryVersion: 30,
+            vectorsRootPath: root,
+          ),
+          throwsA(
+            isA<FileSystemException>().having(
+              (error) => error.path,
+              'model folder',
+              modelDir,
+            ),
+          ),
+        );
+        expect(checked, contains(modelDir));
+        expect(
+          await Directory(
+            modelDir,
+          ).list().where((entry) => entry.path.endsWith('.tmp')).toList(),
+          isEmpty,
+        );
+        expect(
+          await Directory(p.join(root, 'vectors')).list().toList(),
+          isEmpty,
+        );
+        expect(requests, 0);
+      } finally {
+        installer.dispose();
+      }
+    },
+    skip: modelSkip,
+  );
+
+  test(
+    'vectors space is checked again right before the native install',
+    () async {
+      await writePartedMirror();
+      final root = p.join(temp.path, 'library-parent');
+      final vectorsDir = p.join(root, 'vectors');
+      var vectorChecks = 0;
+      final installer = SemanticSearchAssets(
+        nativeLibrary: ExternalLibrary.open(
+          p.join(modelFixture!, 'search_engine.dll'),
+        ),
+        freeBytesFor: (path) {
+          if (path != vectorsDir) return 1 << 40;
+          vectorChecks++;
+          return vectorChecks == 1 ? 1 << 40 : 1;
+        },
+      );
+      try {
+        await expectLater(
+          installer.install(
+            mirrorDir: mirror,
+            dbPath: db,
+            libraryVersion: 30,
+            vectorsRootPath: root,
+          ),
+          throwsA(isA<FileSystemException>()),
+        );
+        expect(vectorChecks, 2);
+        expect(await File(p.join(vectorsDir, 'CURRENT')).exists(), isFalse);
+        expect(requests, 0);
+      } finally {
+        installer.dispose();
+      }
+    },
+    skip: modelSkip,
+  );
+
+  test('pending מקומי אינו יוצר לקוח HTTP', () async {
+    var created = 0;
+    await http.runWithClient(
+      () async {
+        final local = SemanticSearchAssets();
+        await local.pending(mirrorDir: mirror, dbPath: db, libraryVersion: 30);
+        local.dispose();
+      },
+      () {
+        created++;
+        return MockClient((_) async => http.Response('', 500));
+      },
+    );
+    expect(created, 0);
   });
 }

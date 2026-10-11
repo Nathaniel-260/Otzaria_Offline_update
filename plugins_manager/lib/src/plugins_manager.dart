@@ -90,6 +90,14 @@ class PluginsManager {
     _networkTimeout = value;
   }
 
+  Future<void> _catalogLock = Future<void>.value();
+
+  Future<T> _withCatalogLock<T>(Future<T> Function() action) {
+    final result = _catalogLock.then((_) => action());
+    _catalogLock = result.then((_) {}, onError: (Object _) {});
+    return result;
+  }
+
   Future<PluginMirrorStore> _store() async =>
       PluginMirrorStore(await resolveMirrorDir());
 
@@ -122,7 +130,11 @@ class PluginsManager {
     bool Function()? isCancelled,
   }) async {
     final store = await _store();
-    final sync = PluginMirrorSync(client: _client, store: store);
+    final sync = PluginMirrorSync(
+      client: _client,
+      store: store,
+      catalogGuard: _withCatalogLock,
+    );
     return sync.sync(
       appVersions: appVersions,
       onProgress: onProgress,
@@ -224,7 +236,11 @@ class PluginsManager {
 
   /// נתיב מוחלט לנכס שנשמר בקטלוג כנתיב יחסי, או null אם אין נכס.
   Future<String?> assetPath(String? relativePath) async {
-    if (relativePath == null || relativePath.isEmpty) return null;
+    if (relativePath == null ||
+        relativePath.isEmpty ||
+        !PluginMirrorStore.isSafeRelative(relativePath)) {
+      return null;
+    }
     return (await _store()).absolutePath(relativePath);
   }
 
@@ -292,15 +308,30 @@ class PluginsManager {
   ) async {
     if (target.downloadUrl.isEmpty) return null;
 
+    if (!plugin.hasValidId) return null;
+
     try {
+      final current = (await store.load())
+          .plugins
+          .where((entry) => entry.id == plugin.id)
+          .firstOrNull;
+      final known = current?.localFileFor(target.version);
+      if (known != null && await store.hasFileFor(current!, target.version)) {
+        return known;
+      }
+
       await Directory(store.pluginDir(plugin.id)).create(recursive: true);
+      Map<String, dynamic>? manifest;
       final asset = await _client.downloadAsset(
         target.downloadUrl,
         store.pluginFilePathNoExt(plugin.id, target.version),
         preferredExt: PluginMirrorStore.pluginFileExt,
         requiredExt: PluginMirrorStore.pluginFileExt,
         expectedSize: target.fileSize,
-        isValid: (path) => PluginManifestReader.read(path) != null,
+        isValid: (path) {
+          manifest = PluginManifestReader.read(path);
+          return manifest != null;
+        },
       );
 
       final file = PluginLocalFile(
@@ -311,26 +342,29 @@ class PluginsManager {
         sourceUrl: target.downloadUrl,
         targetedAt: DateTime.now(),
       );
-      final updated = plugin.copyWith(
-        localFiles: {...plugin.localFiles, target.version: file},
-        manifestId:
-            plugin.manifestId ?? PluginManifestReader.readId(asset.path),
-      );
-
-      final catalog = await store.load();
-      if (!catalog.plugins.any((entry) => entry.id == updated.id)) return file;
-      await store.save(
-        PluginCatalog(
-          lastSync: catalog.lastSync,
-          plugins: [
-            for (final entry in catalog.plugins)
-              entry.id == updated.id ? updated : entry,
-          ],
-          categories: catalog.categories,
-          home: catalog.home,
-        ),
-      );
-      onPluginUpdated?.call(updated);
+      final updated = await _withCatalogLock<StorePlugin?>(() async {
+        final catalog = await store.load();
+        final base =
+            catalog.plugins.where((entry) => entry.id == plugin.id).firstOrNull;
+        if (base == null) return null;
+        final next = base.copyWith(
+          localFiles: {...base.localFiles, target.version: file},
+          manifestId: base.manifestId ?? PluginManifestReader.idOf(manifest),
+        );
+        await store.save(
+          PluginCatalog(
+            lastSync: catalog.lastSync,
+            plugins: [
+              for (final entry in catalog.plugins)
+                entry.id == next.id ? next : entry,
+            ],
+            categories: catalog.categories,
+            home: catalog.home,
+          ),
+        );
+        return next;
+      });
+      if (updated != null) onPluginUpdated?.call(updated);
       return file;
     } catch (_) {
       return null;
@@ -340,7 +374,7 @@ class PluginsManager {
   /// פותח קישור חיצוני (עמוד המקור של התוסף) בדפדפן ברירת המחדל — אותו
   /// מנגנון מסירה למערכת ההפעלה כמו ההתקנה הישירה.
   Future<PluginInstallResult> openExternalUrl(String url) =>
-      PluginDirectInstaller.openProtocolUrl(url);
+      PluginDirectInstaller.openExternalUrl(url);
 
   void dispose() => _client.dispose();
 }

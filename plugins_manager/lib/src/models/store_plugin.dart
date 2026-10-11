@@ -324,6 +324,13 @@ class StorePlugin extends Equatable {
     );
   }
 
+  static final RegExp _safeId = RegExp(r'^[A-Za-z0-9._-]{1,64}$');
+
+  static bool isValidId(String id) =>
+      _safeId.hasMatch(id) && !id.contains('..');
+
+  bool get hasValidId => isValidId(id);
+
   /// בונה רשומה מתשובת `/api/plugins`. [baseUrl] נדרש כדי להפוך את
   /// `downloadUrl` היחסי לכתובת מוחלטת שתישמר בקטלוג.
   factory StorePlugin.fromApi(Map<String, dynamic> json, String baseUrl) {

@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'running_otzaria_locator.dart';
 
 /// מבקש מאוצריא הרצה להיסגר, כדי שהמשתמש לא יצטרך לעבור לחלון שלה ולסגור
@@ -57,13 +59,40 @@ class OtzariaProcessCloser {
 
   Future<void> _requestCloseWindows() async {
     for (final name in RunningOtzariaLocator.processNamesFor('windows')) {
-      for (final pid in await RunningOtzariaLocator.windowsPidsOf(name)) {
+      final pids = await RunningOtzariaLocator.windowsPidsOf(name);
+      for (final pid in pidsToClose(
+        pids,
+        imagePathOf: RunningOtzariaLocator.windowsImagePathOfPid,
+        selfPath: Platform.resolvedExecutable,
+      )) {
         // לפי PID ולא לפי שם: `/IM` היה תופס גם מופע נוסף שאינו זה שזוהה,
         // והנתיב שכבר נבדק הוא מה שמפריד את אוצריא מהלאנצ'ר עצמו.
         await Process.run('taskkill', ['/PID', '$pid']);
       }
     }
   }
+
+  static Iterable<int> pidsToClose(
+    Iterable<int> pids, {
+    required String? Function(int pid) imagePathOf,
+    required String selfPath,
+  }) sync* {
+    for (final pid in pids) {
+      final path = imagePathOf(pid);
+      if (path != null && p.equals(path, selfPath)) continue;
+      yield pid;
+    }
+  }
+
+  static List<String> macQuitArguments(String launchPath) => [
+        '-e',
+        'on run argv',
+        '-e',
+        'tell application (item 1 of argv) to quit',
+        '-e',
+        'end run',
+        launchPath,
+      ];
 
   /// `tell application <path> to quit` — הבקשה שעוברת דרך Launch Services,
   /// כמו בחירה ב-Quit מהתפריט. נתיב החבילה ולא שם התוכנה: השם ב-macOS הוא
@@ -72,7 +101,7 @@ class OtzariaProcessCloser {
     if (launchPath != null) {
       final result = await Process.run(
         '/usr/bin/osascript',
-        ['-e', 'tell application "$launchPath" to quit'],
+        macQuitArguments(launchPath),
       );
       if (result.exitCode == 0) return;
     }

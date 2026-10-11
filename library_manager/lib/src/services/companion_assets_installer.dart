@@ -110,6 +110,7 @@ class CompanionAssetsInstaller {
 
     final libraryDir = p.dirname(dbPath);
     final strings = AppL10n.strings.libraryDomain;
+    final talmudBefore = _talmudStatsMemo(libraryDir);
 
     Future<void> run(
       CompanionAsset asset,
@@ -124,7 +125,7 @@ class CompanionAssetsInstaller {
       }
       onStage?.call(strings.companionChecking(name));
       try {
-        if (_wasDelivered(asset, libraryDir, entry, delivered)) {
+        if (_wasDelivered(asset, libraryDir, entry, delivered, talmudBefore)) {
           outcomes[asset] = CompanionInstallOutcome.alreadyUpToDate;
           return;
         }
@@ -151,7 +152,8 @@ class CompanionAssetsInstaller {
     await run(
       CompanionAsset.talmud,
       strings.companionTalmudName,
-      (entry) => _installTalmud(mirrorDir, libraryDir, entry, onStage),
+      (entry) =>
+          _installTalmud(mirrorDir, libraryDir, entry, onStage, talmudBefore),
     );
     await run(
       CompanionAsset.catalog,
@@ -187,13 +189,14 @@ class CompanionAssetsInstaller {
     final libraryDir = p.dirname(dbPath);
     final pending = <CompanionAsset>{};
     final unavailable = <CompanionAsset>{};
+    final talmudStats = _talmudStatsMemo(libraryDir);
 
     for (final e in manifest.entries.entries) {
-      if (_isUpToDate(e.key, libraryDir, e.value)) continue;
+      if (_isUpToDate(e.key, libraryDir, e.value, talmudStats)) continue;
       // המראה הזו כבר נמסרה כאן ומשהו אחר יושב במקומה — לא מציעים שוב.
       // התנאי השני הוא מה שמבדיל בין "הוחלף בגרסה אחרת" לבין "נמחק": פריט
       // שנעלם לגמרי כן צריך לחזור.
-      if (_wasDelivered(e.key, libraryDir, e.value, delivered)) {
+      if (_wasDelivered(e.key, libraryDir, e.value, delivered, talmudStats)) {
         continue;
       }
       // **קיום אינו שלמות.** רשומה שהקובץ שלה חסר או קטוע במראה אינה הצעה
@@ -215,8 +218,9 @@ class CompanionAssetsInstaller {
     CompanionAsset asset,
     String libraryDir,
     CompanionMirrorEntry entry,
-    Map<CompanionAsset, String> delivered,
-  ) {
+    Map<CompanionAsset, String> delivered, [
+    _TalmudStatsMemo? talmudStats,
+  ]) {
     final recorded = delivered[asset];
     if (recorded == null) return false;
     final matches =
@@ -224,7 +228,8 @@ class CompanionAssetsInstaller {
         (asset == CompanionAsset.dictionary &&
             entry.sha256 != null &&
             recorded.endsWith('|${entry.sha256}'));
-    return matches && _isInstalledLocally(asset, libraryDir, entry);
+    return matches &&
+        _isInstalledLocally(asset, libraryDir, entry, talmudStats);
   }
 
   static String mirrorMarkerOf(
@@ -255,8 +260,9 @@ class CompanionAssetsInstaller {
   bool _isInstalledLocally(
     CompanionAsset asset,
     String libraryDir,
-    CompanionMirrorEntry entry,
-  ) {
+    CompanionMirrorEntry entry, [
+    _TalmudStatsMemo? talmudStats,
+  ]) {
     switch (asset) {
       case CompanionAsset.talmud:
         final marker = File(
@@ -267,7 +273,12 @@ class CompanionAssetsInstaller {
         if (installed == talmudInstallingMarker) return false;
         // תיקייה שתוכנה נמחק היא "נמחק", לא "הוחלף" — בלי זה המשמר של
         // `delivered` בולע בדיוק את המקרה של issue #33.
-        return _talmudContentsComplete(libraryDir, entry, installed);
+        return _talmudContentsComplete(
+          libraryDir,
+          entry,
+          installed,
+          talmudStats,
+        );
       case CompanionAsset.catalog:
         return File(p.join(libraryDir, catalogDatabaseFileName)).existsSync();
       case CompanionAsset.dictionary:
@@ -282,11 +293,12 @@ class CompanionAssetsInstaller {
   bool _isUpToDate(
     CompanionAsset asset,
     String libraryDir,
-    CompanionMirrorEntry entry,
-  ) {
+    CompanionMirrorEntry entry, [
+    _TalmudStatsMemo? talmudStats,
+  ]) {
     switch (asset) {
       case CompanionAsset.talmud:
-        return _talmudUpToDate(libraryDir, entry);
+        return _talmudUpToDate(libraryDir, entry, talmudStats);
       case CompanionAsset.catalog:
         return _catalogUpToDate(libraryDir, entry);
       case CompanionAsset.dictionary:
@@ -296,7 +308,15 @@ class CompanionAssetsInstaller {
 
   // ── תלמוד בבלי ────────────────────────────────────────────────────────
 
-  bool _talmudUpToDate(String libraryDir, CompanionMirrorEntry entry) {
+  _TalmudStatsMemo _talmudStatsMemo(String libraryDir) => _TalmudStatsMemo(
+    () => _talmudFolderStats(Directory(p.join(libraryDir, talmudFolderName))),
+  );
+
+  bool _talmudUpToDate(
+    String libraryDir,
+    CompanionMirrorEntry entry, [
+    _TalmudStatsMemo? talmudStats,
+  ]) {
     final dir = Directory(p.join(libraryDir, talmudFolderName));
     if (!dir.existsSync()) return false;
     final marker = File(p.join(dir.path, talmudVersionFileName));
@@ -308,7 +328,7 @@ class CompanionAssetsInstaller {
     // ~450MB מחדש בכל פתיחה — בלי שדבר ישתנה.
     if (installed != (entry.versionMarker ?? '')) return false;
     // הסימון תואם, והקבצים עדיין עשויים להיות חסרים מתחתיו.
-    return _talmudContentsComplete(libraryDir, entry, installed);
+    return _talmudContentsComplete(libraryDir, entry, installed, talmudStats);
   }
 
   /// האם תוכן תיקיית התלמוד שלם, ולא רק הסימון שמעליו. בלי זה תיקייה שנשאר
@@ -321,10 +341,11 @@ class CompanionAssetsInstaller {
   bool _talmudContentsComplete(
     String libraryDir,
     CompanionMirrorEntry entry,
-    String marker,
-  ) {
+    String marker, [
+    _TalmudStatsMemo? talmudStats,
+  ]) {
     final dir = Directory(p.join(libraryDir, talmudFolderName));
-    final stats = _talmudFolderStats(dir);
+    final stats = talmudStats?.value ?? _talmudFolderStats(dir);
     final recorded = _readTalmudContents(dir, marker);
     // `>=` ולא `==`: קובץ שנוסף לתיקייה אינו חוסר.
     if (recorded != null) {
@@ -396,8 +417,9 @@ class CompanionAssetsInstaller {
     String libraryDir,
     CompanionMirrorEntry entry,
     void Function(String stage)? onStage,
+    _TalmudStatsMemo talmudBefore,
   ) async {
-    if (_talmudUpToDate(libraryDir, entry)) return false;
+    if (_talmudUpToDate(libraryDir, entry, talmudBefore)) return false;
     final strings = AppL10n.strings.libraryDomain;
     final archive = _readyMirrorFile(mirrorDir, entry);
 
@@ -428,7 +450,7 @@ class CompanionAssetsInstaller {
       );
       _ensureSpaceForTalmud(
         libraryDir,
-        expectedStats.bytes - _talmudFolderStats(targetDir).bytes,
+        expectedStats.bytes - talmudBefore.value.bytes,
       );
       marker.writeAsStringSync(talmudInstallingMarker);
       for (final entity in targetDir.listSync()) {
@@ -462,7 +484,17 @@ class CompanionAssetsInstaller {
   }
 
   static Future<void> _extractTarInIsolate(String tarPath, String outputDir) =>
-      Isolate.run(() => extractFileToDisk(tarPath, outputDir));
+      Isolate.run(() async {
+        final input = InputFileStream(tarPath);
+        try {
+          await extractArchiveToDisk(
+            TarDecoder().decodeStream(input),
+            outputDir,
+          );
+        } finally {
+          await input.close();
+        }
+      });
 
   Map<String, int> _talmudArchiveFiles(String tarPath) {
     final files = <String, int>{};
@@ -493,17 +525,12 @@ class CompanionAssetsInstaller {
     throw StateError(
       AppL10n.strings.libraryDomain.notEnoughDiskSpace(
         libraryDir,
-        _formatBytes(needed),
-        _formatBytes(DiskSpaceProbe.freeBytesFor(libraryDir) ?? 0),
+        DiskSpaceProbe.formatBytes(needed),
+        DiskSpaceProbe.formatBytes(
+          DiskSpaceProbe.freeBytesFor(libraryDir) ?? 0,
+        ),
       ),
     );
-  }
-
-  static String _formatBytes(int bytes) {
-    const gb = 1 << 30;
-    const mb = 1 << 20;
-    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(1)} GB';
-    return '${(bytes / mb).round()} MB';
   }
 
   // ── קטלוג otzar-HB ────────────────────────────────────────────────────
@@ -709,4 +736,13 @@ class CompanionAssetsInstaller {
       if (file.existsSync()) file.deleteSync();
     } catch (_) {}
   }
+}
+
+class _TalmudStatsMemo {
+  _TalmudStatsMemo(this._scan);
+
+  final ({int files, int bytes}) Function() _scan;
+  ({int files, int bytes})? _value;
+
+  ({int files, int bytes}) get value => _value ??= _scan();
 }

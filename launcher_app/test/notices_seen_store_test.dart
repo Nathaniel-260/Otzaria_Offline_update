@@ -31,6 +31,17 @@ void main() {
     expect(await later.hasSeen(key), isTrue);
   });
 
+  test('סימונים במקביל אינם מאבדים זה את זה', () async {
+    final a = NoticesSeenStore(tempDir.path, hostName: 'a');
+    final b = NoticesSeenStore(tempDir.path, hostName: 'a');
+
+    await Future.wait([a.markSeen('x'), b.markSeen('y'), a.markSeen('z')]);
+
+    expect(await a.hasSeen('x'), isTrue);
+    expect(await a.hasSeen('y'), isTrue);
+    expect(await a.hasSeen('z'), isTrue);
+  });
+
   test('רישום כפול אינו משכפל, ומפתחות שונים נשמרים יחד', () async {
     final store = NoticesSeenStore(tempDir.path, hostName: 'a');
 

@@ -414,6 +414,121 @@ void main() {
     );
   });
 
+  test(
+    'נלווה שהוחלף בשרת ונפל באמצע ההורדה משאיר את העותק הקודם שלם',
+    () async {
+      final first = buildMirror();
+      addTearDown(first.mirror.dispose);
+      await first.mirror.sync(destDir: destDir);
+      final dictPath = p.join(destDir, 'lexical.db');
+      final before = await File(dictPath).readAsBytes();
+
+      final replaced = buildMirror(
+        dictionaryRevision: 'B',
+        beforeAsset: (name) async {
+          if (name == 'lexical.db') throw const SocketException('drop');
+        },
+      );
+      addTearDown(replaced.mirror.dispose);
+      await replaced.mirror.sync(destDir: destDir, onWarning: (_, _) {});
+
+      expect(await File(dictPath).readAsBytes(), before);
+    },
+  );
+
+  test('נלווה שהוחלף בשרת מחליף את העותק הישן רק אחרי הורדה מוצלחת', () async {
+    final first = buildMirror();
+    addTearDown(first.mirror.dispose);
+    await first.mirror.sync(destDir: destDir);
+
+    final replaced = buildMirror(dictionaryRevision: 'B');
+    addTearDown(replaced.mirror.dispose);
+    await replaced.mirror.sync(destDir: destDir);
+
+    expect(
+      await File(p.join(destDir, 'lexical.db')).readAsBytes(),
+      bodyOf('lexical.db', 'B'),
+    );
+    expect(File(p.join(destDir, 'lexical.db.new')).existsSync(), isFalse);
+    expect(
+      File(p.join(destDir, 'lexical.db.new.resume')).existsSync(),
+      isFalse,
+    );
+  });
+
+  group('הורדה לקובץ .new של נלווה שהוחלף', () {
+    Future<void> syncFirst() async {
+      final first = buildMirror();
+      addTearDown(first.mirror.dispose);
+      await first.mirror.sync(destDir: destDir);
+    }
+
+    String dictPath() => p.join(destDir, 'lexical.db');
+    String stagedPath() => p.join(destDir, 'lexical.db.new');
+
+    test(
+      'ביטול באמצע ההורדה משאיר את העותק הקודם ואינו מפיל את הבאה',
+      () async {
+        await syncFirst();
+        final before = await File(dictPath()).readAsBytes();
+
+        var cancelled = false;
+        final interrupted = buildMirror(
+          dictionaryRevision: 'B',
+          beforeAsset: (name) async {
+            if (name == 'lexical.db') cancelled = true;
+          },
+        );
+        addTearDown(interrupted.mirror.dispose);
+        await expectLater(
+          interrupted.mirror.sync(
+            destDir: destDir,
+            isCancelled: () => cancelled,
+          ),
+          throwsA(isA<PatchDownloadCancelled>()),
+        );
+        expect(await File(dictPath()).readAsBytes(), before);
+
+        final resumed = buildMirror(dictionaryRevision: 'B');
+        addTearDown(resumed.mirror.dispose);
+        await resumed.mirror.sync(destDir: destDir);
+
+        expect(await File(dictPath()).readAsBytes(), bodyOf('lexical.db', 'B'));
+        expect(File(stagedPath()).existsSync(), isFalse);
+        expect(File('${stagedPath()}.resume').existsSync(), isFalse);
+      },
+    );
+
+    test('שארית .new מזהות קודמת אינה נתפרת להורדה החדשה', () async {
+      await syncFirst();
+      await File(
+        stagedPath(),
+      ).writeAsBytes(utf8.encode('stale-leftover-' * 40));
+      await File('${stagedPath()}.resume').writeAsString('not-a-real-sidecar');
+
+      final replaced = buildMirror(dictionaryRevision: 'C');
+      addTearDown(replaced.mirror.dispose);
+      await replaced.mirror.sync(destDir: destDir);
+
+      expect(await File(dictPath()).readAsBytes(), bodyOf('lexical.db', 'C'));
+      expect(File(stagedPath()).existsSync(), isFalse);
+      expect(File('${stagedPath()}.resume').existsSync(), isFalse);
+    });
+
+    test('.new שכבר מחזיק את התוכן החדש מאומץ בלי הורדה נוספת', () async {
+      await syncFirst();
+      await File(stagedPath()).writeAsBytes(bodyOf('lexical.db', 'B'));
+
+      final replaced = buildMirror(dictionaryRevision: 'B');
+      addTearDown(replaced.mirror.dispose);
+      await replaced.mirror.sync(destDir: destDir);
+
+      expect(replaced.fetched, isNot(contains('lexical.db')));
+      expect(await File(dictPath()).readAsBytes(), bodyOf('lexical.db', 'B'));
+      expect(File(stagedPath()).existsSync(), isFalse);
+    });
+  });
+
   test('מילון שפורסם מחדש בתג חדש ובאותו sha256 אינו ממתין', () async {
     final first = buildMirror();
     addTearDown(first.mirror.dispose);

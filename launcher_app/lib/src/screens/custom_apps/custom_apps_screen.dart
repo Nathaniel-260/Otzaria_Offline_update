@@ -687,7 +687,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
   Future<void> _download(CustomAppView app) async {
     final stored = await widget.controller.download(app.descriptor.id);
     if (stored == null) {
-      UiSnack.showError(widget.controller.errorMessage ?? '');
+      UiSnack.showFailure(widget.controller.errorMessage);
       return;
     }
     UiSnack.showSuccess(

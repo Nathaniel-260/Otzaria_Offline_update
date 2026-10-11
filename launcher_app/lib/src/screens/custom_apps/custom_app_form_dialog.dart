@@ -87,6 +87,8 @@ class _CustomAppFormDialogState extends State<CustomAppFormDialog> {
 
   bool get _isEditing => widget.existing != null;
 
+  String? _savedId;
+
   @override
   void initState() {
     super.initState();
@@ -125,6 +127,7 @@ class _CustomAppFormDialogState extends State<CustomAppFormDialog> {
   /// המזהה נגזר משם קובץ ההרצה, ואם אין — מהשם שנבחר. הוא רק שם תיקייה,
   /// ולכן אינו מוצג ואינו נשאל. בעריכה הוא נשאר כשהיה.
   String get _id =>
+      _savedId ??
       widget.existing?.descriptor.id ??
       AppDescriptorIdGenerator.from(
         _exeName.text.isNotEmpty
@@ -295,24 +298,30 @@ class _CustomAppFormDialogState extends State<CustomAppFormDialog> {
 
     setState(() => _isSaving = true);
     final descriptor = _buildDescriptor();
-    final saved = _isEditing
+    final saved = _isEditing || _savedId != null
         ? await widget.controller.update(descriptor)
         : await widget.controller.add(descriptor);
     if (!saved) {
       if (mounted) setState(() => _isSaving = false);
-      UiSnack.showError(widget.controller.errorMessage ?? '');
+      UiSnack.showFailure(widget.controller.errorMessage);
       return;
     }
+    _savedId = descriptor.id;
 
     // קובץ מקומי נאסף מיד: המשתמש יוצא מכאן עם תוכנה מוכנה לנסוע על
     // הכונן, ולא עם רישום ריק. מקור גיטהאב יורד בלחיצה נפרדת, כי הוא
     // הפעולה הכבדה שדורשת רשת.
     if (_source == AppSourceKind.manual && _localFilePath != null) {
-      await widget.controller.attachInstaller(
+      final attached = await widget.controller.attachInstaller(
         descriptor.id,
         sourcePath: _localFilePath!,
         version: readInstallerVersion(_localFilePath!) ?? '',
       );
+      if (attached == null) {
+        if (mounted) setState(() => _isSaving = false);
+        UiSnack.showFailure(widget.controller.errorMessage);
+        return;
+      }
     }
     // המדיה נכתבת אחרי הרשומה ולא לפניה: היא נשמרת בתיקייה שהרשומה
     // יוצרת, ושמות הקבצים נרשמים בה בסיום. כשלון כאן אינו מבטל את
@@ -322,7 +331,7 @@ class _CustomAppFormDialogState extends State<CustomAppFormDialog> {
       iconSource: _iconPath,
       screenshotSources: _screenshots,
     )) {
-      UiSnack.showError(widget.controller.errorMessage ?? '');
+      UiSnack.showFailure(widget.controller.errorMessage);
     }
     // מי שלא בחר אייקון מקבל אותו לבד מקובץ ההרצה — ברירת המחדל.
     unawaited(widget.controller.fillMissingIcons());

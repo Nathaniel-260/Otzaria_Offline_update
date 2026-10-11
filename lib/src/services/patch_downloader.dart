@@ -16,7 +16,7 @@ class PatchDownloadException implements Exception {
   final String message;
   const PatchDownloadException(this.message);
   @override
-  String toString() => 'PatchDownloadException: $message';
+  String toString() => message;
 }
 
 /// נזרק כשהמשתמש ביטל את ההורדה.
@@ -352,6 +352,9 @@ class PatchDownloader {
   /// נתיב קובץ הצד (`.resume`) של [destPath]. חשוף כדי שהצרכן שמוחק את הקובץ
   /// לאחר חילוץ מוצלח (או בכשל חילוץ) ינקה גם את קובץ הצד.
   static String resumeSidecarPath(String destPath) => '$destPath.resume';
+
+  String? storedResumeToken(String destPath) =>
+      _readSidecar(resumeSidecarPath(destPath))?.token;
 
   /// האם [destPath] כבר מחזיק בדיוק את [expectedSha256], לנכס שלא ירד דרך
   /// [downloadToFile] (הורכב מחלקים). אינו מוחק דבר; סימון תואם חוסך את ה-hash.

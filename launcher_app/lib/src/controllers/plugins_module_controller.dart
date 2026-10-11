@@ -444,13 +444,24 @@ class PluginsModuleController extends ChangeNotifier
   ///
   /// [isCancelled] נבדק בין תוסף לתוסף (הקבצים עצמם קטנים) — ראו
   /// `PluginMirrorSync.sync`.
-  Future<void> sync({bool Function()? isCancelled}) async {
+  Future<void> sync({bool Function()? isCancelled}) =>
+      _syncRun ??= _sync(isCancelled: isCancelled).whenComplete(() {
+        _syncRun = null;
+        if (!_installDone.isClosed) notifyListeners();
+      });
+
+  Future<void>? _syncRun;
+
+  bool get isSyncing => _syncRun != null;
+
+  Future<void> _sync({bool Function()? isCancelled}) async {
     status = PluginsModuleStatus.syncing;
     errorMessage = null;
     lastSyncOutcome = null;
     syncMessage = AppL10n.strings.plugins.syncingOverlayStarting;
     syncProgress = null;
     syncWarnings.clear();
+    await Future<void>.value();
     notifyListeners();
 
     try {
@@ -527,7 +538,14 @@ class PluginsModuleController extends ChangeNotifier
 
   /// מעתיק את תוכנת החנות ואת כל התוספים שבמראה ליעד שהמשתמש בחר. **בלי
   /// רשת.** זורק בכישלון; המסך הוא שמציג את ההודעה.
-  Future<StoreAppExportOutcome> exportStoreApp(String destinationDir) async {
+  Future<StoreAppExportOutcome> exportStoreApp(String destinationDir) =>
+      _exportRun ??= _exportStoreApp(destinationDir).whenComplete(() {
+        _exportRun = null;
+      });
+
+  Future<StoreAppExportOutcome>? _exportRun;
+
+  Future<StoreAppExportOutcome> _exportStoreApp(String destinationDir) async {
     isExporting = true;
     exportMessage = AppL10n.strings.pluginsDomain.exportPreparing;
     exportProgress = null;

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/outbox_report.dart';
@@ -50,7 +51,7 @@ class DirectoryReportOutbox implements ReportOutbox {
     await for (final entity in Directory(directory).list()) {
       if (entity is! File) continue;
       final lower = entity.path.toLowerCase();
-      if (lower.endsWith('.json.tmp')) {
+      if (lower.endsWith('.tmp') && lower.contains('.json.')) {
         await _deleteIfStale(entity);
         continue;
       }
@@ -109,23 +110,25 @@ class DirectoryReportOutbox implements ReportOutbox {
   @override
   Future<void> write(String reportId, Uint8List fileBytes) async {
     await Directory(directory).create(recursive: true);
-    final target = File(_pathFor(reportId));
-    final temp = File(_tempFor(target.path));
-    await temp.writeAsBytes(fileBytes, flush: true);
-    await temp.rename(target.path);
+    await writeBytesAtomically(_pathFor(reportId), fileBytes);
   }
 
   @override
   Future<void> discard(String reportId) async {
     final path = _pathFor(reportId);
-    for (final file in [File(path), File(_tempFor(path))]) {
-      if (await file.exists()) await file.delete();
+    final file = File(path);
+    if (await file.exists()) await file.delete();
+    final name = p.basename(path);
+    final dir = Directory(directory);
+    if (!await dir.exists()) return;
+    await for (final entity in dir.list()) {
+      if (entity is File && isAtomicTempNameOf(p.basename(entity.path), name)) {
+        await entity.delete();
+      }
     }
   }
 
   static const staleTempAge = Duration(hours: 1);
-
-  static String _tempFor(String path) => '$path.tmp';
 
   static Future<void> _deleteIfStale(File temp) async {
     try {

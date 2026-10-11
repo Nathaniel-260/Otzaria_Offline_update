@@ -81,7 +81,7 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (!ok) {
-      UiSnack.showError(widget.controller.errorMessage ?? '');
+      UiSnack.showFailure(widget.controller.errorMessage);
       return;
     }
     _clearForm();
@@ -105,7 +105,7 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
       );
       return;
     }
-    UiSnack.showError(widget.controller.errorMessage ?? '');
+    UiSnack.showFailure(widget.controller.errorMessage);
   }
 
   @override

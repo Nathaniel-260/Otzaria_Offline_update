@@ -32,7 +32,7 @@ Future<bool> installCustomApp({
     copyToDir: copyToDir,
   );
   if (!result.ok) {
-    UiSnack.showError(controller.errorMessage ?? '');
+    UiSnack.showFailure(controller.errorMessage);
     return false;
   }
 

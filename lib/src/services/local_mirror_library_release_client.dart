@@ -14,7 +14,7 @@ class LocalMirrorException implements Exception {
   final String message;
   const LocalMirrorException(this.message);
   @override
-  String toString() => 'LocalMirrorException: $message';
+  String toString() => message;
 }
 
 /// מקור [LibraryReleaseSource] שקורא מתיקייה מקומית (USB / תיקייה משותפת)

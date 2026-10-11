@@ -273,6 +273,21 @@ void main() {
     expect(exists('mirror/companions/otzar-HB_catalog.db'), isFalse);
   });
 
+  test('שארית .new של נלווה שהוחלף נמחקת יחד עם קובץ הצד שלה', () async {
+    json('mirror/companions/companions.json', {
+      'formatVersion': 1,
+      'dictionary': {'fileName': 'lexical.db', 'size': 10},
+    });
+    file('mirror/companions/lexical.db');
+    file('mirror/companions/lexical.db.new', bytes: 300);
+    file('mirror/companions/lexical.db.new.resume', bytes: 20);
+
+    expect(await sweep(), 320);
+    expect(exists('mirror/companions/lexical.db'), isTrue);
+    expect(exists('mirror/companions/lexical.db.new'), isFalse);
+    expect(exists('mirror/companions/lexical.db.new.resume'), isFalse);
+  });
+
   test('רשומת נכס נלווה ללא שם אינה מתירה מחיקת הנכסים', () async {
     json('mirror/companions/companions.json', {
       'formatVersion': 1,

@@ -695,16 +695,9 @@ class LibraryMirrorExporter {
     if (free == null || !DiskSpaceProbe.lacksSpace(free, needed)) return;
     throw StateError(AppL10n.strings.libraryDomain.mirrorNotEnoughDiskSpace(
       destDir,
-      _formatBytes(needed),
-      _formatBytes(free),
+      DiskSpaceProbe.formatBytes(needed),
+      DiskSpaceProbe.formatBytes(free),
     ));
-  }
-
-  static String _formatBytes(int bytes) {
-    const gb = 1 << 30;
-    const mb = 1 << 20;
-    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(1)} GB';
-    return '${(bytes / mb).round()} MB';
   }
 
   /// כמה מהנכס כבר יושב על הדיסק שלם, כלומר לא יעבור ברשת. התנאי זהה לזה
@@ -749,7 +742,7 @@ class LibraryMirrorExporter {
     final assets = [
       for (final release in releases) ...release.deltaManifestAssets,
     ];
-    final fetched = await DownloadScheduler().run<_ManifestFetch>([
+    final fetched = await _scheduler.run<_ManifestFetch>([
       for (final asset in assets)
         () async {
           _throwIfCancelled(isCancelled);

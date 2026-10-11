@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'serial_queue.dart';
+
 /// זוכר אילו תוספים כבר נראו בחנות **במחשב הזה**, כדי שהודעת "תוסף חדש"
 /// תיאמר פעם אחת בלבד ולא בכל הרצה.
 ///
@@ -20,6 +22,8 @@ class KnownPluginsStore {
   final File _file;
   final String _host;
 
+  late final SerialQueue _queue = SerialQueue.forKey(_file.path);
+
   /// התוספים שהטוסט של החנות כבר הכיר במחשב הזה, או `null` כשעוד לא נרשם
   /// כלום — הרגע שבו רק שומרים את הקיים ולא מודיעים על כולו כחדש.
   Future<Set<String>?> loadSeen() => _load('seen');
@@ -33,13 +37,16 @@ class KnownPluginsStore {
 
   Future<Set<String>?> _load(String list) async {
     final ids = (await _loadAll())[_host]?[list];
-    return ids == null ? null : ids.toSet();
+    return ids?.toSet();
   }
 
   /// מוסיף מזהים לרשימה של המחשב הזה. גם רשימה ריקה נרשמת כשהיא עוד לא
   /// קיימת — היא מסמנת ש"נקודת ההתחלה" כבר נקבעה. כשל כתיבה אינו שגיאה
   /// שמוצגת: לכל היותר ההודעה תחזור בהרצה הבאה.
-  Future<void> _record(String list, Iterable<String> ids) async {
+  Future<void> _record(String list, Iterable<String> ids) =>
+      _queue.run(() => _recordNow(list, ids));
+
+  Future<void> _recordNow(String list, Iterable<String> ids) async {
     try {
       final all = await _loadAll();
       final host = {...?all[_host]};

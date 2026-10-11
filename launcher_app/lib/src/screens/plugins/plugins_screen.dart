@@ -31,7 +31,8 @@ class PluginsScreen extends StatefulWidget {
       required this.controller,
       this.onRequestFocus,
       this.readOnly = false,
-      this.driveFull = false});
+      this.driveFull = false,
+      this.busyElsewhere = false});
 
   final PluginsModuleController controller;
 
@@ -42,6 +43,7 @@ class PluginsScreen extends StatefulWidget {
 
   final bool readOnly;
   final bool driveFull;
+  final bool busyElsewhere;
 
   @override
   State<PluginsScreen> createState() => _PluginsScreenState();
@@ -506,7 +508,10 @@ class _PluginsScreenState extends State<PluginsScreen> {
                     spacing: AppTokens.spaceSM,
                     runSpacing: AppTokens.spaceSM,
                     children: [
-                      StoreAppExportButton(controller: controller),
+                      StoreAppExportButton(
+                        controller: controller,
+                        busyElsewhere: widget.busyElsewhere,
+                      ),
                     ],
                   ),
                 ],
@@ -649,7 +654,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           onPressed: widget.controller.showHome,
         ),
         const SizedBox(width: AppTokens.spaceSM),
-        Text('‹', style: theme.textTheme.bodyMedium),
+        const RtlIcon(FluentIcons.chevron_right_20_regular, size: 16),
         const SizedBox(width: AppTokens.spaceSM),
         Flexible(
           child: Text(
@@ -672,7 +677,8 @@ class _PluginsScreenState extends State<PluginsScreen> {
     final theme = Theme.of(context);
     final t = context.strings.plugins;
     final lastSync = controller.lastSync;
-    final isSyncing = controller.status == PluginsModuleStatus.syncing;
+    final isSyncing = controller.isSyncing;
+    final syncBlocked = isSyncing || widget.busyElsewhere;
 
     return Container(
       decoration: BoxDecoration(
@@ -699,7 +705,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
                     text: t.syncButton,
                     icon: FluentIcons.arrow_sync_24_regular,
                     isLoading: isSyncing,
-                    onPressed: isSyncing ? null : _sync,
+                    onPressed: syncBlocked ? null : _sync,
                   ),
                 ),
                 const SizedBox(width: AppTokens.spaceSM),

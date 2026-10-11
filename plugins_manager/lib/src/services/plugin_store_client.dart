@@ -115,10 +115,22 @@ class PluginStoreClient {
     void Function()? checkCancelled,
     bool Function(String path)? isValid,
   }) async {
+    final target = absolute(url);
+    final targetUri = Uri.tryParse(target);
+    final scheme = targetUri?.scheme.toLowerCase();
+    final isLoopback = targetUri != null &&
+        (targetUri.host == 'localhost' ||
+            targetUri.host == '127.0.0.1' ||
+            targetUri.host == '::1');
+    if (scheme != 'https' && !(isLoopback && scheme == 'http')) {
+      throw PluginStoreException(
+        AppL10n.strings.pluginsDomain.responseUnexpectedShape,
+      );
+    }
     final stagingPath = '$destPathNoExt.download';
     final response = await downloadFile(
       client: _client,
-      url: absolute(url),
+      url: target,
       destinationPath: stagingPath,
       connectTimeout: timeout,
       stallTimeout: stallTimeout,
@@ -147,7 +159,12 @@ class PluginStoreClient {
     var ext = preferredExt ?? '';
     String? originalName;
     if (fromDisposition != null) {
-      if (fromDisposition.ext.isNotEmpty) ext = fromDisposition.ext;
+      final dispositionExt = fromDisposition.ext.toLowerCase();
+      if (requiredExt != null || mediaExtensions.contains(dispositionExt)) {
+        if (dispositionExt.isNotEmpty) ext = dispositionExt;
+      } else if (extByContentType.containsKey(contentType)) {
+        ext = extByContentType[contentType]!;
+      }
       originalName = fromDisposition.name;
     } else if (extByContentType.containsKey(contentType)) {
       ext = extByContentType[contentType]!;
@@ -181,6 +198,14 @@ class PluginStoreClient {
           : '$baseUrl$url';
 
   void dispose() => _client.close();
+
+  static const Set<String> mediaExtensions = {
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.webp',
+    '.gif',
+  };
 
   static const Map<String, String> extByContentType = {
     'image/png': '.png',

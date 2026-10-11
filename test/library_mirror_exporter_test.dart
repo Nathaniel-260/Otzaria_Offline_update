@@ -1802,8 +1802,10 @@ void main() {
         throwsA(isA<StateError>().having(
           (e) => e.message,
           'message',
-          AppL10n.strings.libraryDomain
-              .mirrorNotEnoughDiskSpace(destDir, '3 MB', '1 MB'),
+          AppL10n.strings.libraryDomain.mirrorNotEnoughDiskSpace(
+              destDir,
+              DiskSpaceProbe.formatBytes(3 << 20),
+              DiskSpaceProbe.formatBytes(1 << 20)),
         )),
       );
       expect(probed, [destDir]);
@@ -1892,6 +1894,24 @@ void main() {
       );
       await built.exporter.export(destDir: destDir);
       expect(peak, 3);
+    });
+
+    test('גם שליפת ה-manifests עוברת דרך התקרה המשותפת', () async {
+      var inFlight = 0;
+      var peak = 0;
+      final built = buildExporter(
+        parallelReleases(),
+        scheduler: DownloadScheduler(maxConcurrent: 1),
+        beforeAsset: (name) async {
+          if (!name.endsWith('.manifest.json')) return;
+          inFlight++;
+          if (inFlight > peak) peak = inFlight;
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          inFlight--;
+        },
+      );
+      await built.exporter.export(destDir: destDir);
+      expect(peak, 1);
     });
 
     test('הנכס הגדול נפתח ראשון, כדי שהקטנים ירוצו לצידו', () async {

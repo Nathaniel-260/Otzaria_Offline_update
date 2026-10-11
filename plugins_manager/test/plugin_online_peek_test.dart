@@ -182,6 +182,15 @@ void main() {
       );
     });
 
+    test('תוסף שמזההו נדחה אך עדיין נמצא באתר אינו מדווח כהוסר', () async {
+      await mirror([_plugin('a', '1.0.0'), _plugin('אלף', '1.0.0')]);
+      final site = _Site([_plugin('a', '1.0.0'), _plugin('אלף', '1.0.0')]);
+
+      final status = await manager(site).peekOnlineUpdates();
+
+      expect(status.removedPlugins, isEmpty);
+    });
+
     test('רשימה ריקה מהאתר אינה מדווחת הסרה — הסנכרון דוחה אותה', () async {
       await manager(_Site([_plugin('a', '1.0.0')])).sync();
 

@@ -17,9 +17,9 @@ import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.d
 import 'package:launcher_app/src/screens/custom_apps/installer_kind_label.dart';
 import 'package:launcher_app/src/screens/store_kit/store_kit.dart';
 import 'package:launcher_app/src/services/announced_apps_store.dart';
-import 'package:launcher_app/src/services/custom_app_detection_snapshot.dart';
-import 'package:launcher_app/src/services/byte_size.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
+import 'package:launcher_app/src/services/byte_size.dart';
+import 'package:launcher_app/src/services/custom_app_detection_snapshot.dart';
 import 'package:launcher_app/src/theme/theme_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
@@ -456,6 +456,59 @@ void main() {
       expect(controller.apps.single.descriptor.name, 'השם החדש');
       // הקובץ שכבר על הכונן שייך לתיקיית המזהה, והעריכה אינה נוגעת בו.
       expect(controller.apps.single.storedInstaller?.version, '1.4.2');
+    });
+
+    testWidgets('הוספה, צירוף שנכשל וניסיון חוזר — רשומה אחת ללא כפילות', (
+      tester,
+    ) async {
+      const first = AppDescriptor(
+        id: 'retry',
+        name: 'שם ראשון',
+        sourceKind: AppSourceKind.manual,
+      );
+      const second = AppDescriptor(
+        id: 'retry',
+        name: 'שם מתוקן',
+        sourceKind: AppSourceKind.manual,
+        detect: AppDetectRules(exeName: 'retry.exe'),
+      );
+      final missing = p.join(tempDir.path, 'missing-Setup.exe');
+      final present = File(p.join(tempDir.path, 'Retry-Setup.exe'))
+        ..writeAsStringSync('x');
+
+      await tester.runAsync(() async {
+        expect(await controller.add(first), isTrue);
+        expect(
+          await controller.attachInstaller(
+            'retry',
+            sourcePath: missing,
+            version: '1',
+          ),
+          isNull,
+        );
+        expect(controller.errorMessage, isNotNull);
+        expect(controller.apps, hasLength(1));
+        expect(controller.apps.single.storedInstaller, isNull);
+
+        expect(await controller.update(second), isTrue);
+        final stored = await controller.attachInstaller(
+          'retry',
+          sourcePath: present.path,
+          version: '2.0',
+        );
+        expect(stored, isNotNull);
+        expect(await controller.update(second), isTrue);
+      });
+
+      expect(controller.apps, hasLength(1));
+      expect(controller.apps.single.descriptor.name, 'שם מתוקן');
+      expect(controller.apps.single.storedInstaller?.version, '2.0');
+      expect(
+        Directory(p.join(tempDir.path, 'mirror', 'apps'))
+            .listSync()
+            .whereType<Directory>(),
+        hasLength(1),
+      );
     });
 
     testWidgets('עריכה של תוכנה שאינה רשומה אינה מוסיפה אותה', (tester) async {

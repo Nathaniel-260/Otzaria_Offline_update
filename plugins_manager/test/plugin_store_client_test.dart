@@ -65,6 +65,7 @@ void main() {
       final result = await client.downloadAsset(
         'https://example.test/plugin',
         target,
+        requiredExt: '.otzplugin',
       );
       expect(result.ext, '.otzplugin');
       expect(result.size, 6);
@@ -418,6 +419,83 @@ void main() {
         (await client.downloadAsset('/x', p.join(temp.path, 'b'))).ext,
         '',
       );
+    });
+
+    test('סיומת מסוכנת ב-Content-Disposition של תמונה אינה נכנסת לקובץ',
+        () async {
+      final client = clientFor(
+        (_) async => asset(const [
+          137,
+          80,
+          78,
+          71
+        ], {
+          'content-type': 'image/png',
+          'content-disposition': 'attachment; filename="evil.exe"',
+        }),
+      );
+
+      final downloaded = await client.downloadAsset(
+        '/api/plugins/a/image',
+        p.join(temp.path, 'image'),
+      );
+
+      expect(downloaded.ext, '.png');
+      expect(downloaded.path, p.join(temp.path, 'image.png'));
+      expect(File(p.join(temp.path, 'image.exe')).existsSync(), isFalse);
+    });
+
+    test('סיומת תמונה מותרת ב-Content-Disposition נשמרת באותיות קטנות',
+        () async {
+      final client = clientFor(
+        (_) async => asset(const [
+          1
+        ], {
+          'content-disposition': 'attachment; filename="Shot.JPEG"',
+        }),
+      );
+
+      final downloaded = await client.downloadAsset(
+        '/x',
+        p.join(temp.path, 'a'),
+      );
+
+      expect(downloaded.ext, '.jpeg');
+    });
+
+    test('סיומת מסוכנת בלי Content-Type מוכר נשארת בלי סיומת', () async {
+      final client = clientFor(
+        (_) async => asset(const [
+          1
+        ], {
+          'content-disposition': 'attachment; filename="x.bat"',
+        }),
+      );
+
+      final downloaded = await client.downloadAsset(
+        '/x',
+        p.join(temp.path, 'a'),
+      );
+
+      expect(downloaded.ext, '');
+    });
+
+    test('הורדה בכתובת http נדחית בלי לפנות לרשת', () async {
+      var requests = 0;
+      final client = clientFor((_) async {
+        requests++;
+        return asset(const [1], {'content-type': 'image/png'});
+      });
+
+      await expectLater(
+        client.downloadAsset(
+          'http://cdn.example/image.png',
+          p.join(temp.path, 'image'),
+        ),
+        throwsA(isA<PluginStoreException>()),
+      );
+      expect(requests, 0);
+      expect(temp.listSync(), isEmpty);
     });
 
     test('תיקיית היעד נוצרת לבד', () async {

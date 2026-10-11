@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -28,6 +29,19 @@ class LibraryStateStore {
   final String? dataDir;
 
   static Future<String>? _machineKey;
+  static final Map<String, Future<void>> _writeTails = {};
+
+  Future<T> _exclusively<T>(Future<T> Function() action) {
+    final key = p.normalize(p.absolute(stateFilePath));
+    final previous = _writeTails[key] ?? Future<void>.value();
+    final completer = Completer<void>();
+    final tail = completer.future;
+    _writeTails[key] = tail;
+    return previous.then((_) => action()).whenComplete(() {
+      completer.complete();
+      if (identical(_writeTails[key], tail)) _writeTails.remove(key);
+    });
+  }
 
   static Future<String> currentMachineKey() =>
       _machineKey ??= _resolveMachineKey();
@@ -193,7 +207,10 @@ class LibraryStateStore {
     }
   }
 
-  Future<void> saveCustomDbPath(String dbPath) async {
+  Future<void> saveCustomDbPath(String dbPath) =>
+      _exclusively(() => _saveCustomDbPath(dbPath));
+
+  Future<void> _saveCustomDbPath(String dbPath) async {
     final json = await _readAll(forWrite: true);
     final paths = <String, dynamic>{};
     final existing = json['customDbPaths'];
@@ -220,7 +237,9 @@ class LibraryStateStore {
   Future<void> saveAppliedRelease({
     required String tag,
     required int dbVersion,
-  }) async {
+  }) => _exclusively(() => _saveAppliedRelease(tag, dbVersion));
+
+  Future<void> _saveAppliedRelease(String tag, int dbVersion) async {
     final json = await _readAll(forWrite: true);
     final records = <String, dynamic>{};
     final existing = json['appliedReleases'];
@@ -246,8 +265,12 @@ class LibraryStateStore {
     return markers;
   }
 
-  Future<void> saveDeliveredCompanions(Map<String, String> markers) async {
-    if (markers.isEmpty) return;
+  Future<void> saveDeliveredCompanions(Map<String, String> markers) {
+    if (markers.isEmpty) return Future<void>.value();
+    return _exclusively(() => _saveDeliveredCompanions(markers));
+  }
+
+  Future<void> _saveDeliveredCompanions(Map<String, String> markers) async {
     final json = await _readAll(forWrite: true);
     final records = <String, dynamic>{};
     final existing = json['deliveredCompanions'];
@@ -359,7 +382,13 @@ class LibraryStateStore {
     String machineKey,
     int version, {
     Iterable<String> aliases = const [],
-  }) async {
+  }) => _exclusively(() => _recordKnownDbVersion(machineKey, version, aliases));
+
+  Future<void> _recordKnownDbVersion(
+    String machineKey,
+    int version,
+    Iterable<String> aliases,
+  ) async {
     final json = await _readAll(forWrite: true);
     final existing = _knownVersions(json);
     final previousSeen = _stamps(json, _seenField);

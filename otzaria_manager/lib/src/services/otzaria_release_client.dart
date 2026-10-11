@@ -146,6 +146,7 @@ class OtzariaReleaseClient {
       installerAssetName: asset.name,
       installerDownloadUrl: asset.downloadUrl,
       installerSizeBytes: asset.size,
+      installerSha256: OtzariaRelease.normalizedSha256(asset.sha256),
       releaseNotes: json['body'] as String?,
     );
   }

@@ -276,27 +276,6 @@ class OtzariaManager {
         isCancelled: isCancelled,
       );
 
-  /// בודק מה הגרסה העדכנית ביותר ב-GitHub **בערוץ שהמשתמש בחר** —
-  /// **פעולת רשת קלה**: קריאת API יחידה, בלי הורדת קובץ ההתקנה. מיועדת
-  /// לבדיקה צדדית ("יש עדכון?") בלי לחייב הורדה מלאה. זורקת חריג רשת/HTTP
-  /// רגיל בכשל — הקורא אמור להתייחס לכשל כ"אין חיבור כרגע", לא כשגיאה
-  /// חוסמת.
-  ///
-  /// המידע "מה התחדש" בתוצאה מגיע מיומן השינויים המרוכז של אוצריא
-  /// (`OtzariaChangelogClient`) כשהגרסה מופיעה בו, ונופל חזרה לתיאור
-  /// ה-release הגולמי מ-GitHub אם לא.
-  Future<OtzariaRelease> peekLatestOnlineRelease() async {
-    final release = (await peekOnlineChannels()).select(
-      preferPrerelease: preferPrerelease,
-    );
-    if (release == null) {
-      throw StateError(
-        AppL10n.strings.appDomain.noInstallableReleaseForPlatform,
-      );
-    }
-    return release;
-  }
-
   /// **שני הערוצים** כפי שהם ברשת כרגע, ולא גרסה נבחרת אחת.
   ///
   /// ההורדה מביאה תמיד את שניהם, ולכן "יש מה להביא?" חייב להישאל על כל

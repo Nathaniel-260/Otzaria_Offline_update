@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/auto_install_flow.dart';
@@ -117,7 +118,10 @@ class _FakeRollback implements DownloadRollback {
   Future<void> rollback() async {
     log.add('rollback');
     await gate?.future;
+    if (error case final error?) throw error;
   }
+
+  Object? error;
 }
 
 class _FakeDownloadHost implements MirrorDownloadHost {
@@ -158,8 +162,11 @@ class _FakeDownloadHost implements MirrorDownloadHost {
   @override
   Future<DownloadRollback> captureRollback() async {
     log.add('capture');
+    if (captureError case final error?) throw error;
     return rollback;
   }
+
+  Object? captureError;
 
   @override
   Future<void> sweepMirror() async {
@@ -175,7 +182,11 @@ class _FakeDownloadHost implements MirrorDownloadHost {
       );
 
   @override
-  void downloadCancelled() => log.add('cancelled');
+  void downloadSnapshotFailed(Object error) => log.add('snapshot failed');
+
+  @override
+  void downloadCancelled({Object? revertError}) =>
+      log.add(revertError == null ? 'cancelled' : 'cancelled revert failed');
 
   @override
   void downloadEnded() => log.add('ended');
@@ -470,6 +481,44 @@ void main() {
       expect(host.sweeps, 0);
       expect(flow.pendingSweep, isNull);
       expect(log, isNot(contains('finished')));
+    });
+
+    test('a failed snapshot downloads nothing and is reported', () async {
+      host.captureError = const FileSystemException('locked');
+
+      await flow.downloadAll();
+
+      expect(componentsRun(), isEmpty);
+      expect(log.sublist(log.indexOf('capture')), [
+        'capture',
+        'changed downloading=false cancelling=false',
+        'snapshot failed',
+      ]);
+      expect(flow.isDownloading, isFalse);
+      expect(host.sweeps, 0);
+    });
+
+    test('a failed rollback after cancel is reported as such', () async {
+      host.rollback.error = const FileSystemException('locked');
+      app.onDownload = () async => flow.requestCancel();
+
+      await flow.downloadAll();
+
+      expect(log.last, 'cancelled revert failed');
+      expect(flow.isDownloading, isFalse);
+      expect(flow.isCancelling, isFalse);
+    });
+
+    test('a component that throws still releases the download state', () async {
+      app.onDownload = () async => throw StateError('boom');
+
+      await expectLater(flow.downloadAll(), throwsStateError);
+
+      expect(flow.isDownloading, isFalse);
+      expect(log.last, 'changed downloading=false cancelling=false');
+      app.onDownload = null;
+      await flow.downloadAll();
+      expect(componentsRun().where((c) => c == 'app'), hasLength(2));
     });
 
     test('an unmounted shell after the rollback leaves no notification',

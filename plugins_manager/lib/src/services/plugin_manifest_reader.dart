@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' as io;
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 
@@ -9,12 +11,16 @@ import 'package:archive/archive.dart';
 /// ה-id של הקטלוג לעולם לא תזהה תוסף מותקן.
 abstract final class PluginManifestReader {
   static const _manifestEntryName = 'manifest.json';
+  static const maxManifestBytes = 1024 * 1024;
 
   /// מחזיר את ה-id, או `null` אם הקובץ אינו ZIP תקין / חסר manifest / ה-id
   /// ריק. **לא זורק** — תוסף בודד עם קובץ פגום פשוט לא ישווה למותקן, וזה
   /// עדיף על הפלת הסנכרון כולו.
   static String? readId(String pluginFilePath) {
-    final manifest = read(pluginFilePath);
+    return idOf(read(pluginFilePath));
+  }
+
+  static String? idOf(Map<String, dynamic>? manifest) {
     final id = manifest?['id'];
     return id is String && id.trim().isNotEmpty ? id.trim() : null;
   }
@@ -29,9 +35,12 @@ abstract final class PluginManifestReader {
       );
       if (entry.isEmpty) return null;
 
-      final text = utf8
-          .decode(entry.first.content, allowMalformed: true)
-          .replaceFirst('\uFEFF', '');
+      if (entry.first.size > maxManifestBytes) return null;
+
+      final bytes = boundedBytes(entry.first, maxManifestBytes);
+      if (bytes == null) return null;
+      final text =
+          utf8.decode(bytes, allowMalformed: true).replaceFirst('\uFEFF', '');
       final decoded = jsonDecode(text);
       return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
     } catch (_) {
@@ -40,4 +49,45 @@ abstract final class PluginManifestReader {
       input?.closeSync();
     }
   }
+
+  static Uint8List? boundedBytes(ArchiveFile file, int limit) {
+    final raw = file.rawContent;
+    if (raw == null) return Uint8List(0);
+    final stored = raw.getStream(decompress: false).toUint8List();
+    if (stored.length > limit) return null;
+    if (!raw.isCompressed) return stored;
+    if (file.compression != CompressionType.deflate) return null;
+    final sink = _CappedSink(limit);
+    try {
+      final conversion =
+          io.ZLibCodec(raw: true).decoder.startChunkedConversion(sink);
+      conversion.add(stored);
+      conversion.close();
+    } on _LimitExceeded {
+      return null;
+    }
+    return sink.takeBytes();
+  }
+}
+
+class _LimitExceeded implements Exception {
+  const _LimitExceeded();
+}
+
+class _CappedSink implements Sink<List<int>> {
+  _CappedSink(this.limit);
+
+  final int limit;
+  final BytesBuilder _out = BytesBuilder();
+
+  @override
+  void add(List<int> data) {
+    _out.add(data);
+    if (_out.length > limit) throw const _LimitExceeded();
+  }
+
+  @override
+  void close() {}
+
+  Uint8List takeBytes() => _out.takeBytes();
 }

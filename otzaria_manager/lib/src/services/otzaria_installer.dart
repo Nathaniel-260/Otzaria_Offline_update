@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:http/http.dart' as http;
 import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -136,13 +137,15 @@ class OtzariaInstaller {
         assetName: release.installerAssetName,
         downloadUrl: release.installerDownloadUrl,
         sizeBytes: release.installerSizeBytes,
+        sha256: release.installerSha256,
         onDownloadProgress: onDownloadProgress,
         isCancelled: isCancelled,
       );
 
-  /// היכן יושב אסט של [tagName] ב-cache — בלי להוריד ובלי לבדוק קיום.
-  String assetPathFor(String tagName, String assetName) =>
-      p.join(cacheDir, tagName, assetName);
+  static String cacheSegment(String name) {
+    final cleaned = name.replaceAll(RegExp(r'[\x00-\x1f/\\:*?"<>|]'), '_');
+    return RegExp(r'^[. ]*$').hasMatch(cleaned) ? '_' : cleaned;
+  }
 
   /// כמו [ensureCached], אבל לאסט כלשהו של אותו release — כלומר גם לחבילת
   /// ה-FULL, שיושבת באותה תיקיית tag לצד המתקין הרגיל.
@@ -151,15 +154,25 @@ class OtzariaInstaller {
     required String assetName,
     required String downloadUrl,
     required int sizeBytes,
+    String? sha256,
     void Function(int received, int total)? onDownloadProgress,
     bool Function()? isCancelled,
   }) async {
-    final releaseCacheDir = p.join(cacheDir, tagName);
-    final cachedInstallerPath = p.join(releaseCacheDir, assetName);
+    final releaseCacheDir = p.join(cacheDir, cacheSegment(tagName));
+    final cachedInstallerPath = p.join(
+      releaseCacheDir,
+      cacheSegment(assetName),
+    );
     final cachedFile = File(cachedInstallerPath);
 
-    final alreadyCached =
+    var alreadyCached =
         await cachedFile.exists() && await cachedFile.length() == sizeBytes;
+    if (alreadyCached &&
+        sha256 != null &&
+        await _sha256Of(cachedFile) != sha256.toLowerCase()) {
+      alreadyCached = false;
+      await cachedFile.delete();
+    }
 
     if (!alreadyCached) {
       // ביטול לפני כל שינוי בדיסק: יצירת התיקייה עצמה היא כבר עקבות שהמסלול
@@ -170,12 +183,27 @@ class OtzariaInstaller {
         url: downloadUrl,
         destinationPath: cachedInstallerPath,
         expectedSizeBytes: sizeBytes,
+        expectedSha256: sha256,
         onProgress: onDownloadProgress,
         isCancelled: isCancelled,
       );
     }
 
     return cachedInstallerPath;
+  }
+
+  static Future<String> _sha256Of(File file) async =>
+      (await crypto.sha256.bind(file.openRead()).first).toString();
+
+  Future<void> _verifyInstallerDigest(
+    OtzariaRelease release,
+    String installerPath,
+  ) async {
+    final expected = release.installerSha256;
+    if (expected == null) return;
+    if (await _sha256Of(File(installerPath)) != expected.toLowerCase()) {
+      throw StateError(AppL10n.strings.launcherUpdate.digestMismatch);
+    }
   }
 
   /// מתקין קובץ התקנה **שכבר נמצא בדיסק** — בלי לגעת ברשת בכלל. זה המסלול
@@ -204,6 +232,9 @@ class OtzariaInstaller {
     OtzariaInstallerKind? installerKind,
     Duration appAppearTimeout = defaultAppAppearTimeout,
   }) async {
+    if (installerKind == null) {
+      await _verifyInstallerDigest(release, installerPath);
+    }
     if (installDir != null) await Directory(installDir).create(recursive: true);
 
     final OtzariaInstallState installed;
@@ -242,6 +273,7 @@ class OtzariaInstaller {
     String? installDir,
     Duration detectTimeout = wizardDetectTimeout,
   }) async {
+    await _verifyInstallerDigest(release, installerPath);
     final logPath = p.join(
       Directory.systemTemp.path,
       'otzaria-install-$pid.log',
@@ -414,7 +446,7 @@ class OtzariaInstaller {
     try {
       await for (final entry in dir.list()) {
         if (entry is Directory &&
-            !keepTagNames.contains(p.basename(entry.path))) {
+            !keepTagNames.map(cacheSegment).contains(p.basename(entry.path))) {
           await entry.delete(recursive: true);
         }
       }
@@ -427,10 +459,11 @@ class OtzariaInstaller {
     required String url,
     required String destinationPath,
     required int expectedSizeBytes,
+    String? expectedSha256,
     void Function(int received, int total)? onProgress,
     bool Function()? isCancelled,
   }) async {
-    await downloadFile(
+    final result = await downloadFile(
       client: _httpClient,
       url: url,
       destinationPath: destinationPath,
@@ -439,12 +472,18 @@ class OtzariaInstaller {
       stallTimeout: stallTimeout,
       onProgress: onProgress,
       checkCancelled: () => _throwIfCancelled(isCancelled),
+      calculateSha256: expectedSha256 != null,
       statusError: (status) =>
           StateError(AppL10n.strings.appDomain.installerDownloadFailed(status)),
       sizeError: (actual, expected) => StateError(
         AppL10n.strings.appDomain.installerSizeMismatch(actual, expected),
       ),
     );
+    if (expectedSha256 != null &&
+        result.sha256 != expectedSha256.toLowerCase()) {
+      await File(destinationPath).delete();
+      throw StateError(AppL10n.strings.launcherUpdate.digestMismatch);
+    }
   }
 
   // ---------------------------------------------------------------- Windows

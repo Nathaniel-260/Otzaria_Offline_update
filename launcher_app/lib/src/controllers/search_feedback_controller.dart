@@ -9,6 +9,8 @@ import 'dispose_guard.dart';
 
 class SearchFeedbackController extends ChangeNotifier
     with DisposeGuard, SilentAfterDispose {
+  static const Duration _probeCacheTtl = Duration(seconds: 2);
+
   SearchFeedbackController({
     required this.transport,
     required this.resolveSource,
@@ -25,8 +27,24 @@ class SearchFeedbackController extends ChangeNotifier
     final transport = SearchFeedbackTransport(
       SearchFeedbackTransport.dirIn(dataDir),
     );
-    Future<({LibraryDbLocator locator, String root})?> locate() async {
-      if ((await runningLocator.probe()).isRunning) return null;
+    bool? cachedRunning;
+    var cachedAt = DateTime.fromMillisecondsSinceEpoch(0);
+    Future<bool> isRunning({bool fresh = false}) async {
+      if (!fresh &&
+          cachedRunning != null &&
+          DateTime.now().difference(cachedAt) < _probeCacheTtl) {
+        return cachedRunning!;
+      }
+      final running = (await runningLocator.probe()).isRunning;
+      cachedRunning = running;
+      cachedAt = DateTime.now();
+      return running;
+    }
+
+    Future<({LibraryDbLocator locator, String root})?> locate({
+      bool fresh = false,
+    }) async {
+      if (await isRunning(fresh: fresh)) return null;
       final launch = await launchPath();
       if (launch == null) return null;
       final locator = LibraryDbLocator.forLaunch(
@@ -50,14 +68,14 @@ class SearchFeedbackController extends ChangeNotifier
         return p.join(location.root, 'search_feedback');
       },
       grantConsent: () async {
-        final location = await locate();
+        final location = await locate(fresh: true);
         if (location == null) return false;
         if (!await transport.resumeAfterConsent(
           p.join(location.root, 'search_feedback'),
         )) {
           return false;
         }
-        if ((await runningLocator.probe()).isRunning) return false;
+        if (await isRunning(fresh: true)) return false;
         return const OtzariaSettingsWriter().grantSearchFeedbackConsent(
           dataRootPath: location.root,
         );

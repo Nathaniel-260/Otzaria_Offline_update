@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -407,6 +408,81 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('מקביליות', () {
+    test('השלמת קובץ לפי דרישה אינה ממתינה לסנכרון, וגם אינה אובדת בשמירתו',
+        () async {
+      final entry = plugin(downloadUrl: '/api/plugins/a/download');
+      await store.save(PluginCatalog(plugins: [entry]));
+      final gate = Completer<void>();
+      final downloads = <String>[];
+      final client = MockClient((request) async {
+        final path = request.url.path;
+        if (path == '/api/plugins') {
+          return jsonResponse([
+            {'id': 'a', 'name': 'אלף', 'version': '1.0.0'},
+          ]);
+        }
+        if (path == '/api/plugins/store-home') {
+          await gate.future;
+          return http.Response('', 404);
+        }
+        if (path.endsWith('/download')) {
+          downloads.add(path);
+          return http.Response.bytes(
+            pluginBytes('{"id":"manifest-a"}'),
+            200,
+            headers: {
+              'content-disposition': 'attachment; filename="p.otzplugin"'
+            },
+          );
+        }
+        return http.Response('', 404);
+      });
+      final launches = <String>[];
+      final concurrent = PluginsManager(
+        resolveMirrorDir: () async => temp.path,
+        resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
+        baseUrl: 'https://otzaria.test',
+        httpClient: client,
+        otzariaLaunchPath: () async {
+          launches.add('launch');
+          throw const _StopBeforeLaunch();
+        },
+      );
+
+      final syncing = concurrent.sync();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await expectLater(
+        concurrent.directInstall(entry).timeout(const Duration(seconds: 5)),
+        throwsA(isA<_StopBeforeLaunch>()),
+      );
+      expect(downloads, hasLength(1));
+      expect(launches, hasLength(1));
+
+      gate.complete();
+      await syncing;
+
+      expect(downloads, hasLength(1));
+      final saved = (await store.load()).plugins.single;
+      expect(await store.hasFileFor(saved, '1.0.0'), isTrue);
+      expect(saved.manifestId, 'manifest-a');
+    });
+
+    test('טעינת תוכנת החנות מהדיסק אינה יוצרת לקוח HTTP', () async {
+      var created = 0;
+      final loaded = await http.runWithClient(
+        () => manager().loadStoreApp(),
+        () {
+          created++;
+          return MockClient((_) async => http.Response('', 404));
+        },
+      );
+
+      expect(loaded, isNull);
+      expect(created, 0);
     });
   });
 }

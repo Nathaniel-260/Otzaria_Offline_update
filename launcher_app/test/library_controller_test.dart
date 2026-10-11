@@ -990,6 +990,7 @@ class _ApplyManager extends LibraryManager {
     void Function(String assetName, Object error)? onCompanionWarning,
     void Function(Object error)? onStateWarning,
     void Function(String dbPath)? onLibraryLocationNotSet,
+    void Function(String reason)? onLibraryLocationFailure,
     bool Function()? isCancelled,
     bool useFullDownloadFallback = false,
   }) async {

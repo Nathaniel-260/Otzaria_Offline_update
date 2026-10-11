@@ -2,6 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 /// כמה מקום פנוי יש על הנפח שבו יושב נתיב נתון.
 ///
@@ -12,6 +13,14 @@ import 'package:ffi/ffi.dart';
 /// **כשל מדידה מחזיר `null`, לא אפס.** מדידה שלא הצליחה אינה עדות שאין מקום,
 /// ואסור לה לחסום עדכון — כל הקוראים מדלגים על הבדיקה כשהתשובה `null`.
 abstract final class DiskSpaceProbe {
+  static String formatBytes(int bytes) {
+    const gb = 1 << 30;
+    const mb = 1 << 20;
+    final units = AppL10n.strings.units;
+    if (bytes >= gb) return units.gigabytes((bytes / gb).toStringAsFixed(1));
+    return units.megabytes((bytes / mb).round().toString());
+  }
+
   /// הבייטים הפנויים לחשבון הנוכחי על הנפח של [path], או `null` כשלא ניתן
   /// למדוד. [path] יכול להיות קובץ שעדיין אינו קיים — נמדדת התיקייה הקיימת
   /// הראשונה שמעליו.

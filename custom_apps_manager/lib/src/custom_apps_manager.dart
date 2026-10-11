@@ -238,13 +238,13 @@ class CustomAppsManager {
     final temp = File('$target.part');
     final StoredInstaller stored;
     try {
-      await source.copy(temp.path);
+      final digest = await copyFileWithSha256(sourcePath, temp.path);
       stored = StoredInstaller(
         fileName: fileName,
         version: version,
         sizeBytes: await temp.length(),
         addedAt: DateTime.now(),
-        sha256: await sha256OfFile(temp.path),
+        sha256: digest,
       );
     } catch (_) {
       await _deleteQuietly(temp);

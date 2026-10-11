@@ -204,6 +204,8 @@ abstract class HomeStrings {
   String get cancelDownloadPrompt;
   String get cancelDownloadKeepGoing;
   String get downloadCancelledSnack;
+  String get downloadSnapshotFailedSnack;
+  String get downloadCancelRevertFailedSnack;
 
   /// אילו רכיבים ההורדה דילגה עליהם, כי הבדיקה הוכיחה שאין בהם חדש.
   String downloadSkippedSnack(String components);
@@ -1285,6 +1287,7 @@ abstract class LibraryDomainStrings {
   String patchUrlMissing(String fileName);
   String get fullDbAssetMissingFromPlan;
   String get fullDbExtractionFailed;
+  String get fullDbNeedsNativeZstd;
   String versionMismatchAfterWrite(int? actual, int? expected);
   String get updateCancelled;
 
@@ -1337,6 +1340,7 @@ abstract class LibraryDomainStrings {
   String companionDownloading(String name);
   String companionInstalling(String name);
   String companionAssetMissingInRelease(String name);
+  String companionAssetHttpFailure(String name, int status);
   String companionExtractionFailed(String name);
   String get companionsMirrorMissing;
   String companionStillPendingAfterInstall(String name);

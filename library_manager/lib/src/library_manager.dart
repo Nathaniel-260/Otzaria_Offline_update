@@ -129,7 +129,6 @@ class LibraryManager {
   /// משפיע על ההורדה בלבד; הבדיקה וההחלה זהות בשני המצבים.
   bool personalUpdateMode;
 
-  /// הזמן הקצוב לפעולות הרשת של המודול — נכנס לתוקף בבקשה הבאה.
   set networkTimeout(Duration value) {
     _cloudClient.timeout = value;
     _applier.connectTimeout = value;
@@ -315,6 +314,7 @@ class LibraryManager {
     final companionBytes = bytes.slot();
 
     var exported = true;
+    var exportFailed = false;
     final exporter = LibraryMirrorExporter(
       client: _cloudClient,
       scheduler: _scheduler,
@@ -333,6 +333,7 @@ class LibraryManager {
           isCancelled: isCancelled,
         );
       } catch (_) {
+        exportFailed = true;
         _cloudClient.forgetReleases();
         rethrow;
       } finally {
@@ -351,7 +352,7 @@ class LibraryManager {
       },
       onBytesProgress: companionBytes.report,
       onWarning: onCompanionWarning,
-      isCancelled: isCancelled,
+      isCancelled: () => exportFailed || (isCancelled?.call() ?? false),
     );
 
     await Future.wait<void>([exportFuture, companionsFuture]);
@@ -651,6 +652,7 @@ class LibraryManager {
     void Function(String assetName, Object error)? onCompanionWarning,
     void Function(Object error)? onStateWarning,
     void Function(String dbPath)? onLibraryLocationNotSet,
+    void Function(String reason)? onLibraryLocationFailure,
     bool Function()? isCancelled,
     bool useFullDownloadFallback = false,
   }) async {
@@ -662,6 +664,7 @@ class LibraryManager {
         onCompanionWarning: onCompanionWarning,
         onStateWarning: onStateWarning,
         onLibraryLocationNotSet: onLibraryLocationNotSet,
+        onLibraryLocationFailure: onLibraryLocationFailure,
         isCancelled: isCancelled,
         useFullDownloadFallback: useFullDownloadFallback,
       );
@@ -678,6 +681,7 @@ class LibraryManager {
     void Function(String assetName, Object error)? onCompanionWarning,
     void Function(Object error)? onStateWarning,
     void Function(String dbPath)? onLibraryLocationNotSet,
+    void Function(String reason)? onLibraryLocationFailure,
     bool Function()? isCancelled,
     bool useFullDownloadFallback = false,
   }) async {
@@ -753,6 +757,7 @@ class LibraryManager {
                 tag: appliedTag,
                 onStateWarning: onStateWarning,
                 onLibraryLocationNotSet: onLibraryLocationNotSet,
+                onLibraryLocationFailure: onLibraryLocationFailure,
               );
               rethrow;
             }
@@ -778,6 +783,7 @@ class LibraryManager {
         tag: appliedTag,
         onStateWarning: onStateWarning,
         onLibraryLocationNotSet: onLibraryLocationNotSet,
+        onLibraryLocationFailure: onLibraryLocationFailure,
       );
     }
 
@@ -887,6 +893,7 @@ class LibraryManager {
     required String? tag,
     void Function(Object error)? onStateWarning,
     void Function(String dbPath)? onLibraryLocationNotSet,
+    void Function(String reason)? onLibraryLocationFailure,
   }) async {
     // רישומי ה-state הם קבצי JSON זעירים, אבל הם נכתבים **אחרי** שהמסד כבר
     // הוחלף. כשל שלהם (כונן מלא, USB שנשלף) אינו הופך עדכון שהצליח לכישלון —
@@ -910,8 +917,11 @@ class LibraryManager {
       }
     });
     if (check.isFreshInstall) {
-      final pointed = await _pointOtzariaAtFreshDb(dbPath, locator);
-      if (!pointed) onLibraryLocationNotSet?.call(dbPath);
+      final failure = await _pointOtzariaAtFreshDb(dbPath, locator);
+      if (failure != null) {
+        onLibraryLocationFailure?.call(failure);
+        onLibraryLocationNotSet?.call(dbPath);
+      }
     }
     // רושמים מאיזה release התוכן הנוכחי הגיע, **יחד עם הגרסה** — זה מה
     // שמאפשר לזהות בהמשך מסד מתוקן שפורסם באותו db_version, ומונע השוואה
@@ -934,14 +944,16 @@ class LibraryManager {
     );
   }
 
-  Future<bool> _pointOtzariaAtFreshDb(
+  Future<String?> _pointOtzariaAtFreshDb(
     String dbPath,
     LibraryDbLocator locator,
   ) async {
     try {
       final launchPath = await locator.otzariaLaunchPath?.call();
       final root = await locator.otzariaSettingsRoot(launchPath);
-      if (root == null) return false;
+      if (root == null) {
+        return 'No known Otzaria settings root (launch path: $launchPath)';
+      }
 
       final current = await locator.settingsReader.read(root);
       if (current != null && !current.isEmpty) {
@@ -949,21 +961,40 @@ class LibraryManager {
           path: p.context,
           fileName: LibraryDbLocator.databaseFileName,
         );
-        return resolved != null && p.equals(resolved, dbPath);
+        if (resolved != null && p.equals(resolved, dbPath)) return null;
+        if (resolved != null) {
+          if (await File(resolved).exists()) {
+            return 'Otzaria settings point at $resolved, which already holds '
+                'a database, so they were not overwritten';
+          }
+          if (!p.isAbsolute(resolved) ||
+              !await Directory(p.dirname(resolved)).exists()) {
+            return 'Otzaria settings point at $resolved, which is unavailable '
+                '(unplugged drive?), so they were not overwritten';
+          }
+        }
       }
 
       final boxFile = File(p.join(root, OtzariaSettingsReader.boxFileName));
-      if (current == null && await boxFile.exists()) return false;
+      if (current == null && await boxFile.exists()) {
+        return 'Settings file ${boxFile.path} exists but could not be read '
+            '(corrupt, encrypted or another format)';
+      }
 
-      if (await _isOtzariaRunning()) return false;
+      if (await _isOtzariaRunning()) {
+        return 'Otzaria is running, so the settings were not written';
+      }
 
-      return await _settingsWriter.pointLibraryAt(
+      final written = await _settingsWriter.pointLibraryAt(
         dataRootPath: root,
         dbPath: dbPath,
         allowCreate: launchPath != null,
       );
-    } catch (_) {
-      return false;
+      if (written) return null;
+      return 'Writing the settings to $root failed (root creation allowed: '
+          '${launchPath != null})';
+    } catch (e) {
+      return 'Writing the settings threw: $e';
     }
   }
 

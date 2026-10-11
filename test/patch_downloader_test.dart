@@ -2533,4 +2533,8 @@ void main() {
       });
     });
   });
+
+  test('toString של חריג ההורדה מחזיר את ההודעה בלבד', () {
+    expect(const PatchDownloadException('שגיאה').toString(), 'שגיאה');
+  });
 }

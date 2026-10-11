@@ -160,7 +160,7 @@ void main() {
           plan: LibraryUpdatePlan.none(localVersion: 5),
           dbPath: dbPath,
         ),
-        throwsA(isA<LibraryApplyException>()),
+        throwsStateError,
       );
     });
 
@@ -170,7 +170,7 @@ void main() {
           plan: LibraryUpdatePlan.none(localVersion: 5),
           dbPath: dbPath,
         ),
-        throwsA(isA<LibraryApplyException>()),
+        throwsStateError,
       );
     });
   });
@@ -627,8 +627,8 @@ void main() {
             'message',
             AppL10n.strings.libraryDomain.notEnoughDiskSpace(
               p.dirname(dbPath),
-              '3 MB',
-              '1 MB',
+              DiskSpaceProbe.formatBytes(3 << 20),
+              DiskSpaceProbe.formatBytes(1 << 20),
             ),
           ),
         ),
@@ -824,6 +824,91 @@ void main() {
       );
 
       expect(File(dbPath).readAsBytesSync(), payload);
+    });
+
+    test('ביטול אחרי האימות מוחק את ה-.new ואת ה-DB החי נשאר', () async {
+      var cancelled = false;
+      applier = LibraryUpdateApplier(
+        processGuard: const _FakeGuard(false),
+        verifyExtractedDb: (path, version, {onStage}) async {
+          cancelled = true;
+        },
+        streamFile:
+            (
+              sourcePath,
+              destPath, {
+              onProgress,
+              onSourceDigest,
+              onOutputDigest,
+              isCancelled,
+              maxOutputBytes,
+            }) async {
+              File(destPath).writeAsBytesSync(Uint8List(64));
+              return true;
+            },
+      );
+      final compressedPath = p.join(tempDir.path, 'seforim.db.zst');
+      File(compressedPath).writeAsBytesSync(Uint8List(8));
+      File(dbPath).writeAsStringSync('OLD DB');
+
+      await expectLater(
+        applier.applyFullDownload(
+          plan: fullPlanFor(compressedPath),
+          dbPath: dbPath,
+          isCancelled: () => cancelled,
+        ),
+        throwsA(isA<LibraryApplyException>()),
+      );
+
+      expect(File('$dbPath.new').existsSync(), isFalse);
+      expect(File(dbPath).readAsStringSync(), 'OLD DB');
+      expect(File(compressedPath).existsSync(), isTrue);
+    });
+
+    test('בלי ספריית zstd לזרימה ה-DB המלא אינו מחולץ בזיכרון', () async {
+      var memoryCalls = 0;
+      applier = LibraryUpdateApplier(
+        processGuard: const _FakeGuard(false),
+        decompress: (_) async {
+          memoryCalls++;
+          return Uint8List(64);
+        },
+        streamFile:
+            (
+              sourcePath,
+              destPath, {
+              onProgress,
+              onSourceDigest,
+              onOutputDigest,
+              isCancelled,
+              maxOutputBytes,
+            }) async => false,
+      );
+      final compressedPath = p.join(tempDir.path, 'seforim.db.zst');
+      File(compressedPath).writeAsBytesSync(Uint8List(8));
+      File(dbPath).writeAsStringSync('OLD DB');
+
+      await expectLater(
+        applier.applyFullDownload(
+          plan: fullPlanFor(compressedPath),
+          dbPath: dbPath,
+        ),
+        throwsA(
+          isA<LibraryApplyException>().having(
+            (e) => e.message,
+            'message',
+            AppL10n.strings.libraryDomain.fullDbNeedsNativeZstd,
+          ),
+        ),
+      );
+
+      expect(memoryCalls, 0);
+      expect(File('$dbPath.new').existsSync(), isFalse);
+      expect(File(dbPath).readAsStringSync(), 'OLD DB');
+    });
+
+    test('הודעת החריג מוצגת כפי שהיא, בלי שם המחלקה באנגלית', () {
+      expect(const LibraryApplyException('שגיאה').toString(), 'שגיאה');
     });
   });
 

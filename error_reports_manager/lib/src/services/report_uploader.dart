@@ -36,6 +36,12 @@ class ErrorReportUploader {
 
   final int maxRateLimitRetries;
 
+  final Map<String, int> _unconfirmed = {};
+  final Map<String, int> _unconfirmedStatus = {};
+  final Map<String, DateTime> _unconfirmedUntil = {};
+
+  static const maxUnconfirmedAnswers = 3;
+
   int _windowCount = 0;
   DateTime? _lastRequestEnd;
 
@@ -65,6 +71,7 @@ class ErrorReportUploader {
     var sent = 0;
     var rejected = 0;
     final rejections = <ReportRejection>[];
+    int? stuckStatus;
 
     ReportUploadResult finish({String? error, bool cancelled = false}) =>
         ReportUploadResult(
@@ -73,7 +80,11 @@ class ErrorReportUploader {
           rejected: rejected,
           remaining: total - sent - rejected,
           rejections: rejections,
-          error: error,
+          error: error ??
+              (stuckStatus == null
+                  ? null
+                  : AppL10n.strings.errorReportsDomain
+                      .uploadHttpStatus(stuckStatus)),
           cancelled: cancelled,
         );
 
@@ -84,6 +95,12 @@ class ErrorReportUploader {
         ));
 
     for (final item in reports) {
+      if ((_unconfirmed[item.reportId] ?? 0) >= maxUnconfirmedAnswers &&
+          _clock().isBefore(_unconfirmedUntil[item.reportId]!)) {
+        stuckStatus = _unconfirmedStatus[item.reportId];
+        report(null);
+        continue;
+      }
       if (!item.isAllowedEndpoint) {
         await _removeQuietly(outbox, item);
         rejected++;
@@ -158,12 +175,27 @@ class ErrorReportUploader {
           }
         }
         if (status >= 200 && status < 300 && attempt.accepted) {
+          _unconfirmed.remove(item.reportId);
+          _unconfirmedStatus.remove(item.reportId);
+          _unconfirmedUntil.remove(item.reportId);
           await _removeQuietly(outbox, item);
           sent++;
         } else if (_rejectStatuses.contains(status)) {
           await _removeQuietly(outbox, item);
           rejected++;
           rejections.add(_rejection(item, '$status ${attempt.excerpt}'));
+        } else if (status >= 200 && status < 300) {
+          final strikes = (_unconfirmed[item.reportId] ?? 0) + 1;
+          _unconfirmed[item.reportId] = strikes;
+          _unconfirmedStatus[item.reportId] = status;
+          if (strikes < maxUnconfirmedAnswers) {
+            return stop(
+              error:
+                  AppL10n.strings.errorReportsDomain.uploadHttpStatus(status),
+            );
+          }
+          _unconfirmedUntil[item.reportId] = _clock().add(batchInterval);
+          stuckStatus = status;
         } else {
           return stop(
             error: AppL10n.strings.errorReportsDomain.uploadHttpStatus(status),

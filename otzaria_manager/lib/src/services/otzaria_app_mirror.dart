@@ -206,6 +206,10 @@ class OtzariaAppMirror {
     } catch (_) {
       return null;
     }
+    if (!p.isWithin(
+        p.absolute(mirrorDir), p.normalize(p.absolute(installerPath)))) {
+      return null;
+    }
 
     final platform = _platform;
     if (platform != null && release.installerKind.targetPlatform != platform) {
@@ -304,8 +308,9 @@ class OtzariaAppMirror {
     if (result.all.isNotEmpty) {
       await _installer.pruneCacheExcept(
         keepTagNames: {
-          for (final e in result.all) e.release.tagName,
-          ..._tagNamesIn(others),
+          for (final e in result.all)
+            OtzariaInstaller.cacheSegment(e.release.tagName),
+          ..._tagNamesIn(others).map(OtzariaInstaller.cacheSegment),
         },
       );
     }

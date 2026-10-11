@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
@@ -194,6 +195,65 @@ void main() {
       expect(
         plugin.statusAgainst({'cmdb1234website': '1.0.0'}),
         PluginInstallStatus.notInstalled,
+      );
+    });
+  });
+
+  group('גודל', () {
+    test('manifest מנופח מעל התקרה נדחה', () {
+      final padding = 'a' * (PluginManifestReader.maxManifestBytes + 1024);
+      final path = writePluginFile(
+        temp,
+        'bomb.otzplugin',
+        '{"id":"x","pad":"$padding"}',
+      );
+
+      expect(PluginManifestReader.read(path), isNull);
+      expect(PluginManifestReader.readId(path), isNull);
+    });
+
+    test('manifest רגיל מתחת לתקרה נקרא', () {
+      final path = writePluginFile(
+        temp,
+        'ok.otzplugin',
+        '{"id":"x","pad":"${'a' * 1000}"}',
+      );
+
+      expect(PluginManifestReader.readId(path), 'x');
+    });
+
+    test('כותרת ZIP מזויפת שמצהירה על גודל קטן אינה מנפחת את התוכן בזיכרון',
+        () {
+      final bytes = Uint8List.fromList(
+        pluginBytes('{"id":"x","pad":"${'a' * (20 << 20)}"}'),
+      );
+      final view = ByteData.sublistView(bytes);
+      for (var i = 0; i + 30 < bytes.length; i++) {
+        final signature = view.getUint32(i, Endian.little);
+        if (signature == 0x04034b50) view.setUint32(i + 22, 100, Endian.little);
+        if (signature == 0x02014b50) view.setUint32(i + 24, 100, Endian.little);
+      }
+      final path = p.join(temp.path, 'forged.otzplugin');
+      File(path).writeAsBytesSync(bytes);
+      final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+      final manifest =
+          archive.files.firstWhere((f) => f.name == 'manifest.json');
+
+      expect(manifest.size, 100);
+      expect(PluginManifestReader.boundedBytes(manifest, 1 << 20), isNull);
+      expect(PluginManifestReader.read(path), isNull);
+    });
+
+    test('boundedBytes מחזיר את התוכן המלא כשהוא בתוך התקרה', () {
+      final bytes = pluginBytes('{"id":"x"}');
+      final manifest = ZipDecoder()
+          .decodeBytes(bytes, verify: false)
+          .files
+          .firstWhere((f) => f.name == 'manifest.json');
+
+      expect(
+        utf8.decode(PluginManifestReader.boundedBytes(manifest, 1 << 20)!),
+        '{"id":"x"}',
       );
     });
   });

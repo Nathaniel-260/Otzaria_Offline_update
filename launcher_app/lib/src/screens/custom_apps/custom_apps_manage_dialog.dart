@@ -50,7 +50,7 @@ Future<void> confirmRemoveCustomApp(
     UiSnack.show(AppL10n.strings.customApps.removedSnack(app.descriptor.name));
     return;
   }
-  UiSnack.showError(controller.errorMessage ?? '');
+  UiSnack.showFailure(controller.errorMessage);
 }
 
 /// **כל ניהול התוכנות הנוספות יושב כאן** — הוספה, עריכה, הסרה, קטגוריות

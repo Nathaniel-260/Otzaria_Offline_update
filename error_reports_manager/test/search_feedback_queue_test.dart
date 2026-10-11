@@ -366,6 +366,24 @@ void main() {
     expect(await File(p.join(directory.path, '.dirty')).exists(), isFalse);
   });
 
+  test('interrupted purge removes unique atomic temp files', () async {
+    await queue.append(event(1), context);
+    final leftovers = [
+      'strikes.json.12-34-0.tmp',
+      'queue-state.json.12-34-1.tmp',
+      'batch.jsonl.12-34-2.tmp',
+    ].map((name) => File(p.join(directory.path, name))).toList();
+    for (final file in leftovers) {
+      await file.writeAsString('x');
+    }
+    await File(p.join(directory.path, '.dirty')).writeAsString('100');
+    queue = create();
+    await queue.load();
+    for (final file in leftovers) {
+      expect(await file.exists(), isFalse, reason: file.path);
+    }
+  });
+
   test('directory resolution retries after failure', () async {
     var calls = 0;
     queue = SearchFeedbackQueue(() async {
