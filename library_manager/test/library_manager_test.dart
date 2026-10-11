@@ -699,7 +699,7 @@ void main() {
       File(
         p.join(exeDir, LibraryDbLocator.portableMarkerFileName),
       ).writeAsStringSync('');
-      final livedAt = p.join(
+      final livedAt = p.posix.join(
         home,
         '.local',
         'share',
