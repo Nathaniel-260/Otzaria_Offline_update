@@ -10,9 +10,6 @@ import 'package:http/testing.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
-// פורט של `test/app_report/app_report_service_test.dart` באוצריא, בלי מה
-// שלא הועבר (minidump, מצב לא-מקוון, סימון כנשלח, עריכה) — ועם `product`.
-
 AppReport _report({String? id, String title = 'באג'}) => AppReport(
       reportId: id ?? AppReport.generateReportId(),
       type: AppReportType.bug,
@@ -46,7 +43,6 @@ void main() {
       service.dispose();
     }
     services.clear();
-    // שליחה שהתחילה ברקע (`unawaited(flush)`) מסתיימת לפני המחיקה.
     await Future<void>.delayed(const Duration(milliseconds: 50));
     tmp.deleteSync(recursive: true);
   });
@@ -186,7 +182,6 @@ void main() {
       expect(result.isQueued, isTrue);
       expect(result.httpStatus, status);
       expect(await service.getPendingReportsCount(), 1);
-      // הרשימה בלי צרופות; הקובץ שומר אותן לשליחה חוזרת.
       expect((await service.getPendingReports()).single.errorLog, isNull);
       final file = Directory(
         p.join(AppReportService.dirIn(tmp.path), 'pending'),
@@ -257,7 +252,6 @@ void main() {
         return http.Response('', 503);
       }),
     );
-    // כאילו נשאר בתור מהרצה שנקטעה אחרי השליחה.
     final file = File(
       p.join(AppReportService.dirIn(tmp.path), 'pending',
           '0000000000000000001.${report.reportId}.json'),
@@ -420,7 +414,6 @@ void main() {
       final service =
           build(MockClient((_) async => _json(200, {'success': true})));
       await service.queueReport(_report());
-      // תיקייה במקום sent.json: ה-rename של הכתיבה נכשל.
       Directory(p.join(AppReportService.dirIn(tmp.path), 'sent.json'))
           .createSync(recursive: true);
       final logs = <String>[];
@@ -517,7 +510,7 @@ void main() {
         MockClient((request) async {
           body = jsonDecode(utf8.decode(request.bodyBytes))
               as Map<String, dynamic>;
-          return _json(200, {'issueNumber': 3});
+          return _json(200, {'success': true, 'issueNumber': 3});
         }),
       );
       final report = _report().copyWith(images: [image]);
@@ -549,7 +542,9 @@ void main() {
         MockClient((request) async {
           bodies.add(jsonDecode(utf8.decode(request.bodyBytes))
               as Map<String, dynamic>);
-          return bodies.length == 1 ? _json(409, {}) : _json(200, {});
+          return bodies.length == 1
+              ? _json(409, {})
+              : _json(200, {'success': true});
         }),
       );
       final report = _report().copyWith(images: [image]);
@@ -661,7 +656,7 @@ void main() {
     });
 
     test('כשל קריאה זמני של היסטוריה אינו מוחק אותה ואת המונה', () async {
-      if (!Platform.isWindows) return; // נעילת קובץ נאכפת רק ב-Windows
+      if (!Platform.isWindows) return;
       final service =
           build(MockClient((_) async => _json(200, {'success': true})));
       await service.send(_report());
@@ -715,7 +710,6 @@ void main() {
       await service.queueReport(_report());
       Directory(p.join(AppReportService.dirIn(tmp.path), 'sent.json'))
           .createSync(recursive: true);
-      // לא זורק, גם כשהדיסק מסרב.
       await service.flushPendingReports();
       expect(logs.any((l) => l.contains('flush failed')), isTrue);
     });
@@ -768,7 +762,6 @@ void main() {
           build(MockClient((_) async => _json(200, {'success': true})));
       final done = _report();
       await service.send(done);
-      // send מפעיל סבב ברקע; ממתינים לו, כדי שלא יספור את הקבצים שלהלן.
       await service.flush();
       final dir = Directory(p.join(AppReportService.dirIn(tmp.path), 'pending'))
         ..createSync(recursive: true);
@@ -813,7 +806,6 @@ void main() {
     final result = await service.send(_report());
     expect(result.isSent, isTrue);
     expect(File('${sent.path}.bad').existsSync(), isTrue);
-    // נשמר בהיסטוריה החדשה, ואינו מוחזר לתור כדי להישלח שוב.
     expect(await service.getSentReports(), hasLength(1));
     expect(await service.getPendingReportsCount(), 0);
   });
@@ -836,7 +828,6 @@ void main() {
 
     expect(sentFile.existsSync(), isTrue);
     expect(await service.getSentReports(), hasLength(1));
-    // רק העותק הפגום המקורי הועבר הצידה.
     expect(
       Directory(dir).listSync().where((e) => e.path.endsWith('.bad')),
       hasLength(1),
@@ -900,7 +891,6 @@ void main() {
   });
 }
 
-/// נבדק בקידוד: `toJson` רץ באיזה isolate? ראו `_encodePending`.
 class _EncodingIsolateProbe {
   const _EncodingIsolateProbe();
 

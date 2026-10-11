@@ -10,11 +10,8 @@ import '../models/outbox_report.dart';
 import '../models/upload_result.dart';
 import 'report_outbox.dart';
 
-/// המתנה מוזרקת — בבדיקות היא מיידית או נשלטת.
 typedef ReportDelay = Future<void> Function(Duration duration);
 
-/// שולח את תיבת היציאה לשרת של אוצריא — הפעולה היחידה בחבילה שנוגעת ברשת.
-/// השרת מקבל [batchSize] דיווחים לדקה, ולכן בין מנה למנה ממתינים [batchInterval].
 class ErrorReportUploader {
   ErrorReportUploader({
     http.Client? httpClient,
@@ -37,11 +34,8 @@ class ErrorReportUploader {
   final int batchSize;
   final Duration batchInterval;
 
-  /// כמה פעמים מנסים שוב אותו דיווח אחרי 429 לפני שעוצרים את הריצה.
   final int maxRateLimitRetries;
 
-  /// בקשות בחלון, ומתי הסתיימה האחרונה — ממנה נמדד החלון הבא (בקשה איטית לא
-  /// מקצרת אותו). נשמר במופע, כך שהמשך מיד אחרי עצירה עדיין ממתין.
   int _windowCount = 0;
   DateTime? _lastRequestEnd;
 
@@ -52,7 +46,6 @@ class ErrorReportUploader {
     'User-Agent': 'otzaria-launcher',
   };
 
-  /// כמה דקות תיקח העלאה של [count] דיווחים — לדיאלוג שלפני ההתחלה.
   int estimateMinutes(int count) {
     if (count <= batchSize) return 1;
     final waits = (count - 1) ~/ batchSize;
@@ -60,7 +53,6 @@ class ErrorReportUploader {
     return (seconds / 60).ceil().clamp(1, 1 << 30);
   }
 
-  /// סוגר את ה-`http.Client`. אחרי זה המופע אינו שמיש.
   void close() => _http.close();
 
   Future<ReportUploadResult> upload(
@@ -92,14 +84,6 @@ class ErrorReportUploader {
         ));
 
     for (final item in reports) {
-      var bodyChanged = false;
-      Future<ReportUploadResult> stop({
-        String? error,
-        bool cancelled = false,
-      }) async {
-        if (bodyChanged) await _rewriteWithoutMinidump(outbox, item);
-        return finish(error: error, cancelled: cancelled);
-      }
       if (!item.isAllowedEndpoint) {
         await _removeQuietly(outbox, item);
         rejected++;
@@ -116,6 +100,18 @@ class ErrorReportUploader {
         return finish(
           error: AppL10n.strings.errorReportsDomain.outboxUnreadable('$e'),
         );
+      }
+
+      Map<String, dynamic>? strippedBody;
+      Future<ReportUploadResult> stop({
+        String? error,
+        bool cancelled = false,
+      }) async {
+        final stripped = strippedBody;
+        if (stripped != null) {
+          await _rewriteWithoutMinidump(outbox, item, stripped);
+        }
+        return finish(error: error, cancelled: cancelled);
       }
 
       var retries = 0;
@@ -156,8 +152,8 @@ class ErrorReportUploader {
         if (_minidumpRejection(attempt)) {
           final withoutMinidump = _withoutMinidump(body);
           if (withoutMinidump != null) {
-            body = withoutMinidump;
-            bodyChanged = true;
+            strippedBody = withoutMinidump;
+            body = Uint8List.fromList(utf8.encode(jsonEncode(withoutMinidump)));
             continue;
           }
         }
@@ -185,7 +181,6 @@ class ErrorReportUploader {
     _lastRequestEnd = _clock();
   }
 
-  /// ממתין אם החלון מלא. `false` = נעצר בזמן ההמתנה.
   Future<bool> _waitForWindow(
     void Function(Duration? wait) report,
     ReportUploadCancellation? cancellation,
@@ -194,14 +189,12 @@ class ErrorReportUploader {
     final last = _lastRequestEnd;
     if (last == null) return true;
     final opensAt = last.add(batchInterval);
-    // שקט של חלון שלם מאפס את המונה גם בלי המתנה.
     if (!_clock().isBefore(opensAt)) {
       _windowCount = 0;
       return true;
     }
     if (_windowCount < batchSize) return true;
 
-    // המתנה בצעדים של שנייה — כך הספירה לאחור מתעדכנת במסך.
     while (true) {
       final remaining = opensAt.difference(_clock());
       if (remaining <= Duration.zero) break;
@@ -248,9 +241,7 @@ class ErrorReportUploader {
     final status = response.statusCode;
     return _Attempt(
       status,
-      responseBody.length > 200
-          ? responseBody.substring(0, 200)
-          : responseBody,
+      responseBody.length > 200 ? responseBody.substring(0, 200) : responseBody,
       accepted: _isProtocolSuccess(responseBody),
       rejectedField: status == 422 ? _rejectedField(responseBody) : null,
     );
@@ -270,7 +261,7 @@ class ErrorReportUploader {
       (attempt.statusCode == 422 &&
           attempt.rejectedField == 'attachments.minidump');
 
-  static Uint8List? _withoutMinidump(Uint8List bytes) {
+  static Map<String, dynamic>? _withoutMinidump(Uint8List bytes) {
     final decoded = jsonDecode(utf8.decode(bytes));
     if (decoded is! Map<String, dynamic>) return null;
     final attachments = decoded['attachments'];
@@ -283,31 +274,24 @@ class ErrorReportUploader {
     } else {
       updated['attachments'] = updatedAttachments;
     }
-    return Uint8List.fromList(utf8.encode(jsonEncode(updated)));
+    return updated;
   }
 
   static Future<void> _rewriteWithoutMinidump(
     ReportOutbox outbox,
     OutboxReport report,
+    Map<String, dynamic> body,
   ) async {
     try {
-      final file = File(report.filePath);
-      final decodedFile = jsonDecode(await file.readAsString());
-      if (decodedFile is! Map<String, dynamic>) return;
-      final queuedBody = decodedFile['body'];
-      if (queuedBody is! Map<String, dynamic>) return;
-      final attachments = queuedBody['attachments'];
-      if (attachments is! Map || attachments['minidump'] == null) return;
-      final updatedAttachments = Map<String, dynamic>.from(attachments)
-        ..remove('minidump');
-      if (updatedAttachments.isEmpty) {
-        queuedBody.remove('attachments');
-      } else {
-        queuedBody['attachments'] = updatedAttachments;
-      }
       await outbox.write(
         report.reportId,
-        Uint8List.fromList(utf8.encode(jsonEncode(decodedFile))),
+        OutboxReport.encodeFile(OutboxReport.fileJson(
+          reportId: report.reportId,
+          bookTitle: report.bookTitle,
+          createdAt: report.createdAt?.toUtc().toIso8601String() ?? '',
+          endpoint: report.endpoint.toString(),
+          body: body,
+        )),
       );
     } catch (_) {
       return;
@@ -331,7 +315,7 @@ class ErrorReportUploader {
     try {
       await outbox.remove(report);
     } catch (_) {
-      // קובץ נעול יישלח שוב בפעם הבאה, והשרת יענה `duplicate`.
+      return;
     }
   }
 

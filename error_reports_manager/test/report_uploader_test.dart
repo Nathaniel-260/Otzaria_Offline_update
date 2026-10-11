@@ -9,7 +9,6 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-/// שעון מדומה שההמתנה המוזרקת מקדמת — בלי לחכות בזמן אמת.
 class _FakeTime {
   DateTime now = DateTime.utc(2026, 9, 1);
   final waits = <Duration>[];
@@ -79,7 +78,7 @@ void main() {
     final readsAtRequest = <int>[];
     final result = await uploader((_) async {
       readsAtRequest.add(outbox.bodyReads.length);
-      return http.Response('{}', 200);
+      return http.Response(_ok, 200);
     }).upload(outbox);
     expect(result.sent, 3);
     expect(readsAtRequest, [1, 2, 3]);
@@ -90,7 +89,7 @@ void main() {
     final outbox = MemoryOutbox(['a', 'b']);
     outbox.files.remove('b.json');
     final result =
-        await uploader((_) async => http.Response('{}', 200)).upload(outbox);
+        await uploader((_) async => http.Response(_ok, 200)).upload(outbox);
     expect(result.sent, 1);
     expect(result.remaining, 1);
     expect(result.error, isNotNull);
@@ -186,7 +185,7 @@ void main() {
     final outbox = MemoryOutbox([]);
     await outbox.write(
         'app',
-        OutboxReport.fileJson(
+        OutboxReport.encodeFile(OutboxReport.fileJson(
           reportId: 'app',
           bookTitle: 'קריסה',
           createdAt: '2026-10-01T10:00:00Z',
@@ -198,7 +197,7 @@ void main() {
               'minidump': {'fileName': 'crash.dmp', 'data': 'AQID'},
             },
           },
-        ));
+        )));
     return outbox;
   }
 
@@ -209,7 +208,7 @@ void main() {
       requestTimeoutWithImages: const Duration(seconds: 2),
       httpClient: MockClient((_) async {
         await Future<void>.delayed(const Duration(milliseconds: 30));
-        return http.Response('{}', 200);
+        return http.Response(_ok, 200);
       }),
     );
     addTearDown(sender.close);
@@ -227,7 +226,7 @@ void main() {
         bodies.add(jsonDecode(req.body) as Map<String, dynamic>);
         return bodies.length == 1
             ? http.Response(response, status)
-            : http.Response('{}', 201);
+            : http.Response(_ok, 201);
       }).upload(outbox);
       expect(bodies, hasLength(2));
       expect(
@@ -247,7 +246,9 @@ void main() {
     final bodies = <Map<String, dynamic>>[];
     await uploader((req) async {
       bodies.add(jsonDecode(req.body) as Map<String, dynamic>);
-      return http.Response('', bodies.length == 1 ? 413 : 200);
+      return bodies.length == 1
+          ? http.Response('', 413)
+          : http.Response(_ok, 200);
     }).upload(outbox);
     expect(bodies.last, {'reportId': 'app'});
   });
@@ -296,7 +297,7 @@ void main() {
       expect(first.remaining, 1);
       expect(bodies, hasLength(2));
       final kept = outbox.reports.single;
-      expect(kept.body, {
+      expect(outbox.bodyOf(kept), {
         'reportId': 'app',
         'attachments': {'errorLog': 'לוג'},
       });
@@ -307,7 +308,7 @@ void main() {
       final again = <Map<String, dynamic>>[];
       final next = await uploader((req) async {
         again.add(jsonDecode(req.body) as Map<String, dynamic>);
-        return http.Response('{}', 200);
+        return http.Response(_ok, 200);
       }).upload(outbox);
       expect(again, hasLength(1));
       expect(hasDump(again.single), isFalse);
@@ -330,7 +331,7 @@ void main() {
       if (p.isWaiting) cancellation.cancel();
     });
     expect(result.cancelled, isTrue);
-    expect(hasDump(outbox.reports.single.body), isFalse);
+    expect(hasDump(outbox.bodyOf(outbox.reports.single)), isFalse);
   });
 
   test('כשל זמני בלי דחיית minidump — הקובץ נשאר כמו שהוא', () async {
@@ -338,7 +339,7 @@ void main() {
     final result =
         await uploader((_) async => http.Response('oops', 503)).upload(outbox);
     expect(result.error, isNotNull);
-    expect(hasDump(outbox.reports.single.body), isTrue);
+    expect(hasDump(outbox.bodyOf(outbox.reports.single)), isTrue);
   });
 
   test('בתיבה על הדיסק — אותו קובץ נדרס בלי ה-dump, בלי כפילות', () async {
@@ -349,13 +350,13 @@ void main() {
     final original = source.reports.single;
     await outbox.write(
         'app',
-        OutboxReport.fileJson(
+        OutboxReport.encodeFile(OutboxReport.fileJson(
           reportId: 'app',
           bookTitle: original.bookTitle,
           createdAt: '2026-10-01T10:00:00Z',
           endpoint: OutboxReport.appReportingEndpoint,
-          body: original.body,
-        ));
+          body: source.bodyOf(original),
+        )));
     var calls = 0;
     await uploader((_) async {
       calls++;
@@ -365,8 +366,12 @@ void main() {
     expect(files, hasLength(1));
     final kept = (await outbox.list()).single;
     expect(kept.filePath, files.single.path);
-    expect(hasDump(kept.body), isFalse);
-    expect(kept.body['attachments'], {'errorLog': 'לוג'});
+    final keptFile = jsonDecode(files.single.readAsStringSync()) as Map;
+    final keptBody = keptFile['body'] as Map<String, dynamic>;
+    expect(hasDump(keptBody), isFalse);
+    expect(keptBody['attachments'], {'errorLog': 'לוג'});
+    expect(kept.createdAt, DateTime.utc(2026, 10, 1, 10));
+    expect(kept.endpoint.toString(), OutboxReport.appReportingEndpoint);
   });
 
   test('כתובת שאינה של אוצריא נדחית בלי שליחה', () async {
@@ -442,7 +447,6 @@ void main() {
     expect(result.remaining, 2);
     expect(outbox.reports, hasLength(2));
 
-    // המשך מיד: החלון עוד מלא, ולכן ממתינים לפני הבקשה הראשונה.
     time.waits.clear();
     final resumed = await up.upload(outbox);
     expect(resumed.sent, 2);
@@ -492,7 +496,7 @@ void main() {
       calls++;
       return http.Response('', 429);
     }).upload(outbox);
-    expect(calls, 4); // הניסיון הראשון ועוד שלושה
+    expect(calls, 4);
     expect(result.error, isNotNull);
     expect(outbox.reports, hasLength(1));
   });
@@ -502,7 +506,6 @@ void main() {
     final sentAt = <DateTime>[];
     final result = await uploader((_) async {
       sentAt.add(time.now);
-      // כל בקשה "אורכת" 2 שניות לפי השעון המדומה.
       time.now = time.now.add(const Duration(seconds: 2));
       return http.Response(_ok, 200);
     }).upload(outbox);

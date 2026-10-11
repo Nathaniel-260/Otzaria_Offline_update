@@ -11,8 +11,6 @@ import 'package:test/test.dart';
 
 import 'support.dart';
 
-/// הסכמה של `UserStateDatabase._createSchema` באוצריא (upstream/dev,
-/// 52678edb3), מילה במילה — כך הבדיקה רצה מול המבנה האמיתי.
 void _createOtzariaSchema(Database db, {int userVersion = 1}) {
   db.execute('''
     CREATE TABLE IF NOT EXISTS lists (
@@ -118,7 +116,7 @@ void main() {
     expect(calls, 1);
     final result = await queue.collectTo(MemoryOutbox(const []));
     expect(result.collected, 1);
-    expect(calls, 3); // קריאה, ואחרי כתיבת הקבצים — הסימון
+    expect(calls, 3);
   });
 
   test('כשל של שלב הסימון כולו — כל הקבצים נמחקים, והשורות נשארות', () async {
@@ -176,7 +174,7 @@ void main() {
     final result = await UserStateReportQueue(dbPath).collectTo(outbox);
 
     expect(result.collected, 1);
-    expect(result.error, isNull); // שורה שהשתנתה אינה שגיאה
+    expect(result.error, isNull);
     expect(outbox.reports.map((r) => r.reportId), ['a']);
     expect(rows(pending).map((r) => r['id']), ['b']);
     expect(rows(sent).map((r) => r['id']), ['a']);
@@ -237,7 +235,6 @@ void main() {
 
     expect(rows(pending).map((r) => r['id']), ['newer']);
     expect(rows(sent).map((r) => r['id']), ['old', 'a', 'b']);
-    // בלי מונה קודם — מתחיל מגודל ההיסטוריה (1), כמו `increment(floor:)`.
     expect(counter(), 3);
   });
 
@@ -256,7 +253,6 @@ void main() {
       'createdAt': '2026-09-01T10:00:00.000Z',
       'diagnostics': {'version': '1.0'},
       'errorLog': 'לוג',
-      // דיווח מהתור של אוצריא לעולם לא מנותב כדיווח של הלאנצ'ר.
       'product': AppReport.offlineUpdateProduct,
       'images': [
         {'fileName': 'צילום.png', 'mimeType': 'image/png', 'data': 'AQID'}
@@ -349,7 +345,8 @@ void main() {
     expect(await queue.countSendable(), 1);
     final outbox = MemoryOutbox(const []);
     expect((await queue.collectTo(outbox)).collected, 1);
-    final attachments = outbox.reports.single.body['attachments'] as Map;
+    final attachments =
+        outbox.bodyOf(outbox.reports.single)['attachments'] as Map;
     expect(attachments['minidump'], {'fileName': 'crash.dmp', 'data': dump});
     expect(attachments['errorLog'], 'לוג');
 
@@ -504,7 +501,7 @@ void main() {
   test('כשל בסימון — הקובץ נמחק, השורה נשארת, והשגיאה מדווחת', () async {
     final db = create();
     insert(db, pending, _stored('a'));
-    db.execute('DROP TABLE lists'); // המונה נכשל באמצע הטרנזקציה
+    db.execute('DROP TABLE lists');
     db.close();
 
     final outbox = MemoryOutbox(const []);
@@ -584,7 +581,6 @@ void main() {
             dataRoot: dataRoot, databasesPathSetting: custom),
         isNull,
       );
-      // הבדיקה אינה יוצרת את התיקייה, ואינה משאירה קובץ בדיקה.
       expect(Directory(custom).existsSync(), isFalse);
       expect(
         temp.listSync().whereType<File>().map((f) => p.basename(f.path)),
@@ -634,7 +630,6 @@ void main() {
   });
 }
 
-/// תיבה שמשנה את המסד בדיוק בין כתיבת הקובץ לסימון באוצריא.
 class _ChangingOutbox extends MemoryOutbox {
   _ChangingOutbox(this.onWrite) : super(const []);
 
@@ -647,7 +642,6 @@ class _ChangingOutbox extends MemoryOutbox {
   }
 }
 
-/// תיבה שהכתיבה לדיווח אחד בה נכשלת.
 class _FailingOutbox extends MemoryOutbox {
   _FailingOutbox(this.failFor) : super(const []);
 
