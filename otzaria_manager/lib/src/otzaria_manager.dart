@@ -4,6 +4,7 @@ import 'dart:io'
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
+import 'models/otzaria_capabilities.dart';
 import 'models/otzaria_deep_links.dart';
 import 'models/otzaria_install_state.dart';
 import 'models/otzaria_release.dart';
@@ -56,6 +57,7 @@ class OtzariaManager {
     RunningOtzariaLocator runningLocator = const RunningOtzariaLocator(),
     WindowsInstallRegistry installRegistry = const WindowsInstallRegistry(),
     OtzariaLauncher launcher = const OtzariaLauncher(),
+    InstalledVersionReader? versionReader,
     this.preferPrerelease = false,
   })  : _platform =
             platform ?? OtzariaTargetPlatform.detect(Platform.operatingSystem),
@@ -72,7 +74,7 @@ class OtzariaManager {
     // [_platform] שכבר נפתר — במקום לפתור את `Platform.operatingSystem`
     // מחדש בכל אחד מהם.
     _appLocator = OtzariaAppLocator(platform: _platform);
-    _versionReader = installedVersionReaderFor(_platform);
+    _versionReader = versionReader ?? installedVersionReaderFor(_platform);
     _releaseClient = OtzariaReleaseClient(platform: _platform);
     _changelogClient = OtzariaChangelogClient();
     _installer = OtzariaInstaller(
@@ -476,7 +478,7 @@ class OtzariaManager {
     // גיטהאב מלא — כולל ה-build שלו, שהדיסק אינו יודע לדווח.
     if (onDisk == stored.appVersion) return stored;
 
-    final version = OtzariaUpdateCheckResult.normalizeVersion(onDisk);
+    final version = _installedVersionOf(stored.launchPath, onDisk);
     if (stored.appVersion == null &&
         OtzariaUpdateCheckResult.sameVersion(
           version,
@@ -490,7 +492,7 @@ class OtzariaManager {
       );
     }
     if (stored.appVersion == null &&
-        _sameMajorMinorPatch(version, stored.installedTagName)) {
+        _sameMajorMinorPatch(onDisk, version, stored.installedTagName)) {
       return stored;
     }
 
@@ -501,8 +503,14 @@ class OtzariaManager {
     );
   }
 
-  static bool _sameMajorMinorPatch(String diskVersion, String tagName) {
-    final pattern = RegExp(r'^\d+(?:\.\d+){0,2}');
+  static bool _sameMajorMinorPatch(
+    String rawDiskVersion,
+    String diskVersion,
+    String tagName,
+  ) {
+    final pattern = OtzariaUpdateCheckResult.carriesVersionCode(rawDiskVersion)
+        ? RegExp(r'^\d+(?:\.\d+){0,3}')
+        : RegExp(r'^\d+(?:\.\d+){0,2}');
     final disk = pattern
         .firstMatch(OtzariaUpdateCheckResult.normalizeVersion(diskVersion))
         ?.group(0);
@@ -623,11 +631,28 @@ class OtzariaManager {
     required String version,
   }) =>
       OtzariaInstallState(
-        installedTagName: OtzariaUpdateCheckResult.normalizeVersion(version),
+        installedTagName: _installedVersionOf(launchPath, version),
         installDir: installDir,
         launchPath: launchPath,
         appVersion: version,
       );
+
+  String _installedVersionOf(String launchPath, String diskVersion) {
+    final capabilities = OtzariaCapabilities.readForInstall(
+      launchPath,
+      platform: _platform,
+      environment: _environment,
+    );
+    final appVersion = capabilities?.appVersion;
+    final build = OtzariaUpdateCheckResult.buildNumberOf(diskVersion);
+    if (appVersion != null &&
+        build != null &&
+        capabilities!.buildNumber == build &&
+        capabilities.describesExe(launchPath)) {
+      return OtzariaUpdateCheckResult.normalizeVersion(appVersion);
+    }
+    return OtzariaUpdateCheckResult.versionFromDisk(diskVersion);
+  }
 
   bool _verifyIsOtzaria(String candidatePath) {
     if (OtzariaAppLocator.nameLooksLikeOtzaria(candidatePath)) return true;

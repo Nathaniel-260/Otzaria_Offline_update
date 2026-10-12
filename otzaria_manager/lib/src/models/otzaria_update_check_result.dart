@@ -188,6 +188,27 @@ class OtzariaUpdateCheckResult {
     return separator >= 0 ? version.substring(0, separator) : version;
   }
 
+  static bool carriesVersionCode(String raw) => _hotfixOf(raw) != null;
+
+  static String versionFromDisk(String raw) {
+    final version = normalizeVersion(raw);
+    final hotfix = _hotfixOf(raw);
+    return hotfix == null || hotfix == 0 ? version : '$version.$hotfix';
+  }
+
+  static int? _hotfixOf(String raw) {
+    final build = buildNumberOf(raw);
+    final parts = normalizeVersion(raw).split('.').map(int.tryParse).toList();
+    if (build == null || build < 10000 || parts.length != 3) return null;
+    if (parts.any((part) => part == null || part < 0 || part > 99)) return null;
+    final [major!, minor!, patch!] = parts;
+    if (build ~/ 100 != major * 10000 + minor * 100 + patch) return null;
+    return build % 100;
+  }
+
+  static int? buildNumberOf(String raw) =>
+      int.tryParse(_buildSuffix(raw) ?? '');
+
   /// מנרמל תג/גרסה להשוואה: מוריד `v` מוביל ואת סיומת ה-build שאחרי `+`.
   ///
   /// **למה זה נחוץ:** כשההתקנה בוצעה על ידי הלאנצ'ר, [OtzariaInstallState.

@@ -27,8 +27,14 @@ class MacAppVersionReader implements InstalledVersionReader {
   /// [launchPath] הוא נתיב חבילת ה-`.app`. אם הועבר בטעות נתיב לקובץ
   /// ההפעלה שבתוך ה-bundle, גם זה עובד — עולים לשורש ה-bundle.
   @override
-  String? readVersion(String launchPath) =>
-      _readKey(launchPath, 'CFBundleShortVersionString');
+  String? readVersion(String launchPath) {
+    final version = _readKey(launchPath, 'CFBundleShortVersionString');
+    if (version == null || version.contains('+')) return version;
+    final build = _readKey(launchPath, 'CFBundleVersion');
+    return build != null && RegExp(r'^\d+$').hasMatch(build)
+        ? '$version+$build'
+        : version;
+  }
 
   /// מזהה ה-bundle (`CFBundleIdentifier`) — משמש כדי לוודא שחבילת `.app`
   /// שנמצאה בתיקייה משותפת כמו `/Applications` היא בכלל אוצריא.

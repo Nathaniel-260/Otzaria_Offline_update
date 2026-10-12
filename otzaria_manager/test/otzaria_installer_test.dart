@@ -781,9 +781,28 @@ void main() {
     );
 
     test(
-      'same-base hotfix with the exe untouched remains installable',
+      'an older hotfix left on disk after exit 0 is not the new install',
       () async {
         await File(exe).writeAsString('0.9.97+99701');
+        final fakeInstaller = await _writeExitScript(tempDir.path, exitCode: 0);
+
+        await expectLater(
+          installer.installWithWizard(
+            release: _release(tag: '0.9.97.2+800'),
+            installerPath: fakeInstaller,
+            installDir: installDir,
+            locateInstalled: (_) async => installedAt(exe),
+            detectTimeout: Duration.zero,
+          ),
+          throwsA(isA<OtzariaWizardStillOpen>()),
+        );
+      },
+    );
+
+    test(
+      'an exe without a version code keeps the three-part comparison',
+      () async {
+        await File(exe).writeAsString('0.9.97+740');
         final fakeInstaller = await _writeExitScript(tempDir.path, exitCode: 0);
 
         final state = await installer.installWithWizard(

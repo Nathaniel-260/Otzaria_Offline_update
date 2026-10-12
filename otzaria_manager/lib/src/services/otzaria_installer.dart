@@ -833,9 +833,11 @@ class OtzariaInstaller {
   }
 
   static bool _isOlderBase(String installed, String tagName) {
-    final pattern = RegExp(r'^\d+(?:\.\d+){0,2}');
+    final pattern = OtzariaUpdateCheckResult.carriesVersionCode(installed)
+        ? RegExp(r'^\d+(?:\.\d+){0,3}')
+        : RegExp(r'^\d+(?:\.\d+){0,2}');
     final a = pattern
-        .firstMatch(OtzariaUpdateCheckResult.normalizeVersion(installed))
+        .firstMatch(OtzariaUpdateCheckResult.versionFromDisk(installed))
         ?.group(0);
     final b = pattern
         .firstMatch(OtzariaUpdateCheckResult.normalizeVersion(tagName))
