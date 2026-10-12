@@ -30,7 +30,7 @@ abstract final class RegistryDisplayNamePattern {
     final base = prefix.length >= _minPrefixLength ? prefix : trimmed;
     // טווח מפורש ולא `\p{L}`: בלי דגל ה-unicode Dart מפרש אותו מילולית.
     // העברית בפנים, אחרת "קול" היה מתאים ל"קולמוס".
-    return '^${RegExp.escape(base)}(?![A-Za-z\\d֐-׿])';
+    return '^${RegExp.escape(base)}' r'(?![A-Za-z\d\u0590-\u05FF])';
   }
 
   /// האם [displayName] תואם ל-[pattern]. תבנית פגומה אינה מפילה את הבדיקה,

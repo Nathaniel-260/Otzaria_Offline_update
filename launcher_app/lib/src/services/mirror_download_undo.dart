@@ -71,7 +71,7 @@ class MirrorDownloadUndo {
           );
         } catch (error) {
           untouched.add(entity.path);
-          notes.add('צילום המראה לא קרא את ${entity.path}: $error');
+          notes.add('Mirror snapshot could not read ${entity.path}: $error');
         }
       }
     }
@@ -164,7 +164,7 @@ class MirrorDownloadUndo {
     try {
       action();
     } catch (error) {
-      notes.add('ניקוי אחרי ביטול ההורדה דילג על $path: $error');
+      notes.add('Cancel cleanup skipped $path: $error');
     }
   }
 }

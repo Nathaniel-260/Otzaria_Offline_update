@@ -183,6 +183,9 @@ class AppLogger {
     for (var drain = _drain; drain != null; drain = _drain) {
       await drain;
     }
+    // Releases the handle (exit, tests deleting the folder); the next line
+    // reopens it.
+    if (_drain == null) await _closeSink();
   }
 
   /// חשוף לבדיקות: מאפס את ה-singleton כדי שכל בדיקה תתחיל מקובץ נקי.
