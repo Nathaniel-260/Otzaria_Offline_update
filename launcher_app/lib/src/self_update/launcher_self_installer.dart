@@ -58,9 +58,11 @@ class LauncherSelfInstaller {
   /// ה-`.app` הקודמת — וכל אחת מהן היא חבילה שלמה של מאות מגה-בייט. עד
   /// שנוספו כאן הן נשארו על הכונן לנצח אחרי עדכון שנקטע.
   Future<void> cleanupLeftovers(LauncherInstallLayout layout) async {
+    if (_operatingSystem == 'windows') await _restoreInterruptedReplace(layout);
     for (final name in const [stagedName, previousName]) {
       try {
         final file = File(p.join(layout.executableDir, name));
+        if (p.equals(file.path, layout.executablePath)) continue;
         if (await file.exists()) await file.delete();
       } catch (_) {
         // כנראה עדיין נעול — הריצה הבאה תנסה שוב.
@@ -76,6 +78,21 @@ class LauncherSelfInstaller {
       } catch (_) {
         // כמו למעלה — הריצה הבאה תנסה שוב.
       }
+    }
+  }
+
+  /// The same rule as `RecoverInterruptedUpdate` in `stub.c`: a replace cut
+  /// between its two renames leaves only [previousName], the one copy to keep.
+  Future<void> _restoreInterruptedReplace(LauncherInstallLayout layout) async {
+    final previous = File(p.join(layout.executableDir, previousName));
+    try {
+      if (await File(layout.executablePath).exists() ||
+          !await previous.exists()) {
+        return;
+      }
+      await previous.rename(layout.executablePath);
+    } on FileSystemException {
+      return;
     }
   }
 

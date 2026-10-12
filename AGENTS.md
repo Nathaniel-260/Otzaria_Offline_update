@@ -1605,8 +1605,17 @@ just launch. Five load-bearing details:
 - The completion guard is the `.ready` marker, not the presence of
   `launcher_app.exe`, so an interrupted extraction is never mistaken for a finished
   one.
-- Its single error message is the **one** user-visible string in this repo that is not
-  in `otzaria_l10n` — C cannot depend on a Dart package.
+- Its two message boxes (the failure, and "extract me first") are the **only**
+  user-visible strings in this repo outside `otzaria_l10n` — C cannot depend on
+  a Dart package.
+- **It refuses to run from `%TEMP%` or from inside a `.zip`**
+  (`IsTemporaryLocation`; Dart twin `AppPaths.isTemporaryLocation` →
+  `AppPathsFailure.runningFromTemp`). Explorer runs an exe opened in a zip from
+  `%TEMP%\Temp1_<name>.zip\`, and everything downloaded there was discarded.
+- **It recovers a self-update cut between its two renames.** Run as
+  `.launcher-previous.exe` / `.launcher-update.exe` with no exe under the real
+  name, it renames the previous one back (`RecoverInterruptedUpdate`), and
+  `LauncherSelfInstaller.cleanupLeftovers` never deletes that last copy.
 
 **`package.ps1` must pack the payload before it compiles the stub.** `stub.rc` embeds
 `windows_stub/build/payload.otz`, so `rc.exe` needs that file to exist;

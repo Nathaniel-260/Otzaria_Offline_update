@@ -1,9 +1,17 @@
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
+
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
+import 'package:win32/win32.dart';
 
-enum AppPathsFailure { cannotWrite, driveFull, appTranslocated }
+enum AppPathsFailure {
+  cannotWrite,
+  driveFull,
+  appTranslocated,
+  runningFromTemp
+}
 
 class AppPathsException implements Exception {
   const AppPathsException({
@@ -61,8 +69,11 @@ class AppPaths {
     Map<String, String>? environment,
     String? resolvedExecutable,
     bool? isMacOS,
+    bool? isWindows,
+    List<String>? tempDirs,
   }) async {
     final macOS = isMacOS ?? Platform.isMacOS;
+    final windows = isWindows ?? Platform.isWindows;
     final executable = resolvedExecutable ?? Platform.resolvedExecutable;
     final dataDir = p.join(
       executableRoot(executable, isMacOS: macOS),
@@ -73,6 +84,17 @@ class AppPaths {
         message: AppL10n.strings.setupError.appTranslocated,
         attemptedDir: dataDir,
         kind: AppPathsFailure.appTranslocated,
+      );
+    }
+    if (windows &&
+        isTemporaryLocation(
+          p.dirname(executable),
+          tempDirs: tempDirs ?? _windowsTempDirs(environment),
+        )) {
+      throw AppPathsException(
+        message: AppL10n.strings.setupError.runningFromTemp,
+        attemptedDir: dataDir,
+        kind: AppPathsFailure.runningFromTemp,
       );
     }
     final failure = await _probeWritable(dataDir);
@@ -105,6 +127,52 @@ class AppPaths {
       attemptedDir: dataDir,
       kind: diskFull ? AppPathsFailure.driveFull : AppPathsFailure.cannotWrite,
     );
+  }
+
+  static final RegExp _zipSegment =
+      RegExp(r'\.zip([\\/]|$)', caseSensitive: false);
+
+  /// Explorer runs an exe opened inside a zip from a copy under `%TEMP%`
+  /// (`Temp1_<name>.zip`); data written there is discarded. = `stub.c`.
+  static bool isTemporaryLocation(
+    String dir, {
+    required List<String> tempDirs,
+  }) {
+    if (_zipSegment.hasMatch(dir)) return true;
+    final normalized = p.windows.normalize(dir).toLowerCase();
+    for (final temp in tempDirs) {
+      if (temp.isEmpty) continue;
+      final root = p.windows.normalize(temp).toLowerCase();
+      if (normalized == root || p.windows.isWithin(root, normalized)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static List<String> _windowsTempDirs(Map<String, String>? environment) {
+    final env = environment ?? Platform.environment;
+    final dirs = <String>{
+      for (final key in const ['TEMP', 'TMP'])
+        if (env[key] case final value? when value.isNotEmpty) value,
+    };
+    final buffer = wsalloc(MAX_PATH + 1);
+    try {
+      final length = GetTempPath(MAX_PATH + 1, buffer);
+      if (length > 0 && length <= MAX_PATH) dirs.add(buffer.toDartString());
+      for (final dir in dirs.toList()) {
+        final short = dir.toNativeUtf16();
+        try {
+          final long = GetLongPathName(short, buffer, MAX_PATH + 1);
+          if (long > 0 && long <= MAX_PATH) dirs.add(buffer.toDartString());
+        } finally {
+          free(short);
+        }
+      }
+    } finally {
+      free(buffer);
+    }
+    return dirs.toList();
   }
 
   static bool _isDiskFull(FileSystemException error) {

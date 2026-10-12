@@ -1518,7 +1518,10 @@ class _Faq extends FaqStrings {
   String get aLauncherSelfUpdate =>
       'Yes. When a new version exists it offers to download it on a computer '
       'with internet, then replaces itself and reopens. Your settings, books '
-      'and plugins already on the drive stay untouched.';
+      'and plugins already on the drive stay untouched. If the replacement '
+      'was interrupted (say, by a power cut) and the program file is gone, '
+      'run .launcher-previous.exe next to it — it restores the previous '
+      'version under its usual name.';
   @override
   String get qFree => 'Wow, is all of this really free?';
   @override
@@ -1641,6 +1644,15 @@ class _SetupError extends SetupErrorStrings {
   @override
   String get appTranslocatedTitle =>
       'macOS is running this program from a temporary copy';
+  @override
+  String get runningFromTemp =>
+      'This program was started from inside a ZIP file or a temporary folder, '
+      'and everything it downloads there would be deleted along with that '
+      'folder. Extract the file to the USB drive (or a permanent folder on '
+      'disk) and run it from there.';
+  @override
+  String get runningFromTempTitle =>
+      'Extract the file to a drive before running it';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {

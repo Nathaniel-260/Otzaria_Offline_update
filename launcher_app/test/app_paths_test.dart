@@ -239,6 +239,70 @@ void main() {
     });
   });
 
+  group('הפעלה מתוך zip או מתיקייה זמנית', () {
+    const temp = [r'C:\Users\u\AppData\Local\Temp'];
+
+    test('תיקייה תחת %TEMP% — גם בלי הבחנה בין אותיות גדולות', () {
+      expect(
+        AppPaths.isTemporaryLocation(
+          r'c:\users\U\appdata\local\temp\7zO1234\app-files',
+          tempDirs: temp,
+        ),
+        isTrue,
+      );
+      expect(
+        AppPaths.isTemporaryLocation(
+          r'C:\Users\u\AppData\Local\Temp',
+          tempDirs: temp,
+        ),
+        isTrue,
+      );
+    });
+
+    test('עותק ש-Explorer פתח מתוך zip, גם מחוץ ל-%TEMP%', () {
+      expect(
+        AppPaths.isTemporaryLocation(
+          r'D:\x\Temp1_Otzaria-Updates.ZIP\app-files',
+          tempDirs: const [],
+        ),
+        isTrue,
+      );
+    });
+
+    test('כונן נייד ותיקייה ששמה רק מזכיר temp — אינם זמניים', () {
+      for (final dir in const [
+        r'E:\app-files',
+        r'C:\Users\u\AppData\Local\TempStuff\app-files',
+        r'D:\backup.zipx\app-files',
+      ]) {
+        expect(AppPaths.isTemporaryLocation(dir, tempDirs: temp), isFalse,
+            reason: dir);
+      }
+    });
+
+    test('resolve מסרב עם הודעה ייעודית, לפני שנוגע בדיסק', () async {
+      final overrides = _RedirectingIOOverrides(Directory.systemTemp.path);
+      await expectLater(
+        IOOverrides.runWithIOOverrides(
+          () => AppPaths.resolve(
+            resolvedExecutable:
+                r'C:\Users\u\AppData\Local\Temp\Temp1_a.zip\app-files\l.exe',
+            isMacOS: false,
+            isWindows: true,
+            tempDirs: temp,
+          ),
+          overrides,
+        ),
+        throwsA(isA<AppPathsException>()
+            .having((e) => e.kind, 'kind', AppPathsFailure.runningFromTemp)
+            .having((e) => e.message, 'message',
+                AppL10n.strings.setupError.runningFromTemp)),
+      );
+      expect(overrides.createdDirs, isEmpty);
+      expect(overrides.createdFiles, isEmpty);
+    });
+  });
+
   group('כונן מוגן-כתיבה (בעיה #25)', () {
     late Directory sandbox;
     late Directory drive;

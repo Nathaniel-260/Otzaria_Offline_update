@@ -20,6 +20,7 @@ class SetupErrorScreen extends StatelessWidget {
       AppPathsFailure.cannotWrite => t.title,
       AppPathsFailure.driveFull => t.driveFullTitle,
       AppPathsFailure.appTranslocated => t.appTranslocatedTitle,
+      AppPathsFailure.runningFromTemp => t.runningFromTempTitle,
     };
     final generic = error.kind == AppPathsFailure.cannotWrite;
 

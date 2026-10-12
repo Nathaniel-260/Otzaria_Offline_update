@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/self_update/launcher_install_layout.dart';
+import 'package:launcher_app/src/self_update/launcher_self_installer.dart';
 import 'package:launcher_app/src/services/app_paths.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 
@@ -89,6 +90,23 @@ void main() {
         reason: 'שם שהלאנצ\'ר נקרא בו חייב להיפסל באיתור אוצריא: $name',
       );
     }
+  });
+
+  test('שמות השאריות של ההחלפה זהים ב-stub ובלאנצ\'ר', () {
+    expect(stubC,
+        contains('kStagedExeName[] = L"${LauncherSelfInstaller.stagedName}"'));
+    expect(
+        stubC,
+        contains(
+            'kPreviousExeName[] = L"${LauncherSelfInstaller.previousName}"'));
+    expect(
+        stubC,
+        contains(
+            'kPackagedExeName[] = L"${LauncherInstallLayout.packagedExeName}"'));
+    expect(
+        stubC,
+        contains('kPublishedExeName[] = '
+            'L"${LauncherInstallLayout.publishedExeName}"'));
   });
 
   test('המרקר מושווה לגרסת ה-payload, ולא רק נבדק שהוא קיים', () {

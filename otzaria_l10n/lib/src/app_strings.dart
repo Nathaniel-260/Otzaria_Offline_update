@@ -923,6 +923,8 @@ abstract class SetupErrorStrings {
   String get driveFullTitle;
   String get appTranslocated;
   String get appTranslocatedTitle;
+  String get runningFromTemp;
+  String get runningFromTempTitle;
 }
 
 // ── כונן מוגן-כתיבה: מצב קריאה ────────────────────────────────────────────────

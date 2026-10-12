@@ -1431,7 +1431,9 @@ class _Faq extends FaqStrings {
   String get aLauncherSelfUpdate =>
       'כן. כשיש לה גרסה חדשה היא מציעה להוריד אותה במחשב שיש בו אינטרנט, ואז '
       'מחליפה את עצמה ונפתחת מחדש. ההגדרות, הספרים והתוספים שכבר על הכונן '
-      'נשארים כמו שהם.';
+      'נשארים כמו שהם. אם ההחלפה נקטעה (למשל בכיבוי המחשב) והקובץ של התוכנה '
+      'נעלם, יש להפעיל את ‎.launcher-previous.exe שלצידו — הוא משחזר את '
+      'הגרסה הקודמת בשמה הרגיל.';
   @override
   String get qFree => 'וואו, הכול בחינם?';
   @override
@@ -1548,6 +1550,13 @@ class _SetupError extends SetupErrorStrings {
       'אותה שוב.';
   @override
   String get appTranslocatedTitle => 'macOS מריץ את התוכנה מעותק זמני';
+  @override
+  String get runningFromTemp =>
+      'התוכנה הופעלה מתוך קובץ ZIP או מתיקייה זמנית, וכל מה שהיא תוריד משם '
+      'יימחק יחד עם התיקייה הזמנית. יש לחלץ את הקובץ לכונן הנייד (או לתיקייה '
+      'קבועה בדיסק) ולהפעיל אותו משם.';
+  @override
+  String get runningFromTempTitle => 'חלץ את הקובץ לכונן לפני ההפעלה';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {
