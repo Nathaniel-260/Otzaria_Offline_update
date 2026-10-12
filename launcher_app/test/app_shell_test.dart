@@ -483,6 +483,18 @@ void main() {
     });
   });
 
+  test('Ctrl+R ו-F5 מרעננים, ולא בזמן משימה ארוכה', () {
+    final source = _appShellSource();
+    expect(source, contains('LogicalKeyboardKey.keyR, control: true'));
+    expect(source, contains('LogicalKeyboardKey.f5'));
+    final body = source.substring(
+      source.indexOf('Future<void> _refreshFromKeyboard()'),
+      source.indexOf('Widget build(BuildContext context)',
+          source.indexOf('Future<void> _refreshFromKeyboard()')),
+    );
+    expect(body, contains('if (_longTaskRunning) return;'));
+  });
+
   group('חיווט הזרימות שהוצאו מהמסגרת', () {
     final source = _appShellSource();
 

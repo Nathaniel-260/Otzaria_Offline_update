@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -970,8 +971,32 @@ class _AppShellState extends State<AppShell> {
           ),
       };
 
+  /// Ctrl+R: re-reads what is installed and what the drive carries, without
+  /// the startup offers. Ignored while a long task runs.
+  Future<void> _refreshFromKeyboard() async {
+    if (_longTaskRunning) return;
+    await _launcherFlow.checkMirror();
+    if (!mounted) return;
+    await _otzaria.checkForUpdate();
+    if (!mounted) return;
+    unawaited(_plugins.refreshInstalled());
+    await _library.checkForUpdate();
+  }
+
   @override
   Widget build(BuildContext context) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyR, control: true): () =>
+            unawaited(_refreshFromKeyboard()),
+        const SingleActivator(LogicalKeyboardKey.f5): () =>
+            unawaited(_refreshFromKeyboard()),
+      },
+      child: Focus(autofocus: true, child: _scaffold(context)),
+    );
+  }
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: AppSurfaces.panelBackground(context),
       // שורת הכותרת נפרסת על כל הרוחב — מעל סרגל הניווט ולא לצידו — כך שגרירת

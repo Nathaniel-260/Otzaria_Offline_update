@@ -146,7 +146,12 @@ class InfoProgressRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppTokens.spaceXS),
-          LinearProgressIndicator(value: value, minHeight: 6),
+          LinearProgressIndicator(
+            value: value,
+            minHeight: 6,
+            semanticsLabel: stage,
+            semanticsValue: value == null ? null : '${(value * 100).round()}%',
+          ),
           if (secondaryStage != null) ...[
             const SizedBox(height: AppTokens.spaceXS),
             Text(
