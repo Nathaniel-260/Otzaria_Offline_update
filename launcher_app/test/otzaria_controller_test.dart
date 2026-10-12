@@ -34,6 +34,7 @@ void main() {
     String? stableTag,
     String? prereleaseTag,
     bool staleFullOnDrive = false,
+    bool arm64Checked = true,
     OtzariaInstallerKind installerKind = OtzariaInstallerKind.windowsSetupExe,
   }) {
     final mirrorDir = p.join(tempDir.path, 'mirror', 'app');
@@ -73,6 +74,15 @@ void main() {
       'syncedAt': '2026-08-01T00:00:00.000Z',
       if (stableTag != null) 'stable': entry(stableTag, false),
       if (prereleaseTag != null) 'prerelease': entry(prereleaseTag, true),
+      if (arm64Checked)
+        'platforms': {
+          'windows_arm64': {
+            'missingAssetTags': [
+              if (stableTag != null) stableTag,
+              if (prereleaseTag != null) prereleaseTag,
+            ],
+          },
+        },
     }));
   }
 
@@ -692,6 +702,14 @@ void main() {
       expect(c.downloadStatus, OtzariaDownloadStatus.error);
     });
   });
+
+  test('מראה שלא נבדקה בה ARM64 מחייבת את מודול התוכנה לרוץ', () async {
+    writeAppMirror(stableTag: '0.9.96', arm64Checked: false);
+    final c = controllerFor();
+    await c.checkForUpdate();
+
+    expect(c.hasStaleFullPackage, isTrue);
+  }, testOn: 'windows');
 
   group('חבילת FULL שנשארה מגרסה ישנה', () {
     test('מראה רגילה — אין מה לנקות', () async {

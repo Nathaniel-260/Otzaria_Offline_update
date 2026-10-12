@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart'
+    show RunningOtzariaLocator, RunningOtzariaProbe;
 import 'package:path/path.dart' as p;
 
 /// ה-landmine: ההתאמה חייבת להיות **מדויקת**. התאמת תת-מחרוזת (או `pgrep -f`
@@ -63,7 +65,9 @@ void main() {
       }
 
       const guardProbe = OtzariaProcessGuard();
-      if (await guardProbe.isRunning('otzaria.exe')) {
+      if (await guardProbe.isAnyRunning(
+        OtzariaProcessGuard.processNamesFor('windows'),
+      )) {
         // אוצריא אמיתית פתוחה על המכונה הזו — אין דרך להבחין בינה לבין
         // התאמת-יתר, וזה מצב שגרתי אצל מי שמפתח כאן.
         markTestSkipped('אוצריא אמיתית פתוחה — יש לסגור אותה לבדיקה הזו');
@@ -80,13 +84,11 @@ void main() {
       fakeLauncher = started;
 
       const guard = OtzariaProcessGuard();
-      if (!await _waitUntilRunning(guard, 'otzaria-launcher-fake.exe')) {
-        markTestSkipped('תהליך העזר לא הופיע ב-tasklist');
+      if (!await _waitUntilRunning('otzaria-launcher-fake.exe')) {
+        markTestSkipped('תהליך העזר לא הופיע ברשימת התהליכים');
         return;
       }
 
-      // זה הלב: הלאנצ'ר המדומה רץ, ובכל זאת "אוצריא" מדווחת כסגורה.
-      expect(await guard.isRunning('otzaria.exe'), isFalse);
       expect(
         await guard.isAnyRunning(
           OtzariaProcessGuard.processNamesFor('windows'),
@@ -95,27 +97,19 @@ void main() {
       );
     });
 
-    test('שם תהליך שאינו קיים כלל מדווח כלא רץ', () async {
-      if (!Platform.isWindows) {
-        markTestSkipped('בדיקת tasklist רצה רק בווינדוס');
-        return;
-      }
-
-      const guard = OtzariaProcessGuard();
-      expect(await guard.isRunning('no-such-process-9f2c.exe'), isFalse);
-      expect(await guard.isAnyRunning(const []), isFalse);
-    });
-  });
-
-  group('OtzariaProcessGuard (macOS/לינוקס בלבד)', () {
-    test('pgrep על שם שאינו קיים מחזיר "לא רץ" (קוד יציאה 1)', () async {
-      if (!Platform.isMacOS && !Platform.isLinux) {
-        markTestSkipped('בדיקת pgrep רצה רק ב-macOS/לינוקס');
-        return;
-      }
-
-      const guard = OtzariaProcessGuard();
-      expect(await guard.isRunning('no-such-process-9f2c'), isFalse);
+    test('השומר עונה לפי בדיקת התהליך של RunningOtzariaLocator', () async {
+      expect(
+        await const OtzariaProcessGuard(
+          locator: _FixedLocator(true),
+        ).isAnyRunning(OtzariaProcessGuard.processNamesFor('windows')),
+        isTrue,
+      );
+      expect(
+        await const OtzariaProcessGuard(
+          locator: _FixedLocator(false),
+        ).isAnyRunning(OtzariaProcessGuard.processNamesFor('windows')),
+        isFalse,
+      );
     });
   });
 
@@ -159,10 +153,22 @@ Future<Process?> _startLongLivedCopyOfPing(String destPath) async {
   }
 }
 
-Future<bool> _waitUntilRunning(OtzariaProcessGuard guard, String name) async {
+Future<bool> _waitUntilRunning(String name) async {
   for (var i = 0; i < 20; i++) {
-    if (await guard.isRunning(name)) return true;
+    if ((await RunningOtzariaLocator.windowsPidsOf(name)).isNotEmpty) {
+      return true;
+    }
     await Future<void>.delayed(const Duration(milliseconds: 100));
   }
   return false;
+}
+
+class _FixedLocator extends RunningOtzariaLocator {
+  const _FixedLocator(this.running);
+
+  final bool running;
+
+  @override
+  Future<RunningOtzariaProbe> probe() async =>
+      (isRunning: running, launchPath: null);
 }

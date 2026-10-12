@@ -1,36 +1,17 @@
+import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'package:win32/win32.dart' show CloseHandle;
 
 /// הזיהוי לפי התהליך הרץ הוא המקור **הסמכותי** למיקום ההתקנה: הוא אינו
 /// ניחוש של תיקייה מוכרת אלא הקובץ שהמשתמש באמת מפעיל. הבדיקות כאן
 /// מכסות את הפירוק הטהור בשתי הפלטפורמות, ובווינדוס גם את מסלול ה-FFI
 /// עצמו — מול תהליך הבדיקה הזה, שהנתיב שלו ידוע מראש.
 void main() {
-  group('parseTasklistPids', () {
-    test('שולף את ה-PID מהעמודה השנייה', () {
-      const line = '"otzaria.exe","1234","Console","1","309,328 K"';
-
-      expect(RunningOtzariaLocator.parseTasklistPids(line), [1234]);
-    });
-
-    test('כמה תהליכים באותו שם — כל ה-PIDים', () {
-      const output = '"otzaria.exe","1234","Console","1","309,328 K"\r\n'
-          '"otzaria.exe","5678","Console","1","12,004 K"\r\n';
-
-      expect(RunningOtzariaLocator.parseTasklistPids(output), [1234, 5678]);
-    });
-
-    test('הודעת "אין תהליך תואם" אינה מתפרשת כ-PID', () {
-      const info =
-          'INFO: No tasks are running which match the specified criteria.';
-
-      expect(RunningOtzariaLocator.parseTasklistPids(info), isEmpty);
-    });
-  });
-
   group('selectMacExecutablePath', () {
     const names = ['אוצריא', 'otzaria'];
 
@@ -201,7 +182,60 @@ void main() {
       }
 
       expect(paths, contains(fakeOtzaria));
-      expect(await const RunningOtzariaLocator().findLaunchPath(), isNotNull);
+      expect(await const RunningOtzariaLocator().findLaunchPath(), isNull);
+
+      final mutexName = 'OtzariaLocatorTest-$pid';
+      final mutex = _createMutex(mutexName);
+      addTearDown(() => CloseHandle(mutex));
+      final probe = await RunningOtzariaLocator(mutexName: mutexName).probe();
+      expect(probe.isRunning, isTrue);
+      expect(probe.launchPath, isNotNull);
+    });
+
+    test('המיוטקס של אוצריא הוא הסימן ל"רצה"', () async {
+      final mutexName = 'OtzariaLocatorMutexTest-$pid';
+      final locator = RunningOtzariaLocator(mutexName: mutexName);
+      expect(
+        RunningOtzariaLocator.windowsMutexState(mutexName),
+        WindowsMutexState.absent,
+      );
+      expect((await locator.probe()).isRunning, isFalse);
+
+      final mutex = _createMutex(mutexName);
+      addTearDown(() => CloseHandle(mutex));
+
+      expect(
+        RunningOtzariaLocator.windowsMutexState(mutexName),
+        WindowsMutexState.present,
+      );
+      expect((await locator.probe()).isRunning, isTrue);
+      expect(RunningOtzariaLocator.lastProbeFailure, isNull);
+    });
+
+    test('מיוטקס שהתהליך הזה עצמו מחזיק אינו "אוצריא רצה"', () async {
+      final mutexName = 'OtzariaLocatorOwnMutexTest-$pid';
+      final mutex = _createMutex(mutexName);
+      addTearDown(() => CloseHandle(mutex));
+
+      final probe = await RunningOtzariaLocator(
+        mutexName: mutexName,
+        isMutexHeldByThisProcess: () => true,
+      ).probe();
+
+      final otzariaPids = await RunningOtzariaLocator.windowsOtzariaPids();
+      expect(probe.isRunning, otzariaPids.isNotEmpty);
+    });
+
+    test('waitForExit חוזר מיד כשאין תהליך להמתין לו', () async {
+      final started = DateTime.now();
+      final result = await const RunningOtzariaLocator()
+          .waitForExit(const Duration(seconds: 5));
+      if (result == null) {
+        expect(
+          DateTime.now().difference(started),
+          lessThan(const Duration(seconds: 4)),
+        );
+      }
     });
   }, skip: !Platform.isWindows);
 }
@@ -221,5 +255,17 @@ Future<Process?> _startLongLivedCopyOfPing(String destPath) async {
     return await Process.start(destPath, const ['-n', '30', '127.0.0.1']);
   } catch (_) {
     return null;
+  }
+}
+
+int _createMutex(String name) {
+  final create = DynamicLibrary.open('kernel32.dll').lookupFunction<
+      IntPtr Function(Pointer<Void>, Int32, Pointer<Utf16>),
+      int Function(Pointer<Void>, int, Pointer<Utf16>)>('CreateMutexW');
+  final namePtr = name.toNativeUtf16();
+  try {
+    return create(nullptr, 0, namePtr);
+  } finally {
+    calloc.free(namePtr);
   }
 }

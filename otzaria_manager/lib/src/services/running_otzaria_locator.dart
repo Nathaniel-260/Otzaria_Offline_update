@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
@@ -17,26 +18,25 @@ typedef RunningOtzariaProbe = ({bool isRunning, String? launchPath});
 /// הותקן במקום שאינו ברשימת ברירות המחדל של
 /// [OtzariaManager] (`_autoDetectDirs`).
 ///
-/// עובד כמובן רק כשאוצריא פתוחה — אבל זה בדיוק הרגע שבו הלאנצ'ר כבר
-/// מציג "אוצריא פתוחה, יש לסגור אותה" (`OtzariaProcessGuard` ב-
-/// `library_manager` מזהה את אותו תהליך, בשמו בלבד), והתוצאה נשמרת
-/// ב-state ולכן נשארת גם אחרי שהיא נסגרת.
-///
 /// **מה זה לא פותר:** מיקום ה-`seforim.db`. הוא יושב תחת `%APPDATA%`
 /// ללא קשר לתיקיית ההתקנה, ולגזור אותו מהתהליך היה מחייב סריקת
 /// ה-handles הפתוחים שלו — ראו `LibraryDbLocator`.
 class RunningOtzariaLocator {
-  const RunningOtzariaLocator();
+  const RunningOtzariaLocator({
+    this.mutexName = singleInstanceMutexName,
+    this.isMutexHeldByThisProcess,
+  });
 
-  /// גודל החוצץ ל-`QueryFullProcessImageNameW`. `MAX_PATH` (260) אינו
-  /// מספיק — נתיב ארוך אפשרי, ואז הקריאה הייתה נכשלת דווקא במקרה הלא-שגרתי
-  /// שבגללו כל המנגנון הזה קיים.
+  static const String singleInstanceMutexName = 'OtzariaAppSingleInstance';
+
+  final String mutexName;
+
+  final bool Function()? isMutexHeldByThisProcess;
+
   static const int _maxPathChars = 32768;
 
-  /// שמות התהליך של אוצריא. **חייב להישאר תואם ל-
-  /// `OtzariaProcessGuard.processNamesFor`** ב-`library_manager` — אותו
-  /// זיהוי בדיוק, בשתי חבילות: שם חוסמים עדכון DB, כאן שולפים נתיב.
-  /// יש בדיקה ב-`launcher_app` שמאמתת שהרשימות זהות.
+  static Object? lastProbeFailure;
+
   static List<String> processNamesFor(String operatingSystem) {
     return switch (operatingSystem) {
       'windows' => const ['otzaria.exe'],
@@ -45,53 +45,103 @@ class RunningOtzariaLocator {
     };
   }
 
-  /// נתיב ההפעלה של אוצריא הרצה כרגע — קובץ ה-`.exe` בווינדוס, חבילת
-  /// ה-`.app` ב-macOS — או null.
-  ///
-  /// null אינו שגיאה: אוצריא אינה רצה, אין הרשאה לקרוא את נתיב התהליך
-  /// (היא רצה כמנהל והלאנצ'ר לא), או שהתהליך אינו יושב בתוך `.app`
-  /// ב-macOS. הקורא פשוט ממשיך לזיהוי לפי תיקיות ברירת המחדל.
   Future<String?> findLaunchPath() async => (await probe()).launchPath;
 
-  /// בדיקה אחת שמחזירה גם "רצה?" וגם את הנתיב. הקורא צריך את שניהם —
-  /// הממשק מציג "אוצריא פתוחה" והזיהוי צריך את הנתיב — וקודם זה עלה שתי
-  /// הרצות נפרדות של `tasklist`, שהן הפעולה היקרה ביותר בעליית הלאנצ'ר.
-  ///
-  /// כשל בבדיקה עצמה מדווח כ"רצה", בדיוק כמו `OtzariaProcessGuard`: עדיף
-  /// לחסום שינוי מסד לשווא מלכתוב לקובץ שאוצריא מחזיקה פתוח.
   Future<RunningOtzariaProbe> probe() async {
     try {
-      if (Platform.isWindows) return await _probeWindows();
-      if (Platform.isMacOS) return await _probeMac();
-    } on ProcessException {
-      // הכלי עצמו חסר/חסום. כמו כשל בהרצתו: מדווחים "רצה" ולא מפילים —
-      // הבדיקה הזו רצה במקביל לאחרות, וחריג ממנה היה בורח כשגיאה לא-נתפסת.
-      return (isRunning: true, launchPath: null);
+      final RunningOtzariaProbe result;
+      if (Platform.isWindows) {
+        result = await _probeWindows();
+      } else if (Platform.isMacOS) {
+        result = await _probeMac();
+      } else {
+        return (isRunning: false, launchPath: null);
+      }
+      lastProbeFailure = null;
+      return result;
+    } on _ProbeFailure catch (failure) {
+      lastProbeFailure = failure.cause;
+      return (isRunning: false, launchPath: null);
+    } on ProcessException catch (e) {
+      lastProbeFailure = e;
+      return (isRunning: false, launchPath: null);
     }
-    return (isRunning: false, launchPath: null);
   }
 
   Future<RunningOtzariaProbe> _probeWindows() async {
-    var isRunning = false;
-    for (final name in processNamesFor('windows')) {
-      final pids = await _windowsPidsOrNull(name);
-      if (pids == null) return (isRunning: true, launchPath: null);
-      if (pids.isNotEmpty) isRunning = true;
+    final mutex = mutexName;
+    final self = Platform.resolvedExecutable;
+    final ownMutex = isMutexHeldByThisProcess?.call() ?? false;
+    final result = await _offUiIsolate(
+      () => windowsProbeSync(mutex, self, mutexHeldByThisProcess: ownMutex),
+    );
+    final failure = result.failure;
+    if (failure != null) throw _ProbeFailure(failure);
+    return (isRunning: result.isRunning, launchPath: result.launchPath);
+  }
 
-      for (final processId in pids) {
-        final path = windowsImagePathOfPid(processId);
-        if (path == null) continue;
-        // הלאנצ'ר עצמו לעולם לא ייקרא otzaria.exe, אבל ביטוח זול.
-        if (_isSelf(path)) continue;
-        return (isRunning: true, launchPath: path);
-      }
+  static ({bool isRunning, String? launchPath, String? failure})
+      windowsProbeSync(
+    String mutexName,
+    String selfPath, {
+    bool mutexHeldByThisProcess = false,
+  }) {
+    final mutex = mutexHeldByThisProcess
+        ? WindowsMutexState.unknown
+        : windowsMutexState(mutexName);
+    if (mutex == WindowsMutexState.absent) {
+      return (isRunning: false, launchPath: null, failure: null);
     }
-    return (isRunning: isRunning, launchPath: null);
+    final running = _otzariaProcesses(selfPath);
+    if (running == null) {
+      return mutex == WindowsMutexState.present
+          ? (isRunning: true, launchPath: null, failure: null)
+          : (
+              isRunning: false,
+              launchPath: null,
+              failure: 'OpenMutexW and EnumProcesses both failed',
+            );
+    }
+    final path = running.map((process) => process.path).nonNulls.firstOrNull;
+    return (
+      isRunning: mutex == WindowsMutexState.present || running.isNotEmpty,
+      launchPath: path,
+      failure: null,
+    );
+  }
+
+  Future<bool?> waitForExit(Duration timeout) async {
+    if (!Platform.isWindows) return null;
+    final self = Platform.resolvedExecutable;
+    final millis = timeout.inMilliseconds;
+    return _offUiIsolate(() => _waitForExitSync(self, millis));
+  }
+
+  static bool? _waitForExitSync(String selfPath, int timeoutMillis) {
+    final processes = _otzariaProcesses(selfPath);
+    if (processes == null || processes.isEmpty) return null;
+    final handle = OpenProcess(SYNCHRONIZE, FALSE, processes.first.pid);
+    if (handle == 0) return null;
+    try {
+      return WaitForSingleObject(handle, timeoutMillis) == WAIT_OBJECT_0;
+    } finally {
+      CloseHandle(handle);
+    }
+  }
+
+  static Future<T> _offUiIsolate<T>(T Function() compute) async {
+    try {
+      return await Isolate.run(compute);
+    } on IsolateSpawnException {
+      return compute();
+    }
   }
 
   Future<RunningOtzariaProbe> _probeMac() async {
     final result = await Process.run('/bin/ps', ['-A', '-o', 'comm=']);
-    if (result.exitCode != 0) return (isRunning: true, launchPath: null);
+    if (result.exitCode != 0) {
+      throw _ProbeFailure('ps exited with ${result.exitCode}');
+    }
 
     final executablePath = selectMacExecutablePath(
       const LineSplitter().convert(result.stdout.toString()),
@@ -100,44 +150,92 @@ class RunningOtzariaLocator {
     );
     if (executablePath == null) return (isRunning: false, launchPath: null);
 
-    // `ps` מחזיר את הבינארי שבתוך החבילה; כל השאר בקוד עובד מול ה-.app.
     return (
       isRunning: true,
       launchPath: MacAppVersionReader.bundleRootOf(executablePath),
     );
   }
 
-  bool _isSelf(String path) => p.equals(path, Platform.resolvedExecutable);
-
-  /// ה-PIDים של תהליך בשם [imageName], דרך `tasklist` בפורמט CSV (הפורמט
-  /// היחיד שאפשר לפרסר ממנו בביטחון — הפורמט הטבלאי מיישר בעמודות).
-  static Future<List<int>> windowsPidsOf(String imageName) async =>
-      await _windowsPidsOrNull(imageName) ?? const [];
-
-  /// כמו [windowsPidsOf], אך `null` = `tasklist` עצמו נכשל, להבדיל מרשימה
-  /// ריקה שפירושה "נבדק, ואינו רץ". ההבחנה נחוצה ל-[probe] fail-safe.
-  static Future<List<int>?> _windowsPidsOrNull(String imageName) async {
-    final result = await Process.run(
-      'tasklist',
-      ['/FI', 'IMAGENAME eq $imageName', '/NH', '/FO', 'CSV'],
+  static Future<List<int>> windowsPidsOf(String imageName) async {
+    if (!Platform.isWindows) return const [];
+    return _offUiIsolate(
+      () => [
+        for (final process in _processesNamed(imageName) ??
+            const <({int pid, String? path})>[])
+          process.pid,
+      ],
     );
-    if (result.exitCode != 0) return null;
-    return parseTasklistPids(result.stdout.toString());
   }
 
-  /// שורת CSV של tasklist: `"otzaria.exe","1234","Console","1","309,328 K"` —
-  /// ה-PID בעמודה השנייה. כשאין תהליך תואם מודפסת שורת INFO חופשית, שפשוט
-  /// אינה מתפרשת ומחזירה רשימה ריקה.
-  static List<int> parseTasklistPids(String stdout) {
-    final pids = <int>[];
-    for (final line in const LineSplitter().convert(stdout)) {
-      final fields = line.split(',');
-      if (fields.length < 2) continue;
-      final pid = int.tryParse(fields[1].replaceAll('"', '').trim());
-      if (pid != null) pids.add(pid);
-    }
-    return pids;
+  static Future<List<int>> windowsOtzariaPids() async {
+    if (!Platform.isWindows) return const [];
+    final self = Platform.resolvedExecutable;
+    return _offUiIsolate(
+      () => [
+        for (final process
+            in _otzariaProcesses(self) ?? const <({int pid, String? path})>[])
+          process.pid,
+      ],
+    );
   }
+
+  static List<({int pid, String? path})>? _otzariaProcesses(String selfPath) =>
+      _processesNamed(processNamesFor('windows').single)
+          ?.where((process) => !p.equals(process.path!, selfPath))
+          .toList();
+
+  static List<({int pid, String? path})>? _processesNamed(String imageName) {
+    final pids = _windowsAllPids();
+    if (pids == null) return null;
+    final target = imageName.toLowerCase();
+    final found = <({int pid, String? path})>[];
+    final buffer = malloc<Uint16>(_maxPathChars).cast<Utf16>();
+    final sizePtr = calloc<Uint32>();
+    try {
+      for (final processId in pids) {
+        final path = _imagePathOf(processId, buffer, sizePtr);
+        if (path != null && p.basename(path).toLowerCase() == target) {
+          found.add((pid: processId, path: path));
+        }
+      }
+    } finally {
+      malloc.free(buffer);
+      calloc.free(sizePtr);
+    }
+    return found;
+  }
+
+  static WindowsMutexState windowsMutexState(String name) {
+    if (!Platform.isWindows) return WindowsMutexState.unknown;
+    final namePtr = name.toNativeUtf16();
+    final openMutex = _openMutex;
+    final lastError = _lastError;
+    try {
+      final handle = openMutex(SYNCHRONIZE, FALSE, namePtr);
+      final error = lastError();
+      if (handle != 0) {
+        CloseHandle(handle);
+        return WindowsMutexState.present;
+      }
+      return switch (error) {
+        ERROR_FILE_NOT_FOUND => WindowsMutexState.absent,
+        ERROR_ACCESS_DENIED => WindowsMutexState.present,
+        _ => WindowsMutexState.unknown,
+      };
+    } finally {
+      calloc.free(namePtr);
+    }
+  }
+
+  static final _openMutex = DynamicLibrary.open('kernel32.dll').lookupFunction<
+      IntPtr Function(Uint32, Int32, Pointer<Utf16>),
+      int Function(int, int, Pointer<Utf16>)>('OpenMutexW', isLeaf: true);
+
+  static final _lastError = DynamicLibrary.open('kernel32.dll')
+      .lookupFunction<Uint32 Function(), int Function()>(
+    'GetLastError',
+    isLeaf: true,
+  );
 
   static String? windowsImagePathOfPid(int processId) {
     if (!Platform.isWindows) return null;
@@ -159,7 +257,7 @@ class RunningOtzariaLocator {
     final buffer = malloc<Uint16>(_maxPathChars).cast<Utf16>();
     final sizePtr = calloc<Uint32>();
     try {
-      for (final processId in _windowsAllPids()) {
+      for (final processId in _windowsAllPids() ?? const <int>[]) {
         final path = _imagePathOf(processId, buffer, sizePtr);
         if (path != null) paths.add(path);
       }
@@ -170,13 +268,13 @@ class RunningOtzariaLocator {
     return paths;
   }
 
-  static List<int> _windowsAllPids() {
+  static List<int>? _windowsAllPids() {
     for (var capacity = 1024;; capacity *= 2) {
       final pids = malloc<Uint32>(capacity);
       final neededPtr = calloc<Uint32>();
       try {
         final bytes = capacity * sizeOf<Uint32>();
-        if (EnumProcesses(pids, bytes, neededPtr) == 0) return const [];
+        if (EnumProcesses(pids, bytes, neededPtr) == 0) return null;
         if (neededPtr.value < bytes) {
           final count = neededPtr.value ~/ sizeOf<Uint32>();
           return [for (var i = 0; i < count; i++) pids[i]];
@@ -235,4 +333,15 @@ class RunningOtzariaLocator {
     }
     return null;
   }
+}
+
+enum WindowsMutexState { present, absent, unknown }
+
+class _ProbeFailure implements Exception {
+  const _ProbeFailure(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => '$cause';
 }

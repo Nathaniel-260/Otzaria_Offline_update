@@ -924,4 +924,7 @@ class _MutableLocator extends RunningOtzariaLocator {
     probes++;
     return (isRunning: isRunning, launchPath: null);
   }
+
+  @override
+  Future<bool?> waitForExit(Duration timeout) async => null;
 }

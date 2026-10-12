@@ -1158,20 +1158,17 @@ and crashed on the next thing it loaded. `OtzariaManager._refuseIfRunningOnMac` 
 signed; `unzip` / `package:archive` destroy the symlinks and xattrs, and therefore the
 signature, and macOS refuses to run it.
 
-**Process detection uses exact matching.** `OtzariaProcessGuard` looks for
-`otzaria.exe` via `tasklist` and the Hebrew process name `אוצריא` via `pgrep -x`.
-`pgrep -f` or a substring match would also match the launcher itself (its path
-contains "otzaria") and block every DB update.
-
-**Two packages match that process, and their name lists must agree.**
-`OtzariaProcessGuard` (`library_manager`) blocks DB updates while Otzaria is open;
-`RunningOtzariaLocator` (`otzaria_manager`) reads that process's *path* to learn where
-Otzaria is installed — the authoritative answer, tried before the guesses in
-`_autoDetectDirs`. The packages do not depend on each other, so
-`launcher_app/test/process_names_test.dart` asserts the two `processNamesFor` lists are
-identical; drift gives "we can see Otzaria is running, yet we cannot tell where it is
-installed". The locator answers only for the *app* directory — `seforim.db` lives under
-`%APPDATA%` regardless and stays `LibraryDbLocator`'s job.
+**"Otzaria is running" is its single-instance mutex, probed off the UI
+isolate.** `RunningOtzariaLocator.probe` opens `OtzariaAppSingleInstance`
+(contract C7) with `OpenMutexW` inside `Isolate.run`; only when it is present
+(or the answer is unknown) does one FFI process enumeration look for
+`otzaria.exe` by exact name, never the launcher itself. `tasklist` cost ~300ms
+per call and a blocked one meant "running forever"; a failed probe now counts
+as closed and is logged (`lastProbeFailure`). Resolve `GetLastError` before
+`OpenMutexW` — its lazy lookup clobbers the error. A process that holds the
+mutex itself (library apply) passes `isMutexHeldByThisProcess`.
+`OtzariaProcessGuard` (`library_manager`) delegates to it, and `AppShell`
+waits for the process to exit instead of polling every 3s.
 
 **The Windows uninstall registry beats every guess.** `WindowsInstallRegistry` reads
 `InstallLocation` from the Inno entries under `…\CurrentVersion\Uninstall` (HKCU, then

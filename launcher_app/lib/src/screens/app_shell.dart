@@ -163,11 +163,10 @@ class _AppShellState extends State<AppShell> {
   /// להפעלה מחדש של הלאנצ'ר, גם אחרי שאוצריא נסגרה ובדיקה חדשה כבר ידעה זאת.
   bool get _otzariaIsRunning => _otzaria.isRunning;
 
-  /// כל עוד אוצריא פתוחה בודקים שוב מדי [_runningPollInterval], כדי שסגירה
-  /// שלה תזוהה מעצמה. כשהיא סגורה אין טיימר בכלל — פתיחה מחדש נתפסת
-  /// בבדיקה שרצה לפני כל פעולה חוסמת (ראו [refreshProcessState]).
   static const Duration _runningPollInterval = Duration(seconds: 3);
+  static const Duration _runningWatchSlice = Duration(minutes: 1);
   Timer? _runningPoll;
+  Future<void>? _runningWatch;
 
   /// המסכים שנבנו בפועל. ה-[IndexedStack] בונה את *כל* ילדיו, ולכן בעבר גם
   /// חנות התוספים (רשת כרטיסים עם תמונה לכל תוסף) נבנתה ופענחה את כל
@@ -462,16 +461,26 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  /// מדליק/מכבה את הרענון המחזורי לפי מצב התהליך שהתקבל כרגע.
   void _syncRunningPoll() {
-    if (_otzariaIsRunning) {
-      _runningPoll ??= Timer.periodic(
-        _runningPollInterval,
-        (_) => unawaited(_otzaria.refreshRunningState()),
-      );
-    } else {
-      _runningPoll?.cancel();
-      _runningPoll = null;
+    if (_otzariaIsRunning) _runningWatch ??= _watchUntilClosed();
+  }
+
+  Future<void> _watchUntilClosed() async {
+    try {
+      while (mounted && _otzariaIsRunning) {
+        final exited =
+            await widget.runningLocator.waitForExit(_runningWatchSlice);
+        if (!mounted) return;
+        if (exited == null) {
+          final elapsed = Completer<void>();
+          _runningPoll = Timer(_runningPollInterval, elapsed.complete);
+          await elapsed.future;
+          if (!mounted) return;
+        }
+        await _otzaria.refreshRunningState();
+      }
+    } finally {
+      _runningWatch = null;
     }
   }
 

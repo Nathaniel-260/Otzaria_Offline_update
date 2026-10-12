@@ -255,9 +255,22 @@ class OtzariaModuleController extends ChangeNotifier
     return inFlight.then((_) => _runningProbe ??= _probeRunning());
   }
 
+  Object? _loggedProbeFailure;
+
+  void _noteProbeFailure() {
+    final failure = RunningOtzariaLocator.lastProbeFailure;
+    if (failure != null && failure != _loggedProbeFailure) {
+      AppLogger.maybeInstance?.warn(
+        'בדיקת "אוצריא פתוחה?" נכשלה ונחשבת "סגורה": $failure',
+      );
+    }
+    _loggedProbeFailure = failure;
+  }
+
   Future<bool> _probeRunning() async {
     try {
       final probe = await _runningLocator.probe();
+      _noteProbeFailure();
       if (isDisposed) return probe.isRunning;
       final changed = isRunning != probe.isRunning;
       isRunning = probe.isRunning;
@@ -401,6 +414,7 @@ class OtzariaModuleController extends ChangeNotifier
       hasStaleFullPackage =
           check.hasStaleFullPackage || check.mirrorLacksArchitectures;
       isRunning = check.isOtzariaRunning;
+      _noteProbeFailure();
       status = switch (check) {
         _ when check.needsDownload => OtzariaModuleStatus.needsDownload,
         _ when check.installedIsNewer => OtzariaModuleStatus.installedIsNewer,
