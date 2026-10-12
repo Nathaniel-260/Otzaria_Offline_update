@@ -232,7 +232,7 @@ jobs:
             packages: launcher_app
             flutter: true
           - shard: flutter_packages
-            packages: .,library_manager
+            packages: library_manager
             flutter: true
           - shard: dart_a
             packages: otzaria_manager,otzaria_l10n,otzaria_downloads

@@ -12,6 +12,7 @@ import 'services/external_update_notice.dart';
 import 'services/library_db_locator.dart';
 import 'services/library_state_store.dart';
 import 'services/library_update_applier.dart';
+import 'services/library_updater_l10n.dart';
 import 'services/otzaria_process_guard.dart';
 import 'services/otzaria_settings_reader.dart';
 import 'services/otzaria_settings_writer.dart';
@@ -95,12 +96,13 @@ class LibraryManager {
          p.join(stateDir ?? dataDir, LibraryStateStore.fileName),
          dataDir: dataDir,
        ),
-       _planner = const LibraryUpdatePlanner(),
+       _planner = const OfflineLibraryUpdatePlanner(),
        _versionReader = versionReader,
-       _recovery = const LibraryDbRecoveryService(),
+       _recovery = const OfflineLibraryDbRecoveryService(),
        _processGuard = processGuard,
        _cloudClient = releaseClient ?? RecentLibraryReleasesClient(),
        _applier = applier ?? LibraryUpdateApplier(processGuard: processGuard) {
+    useLibraryUpdaterL10n();
     _locator = LibraryDbLocator(
       stateStore: _stateStore,
       settingsReader: settingsReader,
@@ -136,13 +138,13 @@ class LibraryManager {
 
   final LibraryStateStore _stateStore;
   late final LibraryDbLocator _locator;
-  final LibraryUpdatePlanner _planner;
+  final OfflineLibraryUpdatePlanner _planner;
   final LocalDbVersionReader _versionReader;
 
   /// נשאר לצורך [checkForUpdate] בלבד — מזהה ומנקה שרידי-קריסה מהתקנות
   /// ישנות של הלאנצ'ר (מגרסאות קודמות שכן ביצעו patch/apply בפועל). לא
   /// כותב/מחיל דבר בעצמו.
-  final LibraryDbRecoveryService _recovery;
+  final OfflineLibraryDbRecoveryService _recovery;
 
   final OtzariaProcessGuard _processGuard;
 
@@ -364,7 +366,7 @@ class LibraryManager {
       try {
         String? tag;
         if (exported) {
-          final discovery = await LibraryUpdateDiscovery(
+          final discovery = await OfflineLibraryUpdateDiscovery(
             client: await _resolveSource(),
           ).discover(allowPrerelease: allowPrerelease);
           tag = discovery.newestReleaseTag;
@@ -458,7 +460,7 @@ class LibraryManager {
   }
 
   ({String tag, int version})? _latestOnline(List<LibraryRelease> all) =>
-      LibraryUpdateDiscovery.latestOnlineRelease(
+      OfflineLibraryUpdateDiscovery.latestOnlineRelease(
         all,
         allowPrerelease: allowPrerelease,
       );
@@ -517,7 +519,7 @@ class LibraryManager {
 
     final source = await _resolveSource();
     final releases = await source.fetchReleases();
-    final discoverer = LibraryUpdateDiscovery(
+    final discoverer = OfflineLibraryUpdateDiscovery(
       client: _FetchedReleasesSource(source, releases),
     );
     final discoveryResult = await discoverer.discover(
@@ -925,7 +927,7 @@ class LibraryManager {
     }
     // רושמים מאיזה release התוכן הנוכחי הגיע, **יחד עם הגרסה** — זה מה
     // שמאפשר לזהות בהמשך מסד מתוקן שפורסם באותו db_version, ומונע השוואה
-    // מול רישום שנעשה בגרסה אחרת (ראו LibraryUpdatePlanner).
+    // מול רישום שנעשה בגרסה אחרת (ראו OfflineLibraryUpdatePlanner).
     if (tag != null && version != null && version > 0) {
       await record(
         () => _stateStore.saveAppliedRelease(tag: tag, dbVersion: version),

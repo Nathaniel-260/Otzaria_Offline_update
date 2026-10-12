@@ -2296,6 +2296,68 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String localFileHashMismatch(String url) =>
       'The sha256 of the local file does not match: $url';
+  @override
+  String get manifestMissingPatchFormatVersion =>
+      'Required manifest field is missing for schema 4+: patchFormatVersion';
+  @override
+  String manifestInvalidOptionalField(String key) =>
+      'Invalid optional manifest field: $key';
+  @override
+  String manifestInvalidHashMap(String key) =>
+      'Invalid value in the manifest hash map: $key';
+  @override
+  String splitManifestDownloadFailed(String name, int statusCode) =>
+      'Failed to download the split manifest ($name): $statusCode';
+  @override
+  String get interruptedUpdateWithoutBackup =>
+      'An unfinished update marker was found without a backup — the DB must '
+      'be checked';
+  @override
+  String get interruptedUpdateRestored =>
+      'An interrupted update was detected — the DB was restored from the '
+      'backup';
+  @override
+  String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema) =>
+      'The library moved to DB schema $schemaVersion, newer than supported '
+      '(DB $supportedSchema) — an app update is required';
+  @override
+  String planSchemaBarrierNeedsFullDownload(int schemaVersion) =>
+      'The library moved to DB schema $schemaVersion; the change requires a '
+      'full download';
+  @override
+  String planDeltaNeedsAppUpdate(
+    int latestVersion,
+    int supportedSchema,
+    int supportedPatchFormat,
+  ) =>
+      'The delta route to version $latestVersion needs a DB schema or patch '
+      'format newer than supported (DB $supportedSchema, patch '
+      '$supportedPatchFormat) — an app update is required';
+  @override
+  String planHeavyDelta(String deltaSize, String localDbSize) =>
+      'The delta route unpacks $deltaSize against a local DB of '
+      '$localDbSize, and applying it may take a long time';
+  @override
+  String tableHashMismatch(String tables) =>
+      'The hash after applying does not match toTableContentHashes in tables: '
+      '$tables';
+  @override
+  String patchOpenFailed(String path, String detail) =>
+      'Cannot open the patch file ($path): $detail';
+  @override
+  String get networkInterrupted =>
+      'The network connection was interrupted during the download';
+  @override
+  String get deletePreviousArchiveFailed =>
+      'Deleting the previous archive failed — the downloaded parts cannot be '
+      'joined';
+  @override
+  String joinedArchiveSizeMismatch(int written, int expected) =>
+      'The joined archive size ($written) does not match the expected '
+      '($expected)';
+  @override
+  String get joinedArchiveHashMismatch =>
+      'The sha256 of the joined archive does not match';
 
   @override
   String get mirrorMissing =>

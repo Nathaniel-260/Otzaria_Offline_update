@@ -2141,6 +2141,60 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String localFileHashMismatch(String url) =>
       'sha256 של הקובץ המקומי אינו תואם: $url';
+  @override
+  String get manifestMissingPatchFormatVersion =>
+      'שדה חובה חסר במניפסט של schema 4+: patchFormatVersion';
+  @override
+  String manifestInvalidOptionalField(String key) =>
+      'שדה אופציונלי לא תקין במניפסט: $key';
+  @override
+  String manifestInvalidHashMap(String key) =>
+      'ערך לא תקין במפת ה-hash במניפסט: $key';
+  @override
+  String splitManifestDownloadFailed(String name, int statusCode) =>
+      'שגיאה בהורדת מניפסט הפיצול ($name): $statusCode';
+  @override
+  String get interruptedUpdateWithoutBackup =>
+      'נמצא סימון עדכון שלא הושלם ללא גיבוי — יש לוודא תקינות ה-DB';
+  @override
+  String get interruptedUpdateRestored =>
+      'עדכון שנקטע זוהה — ה-DB שוחזר מהגיבוי';
+  @override
+  String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema) =>
+      'הספרייה עברה לסכמת DB $schemaVersion, '
+      'חדשה מהנתמך (DB $supportedSchema) — נדרש עדכון אפליקציה';
+  @override
+  String planSchemaBarrierNeedsFullDownload(int schemaVersion) =>
+      'הספרייה עברה לסכמת DB $schemaVersion; המעבר מחייב הורדה מלאה';
+  @override
+  String planDeltaNeedsAppUpdate(
+    int latestVersion,
+    int supportedSchema,
+    int supportedPatchFormat,
+  ) =>
+      'מסלול הדלתא לגרסה $latestVersion דורש סכמת DB או פורמט patch '
+      'חדשים מהנתמך (DB $supportedSchema, '
+      'patch $supportedPatchFormat) — נדרש עדכון אפליקציה';
+  @override
+  String planHeavyDelta(String deltaSize, String localDbSize) =>
+      'מסלול הדלתא פורס $deltaSize לעומת DB מקומי בגודל '
+      '$localDbSize, ושלב ההחלה עלול להימשך זמן רב';
+  @override
+  String tableHashMismatch(String tables) =>
+      'ה-hash אחרי apply אינו תואם ל-toTableContentHashes בטבלאות: $tables';
+  @override
+  String patchOpenFailed(String path, String detail) =>
+      'לא ניתן לפתוח את קובץ ה-patch ($path): $detail';
+  @override
+  String get networkInterrupted => 'החיבור לרשת נקטע במהלך ההורדה';
+  @override
+  String get deletePreviousArchiveFailed =>
+      'מחיקת ארכיון קודם נכשלה — לא ניתן לחבר את חלקי ההורדה';
+  @override
+  String joinedArchiveSizeMismatch(int written, int expected) =>
+      'גודל הארכיון המחובר ($written) אינו תואם לצפוי ($expected)';
+  @override
+  String get joinedArchiveHashMismatch => 'sha256 של הארכיון המחובר אינו תואם';
 
   @override
   String get mirrorMissing =>

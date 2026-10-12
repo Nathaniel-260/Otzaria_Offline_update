@@ -684,7 +684,7 @@ void main() {
   });
 
   group('applyFullDownload — סימון של מסד פגום שקדם להחלה', () {
-    const recovery = LibraryDbRecoveryService();
+    const recovery = OfflineLibraryDbRecoveryService();
 
     Future<void> abortAfterBeginApply({
       required bool markerBefore,
@@ -994,7 +994,7 @@ void main() {
   // נבדק גם מה שמונע ממסד שנקטע להישאר לא-מאומת בשקט: סימון + `verifyFromHash`
   // בהחלה הבאה.
   group('applyDelta — אימות אחד בסוף השרשרת', () {
-    const recovery = LibraryDbRecoveryService();
+    const recovery = OfflineLibraryDbRecoveryService();
     const hasher = LogicalContentHasher();
 
     String buildDb(
