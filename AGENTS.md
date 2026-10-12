@@ -285,10 +285,11 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
 
 ## 4. Code style
 
-- **Do not write comments in code.** Explanations go in the commit message
-  summary, not in the source — comments only weigh the code down. When you find a
-  comment in code you touch, delete it. Never record history in a comment ("used
-  to…", "changed in…", commented-out code) — git keeps that.
+- **Comments are rare and short.** Add one only for a non-obvious *why* or a
+  trap that would bring a bug back, at most two lines; the rest goes in the
+  commit message. Never record history in a comment ("used to…", "changed
+  in…", commented-out code) — git keeps that. The codebase still carries many
+  long comments: do not mass-edit them, but shorten one you touch anyway.
 - **Fix bugs at the root, minimally.** Investigate first — `git log` on the code,
   read it, name the cause — then prefer removing or reverting the code that caused
   it over adding more. A `try/catch` that silences an error, a null check that
