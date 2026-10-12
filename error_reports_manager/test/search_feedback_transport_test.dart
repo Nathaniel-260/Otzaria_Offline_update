@@ -311,6 +311,69 @@ void main() {
     expect(registrations, 1);
   });
 
+  group('carriedOffline (C6)', () {
+    Future<void> addOld() => queue.append({
+          'type': 'search',
+          'eventId': 'old-event',
+          'clientTime': DateTime.now()
+              .subtract(const Duration(days: 40))
+              .toUtc()
+              .toIso8601String(),
+        }, {
+          'app': 'otzaria',
+          'appVersion': '1.2',
+          'platform': 'windows'
+        });
+
+    Future<void> registered() async {
+      identity.registeredKeyId = identity.keyId;
+      await SearchFeedbackIdentityStore(() async => Directory(source))
+          .save(identity);
+    }
+
+    test('אירועים עד 89 יום נשלחים עם carriedOffline:true', () async {
+      await addOld();
+      await registered();
+      final bodies = <Map<String, dynamic>>[];
+      final transport =
+          SearchFeedbackTransport(destination, client: MockClient((req) async {
+        final body = jsonDecode(req.body) as Map<String, dynamic>;
+        bodies.add(body);
+        return http.Response(
+            '{"accepted":${(body['events'] as List).length}}', 200);
+      }));
+      addTearDown(transport.close);
+      await transport.collect(source, mayCollect: () async => true);
+
+      expect(await transport.upload(), (sent: 2, rejected: 0, remaining: 0));
+      expect(bodies.single['carriedOffline'], isTrue);
+    });
+
+    test('שרת שדוחה את המנה — שליחה חוזרת בלי הדגל, בחלון של 29 יום', () async {
+      await addOld();
+      await registered();
+      final bodies = <Map<String, dynamic>>[];
+      final transport =
+          SearchFeedbackTransport(destination, client: MockClient((req) async {
+        final body = jsonDecode(req.body) as Map<String, dynamic>;
+        bodies.add(body);
+        if (bodies.length == 1) {
+          return http.Response('{"error":"invalid","field":"x"}', 422);
+        }
+        return http.Response(
+            '{"accepted":${(body['events'] as List).length}}', 200);
+      }));
+      addTearDown(transport.close);
+      await transport.collect(source, mayCollect: () async => true);
+
+      expect(await transport.upload(), (sent: 1, rejected: 0, remaining: 0));
+      expect(bodies, hasLength(2));
+      expect(bodies.last.containsKey('carriedOffline'), isFalse);
+      expect(
+          (bodies.last['events'] as List).single['eventId'], 'test-event-id');
+    });
+  });
+
   test('expired and local-only events are never sent to production', () async {
     await queue.purge();
     await queue.resume();
@@ -318,7 +381,7 @@ void main() {
       'type': 'search',
       'eventId': 'expired-event',
       'clientTime': DateTime.now()
-          .subtract(const Duration(days: 30))
+          .subtract(const Duration(days: 90))
           .toUtc()
           .toIso8601String()
     }, {

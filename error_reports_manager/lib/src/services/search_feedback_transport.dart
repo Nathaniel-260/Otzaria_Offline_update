@@ -30,6 +30,9 @@ class SearchFeedbackTransport {
 
   static String dirIn(String dataDir) => p.join(dataDir, 'search-feedback');
 
+  static const Duration carriedWindow = Duration(days: 89);
+  static const Duration plainWindow = Duration(days: 29);
+
   SearchFeedbackQueue _queue(String path) => SearchFeedbackQueue(
         () async => Directory(path),
         clock: DateTime.now,
@@ -207,8 +210,9 @@ class SearchFeedbackTransport {
           if (_stopped) break;
           final claimed = await queue.claim(name);
           if (claimed == null) continue;
-          final batch = await queue.read(claimed,
-              notBefore: DateTime.now().subtract(const Duration(days: 29)));
+          var carried = true;
+          var batch = await queue.read(claimed,
+              notBefore: DateTime.now().subtract(carriedWindow));
           if (batch == null) continue;
           final context = jsonDecode(batch.contextJson) as Map;
           if (batch.eventLines.isEmpty || context['localOnly'] == true) {
@@ -247,21 +251,37 @@ class SearchFeedbackTransport {
           }
 
           if (!identity.isRegistered && !await register()) break;
-          Future<SearchFeedbackOutcome> post() => sender.sendEvents(
-                identity: identity,
-                body: '{"schema":1,"batchId":"${newSearchFeedbackId()}",'
-                    '"sentAt":"${searchFeedbackIsoTime(DateTime.now())}",'
-                    '"context":${batch.contextJson},'
-                    '"events":[${batch.eventLines.join(',')}]}',
-                appVersion: version,
-                canSend: () => !_stopped,
-                abortTrigger: _abort.future,
-              );
+          Future<SearchFeedbackOutcome> post() {
+            final events = batch!;
+            return sender.sendEvents(
+              identity: identity,
+              body: '{"schema":1,"batchId":"${newSearchFeedbackId()}",'
+                  '"sentAt":"${searchFeedbackIsoTime(DateTime.now())}",'
+                  '${carried ? '"carriedOffline":true,' : ''}'
+                  '"context":${events.contextJson},'
+                  '"events":[${events.eventLines.join(',')}]}',
+              appVersion: version,
+              canSend: () => !_stopped,
+              abortTrigger: _abort.future,
+            );
+          }
+
           var outcome = await post();
           if (outcome.kind == SearchFeedbackOutcomeKind.unknownKey) {
             identity.registeredKeyId = null;
             await store.save(identity);
             if (!await register()) break;
+            outcome = await post();
+          }
+          if (outcome.kind == SearchFeedbackOutcomeKind.drop && !_stopped) {
+            carried = false;
+            batch = await queue.read(claimed,
+                notBefore: DateTime.now().subtract(plainWindow));
+            if (batch == null) continue;
+            if (batch.eventLines.isEmpty) {
+              await queue.remove(claimed);
+              continue;
+            }
             outcome = await post();
           }
           switch (outcome.kind) {
