@@ -81,6 +81,16 @@ void main() {
       expect((await outbox.list()).map((r) => r.reportId), ['a']);
     });
 
+    test('count סופר קובצי json בלי לפתוח אותם', () async {
+      expect(await DirectoryReportOutbox(dir).count(), 0);
+      writeReport(dir, reportJson('a'));
+      writeReport(dir, reportJson('b'));
+      File(p.join(dir, 'a.json.123.tmp')).writeAsStringSync('{');
+      File(p.join(dir, 'notes.txt')).writeAsStringSync('x');
+
+      expect(await DirectoryReportOutbox(dir).count(), 2);
+    });
+
     test('discard מוחק גם את הקובץ הזמני של כתיבה שנכשלה', () async {
       final outbox = DirectoryReportOutbox(dir);
       await outbox.write('r1', OutboxReport.encodeFile(reportJson('r1')));

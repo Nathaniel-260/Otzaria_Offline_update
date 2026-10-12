@@ -11,6 +11,8 @@ import '../models/outbox_report.dart';
 abstract interface class ReportOutbox {
   Future<List<OutboxReport>> list();
 
+  Future<int> count();
+
   Future<Uint8List> requestBody(OutboxReport report);
 
   Future<void> remove(OutboxReport report);
@@ -42,6 +44,19 @@ class DirectoryReportOutbox implements ReportOutbox {
       onInvalid?.call(path, error);
     }
     return listed.reports;
+  }
+
+  @override
+  Future<int> count() async {
+    final dir = Directory(directory);
+    if (!await dir.exists()) return 0;
+    var count = 0;
+    await for (final entity in dir.list()) {
+      if (entity is File && entity.path.toLowerCase().endsWith('.json')) {
+        count++;
+      }
+    }
+    return count;
   }
 
   static Future<({List<OutboxReport> reports, List<(String, String)> invalid})>

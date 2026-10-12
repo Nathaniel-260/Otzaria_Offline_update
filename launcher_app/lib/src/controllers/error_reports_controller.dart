@@ -126,7 +126,7 @@ class ErrorReportsController extends ChangeNotifier
 
   Future<void> refreshOutbox() async {
     try {
-      outboxCount = (await outbox.list()).length;
+      outboxCount = await outbox.count();
     } catch (e) {
       AppLogger.maybeInstance?.warn('קריאת תיבת הדיווחים נכשלה: $e');
       outboxCount = 0;

@@ -46,6 +46,9 @@ class _MemoryOutbox implements ReportOutbox {
   Future<List<OutboxReport>> list() async => List.of(reports);
 
   @override
+  Future<int> count() async => reports.length;
+
+  @override
   Future<Uint8List> requestBody(OutboxReport report) async =>
       OutboxReport.requestBodyOf(_report(report.reportId));
 
@@ -688,6 +691,9 @@ class _BrokenOutbox implements ReportOutbox {
   @override
   Future<List<OutboxReport>> list() async =>
       throw const FileSystemException('drive removed');
+
+  @override
+  Future<int> count() async => throw const FileSystemException('drive removed');
 
   @override
   Future<Uint8List> requestBody(OutboxReport report) async =>

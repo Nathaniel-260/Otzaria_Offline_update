@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -170,27 +171,32 @@ class ErrorReportUploader {
           continue;
         }
         if (_minidumpRejection(attempt)) {
-          final withoutMinidump = _withoutMinidump(body);
-          if (withoutMinidump != null) {
-            strippedBody = withoutMinidump;
-            body = Uint8List.fromList(utf8.encode(jsonEncode(withoutMinidump)));
+          final sentBody = body;
+          final stripped = await Isolate.run(() {
+            final withoutMinidump = _withoutMinidump(sentBody);
+            return withoutMinidump == null
+                ? null
+                : (
+                    body: withoutMinidump,
+                    bytes: Uint8List.fromList(
+                      utf8.encode(jsonEncode(withoutMinidump)),
+                    ),
+                  );
+          });
+          if (stripped != null) {
+            strippedBody = stripped.body;
+            body = stripped.bytes;
             continue;
           }
         }
         if (status == 409 && !renewedId) {
-          final renewed = _withNewReportId(item, body);
+          final sentBody = body;
+          final conflicted = item;
+          final renewed =
+              await Isolate.run(() => _withNewReportId(conflicted, sentBody));
           if (renewed != null) {
             try {
-              await outbox.write(
-                renewed.report.reportId,
-                OutboxReport.encodeFile(OutboxReport.fileJson(
-                  reportId: renewed.report.reportId,
-                  bookTitle: item.bookTitle,
-                  createdAt: item.createdAt?.toUtc().toIso8601String() ?? '',
-                  endpoint: item.endpoint.toString(),
-                  body: renewed.body,
-                )),
-              );
+              await outbox.write(renewed.report.reportId, renewed.fileBytes);
             } on Object catch (e) {
               return stop(
                 error:
@@ -200,7 +206,7 @@ class ErrorReportUploader {
             await _removeQuietly(outbox, item);
             renewedId = true;
             item = renewed.report;
-            body = Uint8List.fromList(utf8.encode(jsonEncode(renewed.body)));
+            body = renewed.bodyBytes;
             continue;
           }
         }
@@ -382,10 +388,8 @@ class ErrorReportUploader {
     }
   }
 
-  static ({OutboxReport report, Map<String, dynamic> body})? _withNewReportId(
-    OutboxReport item,
-    Uint8List bytes,
-  ) {
+  static ({OutboxReport report, Uint8List fileBytes, Uint8List bodyBytes})?
+      _withNewReportId(OutboxReport item, Uint8List bytes) {
     final decoded = jsonDecode(utf8.decode(bytes));
     if (decoded is! Map<String, dynamic>) return null;
     final isBookReport = decoded.containsKey('report_id');
@@ -394,6 +398,7 @@ class ErrorReportUploader {
     final newId = isBookReport
         ? '${DateTime.now().microsecondsSinceEpoch}-${item.reportId.hashCode.abs()}'
         : AppReport.generateReportId();
+    final body = Map<String, dynamic>.of(decoded)..[key] = newId;
     return (
       report: OutboxReport(
         reportId: newId,
@@ -407,7 +412,14 @@ class ErrorReportUploader {
         hasImages: item.hasImages,
         hasMinidump: item.hasMinidump,
       ),
-      body: Map<String, dynamic>.of(decoded)..[key] = newId,
+      fileBytes: OutboxReport.encodeFile(OutboxReport.fileJson(
+        reportId: newId,
+        bookTitle: item.bookTitle,
+        createdAt: item.createdAt?.toUtc().toIso8601String() ?? '',
+        endpoint: item.endpoint.toString(),
+        body: body,
+      )),
+      bodyBytes: Uint8List.fromList(utf8.encode(jsonEncode(body))),
     );
   }
 
