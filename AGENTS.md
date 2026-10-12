@@ -1256,6 +1256,14 @@ the top-level entry (the syncing platform's, for older launchers): `sync` preser
 other platforms' entries, and sync's prune plus `MirrorJunkSweeper` keep every file any
 platform references.
 
+**Windows installers travel for both architectures; ARM64 is never downgraded
+to x64.** The drive moves between PCs, so a Windows sync also mirrors each
+channel's `windows_arm64.exe` under `platforms.windows_arm64` (top-level entries
+stay x64 for older launchers), and records releases without one in
+`missingAssetTags`. On an ARM64 machine (`WindowsArch.machine`, IsWow64Process2 —
+the env vars lie under x64 emulation) `OtzariaManager._mirrorFor` prefers ARM64
+and falls back to x64 only when the installed exe is not ARM64 (PE header).
+
 ### 5.6 Plugins
 
 **Install-state matching uses `manifestId`, not the catalog `id`.** The `id` from

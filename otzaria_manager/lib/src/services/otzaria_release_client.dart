@@ -6,6 +6,7 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../models/otzaria_release.dart';
 import 'otzaria_asset_selector.dart';
+import 'windows_arch.dart';
 
 /// שולף מידע על releases של github.com/Otzaria/otzaria (אפליקציית אוצריא
 /// עצמה — לא SeforimLibrary/ה-DB).
@@ -65,7 +66,7 @@ class OtzariaReleaseClient {
 
       final OtzariaRelease release;
       try {
-        release = _parseRelease(json);
+        release = _withArm64Variant(_parseRelease(json), json);
       } on NoInstallerAssetException catch (e) {
         firstRejection ??= e;
         continue;
@@ -109,7 +110,24 @@ class OtzariaReleaseClient {
         .toList(growable: false);
   }
 
-  OtzariaRelease _parseRelease(Map<String, dynamic> json) {
+  OtzariaRelease _withArm64Variant(
+    OtzariaRelease release,
+    Map<String, dynamic> json,
+  ) {
+    if (_platform != OtzariaTargetPlatform.windows) return release;
+    try {
+      return release.withArm64Variant(
+        _parseRelease(json, arch: OtzariaArch.arm64),
+      );
+    } on NoInstallerAssetException {
+      return release;
+    }
+  }
+
+  OtzariaRelease _parseRelease(
+    Map<String, dynamic> json, {
+    OtzariaArch arch = OtzariaArch.x64,
+  }) {
     final tagName = json['tag_name'] as String;
     final assets = [
       for (final raw in json['assets'] as List<dynamic>)
@@ -122,13 +140,17 @@ class OtzariaReleaseClient {
       platform: _platform,
       assets: assets,
       nameOf: (asset) => asset.name,
+      arch: arch,
     );
 
     if (selected == null) {
       throw NoInstallerAssetException(
         tagName: tagName,
         platform: _platform,
-        expectedSuffixes: OtzariaAssetSelector.expectedSuffixesFor(_platform),
+        expectedSuffixes: OtzariaAssetSelector.expectedSuffixesFor(
+          _platform,
+          arch: arch,
+        ),
       );
     }
 
@@ -148,6 +170,7 @@ class OtzariaReleaseClient {
       installerSizeBytes: asset.size,
       installerSha256: OtzariaRelease.normalizedSha256(asset.sha256),
       releaseNotes: json['body'] as String?,
+      installerArch: arch,
     );
   }
 

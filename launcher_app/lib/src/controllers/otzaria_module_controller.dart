@@ -398,7 +398,8 @@ class OtzariaModuleController extends ChangeNotifier
       stableVersion = check.stableRelease?.tagName;
       prereleaseVersion = check.prereleaseRelease?.tagName;
       hasChannelChoice = check.hasChannelChoice;
-      hasStaleFullPackage = check.hasStaleFullPackage;
+      hasStaleFullPackage =
+          check.hasStaleFullPackage || check.mirrorLacksArchitectures;
       isRunning = check.isOtzariaRunning;
       status = switch (check) {
         _ when check.needsDownload => OtzariaModuleStatus.needsDownload,

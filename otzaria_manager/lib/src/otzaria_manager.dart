@@ -20,6 +20,7 @@ import 'services/otzaria_launcher.dart';
 import 'services/otzaria_release_client.dart';
 import 'services/otzaria_state_store.dart';
 import 'services/running_otzaria_locator.dart';
+import 'services/windows_arch.dart';
 import 'services/windows_install_registry.dart';
 
 /// נקודת הכניסה היחידה שמודול ה-UI (הדשבורד ב-Flutter) אמור להשתמש בה.
@@ -58,10 +59,14 @@ class OtzariaManager {
     WindowsInstallRegistry installRegistry = const WindowsInstallRegistry(),
     OtzariaLauncher launcher = const OtzariaLauncher(),
     InstalledVersionReader? versionReader,
+    OtzariaArch? machineArch,
+    OtzariaArch? Function(String exePath)? exeArchOf,
     this.preferPrerelease = false,
   })  : _platform =
             platform ?? OtzariaTargetPlatform.detect(Platform.operatingSystem),
         _environment = environment ?? Platform.environment,
+        _machineArchOverride = machineArch,
+        _exeArchOf = exeArchOf ?? WindowsArch.ofExecutable,
         _runningLocator = runningLocator,
         _installRegistry = installRegistry,
         _stateStore = OtzariaStateStore(
@@ -111,6 +116,34 @@ class OtzariaManager {
 
   final OtzariaTargetPlatform _platform;
   final Map<String, String> _environment;
+  final OtzariaArch? _machineArchOverride;
+  final OtzariaArch? Function(String exePath) _exeArchOf;
+
+  OtzariaArch get _machineArch =>
+      _machineArchOverride ??
+      (_platform == OtzariaTargetPlatform.windows
+          ? WindowsArch.machine(environment: _environment)
+          : OtzariaArch.x64);
+
+  Future<MirroredOtzariaReleases> _mirrorFor(
+    OtzariaInstallState? current, {
+    Future<MirroredOtzariaReleases>? x64Load,
+    Future<MirroredOtzariaReleases>? arm64Load,
+  }) async {
+    final x64 = await (x64Load ?? _mirror.load());
+    if (_platform != OtzariaTargetPlatform.windows ||
+        _machineArch != OtzariaArch.arm64) {
+      return x64;
+    }
+    final arm64 = await (arm64Load ?? _mirror.load(arch: OtzariaArch.arm64));
+    final keepArm64 =
+        current != null && _exeArchOf(current.launchPath) == OtzariaArch.arm64;
+    return MirroredOtzariaReleases(
+      stable: arm64.stable ?? (keepArm64 ? null : x64.stable),
+      prerelease: arm64.prerelease ?? (keepArm64 ? null : x64.prerelease),
+    );
+  }
+
   final OtzariaStateStore _stateStore;
   late final OtzariaReleaseClient _releaseClient;
   late final OtzariaChangelogClient _changelogClient;
@@ -316,10 +349,10 @@ class OtzariaManager {
     // על "אוצריא פתוחה?" שהממשק מציג. קודם היא רצה פעמיים — כאן ושוב
     // בלאנצ'ר.
     final mirrorLoad = _mirror.load();
+    final arm64MirrorLoad = _mirror.load(arch: OtzariaArch.arm64);
     final storedState = _stateStore.load();
     final probe = _runningLocator.probe();
 
-    final mirrored = await mirrorLoad;
     final stored = await storedState;
     final running = await probe;
 
@@ -340,6 +373,11 @@ class OtzariaManager {
     // רק כשעדיין לא ידוע כלום: בניית הרשימה עצמה סורקת את הרג'יסטרי
     // (~200ms), ואין סיבה לשלם על זה בכל בדיקה כשההתקנה כבר מוכרת.
     current ??= await _detectInKnownDirs();
+    final mirrored = await _mirrorFor(
+      current,
+      x64Load: mirrorLoad,
+      arm64Load: arm64MirrorLoad,
+    );
 
     return OtzariaUpdateCheckResult(
       stableRelease: mirrored.stable?.release,
@@ -348,6 +386,7 @@ class OtzariaManager {
       currentState: current,
       isOtzariaRunning: running.isRunning,
       hasStaleFullPackage: (await _mirror.staleFullPackages()).isNotEmpty,
+      mirrorLacksArchitectures: await _mirror.lacksArm64Installers(),
     );
   }
 
@@ -355,7 +394,7 @@ class OtzariaManager {
     OtzariaUpdateCheckResult check, {
     bool useWizard = false,
   }) async {
-    final mirrored = await _mirror.load();
+    final mirrored = await _mirrorFor(check.currentState);
     final selected = mirrored.select(preferPrerelease: preferPrerelease);
     if (selected == null) {
       throw StateError(AppL10n.strings.appDomain.mirrorEmptyRunDownload);

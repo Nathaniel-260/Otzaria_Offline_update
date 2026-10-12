@@ -1,4 +1,5 @@
 import '../models/otzaria_release.dart';
+import 'windows_arch.dart';
 
 /// בוחר, מתוך רשימת האסטים של release, את קובץ ההתקנה המתאים לפלטפורמת
 /// היעד. פונקציה טהורה (בלי `Platform` ובלי רשת) כדי שתהיה ניתנת לבדיקה
@@ -36,11 +37,16 @@ class OtzariaAssetSelector {
     ],
   };
 
+  static const List<(String, OtzariaInstallerKind)> _windowsArm64Candidates = [
+    ('windows_arm64.exe', OtzariaInstallerKind.windowsSetupExe),
+  ];
+
   /// סיומות חבילות ה-FULL, שנשארו רק כדי למחוק קובץ שירד בגרסה ישנה.
   /// `-full` ולא רק `full`, כדי שאסט אנדרואיד (`otzaria-android-full.zip`)
   /// לא ייתפס בטעות.
   static const List<String> fullPackageSuffixes = [
     'windows-full.exe',
+    'windows_arm64-full.exe',
     'macos-full.zip',
     'macos-full.dmg',
   ];
@@ -60,8 +66,22 @@ class OtzariaAssetSelector {
   }
 
   /// הסיומות שמחפשים עבור [platform] — לשימוש בהודעות שגיאה.
-  static List<String> expectedSuffixesFor(OtzariaTargetPlatform platform) =>
-      _candidatesByPlatform[platform]!.map((c) => c.$1).toList(growable: false);
+  static List<String> expectedSuffixesFor(
+    OtzariaTargetPlatform platform, {
+    OtzariaArch arch = OtzariaArch.x64,
+  }) =>
+      _candidatesFor(platform, arch).map((c) => c.$1).toList(growable: false);
+
+  static bool isArm64Installer(String assetName) =>
+      assetName.toLowerCase().endsWith('windows_arm64.exe');
+
+  static List<(String, OtzariaInstallerKind)> _candidatesFor(
+    OtzariaTargetPlatform platform,
+    OtzariaArch arch,
+  ) =>
+      platform == OtzariaTargetPlatform.windows && arch == OtzariaArch.arm64
+          ? _windowsArm64Candidates
+          : _candidatesByPlatform[platform]!;
 
   /// מחזיר את האסט הנבחר וסוג ההתקנה שלו, או null אם אין אסט מתאים.
   ///
@@ -71,8 +91,9 @@ class OtzariaAssetSelector {
     required OtzariaTargetPlatform platform,
     required List<T> assets,
     required String Function(T asset) nameOf,
+    OtzariaArch arch = OtzariaArch.x64,
   }) =>
-      _selectFrom(_candidatesByPlatform[platform]!, assets, nameOf);
+      _selectFrom(_candidatesFor(platform, arch), assets, nameOf);
 
   static (T, OtzariaInstallerKind)? _selectFrom<T>(
     List<(String, OtzariaInstallerKind)> candidates,

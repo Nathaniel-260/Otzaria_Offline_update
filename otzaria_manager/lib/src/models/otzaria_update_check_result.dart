@@ -15,6 +15,7 @@ class OtzariaUpdateCheckResult {
     this.preferPrerelease = false,
     this.isOtzariaRunning = false,
     this.hasStaleFullPackage = false,
+    this.mirrorLacksArchitectures = false,
   });
 
   /// הגרסה היציבה שבמראה, או null אם לא הורדה כזו.
@@ -38,6 +39,8 @@ class OtzariaUpdateCheckResult {
   /// אינה נתמכת יותר, וההורדה הבאה מוחקת אותה — ראו
   /// `OtzariaAppMirror.staleFullPackages`.
   final bool hasStaleFullPackage;
+
+  final bool mirrorLacksArchitectures;
 
   /// הגרסה שתותקן בפועל — לפי הערוץ שנבחר, עם נפילה לערוץ השני כשהנבחר
   /// ריק. null אם עדיין לא הורדה שום גרסה. ראו [needsDownload].
