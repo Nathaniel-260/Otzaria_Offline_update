@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -467,8 +468,6 @@ void main() {
 
   group('StartupDiagnostics', () {
     test('שורת הסביבה נושאת מערכת, ABI ומעבד — בשורה אחת', () {
-      // גם הקריאה ל-EnumDisplayDevices עוברת כאן: כשל שלה לא יפיל את
-      // השורה, אבל היא לא אמורה להיכשל על ווינדוס.
       final line = StartupDiagnostics.machineLine();
       expect(line, startsWith('--- machine: '));
       expect(line, endsWith(' ---'));
@@ -476,7 +475,15 @@ void main() {
       expect(line, contains(Platform.operatingSystem));
       expect(line, contains('process '));
       expect(line, contains('cpu '));
+      expect(line, isNot(contains('display ')),
+          reason: 'EnumDisplayDevices אינו רץ על ה-UI בעלייה');
     });
+
+    test('כרטיס המסך נקרא גם מתוך isolate', () async {
+      final adapter =
+          await Isolate.run(StartupDiagnostics.primaryDisplayAdapter);
+      expect(adapter, anyOf(isNull, isNotEmpty));
+    }, skip: !Platform.isWindows);
 
     // אין כאן בדיקה לשתי שורות הפריים: הן נכתבות מתוך callbacks של המנוע,
     // והכתיבה ללוג היא I/O אמיתי שאינו מתקדם בזמן המזויף של `testWidgets`.

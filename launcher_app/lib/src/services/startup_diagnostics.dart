@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:ui' show FrameTiming, PlatformDispatcher, TimingsCallback;
 
 import 'package:error_reports_manager/error_reports_manager.dart'
@@ -41,6 +42,7 @@ class StartupDiagnostics {
       AppLogger.maybeInstance?.info(
         'הפריים הראשון נבנה אחרי ${_elapsedMs()}ms',
       );
+      unawaited(_logDisplayAdapter());
     });
 
     // `addTimingsCallback` מדווח רק על פריים שהרסטר שלו הסתיים — כלומר על
@@ -91,11 +93,22 @@ class StartupDiagnostics {
     buffer.write(cpu == null
         ? ' | cpu x${Platform.numberOfProcessors}'
         : ' | cpu $cpu x${Platform.numberOfProcessors}');
-    final adapter = primaryDisplayAdapter();
-    if (adapter != null) buffer.write(' | display $adapter');
     buffer.write(' | ${_viewsDescription()}');
     buffer.write(' ---');
     return buffer.toString();
+  }
+
+  /// `EnumDisplayDevices` is a synchronous driver call: it runs in an isolate
+  /// after the first frame is built, never on the platform thread at startup.
+  static Future<void> _logDisplayAdapter() async {
+    try {
+      final adapter = await Isolate.run(primaryDisplayAdapter);
+      if (adapter != null) {
+        AppLogger.maybeInstance?.info('--- display $adapter ---');
+      }
+    } catch (e) {
+      AppLogger.maybeInstance?.warn('זיהוי כרטיס המסך נכשל: $e');
+    }
   }
 
   /// חלון שאין לו view הוא כשל אחר לגמרי מחלון שיש לו ולא צויר.
