@@ -16,6 +16,11 @@ class FileDownloadResult {
   final String? sha256;
 }
 
+/// Starts the streaming SHA-256 of [downloadFile]. A Flutter host installs a
+/// native hasher here; `close` must also release whatever it holds.
+ByteConversionSink Function(Sink<Digest> output) startSha256 =
+    sha256.startChunkedConversion;
+
 /// החלקי נשמר בנפרד מהיעד, ורק ETag חזק מאפשר לחבר אליו בייטים חדשים.
 Future<FileDownloadResult> downloadFile({
   required http.Client client,
@@ -209,7 +214,7 @@ Future<FileDownloadResult> _downloadFile({
         await _delete(metadata);
       }
       if (calculateSha256) {
-        hasher = sha256.startChunkedConversion(
+        hasher = startSha256(
           ChunkedConversionSink<Digest>.withCallback(
               (value) => digest = value.single),
         );

@@ -535,8 +535,8 @@ class CustomAppsManager {
     final t = AppL10n.strings.customAppsDomain;
     final dir = await Directory.systemTemp.createTemp('custom-app-');
     try {
-      final copy = await pending.copy(p.join(dir.path, fileName));
-      if (await sha256OfFile(copy.path) != expected) {
+      final copy = File(p.join(dir.path, fileName));
+      if (await copyFileWithSha256(pending.path, copy.path) != expected) {
         throw AppDescriptorException(t.installerDigestMismatch);
       }
       return copy;

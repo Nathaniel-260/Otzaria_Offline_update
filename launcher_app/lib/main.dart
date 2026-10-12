@@ -6,6 +6,7 @@ import 'package:error_reports_manager/error_reports_manager.dart'
     show LauncherLogFormat;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:otzaria_downloads/otzaria_downloads.dart' as downloads;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -20,6 +21,7 @@ import 'src/self_update/payload_check.dart';
 import 'src/services/app_logger.dart';
 import 'src/services/app_paths.dart';
 import 'src/services/instance_lock.dart';
+import 'src/services/native_sha256_sink.dart';
 import 'src/services/startup_diagnostics.dart';
 import 'src/settings/app_settings.dart';
 import 'src/settings/settings_controller.dart';
@@ -62,6 +64,7 @@ void main() {
       // מנסח את הודעתו מ-`AppL10n` ברגע הזריקה. `SettingsController` יחליף
       // אם המשתמש בחר שפה מפורשת.
       AppL10n.use(systemLanguage());
+      downloads.startSha256 = NativeSha256Sink.new;
 
       // תופס שגיאות שה-widgets framework עצמו זורק (למשל בתוך build/layout).
       FlutterError.onError = (details) {
