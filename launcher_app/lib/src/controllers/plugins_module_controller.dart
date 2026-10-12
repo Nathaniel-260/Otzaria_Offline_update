@@ -571,6 +571,12 @@ class PluginsModuleController extends ChangeNotifier
       );
       // ליומן בלבד: הבחירה עצמה שקופה למשתמש, אבל "למה התוסף הזה לא על
       // הכונן" חייב להיות ניתן לענות עליו.
+      if (outcome.versionMismatches.isNotEmpty) {
+        AppLogger.instance.warn(
+          'גרסת המניפסט שונה מזו שבאתר: '
+          '${outcome.versionMismatches.join(', ')}',
+        );
+      }
       if (outcome.incompatible.isNotEmpty) {
         AppLogger.instance.info(
           'תוספים בלי גרסה שתואמת לאוצריא שבכונן: '

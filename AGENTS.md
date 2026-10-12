@@ -1267,10 +1267,12 @@ id and *nothing* is ever detected as installed. A plugin with neither correctly 
 `PluginInstallStatus.unknown` — not an error.
 
 **Every downloaded build is checked against the build it was fetched for**
-(`PluginBuildCheck`): manifest id and version, plus `sha256` when the site publishes it.
-The live `/download` URL serves whatever is live *now*, so a plugin updated mid-sync was
-saved as `plugin-<old version>.otzplugin`. A site that publishes `sha256` also gets
-version-pinned URLs (`?version=`); the same check runs again from the drive at install.
+(`PluginBuildCheck`): a wrong manifest id or a `sha256` mismatch rejects the file. A
+different manifest *version* is only logged (`PluginSyncOutcome.versionMismatches`):
+site admins can change the listed version without a new file. A site that publishes
+`sha256` also gets version-pinned URLs (`?version=`), and a mirrored file recorded
+without a hash is hashed during sync and re-downloaded on mismatch — otherwise the
+install-time check (the same one, from the drive) would refuse it forever.
 
 **Otzaria has two on-disk layouts, and `InstalledPluginsScanner` must read both.**
 Older installs use `installed/<manifest.id>/current/`; newer ones

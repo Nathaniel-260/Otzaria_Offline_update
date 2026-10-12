@@ -9,6 +9,7 @@ class PluginSyncOutcome {
     required this.skipped,
     this.failed = const [],
     this.incompatible = const [],
+    this.versionMismatches = const [],
   });
 
   final PluginCatalog catalog;
@@ -29,6 +30,10 @@ class PluginSyncOutcome {
   /// שיהיה אפשר לענות על "למה התוסף הזה לא בכונן".
   /// כל פריט הוא `שם התוסף (דורש X)`.
   final List<String> incompatible;
+
+  /// בילדים שגרסת המניפסט שלהם שונה מזו שבאתר (מנהל שינה את המספר בלי קובץ
+  /// חדש). נשמרים, ונכתבים ליומן בלבד.
+  final List<String> versionMismatches;
 
   bool get hasFailures => failed.isNotEmpty;
 }

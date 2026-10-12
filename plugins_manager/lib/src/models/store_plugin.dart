@@ -29,7 +29,11 @@ class PluginLocalFile extends Equatable {
 
   final String? sha256;
 
-  PluginLocalFile copyWith({String? sourceUrl, DateTime? targetedAt}) =>
+  PluginLocalFile copyWith({
+    String? sourceUrl,
+    DateTime? targetedAt,
+    String? sha256,
+  }) =>
       PluginLocalFile(
         relativePath: relativePath,
         fileName: fileName,
@@ -37,7 +41,7 @@ class PluginLocalFile extends Equatable {
         size: size,
         sourceUrl: sourceUrl ?? this.sourceUrl,
         targetedAt: targetedAt ?? this.targetedAt,
-        sha256: sha256,
+        sha256: sha256 ?? this.sha256,
       );
 
   Map<String, dynamic> toJson() => {

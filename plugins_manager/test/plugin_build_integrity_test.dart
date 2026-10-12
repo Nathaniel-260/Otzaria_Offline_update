@@ -84,21 +84,28 @@ void main() {
       );
     });
 
-    test('הכתובת החיה שהחזירה גרסה אחרת — הקובץ נדחה ואינו נשמר', () async {
-      final raw = apiPlugin();
+    test('גרסת מניפסט שונה מהאתר — נשמר, ונרשם לאזהרה ביומן', () async {
       final outcome = await manager(
-        raw,
+        apiPlugin(),
         (_) => pluginBytes('{"id":"uid-a","version":"1.2.0"}'),
       ).sync();
 
-      expect(outcome.failed, ['אלף']);
-      final saved = outcome.catalog.plugins.single;
-      expect(saved.localFiles, isEmpty);
-      expect(
-        File(p.join(store.pluginDir('a'), 'plugin-1.1.0.otzplugin'))
-            .existsSync(),
-        isFalse,
-      );
+      expect(outcome.failed, isEmpty);
+      expect(outcome.catalog.plugins.single.localFiles.keys, ['1.1.0']);
+      expect(outcome.versionMismatches, ['אלף: 1.1.0 ≠ 1.2.0']);
+    });
+
+    test('גרסה שונה עם sha256 תואם — נשמר', () async {
+      final bytes = pluginBytes('{"id":"uid-a","version":"9.9.9"}');
+      final outcome = await manager(
+        apiPlugin(
+          hashes: {'1.1.0': sha256.convert(bytes).toString(), '1.0.0': null},
+        ),
+        (_) => bytes,
+      ).sync();
+
+      expect(outcome.failed, isEmpty);
+      expect(outcome.versionMismatches, hasLength(1));
     });
 
     test('מזהה מניפסט שאינו ה-pluginUid של האתר — נדחה', () async {
@@ -193,6 +200,42 @@ void main() {
       );
     });
 
+    group('קובץ ישן בלי sha256 כשהאתר מתחיל לפרסם אותו', () {
+      Future<List<Uri>> resync(List<int> served, String hash) async {
+        final requests = <Uri>[];
+        await manager(
+          apiPlugin(hashes: {'1.1.0': hash, '1.0.0': null}),
+          (_) => served,
+          requests: requests,
+        ).sync();
+        return [
+          for (final url in requests)
+            if (url.path.endsWith('/download')) url,
+        ];
+      }
+
+      test('תואם — אינו יורד שוב, וה-sha256 נרשם', () async {
+        await manager(apiPlugin(), (_) => good).sync();
+
+        expect(await resync(good, goodHash), isEmpty);
+        final file = (await store.load()).plugins.single.localFiles['1.1.0'];
+        expect(file?.sha256, goodHash);
+      });
+
+      test('שונה — יורד שוב בסנכרון, ולא נתקע בהתקנה', () async {
+        final stale = pluginBytes('{"id":"uid-a","version":"1.1.0","x":1}');
+        await manager(apiPlugin(), (_) => stale).sync();
+
+        expect(await resync(good, goodHash), hasLength(1));
+        final file = (await store.load()).plugins.single.localFiles['1.1.0'];
+        expect(file?.sha256, goodHash);
+        expect(
+          File(store.absolutePath(file!.relativePath)).readAsBytesSync(),
+          good,
+        );
+      });
+    });
+
     test('בהתקנה: קובץ שהשתנה בכונן אחרי ההורדה נחסם', () async {
       final m = manager(
         apiPlugin(hashes: {'1.1.0': goodHash, '1.0.0': null}),
@@ -223,15 +266,14 @@ void main() {
       );
     });
 
-    test('בהתקנה בלי sha256: קובץ של גרסה אחרת בשם הגרסה הנבחרת נחסם',
-        () async {
+    test('בהתקנה בלי sha256: קובץ של תוסף אחר בשם הבילד הנבחר נחסם', () async {
       final m = manager(
         apiPlugin(),
         (_) => pluginBytes('{"id":"uid-a","version":"1.1.0"}'),
       );
       final plugin = (await m.sync()).catalog.plugins.single;
       final path = store.absolutePath(plugin.localFiles['1.1.0']!.relativePath);
-      final other = pluginBytes('{"id":"uid-a","version":"1.2.0"}');
+      final other = pluginBytes('{"id":"other","version":"1.1.0"}');
       File(path).writeAsBytesSync(other);
       final resized = plugin.copyWith(
         localFiles: {
