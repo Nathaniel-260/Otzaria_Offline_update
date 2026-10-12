@@ -952,6 +952,19 @@ void main() {
       expect(seen.last, isFalse);
     });
 
+    test('בזמן החלה בקשת האינדקס הממתינה אינה נמחקת', () async {
+      const pending = ExternalUpdateNoticeData(route: 'full');
+      final gate = manager.applyGate = Completer<void>();
+      final apply = controller.update();
+      controller.pendingReindex = pending;
+
+      await controller.markReindexRequestDelivered();
+      expect(controller.pendingReindex, same(pending));
+
+      gate.complete();
+      await apply;
+    });
+
     test('ניסיון המסד המלא מנקה את השגיאה הקודמת כשהוא מתחיל', () async {
       manager.applyError = StateError('delta');
       await controller.update();

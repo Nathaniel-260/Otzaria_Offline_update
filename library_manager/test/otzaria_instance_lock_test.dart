@@ -6,7 +6,81 @@ import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 
 void main() {
+  group('OtzariaInstanceLock — שם המוטקס של אוצריא ניידת', () {
+    test('וקטורים משותפים עם windows/runner/main.cpp (FNV-1a 64, UTF-16)', () {
+      const base = OtzariaInstanceLock.mutexName;
+      expect(OtzariaInstanceLock.fnv1a64Hex(''), 'cbf29ce484222325');
+      expect(
+        OtzariaInstanceLock.portableMutexName(r'C:\Otzaria\otzaria_data'),
+        '$base-5f767ae45f832305',
+      );
+      expect(
+        OtzariaInstanceLock.portableMutexName(
+          r'E:\PortableApps\Otzaria\otzaria_data',
+        ),
+        '$base-351ba4315c762f42',
+      );
+      expect(
+        OtzariaInstanceLock.portableMutexName(
+          r'e:/portableapps/otzaria/otzaria_data',
+        ),
+        '$base-351ba4315c762f42',
+      );
+      expect(
+        OtzariaInstanceLock.portableMutexName(r'D:\אוצריא נייד\otzaria_data'),
+        '$base-7e4574468825c86b',
+      );
+    });
+
+    test('התקנה רגילה מחזיקה רק את השם הציבורי; ניידת את שניהם', () {
+      expect(OtzariaInstanceLock.mutexNamesFor(), [
+        OtzariaInstanceLock.mutexName,
+      ]);
+      expect(
+        OtzariaInstanceLock.mutexNamesFor(
+          portableDataRoot: r'C:\Otzaria\otzaria_data',
+        ),
+        [
+          OtzariaInstanceLock.mutexName,
+          '${OtzariaInstanceLock.mutexName}-5f767ae45f832305',
+        ],
+      );
+    });
+  });
+
   group('OtzariaInstanceLock (Windows)', () {
+    test(
+      'אוצריא ניידת: גם המוטקס של שורש הנתונים שלה מוחזק לכל ההחלה',
+      () async {
+        final root = p.join(
+          Directory.systemTemp.path,
+          'ou-lock-test',
+          'otzaria_data',
+        );
+        final perRoot = OtzariaInstanceLock.portableMutexName(root);
+        final OtzariaInstanceLease lease;
+        try {
+          lease = await const OtzariaInstanceLock().acquire(
+            portableDataRoot: root,
+          );
+        } on OtzariaIsRunningException {
+          markTestSkipped('אוצריא פתוחה במכונה הזו');
+          return;
+        }
+        try {
+          expect(OtzariaInstanceLock.isMutexPresent(perRoot), isTrue);
+          expect(
+            OtzariaInstanceLock.isMutexPresent(OtzariaInstanceLock.mutexName),
+            isTrue,
+          );
+        } finally {
+          lease.release();
+        }
+        expect(OtzariaInstanceLock.isMutexPresent(perRoot), isFalse);
+      },
+      skip: Platform.isWindows ? false : 'Windows בלבד',
+    );
+
     test(
       'מחזיק את המוטקס של אוצריא, ומחזיקה שנייה נחסמת כמו אוצריא שנפתחת',
       () async {
@@ -108,7 +182,7 @@ class _FakeLock implements OtzariaInstanceLock {
   bool held = false;
 
   @override
-  Future<OtzariaInstanceLease> acquire() async {
+  Future<OtzariaInstanceLease> acquire({String? portableDataRoot}) async {
     if (running) throw const OtzariaIsRunningException();
     held = true;
     return _FakeLease(this);

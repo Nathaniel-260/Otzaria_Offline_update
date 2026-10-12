@@ -215,6 +215,20 @@ void main() {
       );
       expect(result.needsNewerOtzaria, isTrue);
     });
+
+    test('חסימה שאינה בגלל אוצריא שומרת את הסיבה המקורית', () async {
+      await installExistingDb(30);
+      await writeMirror('v31', ['seforim-schema99.db.zst']);
+
+      final result = await check(appVersion: '0.9.97');
+
+      expect(result.plan?.kind, LibraryUpdatePlanKind.blocked);
+      expect(
+        result.plan?.reason,
+        isNot(AppL10n.strings.libraryDomain.planOtzariaTooOldForLibrary(5, 31)),
+      );
+      expect(result.needsNewerOtzaria, isFalse);
+    });
   });
 
   group('ReadableSchemaRoute.limit', () {

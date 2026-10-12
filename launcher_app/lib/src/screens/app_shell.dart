@@ -224,6 +224,7 @@ class _AppShellState extends State<AppShell> {
       pendingLaunchUri: () async =>
           _library.hasPendingReindex ? OtzariaDeepLinks.libraryReindex : null,
       onLaunchUriDelivered: () => _library.markReindexRequestDelivered(),
+      isLibraryApplying: () => _library.isApplying,
     )..addListener(_onChange);
     _library = LibraryModuleController(
       dataDir: widget.dataDir,

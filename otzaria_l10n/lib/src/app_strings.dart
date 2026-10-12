@@ -227,6 +227,7 @@ abstract class HomeStrings {
   // ── תוויות מצב הספרייה, משותפות לדף הבית ולמסך הספרייה ──────────────────
   String get libraryNotInstalledYet;
   String get libraryUpdating;
+  String get libraryApplyActive;
   String get libraryNothingDownloaded;
   String get libraryNeedsManualPath;
   String get libraryPersonalOtherMachine;

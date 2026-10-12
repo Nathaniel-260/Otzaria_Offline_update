@@ -342,6 +342,8 @@ class _Home extends HomeStrings {
   @override
   String get libraryUpdating => 'Updating…';
   @override
+  String get libraryApplyActive => 'Library update in progress';
+  @override
   String get libraryNothingDownloaded => 'Nothing downloaded yet';
   @override
   String get libraryNeedsManualPath => 'Choose the database file';

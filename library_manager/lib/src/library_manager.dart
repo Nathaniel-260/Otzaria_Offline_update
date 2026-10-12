@@ -216,8 +216,8 @@ class LibraryManager {
   Future<bool> semanticConsentGranted() async =>
       (await _semanticSettings())?.searchFeedbackGranted ?? false;
 
-  Future<void> setCustomDbPath(String dbPath) =>
-      _stateStore.saveCustomDbPath(dbPath);
+  Future<void> setCustomDbPath(String dbPath, {bool explicit = false}) =>
+      _stateStore.saveCustomDbPath(dbPath, explicit: explicit);
 
   /// נתיב המסד בתוך תיקייה שהמשתמש בחר — לבחירת מיקום להתקנה טרייה, לפני
   /// שיש שם קובץ להצביע עליו.
@@ -553,26 +553,32 @@ class LibraryManager {
       ),
     );
 
-    final plan = _limitToReadableSchema(
-      _planner.plan(
-        localVersion: local.dbVersion,
-        hasLocalVersionMeta: local.hasVersionMeta,
-        latestVersion: discoveryResult.latestVersion,
-        edges: route.edges,
-        latestFullDbAsset: route.latestFullDbAsset,
-        fullDbReleaseTag: route.fullDbReleaseTag,
-        latestFullDbVersion: route.latestFullDbVersion,
-        latestContentTag: discoveryResult.latestContentTag,
-        localReleaseTag: applied?.tag,
-        localReleaseTagVersion: applied?.dbVersion,
-        blockingSchemaVersion: discoveryResult.blockingSchemaVersion,
-        blockingPatchFormatVersion: discoveryResult.blockingPatchFormatVersion,
-        localVersionUnknownReason: corruptAfterCrashReason,
-      ),
-      route: route,
+    LibraryUpdatePlan planFor(ReadableSchemaRoute route) => _planner.plan(
       localVersion: local.dbVersion,
+      hasLocalVersionMeta: local.hasVersionMeta,
       latestVersion: discoveryResult.latestVersion,
+      edges: route.edges,
+      latestFullDbAsset: route.latestFullDbAsset,
+      fullDbReleaseTag: route.fullDbReleaseTag,
+      latestFullDbVersion: route.latestFullDbVersion,
+      latestContentTag: discoveryResult.latestContentTag,
+      localReleaseTag: applied?.tag,
+      localReleaseTagVersion: applied?.dbVersion,
+      blockingSchemaVersion: discoveryResult.blockingSchemaVersion,
+      blockingPatchFormatVersion: discoveryResult.blockingPatchFormatVersion,
+      localVersionUnknownReason: corruptAfterCrashReason,
     );
+
+    final limitedPlan = planFor(route);
+    final plan = route.limited
+        ? _limitToReadableSchema(
+            limitedPlan,
+            unlimited: planFor(ReadableSchemaRoute.unlimited(discoveryResult)),
+            route: route,
+            localVersion: local.dbVersion,
+            latestVersion: discoveryResult.latestVersion,
+          )
+        : limitedPlan;
 
     final settings = await _semanticSettings(locator);
     final semantic = SemanticSearchAssets();
@@ -604,11 +610,7 @@ class LibraryManager {
       semanticConsentGranted: settings?.searchFeedbackGranted ?? false,
       mirrorDownloadIncomplete: mirrorDownloadIncomplete,
       readableDbSchemaVersion: readableSchema,
-      needsNewerOtzaria:
-          route.limited &&
-          (plan.kind == LibraryUpdatePlanKind.blocked ||
-              (plan.finalTargetVersion ?? local.dbVersion) <
-                  discoveryResult.latestVersion),
+      needsNewerOtzaria: !identical(plan, limitedPlan),
     );
   }
 
@@ -623,6 +625,7 @@ class LibraryManager {
 
   LibraryUpdatePlan _limitToReadableSchema(
     LibraryUpdatePlan plan, {
+    required LibraryUpdatePlan unlimited,
     required ReadableSchemaRoute route,
     required int localVersion,
     required int latestVersion,
@@ -630,7 +633,14 @@ class LibraryManager {
     final readable = route.readableSchema;
     if (!route.limited || readable == null) return plan;
     final strings = AppL10n.strings.libraryDomain;
-    final reached = plan.finalTargetVersion ?? localVersion;
+    int reachedBy(LibraryUpdatePlan p) =>
+        p.kind == LibraryUpdatePlanKind.blocked
+        ? localVersion
+        : p.finalTargetVersion ?? localVersion;
+    final reached = reachedBy(plan);
+    if (reached >= latestVersion || reachedBy(unlimited) <= reached) {
+      return plan;
+    }
     switch (plan.kind) {
       case LibraryUpdatePlanKind.none:
         return plan;
@@ -641,7 +651,6 @@ class LibraryManager {
           reason: strings.planOtzariaTooOldForLibrary(readable, latestVersion),
         );
       case LibraryUpdatePlanKind.delta:
-        if (reached >= latestVersion) return plan;
         return LibraryUpdatePlan.delta(
           localVersion: plan.localVersion,
           targetVersion: plan.targetVersion ?? reached,
@@ -650,7 +659,6 @@ class LibraryManager {
           fullDownloadFallback: plan.fullDownloadFallback,
         );
       case LibraryUpdatePlanKind.fullDownload:
-        if (reached >= latestVersion) return plan;
         return LibraryUpdatePlan.fullDownload(
           localVersion: plan.localVersion,
           targetVersion: plan.targetVersion,
@@ -738,7 +746,13 @@ class LibraryManager {
     _appliesInFlight++;
     OtzariaInstanceLease? lease;
     try {
-      lease = await _instanceLock?.acquire();
+      final lock = _instanceLock;
+      if (lock != null) {
+        final launch = await _locator.otzariaLaunchPath?.call();
+        lease = await lock.acquire(
+          portableDataRoot: await _locator.portableDataRoot(launch),
+        );
+      }
       return await _applyUpdate(
         check,
         onProgress: onProgress,

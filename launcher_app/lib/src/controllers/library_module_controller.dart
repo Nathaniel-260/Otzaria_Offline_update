@@ -144,7 +144,7 @@ class LibraryModuleController extends ChangeNotifier
   /// מסמן שהבקשה נמסרה לאוצריא בפועל. **רק אחרי מסירה מוצלחת** — מחיקה
   /// מוקדמת הייתה משאירה את אינדקס החיפוש על התוכן הישן בלי שאיש יידע.
   Future<void> markReindexRequestDelivered() async {
-    if (pendingReindex == null) return;
+    if (pendingReindex == null || _applying) return;
     await _manager.clearReindexRequest(dbPath: dbPath);
     pendingReindex = null;
     notifyListeners();
@@ -672,7 +672,7 @@ class LibraryModuleController extends ChangeNotifier
   }
 
   Future<void> setCustomDbPath(String dbPath) async {
-    await _manager.setCustomDbPath(dbPath);
+    await _manager.setCustomDbPath(dbPath, explicit: true);
     await checkForUpdate();
   }
 

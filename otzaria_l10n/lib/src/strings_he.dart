@@ -325,6 +325,8 @@ class _Home extends HomeStrings {
   @override
   String get libraryUpdating => 'מעדכן...';
   @override
+  String get libraryApplyActive => 'עדכון ספרייה פעיל';
+  @override
   String get libraryNothingDownloaded => 'טרם הורדו עדכונים';
   @override
   String get libraryNeedsManualPath => 'נדרשת בחירת מיקום';

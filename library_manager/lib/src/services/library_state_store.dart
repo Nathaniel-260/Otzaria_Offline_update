@@ -182,9 +182,18 @@ class LibraryStateStore {
     records[key] = value;
   }
 
-  Future<String?> loadCustomDbPath() async {
-    final json = await _readAll();
+  Future<String?> loadCustomDbPath() async =>
+      (await loadCustomDbChoice())?.path;
 
+  Future<({String path, bool explicit})?> loadCustomDbChoice() async {
+    final json = await _readAll();
+    final path = await _loadCustomDbPath(json);
+    if (path == null) return null;
+    final explicit = await _ownRecord(json['customDbPathsExplicit']);
+    return (path: path, explicit: explicit == path);
+  }
+
+  Future<String?> _loadCustomDbPath(Map<String, dynamic> json) async {
     final own = await _ownRecord(json['customDbPaths']);
     if (own is String && own.isNotEmpty) return own;
 
@@ -207,21 +216,38 @@ class LibraryStateStore {
     }
   }
 
-  Future<void> saveCustomDbPath(String dbPath) =>
-      _exclusively(() => _saveCustomDbPath(dbPath));
+  Future<void> saveCustomDbPath(String dbPath, {bool? explicit}) =>
+      _exclusively(() => _saveCustomDbPath(dbPath, explicit));
 
-  Future<void> _saveCustomDbPath(String dbPath) async {
+  Future<void> _saveCustomDbPath(String dbPath, bool? explicit) async {
     final json = await _readAll(forWrite: true);
-    final paths = <String, dynamic>{};
-    final existing = json['customDbPaths'];
+    final paths = _stringRecords(json['customDbPaths']);
+    final explicitPaths = _stringRecords(json['customDbPathsExplicit']);
+    final keep =
+        explicit == null &&
+        await _ownRecord(json['customDbPaths']) == dbPath &&
+        await _ownRecord(json['customDbPathsExplicit']) == dbPath;
+    await _putOwnRecord(paths, dbPath);
+    if (explicit == true || keep) {
+      await _putOwnRecord(explicitPaths, dbPath);
+    } else {
+      explicitPaths
+        ..remove(await currentMachineKey())
+        ..remove(legacyMachineKey());
+    }
+    json['customDbPaths'] = paths;
+    json['customDbPathsExplicit'] = explicitPaths;
+    await _writeAll(json);
+  }
+
+  static Map<String, dynamic> _stringRecords(Object? existing) {
+    final records = <String, dynamic>{};
     if (existing is Map) {
       existing.forEach((key, value) {
-        if (key is String && value is String) paths[key] = value;
+        if (key is String && value is String) records[key] = value;
       });
     }
-    await _putOwnRecord(paths, dbPath);
-    json['customDbPaths'] = paths;
-    await _writeAll(json);
+    return records;
   }
 
   Future<AppliedRelease?> loadAppliedRelease() async {

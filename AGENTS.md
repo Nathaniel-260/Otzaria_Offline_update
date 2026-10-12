@@ -828,7 +828,9 @@ compare, so the chain stands. A local DB that is not on the mirrored chain lands
 `DatabaseConstants.getDatabasePath`), then its `library_database_path.txt` and
 the `libraryDbPath` of `otzaria_capabilities.json`; only then a path we saved
 ourselves (it used to come first, so a library moved inside Otzaria kept
-updating the stale copy); a library bundled by a legacy FULL install; `%APPDATA%\otzaria\books\`,
+updating the stale copy) — unless the user picked it explicitly in OU
+(`saveCustomDbPath(explicit: true)`), which goes first, also for
+`resolveInstallDbPath`; a library bundled by a legacy FULL install; `%APPDATA%\otzaria\books\`,
 `%ProgramData%\otzaria\books\` (Windows) or
 `~/Library/Application Support/otzaria/books/` and the system-wide equivalent
 (macOS); finally `C:\אוצריא\`. Nothing found → `null`, and the UI must ask. Do not
@@ -912,11 +914,19 @@ schema 6 only from 0.9.98; the mirror carries both, and OU picked the newest.
 else the app-version table); nothing compatible is `blocked` with "update
 Otzaria first", and `AutoInstallFlow` installs the app before the library.
 
-**An apply holds Otzaria's `OtzariaAppSingleInstance` mutex (Windows).** Otzaria
-checks it before touching the DB and exits as a second instance, so its
-startup recovery can no longer clear our `.applying` marker mid-apply. A second
-SQLite connection cannot be the lock: `PatchApplier` opens its own and would
-block on it. `OtzariaInstanceLock`, opt-in from `AppShell`.
+**An apply holds Otzaria's single-instance mutexes (Windows).** Otzaria checks
+`OtzariaAppSingleInstance` — a portable copy `OtzariaAppSingleInstance-<FNV-1a
+64 of its lower-cased data root>` — before touching the DB and exits, so its
+recovery cannot clear our `.applying` mid-apply. We hold both names
+(`OtzariaInstanceLock.mutexNamesFor`; vectors shared with `main.cpp`), and
+"launch Otzaria" is disabled meanwhile. Not a SQLite lock: `PatchApplier` opens
+its own connection.
+
+**Tests never see the real Otzaria data roots.** A test once installed a
+dictionary into the developer's real `%APPDATA%\otzaria\books`.
+`flutter_test_config.dart` in `library_manager` and `launcher_app` calls
+`LibraryDbLocator.sandboxForTests`: the default environment points into a temp
+dir and any touch of a real root throws. Keep both files when adding packages.
 
 **There is no backup of `seforim.db`, and no setting for one.**
 `LibraryDbRecoveryService` writes a marker (`<db>.applying`) and nothing else. A

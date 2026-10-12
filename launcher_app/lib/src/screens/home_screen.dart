@@ -196,6 +196,7 @@ class HomeScreen extends StatelessWidget {
       ),
       primaryActionText: switch (c.status) {
         OtzariaModuleStatus.updateAvailable => common.install,
+        _ when c.libraryApplyActive => t.libraryApplyActive,
         _ => c.canLaunch ? common.launch : null,
       },
       primaryActionIcon: switch (c.status) {

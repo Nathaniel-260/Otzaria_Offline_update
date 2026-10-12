@@ -82,7 +82,9 @@ class OtzariaScreen extends StatelessWidget {
       actions: [
         RecheckButton(onPressed: _isBusy ? null : c.checkForUpdate),
         ActionButton.recommended(
-          text: t.launchButton,
+          text: c.libraryApplyActive
+              ? context.strings.home.libraryApplyActive
+              : t.launchButton,
           icon: FluentIcons.play_24_regular,
           onPressed: c.canLaunch ? c.launch : null,
         ),
