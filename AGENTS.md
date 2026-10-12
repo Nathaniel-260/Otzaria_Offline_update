@@ -530,6 +530,15 @@ The library is never skipped in personal-update mode, where the target comes fro
 the recorded DB version. The skip is announced in a snackbar; a silent one produced
 the "why did it not download the plugins" confusion.
 
+**Filtered networks get their own messages and NetFree's CA.** A filter answers
+418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
+handshake dump. `otzaria_downloads` maps them to `NetworkBlockedException` /
+`NetworkCertificateException` (`githubGet` maps 418 only, since its callers read
+403 themselves; `downloadFile` and `OtzariaReleaseClient` map both), and `main.dart`
+loads `assets/ca/*.pem` (copied from Otzaria) into
+`SecurityContext.defaultContext` — the one context every client in the UI
+isolate uses, `library_manager`'s included — before the first frame.
+
 **The library's light check covers the companions, not just the DB version.**
 They download only inside the library download, which `skipLibrary` skipped whenever
 the mirror's DB matched the latest online — so a drive that once missed the Talmud

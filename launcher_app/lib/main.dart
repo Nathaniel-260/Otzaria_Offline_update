@@ -20,6 +20,7 @@ import 'src/self_update/payload_check.dart';
 import 'src/services/app_logger.dart';
 import 'src/services/app_paths.dart';
 import 'src/services/instance_lock.dart';
+import 'src/services/netfree_certificates.dart';
 import 'src/services/startup_diagnostics.dart';
 import 'src/settings/app_settings.dart';
 import 'src/settings/settings_controller.dart';
@@ -137,6 +138,7 @@ void main() {
           payloadVersion: PayloadCheck.stubPayloadVersion(),
         ),
         settings.load(),
+        trustNetfreeCertificates(),
       ]);
       logger = initialized.first as AppLogger;
 

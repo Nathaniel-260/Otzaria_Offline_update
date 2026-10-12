@@ -94,9 +94,11 @@ class OtzariaReleaseClient {
       _httpClient,
       uri,
       timeout: timeout,
-      statusError: (status) => GithubApiException(
-        AppL10n.strings.appDomain.githubStatus(status, '$uri'),
-      ),
+      statusError: (status) => isFilterBlockStatus(status)
+          ? NetworkBlockedException(uri: uri, statusCode: status)
+          : GithubApiException(
+              AppL10n.strings.appDomain.githubStatus(status, '$uri'),
+            ),
     ) as List<dynamic>;
     if (decoded.isEmpty) {
       throw StateError(
