@@ -254,6 +254,62 @@ void main() {
 
       expect(await locator(launchPath: launchPath).resolveDbPath(), portableDb);
     });
+
+    test('ההגדרה הנוכחית של אוצריא מנצחת נתיב ישן ששמרנו', () async {
+      final stale = await createDb(p.join(tempDir.path, 'old-place'));
+      await stateStore.saveCustomDbPath(stale);
+      final current = await createDb(p.join(tempDir.path, 'moved'));
+      await writeSettings({
+        OtzariaSettingsReader.keyLibraryPath: p.join(tempDir.path, 'moved'),
+      });
+
+      expect(await locator().resolveDbPath(), current);
+    });
+
+    test('נתיב שמור עדיין קודם לברירת המחדל כשאוצריא אינה מצביעה', () async {
+      await createDb(p.join(dataRoot, 'books'));
+      final custom = await createDb(p.join(tempDir.path, 'custom'));
+      await stateStore.saveCustomDbPath(custom);
+
+      expect(await locator().resolveDbPath(), custom);
+    });
+
+    test('library_database_path.txt (UTF-8 עם BOM) מנצח נתיב שמור', () async {
+      final stale = await createDb(p.join(tempDir.path, 'old-place'));
+      await stateStore.saveCustomDbPath(stale);
+      final recordedDir = p.join(tempDir.path, 'ספרייה', 'אוצריא');
+      final recorded = await createDb(recordedDir);
+      await File(
+        p.join(dataRoot, OtzariaCapabilities.libraryDatabasePathFileName),
+      ).writeAsBytes([0xEF, 0xBB, 0xBF, ...utf8.encode(recordedDir)]);
+
+      expect(await locator().resolveDbPath(), recorded);
+      expect(await locator().isKnownToOtzaria(recorded), isTrue);
+    });
+
+    test('libraryDbPath של otzaria_capabilities.json מנצח נתיב שמור', () async {
+      final stale = await createDb(p.join(tempDir.path, 'old-place'));
+      await stateStore.saveCustomDbPath(stale);
+      final declared = await createDb(p.join(tempDir.path, 'declared'));
+      await File(p.join(dataRoot, OtzariaCapabilities.fileName)).writeAsString(
+        jsonEncode({'formatVersion': 1, 'libraryDbPath': declared}),
+      );
+
+      expect(await locator().resolveDbPath(), declared);
+    });
+
+    test('הקופסה קודמת לקבצי הרישום, שעשויים להיות ישנים', () async {
+      final fromBox = await createDb(p.join(tempDir.path, 'from-box'));
+      await writeSettings({
+        OtzariaSettingsReader.keyLibraryPath: p.join(tempDir.path, 'from-box'),
+      });
+      final declared = await createDb(p.join(tempDir.path, 'declared'));
+      await File(
+        p.join(dataRoot, OtzariaCapabilities.fileName),
+      ).writeAsString(jsonEncode({'libraryDbPath': declared}));
+
+      expect(await locator().resolveDbPath(), fromBox);
+    });
   });
 
   /// סדר החיפוש בווינדוס — ברירות המחדל מוצבעות לתוך ה-tempDir דרך דריסת

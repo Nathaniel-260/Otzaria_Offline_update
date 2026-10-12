@@ -3,16 +3,17 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'library_state_store.dart';
+import 'otzaria_capabilities.dart';
 import 'otzaria_settings_reader.dart';
 
 /// מוצא את נתיב `seforim.db` של המשתמש.
 ///
 /// **סדר החיפוש**:
-/// 1. נתיב מותאם אישית ששמור מ-[LibraryStateStore] (המשתמש כבר הצביע עליו).
-/// 2. **ההגדרות של אוצריא עצמה** — `key-library-path` +
+/// 1. **ההגדרות של אוצריא עצמה** — `key-library-path` +
 ///    `key-library-folder-name` מתוך `app_preferences.hive`, בדיוק כמו
-///    `DatabaseConstants.getDatabasePath` שם. זה המקור האמיתי: משתמש שהעביר
-///    את הספרייה לכונן אחר עשה זאת *שם*, ובלי לקרוא את ההגדרה נעדכן קובץ אחר.
+///    `DatabaseConstants.getDatabasePath` שם; אחריהן `library_database_path.txt`
+///    ו-`libraryDbPath` של `otzaria_capabilities.json` בשורש הנתונים שלה.
+/// 2. נתיב מותאם אישית ששמור מ-[LibraryStateStore] (המשתמש כבר הצביע עליו).
 /// 3. ספרייה מצורפת ליד ההתקנה (חבילת FULL ב-macOS) — ראו [bundledLibraryDir].
 /// 4. ברירות המחדל של אוצריא בפלטפורמה הנוכחית — ראו [defaultDbDirs].
 /// 5. **גיבוי** בווינדוס: `C:\אוצריא\seforim.db`.
@@ -292,32 +293,45 @@ class LibraryDbLocator {
   ///
   /// [includeReadOnly] מוסיף מקומות שמזהים בהם מסד קיים אבל **לא מתקינים**
   /// אליהם חדש: ספרייה מצורפת (חבילת FULL) והגיבוי הישן בווינדוס.
-  Future<List<String>> _otzariaDbCandidates({
+  Future<({List<String> current, List<String> fallbacks})>
+  _otzariaDbCandidates({
     required String? launchPath,
     required bool includeReadOnly,
   }) async {
-    final paths = <String>[];
-
-    // ההגדרה של אוצריא עצמה — המקור המוסמך כשהיא כבר רצה פעם אחת.
+    final current = <String>[];
     for (final root in await otzariaDataRoots(launchPath)) {
       final settings = await settingsReader.read(root);
       final fromSettings = settings?.resolveDbPath(
         path: _path,
         fileName: databaseFileName,
       );
-      if (fromSettings != null) paths.add(fromSettings);
+      if (fromSettings != null) current.add(fromSettings);
     }
 
+    final settingsRoot = await otzariaSettingsRoot(launchPath);
+    if (settingsRoot != null) {
+      final recordedDir = await OtzariaCapabilities.readLibraryDatabaseDir(
+        settingsRoot,
+      );
+      if (recordedDir != null) {
+        current.add(_path.join(recordedDir, databaseFileName));
+      }
+      final declared = (await OtzariaCapabilities.read(
+        settingsRoot,
+      ))?.libraryDbPath;
+      if (declared != null) current.add(declared);
+    }
+
+    final fallbacks = <String>[];
     if (includeReadOnly) {
       final bundled = await bundledLibraryDir(launchPath);
-      if (bundled != null) paths.add(_path.join(bundled, databaseFileName));
+      if (bundled != null) fallbacks.add(_path.join(bundled, databaseFileName));
     }
 
-    // התקנה ניידת ששורש הנתונים שלה ליד התוכנה, כשאוצריא עוד לא רצה שם.
     final exeDir = exeDirFor(launchPath);
     if (exeDir != null &&
         await File(_path.join(exeDir, portableMarkerFileName)).exists()) {
-      paths.add(
+      fallbacks.add(
         _path.joinAll([
           exeDir,
           portableDataFolderName,
@@ -332,14 +346,14 @@ class LibraryDbLocator {
       environment: _environment,
       systemInstall: await isSystemInstall(launchPath),
     )) {
-      paths.add(_path.join(dir, databaseFileName));
+      fallbacks.add(_path.join(dir, databaseFileName));
     }
 
     if (includeReadOnly && _operatingSystem == 'windows') {
-      paths.add(_path.join(legacyFallbackLibraryPath, databaseFileName));
+      fallbacks.add(_path.join(legacyFallbackLibraryPath, databaseFileName));
     }
 
-    return paths;
+    return (current: current, fallbacks: fallbacks);
   }
 
   Future<String?> resolveDbPath() async {
@@ -351,12 +365,14 @@ class LibraryDbLocator {
 
   Future<List<String>> dbCandidates() async {
     final custom = await stateStore.loadCustomDbPath();
+    final otzaria = await _otzariaDbCandidates(
+      launchPath: await otzariaLaunchPath?.call(),
+      includeReadOnly: true,
+    );
     return [
+      ...otzaria.current,
       if (custom != null) custom,
-      ...await _otzariaDbCandidates(
-        launchPath: await otzariaLaunchPath?.call(),
-        includeReadOnly: true,
-      ),
+      ...otzaria.fallbacks,
     ];
   }
 
@@ -374,7 +390,8 @@ class LibraryDbLocator {
       launchPath: await otzariaLaunchPath?.call(),
       includeReadOnly: false,
     );
-    return candidates.isEmpty ? null : candidates.first;
+    final first = [...candidates.current, ...candidates.fallbacks];
+    return first.isEmpty ? null : first.first;
   }
 
   /// האם אוצריא תמצא את המסד הזה בעצמה — כלומר ההגדרה שלה או אחת מברירות
@@ -385,6 +402,9 @@ class LibraryDbLocator {
       launchPath: await otzariaLaunchPath?.call(),
       includeReadOnly: true,
     );
-    return candidates.any((candidate) => _path.equals(candidate, dbPath));
+    return [
+      ...candidates.current,
+      ...candidates.fallbacks,
+    ].any((candidate) => _path.equals(candidate, dbPath));
   }
 }

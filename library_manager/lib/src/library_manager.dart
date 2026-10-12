@@ -12,9 +12,12 @@ import 'services/external_update_notice.dart';
 import 'services/library_db_locator.dart';
 import 'services/library_state_store.dart';
 import 'services/library_update_applier.dart';
+import 'services/otzaria_capabilities.dart';
+import 'services/otzaria_instance_lock.dart';
 import 'services/otzaria_process_guard.dart';
 import 'services/otzaria_settings_reader.dart';
 import 'services/otzaria_settings_writer.dart';
+import 'services/readable_schema_limit.dart';
 import 'services/recent_library_releases_client.dart';
 import 'services/semantic_search_assets.dart';
 
@@ -84,6 +87,8 @@ class LibraryManager {
     this.allowPrerelease = false,
     this.personalUpdateMode = false,
     Future<String?> Function()? otzariaLaunchPath,
+    Future<String?> Function()? otzariaAppVersion,
+    OtzariaInstanceLock? instanceLock,
     String? operatingSystem,
     Map<String, String>? environment,
     LocalDbVersionReader versionReader = const LocalDbVersionReader(),
@@ -99,6 +104,8 @@ class LibraryManager {
        _versionReader = versionReader,
        _recovery = const LibraryDbRecoveryService(),
        _processGuard = processGuard,
+       _otzariaAppVersion = otzariaAppVersion,
+       _instanceLock = instanceLock,
        _cloudClient = releaseClient ?? RecentLibraryReleasesClient(),
        _applier = applier ?? LibraryUpdateApplier(processGuard: processGuard) {
     _locator = LibraryDbLocator(
@@ -145,6 +152,10 @@ class LibraryManager {
   final LibraryDbRecoveryService _recovery;
 
   final OtzariaProcessGuard _processGuard;
+
+  final Future<String?> Function()? _otzariaAppVersion;
+
+  final OtzariaInstanceLock? _instanceLock;
 
   final RecentLibraryReleasesClient _cloudClient;
 
@@ -524,6 +535,13 @@ class LibraryManager {
       allowPrerelease: allowPrerelease,
     );
     final mirrorDownloadIncomplete = await _mirrorDownloadIncomplete(releases);
+    final readableSchema = await _readableDbSchema(locator);
+    final route = ReadableSchemaRoute.limit(
+      discovery: discoveryResult,
+      releases: releases,
+      allowPrerelease: allowPrerelease,
+      readableSchema: readableSchema,
+    );
 
     final applied = await _stateStore.loadAppliedRelease();
 
@@ -535,20 +553,25 @@ class LibraryManager {
       ),
     );
 
-    final plan = _planner.plan(
+    final plan = _limitToReadableSchema(
+      _planner.plan(
+        localVersion: local.dbVersion,
+        hasLocalVersionMeta: local.hasVersionMeta,
+        latestVersion: discoveryResult.latestVersion,
+        edges: route.edges,
+        latestFullDbAsset: route.latestFullDbAsset,
+        fullDbReleaseTag: route.fullDbReleaseTag,
+        latestFullDbVersion: route.latestFullDbVersion,
+        latestContentTag: discoveryResult.latestContentTag,
+        localReleaseTag: applied?.tag,
+        localReleaseTagVersion: applied?.dbVersion,
+        blockingSchemaVersion: discoveryResult.blockingSchemaVersion,
+        blockingPatchFormatVersion: discoveryResult.blockingPatchFormatVersion,
+        localVersionUnknownReason: corruptAfterCrashReason,
+      ),
+      route: route,
       localVersion: local.dbVersion,
-      hasLocalVersionMeta: local.hasVersionMeta,
       latestVersion: discoveryResult.latestVersion,
-      edges: discoveryResult.edges,
-      latestFullDbAsset: discoveryResult.latestFullDbAsset,
-      fullDbReleaseTag: discoveryResult.fullDbReleaseTag,
-      latestFullDbVersion: discoveryResult.latestFullDbVersion,
-      latestContentTag: discoveryResult.latestContentTag,
-      localReleaseTag: applied?.tag,
-      localReleaseTagVersion: applied?.dbVersion,
-      blockingSchemaVersion: discoveryResult.blockingSchemaVersion,
-      blockingPatchFormatVersion: discoveryResult.blockingPatchFormatVersion,
-      localVersionUnknownReason: corruptAfterCrashReason,
     );
 
     final settings = await _semanticSettings(locator);
@@ -580,7 +603,63 @@ class LibraryManager {
       semanticPending: semanticPending,
       semanticConsentGranted: settings?.searchFeedbackGranted ?? false,
       mirrorDownloadIncomplete: mirrorDownloadIncomplete,
+      readableDbSchemaVersion: readableSchema,
+      needsNewerOtzaria:
+          route.limited &&
+          (plan.kind == LibraryUpdatePlanKind.blocked ||
+              (plan.finalTargetVersion ?? local.dbVersion) <
+                  discoveryResult.latestVersion),
     );
+  }
+
+  Future<int?> _readableDbSchema(LibraryDbLocator locator) async {
+    final launch = await locator.otzariaLaunchPath?.call();
+    final root = await locator.otzariaSettingsRoot(launch);
+    return OtzariaCapabilities.resolveReadableDbSchema(
+      capabilities: root == null ? null : await OtzariaCapabilities.read(root),
+      installedVersion: await _otzariaAppVersion?.call(),
+    );
+  }
+
+  LibraryUpdatePlan _limitToReadableSchema(
+    LibraryUpdatePlan plan, {
+    required ReadableSchemaRoute route,
+    required int localVersion,
+    required int latestVersion,
+  }) {
+    final readable = route.readableSchema;
+    if (!route.limited || readable == null) return plan;
+    final strings = AppL10n.strings.libraryDomain;
+    final reached = plan.finalTargetVersion ?? localVersion;
+    switch (plan.kind) {
+      case LibraryUpdatePlanKind.none:
+        return plan;
+      case LibraryUpdatePlanKind.blocked:
+        return LibraryUpdatePlan.blocked(
+          localVersion: plan.localVersion,
+          targetVersion: latestVersion,
+          reason: strings.planOtzariaTooOldForLibrary(readable, latestVersion),
+        );
+      case LibraryUpdatePlanKind.delta:
+        if (reached >= latestVersion) return plan;
+        return LibraryUpdatePlan.delta(
+          localVersion: plan.localVersion,
+          targetVersion: plan.targetVersion ?? reached,
+          steps: plan.deltaSteps,
+          reason: strings.planStopsBeforeOtzariaSchema(reached, latestVersion),
+          fullDownloadFallback: plan.fullDownloadFallback,
+        );
+      case LibraryUpdatePlanKind.fullDownload:
+        if (reached >= latestVersion) return plan;
+        return LibraryUpdatePlan.fullDownload(
+          localVersion: plan.localVersion,
+          targetVersion: plan.targetVersion,
+          asset: plan.fullDbAsset!,
+          releaseTag: plan.fullDbReleaseTag!,
+          reason: strings.planStopsBeforeOtzariaSchema(reached, latestVersion),
+          followUpDelta: plan.followUpDelta,
+        );
+    }
   }
 
   Future<bool> _mirrorDownloadIncomplete(List<LibraryRelease> releases) async {
@@ -657,7 +736,9 @@ class LibraryManager {
     bool useFullDownloadFallback = false,
   }) async {
     _appliesInFlight++;
+    OtzariaInstanceLease? lease;
     try {
+      lease = await _instanceLock?.acquire();
       return await _applyUpdate(
         check,
         onProgress: onProgress,
@@ -669,6 +750,7 @@ class LibraryManager {
         useFullDownloadFallback: useFullDownloadFallback,
       );
     } finally {
+      lease?.release();
       _appliesInFlight--;
     }
   }

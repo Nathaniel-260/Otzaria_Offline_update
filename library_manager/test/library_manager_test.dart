@@ -182,7 +182,7 @@ void main() {
       await writeMirror(tag: 'v27');
       await writeCompanionMirror(tag: 'v2', content: 'LEXICAL');
 
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
       addTearDown(manager.dispose);
 
       // המסד מעודכן, ורק המילון ממתין — וזה נאמר בשמו.
@@ -221,7 +221,7 @@ void main() {
         p.join(dataDir, 'mirror', 'companions', 'lexical.db'),
       ).delete();
 
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
       addTearDown(manager.dispose);
 
       final check = await manager.checkForUpdate();
@@ -233,13 +233,13 @@ void main() {
 
   group('mirrorDir / hasMirror', () {
     test('המראה יושבת תמיד באותו מקום יחסית לתיקיית הנתונים', () {
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
       expect(manager.mirrorDir, p.join(dataDir, 'mirror', 'library'));
       manager.dispose();
     });
 
     test('hasMirror נשען על releases.json, לא על קיום התיקייה', () async {
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
       expect(await manager.hasMirror, isFalse);
 
       // תיקייה + נכסים בלי המניפסט = הורדה שנקטעה, לא מראה שמישה.
@@ -262,7 +262,7 @@ void main() {
       'בלי מראה — LibraryMirrorMissingException, בלי שום פנייה לרשת',
       () async {
         await _withoutNetwork((created) async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           await expectLater(
             manager.checkForUpdate(),
             throwsA(
@@ -284,7 +284,7 @@ void main() {
       'גרסת המסד המקומי נקראת גם בלי מראה — בחירה ידנית לפני הורדה',
       () async {
         await installExistingDb(17);
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         addTearDown(manager.dispose);
 
         // הבדיקה נכשלת (אין מראה), אבל הגרסה שנקראה מהמסד לא הולכת לאיבוד.
@@ -331,7 +331,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         await manager.checkForUpdate(); // עובד כל עוד המניפסט קיים
 
         File(p.join(mirrorDir, 'releases.json')).deleteSync();
@@ -402,7 +402,7 @@ void main() {
         );
 
         await _withoutNetwork((_) async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           final check = await manager.checkForUpdate();
 
           expect(check.isFreshInstall, isFalse);
@@ -428,7 +428,7 @@ void main() {
         );
 
         await _withoutNetwork((_) async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           final check = await manager.checkForUpdate();
 
           expect(check.plan!.kind, LibraryUpdatePlanKind.fullDownload);
@@ -450,7 +450,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         final check = await manager.checkForUpdate();
         expect(check.plan!.kind, LibraryUpdatePlanKind.none);
         manager.dispose();
@@ -469,7 +469,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         final check = await manager.checkForUpdate();
 
         expect(check.plan!.kind, LibraryUpdatePlanKind.fullDownload);
@@ -493,6 +493,8 @@ void main() {
         await _withoutNetwork((_) async {
           final manager = LibraryManager(
             dataDir: dataDir,
+            operatingSystem: 'linux',
+            environment: hermeticEnvironment(),
             versionReader: const LocalDbVersionReader(
               busyTimeout: Duration(milliseconds: 50),
             ),
@@ -534,7 +536,7 @@ void main() {
       await writeMirror(tag: 'v9'); // release בלי seforim.db.zst
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         final check = await manager.checkForUpdate();
         // אין נכס להוריד ואין edges — אין מה לתכנן.
         expect(check.plan!.kind, LibraryUpdatePlanKind.none);
@@ -554,7 +556,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         Future<bool> incomplete() async =>
             (await manager.checkForUpdate()).mirrorDownloadIncomplete;
 
@@ -590,7 +592,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         expect(
           (await manager.checkForUpdate()).plan!.kind,
           LibraryUpdatePlanKind.none,
@@ -622,7 +624,7 @@ void main() {
       File('$dbPath.applying').writeAsStringSync('{"fromVersion":4}');
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         final check = await manager.checkForUpdate();
 
         expect(check.localVersion!.dbVersion, 5);
@@ -642,7 +644,7 @@ void main() {
       await writeMirror(tag: 'v5', compressedDb: Uint8List.fromList([1, 2]));
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         final check = await manager.checkForUpdate();
 
         expect(check.isFreshInstall, isFalse);
@@ -666,7 +668,7 @@ void main() {
       File('$dbPath.applying').writeAsStringSync('{"fromVersion":4}');
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         addTearDown(manager.dispose);
         final writer = sqlite3.sqlite3.open(dbPath);
         try {
@@ -741,7 +743,12 @@ void main() {
         final applier = _GatedApplier(dbBytes);
 
         await _withoutNetwork((_) async {
-          final manager = LibraryManager(dataDir: dataDir, applier: applier);
+          final manager = LibraryManager(
+            dataDir: dataDir,
+            operatingSystem: 'linux',
+            environment: hermeticEnvironment(),
+            applier: applier,
+          );
           final check = await manager.checkForUpdate();
           expect(check.plan!.kind, LibraryUpdatePlanKind.fullDownload);
 
@@ -795,7 +802,7 @@ void main() {
         );
 
         await _withoutNetwork((_) async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           final check = await manager.checkForUpdate();
           expect(check.plan!.kind, LibraryUpdatePlanKind.fullDownload);
           expect(check.plan!.localVersion, 4);
@@ -876,7 +883,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         await manager.applyUpdate(check);
 
         expect(File(dbPath).readAsBytesSync(), dbBytes);
@@ -925,7 +932,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
         await manager.applyUpdate(check);
 
         final applied = await LibraryStateStore(
@@ -1006,7 +1013,7 @@ void main() {
         );
 
         await _withoutNetwork((_) async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           await expectLater(
             manager.applyUpdate(check),
             throwsA(isA<PatchApplyException>()),
@@ -1028,7 +1035,7 @@ void main() {
     );
 
     test('תוכנית none / חסרה — לא עושה כלום', () async {
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
       final dbPath = p.join(tempDir.path, 'books', 'seforim.db');
 
       await manager.applyUpdate(LibraryUpdateCheckResult(dbPath: dbPath));
@@ -1109,7 +1116,7 @@ void main() {
         expect(check.canFallBackToFullDownload, isTrue);
 
         await _withoutNetwork((_) async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           await manager.applyUpdate(check, useFullDownloadFallback: true);
 
           expect(File(dbPath).readAsBytesSync(), dbBytes);
@@ -1167,7 +1174,7 @@ void main() {
         );
 
         await _withoutNetwork((_) async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           await manager.applyUpdate(check, useFullDownloadFallback: true);
 
           final applied = await LibraryStateStore(
@@ -1181,7 +1188,7 @@ void main() {
     );
 
     test('בקשת מסלול חלופי שאינו קיים נכשלת במקום לא לעשות כלום', () async {
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
 
       await expectLater(
         manager.applyUpdate(
@@ -1207,7 +1214,7 @@ void main() {
     });
 
     test('תוכנית blocked זורקת LibraryApplyException עם הסיבה', () async {
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
 
       await expectLater(
         manager.applyUpdate(
@@ -1344,7 +1351,7 @@ void main() {
       await Directory(p.dirname(dbPath)).create(recursive: true);
       File(dbPath).writeAsStringSync('db');
 
-      final manager = LibraryManager(dataDir: dataDir);
+      final manager = hermeticManager();
       await manager.setCustomDbPath(dbPath);
 
       expect(await manager.currentDbPath(), dbPath);
@@ -1575,7 +1582,7 @@ void main() {
       );
 
       await _withoutNetwork((_) async {
-        final manager = LibraryManager(dataDir: dataDir);
+        final manager = hermeticManager();
 
         // "אין רשת" — הקורא אמור לבלוע את זה, לא להציג שגיאה חוסמת.
         await expectLater(manager.peekLatestOnlineVersion(), throwsA(anything));
@@ -1647,7 +1654,7 @@ void main() {
             ]),
           ],
           () async {
-            final manager = LibraryManager(dataDir: dataDir);
+            final manager = hermeticManager();
             try {
               expect(await manager.peekLatestOnlineVersion(), 31);
               expect(await manager.peekPendingSemanticSearch(), isFalse);
@@ -1670,7 +1677,7 @@ void main() {
           release('v34-20261004000000', ['seforim.db.zst'], draft: true),
         ],
         () async {
-          final manager = LibraryManager(dataDir: dataDir);
+          final manager = hermeticManager();
           try {
             expect(await manager.peekLatestOnlineVersion(), isNull);
             expect(await manager.peekPendingSemanticSearch(), isFalse);

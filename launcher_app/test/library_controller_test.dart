@@ -32,7 +32,14 @@ void main() {
     HttpOverrides.global = NoNetworkHttpOverrides();
     AppLogger.resetForTest();
     await AppLogger.init(tempDir.path);
-    controller = LibraryModuleController(dataDir: tempDir.path);
+    controller = LibraryModuleController(
+      dataDir: tempDir.path,
+      manager: LibraryManager(
+        dataDir: tempDir.path,
+        operatingSystem: 'linux',
+        environment: {'HOME': p.join(tempDir.path, 'home')},
+      ),
+    );
   });
 
   tearDown(() async {
@@ -68,6 +75,8 @@ void main() {
         dataDir: tempDir.path,
         manager: LibraryManager(
           dataDir: tempDir.path,
+          operatingSystem: 'linux',
+          environment: {'HOME': p.join(tempDir.path, 'home')},
           versionReader: const LocalDbVersionReader(
             busyTimeout: Duration(milliseconds: 50),
           ),
@@ -249,6 +258,38 @@ void main() {
 
       expect(notifications, 0);
       expect(controller.status, LibraryModuleStatus.idle);
+    });
+  });
+
+  group('ספרייה שדורשת אוצריא חדשה יותר', () {
+    Future<String?> blockedMessage(String? mirroredOtzaria) async {
+      controller.dispose();
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        mirroredOtzariaUpdate: () async => mirroredOtzaria,
+        manager: _NeedsNewerOtzariaManager(tempDir.path),
+      );
+      await controller.checkForUpdate();
+      expect(controller.status, LibraryModuleStatus.error);
+      return controller.errorMessage;
+    }
+
+    test('אוצריא חדשה בכונן שקוראת את הספרייה — מוצע הסדר הנכון', () async {
+      expect(
+        await blockedMessage('0.9.98'),
+        AppL10n.strings.libraryDomain.libraryNeedsOtzariaUpdateFromDrive(
+          '0.9.98',
+        ),
+      );
+    });
+
+    test('בלי אוצריא מתאימה בכונן — נשאר ההסבר של התוכנית', () async {
+      final reason = AppL10n.strings.libraryDomain.planOtzariaTooOldForLibrary(
+        5,
+        31,
+      );
+      expect(await blockedMessage(null), reason);
+      expect(await blockedMessage('0.9.97+800'), reason);
     });
   });
 
@@ -999,6 +1040,32 @@ class _ApplyManager extends LibraryManager {
     if (applyError case final error?) throw error;
     return const {};
   }
+}
+
+class _NeedsNewerOtzariaManager extends LibraryManager {
+  _NeedsNewerOtzariaManager(String dataDir) : super(dataDir: dataDir);
+
+  @override
+  Future<LibraryUpdateCheckResult> checkForUpdate() async =>
+      LibraryUpdateCheckResult(
+        dbPath: 'seforim.db',
+        localVersion: const LocalDbVersion(
+          dbVersion: 30,
+          schemaVersion: 5,
+          hasVersionMeta: true,
+        ),
+        latestVersion: 31,
+        readableDbSchemaVersion: 5,
+        needsNewerOtzaria: true,
+        plan: LibraryUpdatePlan.blocked(
+          localVersion: 30,
+          targetVersion: 31,
+          reason: AppL10n.strings.libraryDomain.planOtzariaTooOldForLibrary(
+            5,
+            31,
+          ),
+        ),
+      );
 }
 
 class _DownloadManager extends LibraryManager {
