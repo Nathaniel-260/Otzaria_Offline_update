@@ -1175,11 +1175,11 @@ waits for the process to exit instead of polling every 3s.
 HKLM 64- and 32-bit), so an install in a folder nobody guessed is found *with Otzaria
 closed*. Only the **directory** comes from there; the version is still read from the
 exe, because `DisplayVersion` records what the installer wrote, not what is on disk
-now. The scan costs ~200ms, so `checkForUpdate` builds `_autoDetectDirs` only when
-nothing is known yet.
+now. The scan costs ~200ms, so it runs off the UI isolate and only when nothing is
+known yet.
 
-**Only `DisplayName` identifies an entry in that registry.** Matching on
-`InstallLocation` too let any third-party program in a path merely mentioning
+**Only the uninstall key name or `DisplayName` identifies an entry in that
+registry.** Matching on `InstallLocation` too let any third-party program in a path merely mentioning
 "otzaria" into `_autoDetectDirs`, where `sharedDir: false` means no further identity
 check. Both real Inno entries write a `DisplayName` ("אוצריא גירסה …"), verified on a
 real machine. `UninstallString` is only a fallback for the *directory*, and must be
@@ -1187,22 +1187,18 @@ parsed as a command line, not a path: `MsiExec.exe /X{GUID}` through `p.dirname`
 a **relative** string, because `package:path` treats the `/switch` as a path segment.
 
 **Where a fresh Windows install goes is the installer's call, not ours.**
-`installFromFile` passes `/DIR=` only when updating an install we already know about;
-for a fresh one it passes none and finds the result through detection. This repo once
-recorded `{autopf}\Otzaria` as "the installer's real default, verified with the Otzaria
-developers (2026-08-07) — not a guess", while `installer/otzaria.iss` in
-`Otzaria/otzaria` says `DefaultDirName=C:\אוצריא`. A copied default drifts from the
-thing it copies. `_windowsRealDefaultDirs` (`{autopf}\Otzaria`,
-`%ProgramFiles%\Otzaria`, `{Program Files}\אוצריא`, `C:\אוצריא`) is a **detection**
-list only, and `resolveDefaultInstallDir()` is a Windows *display* value plus the real
-macOS target (`/Applications`, falling back to `~/Applications`) — never an install
-argument on Windows. Verify installer facts against **`Otzaria/otzaria`** (what
-`OtzariaReleaseClient` downloads); `Sivan22/otzaria` has a similar-but-different
-`installer/` folder, and reading the wrong one produces confident wrong answers. This
-is a *different* directory from where the library DB lives (`%APPDATA%\otzaria\`) —
-don't conflate them when debugging "Otzaria not detected". The manual
-"בחירת מיקום ידנית" picker (`adoptInstallDir`) is the fallback for anything the paths
-do not cover.
+`installFromFile` passes `/DIR=` only when updating an install we already know
+about; for a fresh one it passes none and finds the result through detection.
+`otzaria.iss` (in `Otzaria/otzaria`, not `Sivan22/otzaria`) sets
+`DefaultDirName={code:GetDefaultInstallDir}`: the previous install (registry,
+`C:\אוצריא`, `{autopf}\אוצריא`, `{autopf}\Otzaria`), else `{autopf}\Otzaria`. A
+copied default drifts, so `_windowsRealDefaultDirs` is a **detection** list only
+and `resolveDefaultInstallDir()` a Windows *display* value (and the real macOS
+target). Detection first matches the Inno uninstall key
+`{EEC4F712-CD05-4D15-A753-509E840A51A5}_is1`, then `DisplayName`
+(`WindowsInstallRegistry.otzariaInstallDirs`, in `Isolate.run`, memoized per
+`checkForUpdate`). The install dir is not where the DB lives
+(`%APPDATA%\otzaria\`); `adoptInstallDir` covers anything else.
 
 **Never return the first `.exe` in the install folder.** `crashpad_handler.exe` ships
 next to `otzaria.exe`, sorts before it, *and* carries its own version resource

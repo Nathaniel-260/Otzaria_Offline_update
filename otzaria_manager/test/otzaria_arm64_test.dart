@@ -330,8 +330,5 @@ class _NoRegistry extends WindowsInstallRegistry {
   const _NoRegistry();
 
   @override
-  List<String> installDirs({
-    bool Function(String displayName)? matchesDisplayName,
-  }) =>
-      const [];
+  Future<List<String>> otzariaInstallDirs() async => const [];
 }

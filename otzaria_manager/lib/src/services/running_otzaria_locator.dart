@@ -250,6 +250,9 @@ class RunningOtzariaLocator {
     }
   }
 
+  static Future<List<String>> windowsRunningImagePathsOffUiIsolate() =>
+      _offUiIsolate(windowsRunningImagePaths);
+
   static List<String> windowsRunningImagePaths() {
     if (!Platform.isWindows) return const [];
 

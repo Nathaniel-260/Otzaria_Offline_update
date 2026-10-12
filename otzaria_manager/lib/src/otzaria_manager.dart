@@ -179,16 +179,6 @@ class OtzariaManager {
   /// נשאר בנתיב שלה, למשל C:\אוצריא או {Program Files}\אוצריא").
   static const String _legacyWindowsInstallDir = r'C:\אוצריא';
 
-  /// המיקומים שאוצריא **עשויה** לשבת בהם בווינדוס, לצורכי זיהוי:
-  /// `{autopf}\Otzaria` (כלומר `%LocalAppData%\Programs\Otzaria` למשתמש
-  /// הנוכחי, או `%ProgramFiles%\Otzaria` לכל המשתמשים), ואחריו
-  /// [_legacyWindowsInstallDir]. כולן תיקיות ייעודיות לאוצריא בלבד — לא
-  /// "משותפות" כמו `/Applications`.
-  ///
-  /// ⚠️ **אין להסיק מכאן לאן להתקין.** הרשימה נבנתה כשחשבנו ש-`{autopf}`
-  /// הוא ברירת המחדל של המתקין (כך נמסר מהמפתחים ב-2026-08-07), אבל ה-iss
-  /// אומר `DefaultDirName=C:\אוצריא`. התקנה חדשה בווינדוס לא מוסרת `/DIR=`
-  /// בכלל — ראו [_installDirFor].
   List<({String dir, bool sharedDir})> get _windowsRealDefaultDirs {
     final dirs = <({String dir, bool sharedDir})>[];
 
@@ -196,6 +186,10 @@ class OtzariaManager {
     if (localAppData != null && localAppData.isNotEmpty) {
       dirs.add((
         dir: p.join(localAppData, 'Programs', 'Otzaria'),
+        sharedDir: false,
+      ));
+      dirs.add((
+        dir: p.join(localAppData, 'Programs', 'אוצריא'),
         sharedDir: false,
       ));
     }
@@ -265,15 +259,22 @@ class OtzariaManager {
   /// לרשימה — "HebrewBooks לאוצריא" הביא את הלאנצ'ר לקרוא גרסה מ-exe זר
   /// (2.12.0), להכריז installedIsNewer ולסרב להתקין אוצריא בכלל. בתיקייה
   /// ייעודית (`{autopf}\Otzaria`) הניחוש בטוח, וה-fallback נשאר.
-  List<({String dir, bool sharedDir, bool verifyIdentity})>
-      get _autoDetectDirs => switch (_platform) {
+  Future<List<String>>? _registryDirs;
+
+  Future<List<String>> _registryInstallDirs({bool fresh = false}) {
+    if (fresh) _registryDirs = null;
+    return _registryDirs ??= _installRegistry.otzariaInstallDirs();
+  }
+
+  Future<List<({String dir, bool sharedDir, bool verifyIdentity})>>
+      _autoDetectDirs({bool fresh = false}) async => switch (_platform) {
             OtzariaTargetPlatform.windows => [
                 (
                   dir: _managedInstallDir,
                   sharedDir: false,
                   verifyIdentity: false
                 ),
-                for (final dir in _installRegistry.installDirs())
+                for (final dir in await _registryInstallDirs(fresh: fresh))
                   (dir: dir, sharedDir: false, verifyIdentity: true),
                 for (final candidate in _windowsRealDefaultDirs)
                   (
@@ -348,6 +349,7 @@ class OtzariaManager {
     // בדיקת תהליך **אחת** משרתת את כל הבדיקה: היא גם מזהה התקנה וגם עונה
     // על "אוצריא פתוחה?" שהממשק מציג. קודם היא רצה פעמיים — כאן ושוב
     // בלאנצ'ר.
+    _registryDirs = null;
     final mirrorLoad = _mirror.load();
     final arm64MirrorLoad = _mirror.load(arch: OtzariaArch.arm64);
     final storedState = _stateStore.load();
@@ -411,14 +413,15 @@ class OtzariaManager {
         ? await _installer.installWithWizard(
             release: selected.release,
             installerPath: selected.installerPath,
-            locateInstalled: (accept) => _detectInKnownDirs(accept: accept),
+            locateInstalled: (accept) =>
+                _detectInKnownDirs(accept: accept, fresh: true),
             installDir: installDir,
           )
         : await _installer.installFromFile(
             release: selected.release,
             installerPath: selected.installerPath,
             installDir: installDir,
-            locateInstalled: _detectInKnownDirs,
+            locateInstalled: () => _detectInKnownDirs(fresh: true),
           );
     await _stateStore.save(state);
     return state;
@@ -439,15 +442,6 @@ class OtzariaManager {
     throw StateError(AppL10n.strings.appDomain.macCloseOtzariaBeforeInstall);
   }
 
-  /// לאן להתקין: התיקייה של התקנה קיימת — ובהיעדרה `null` בווינדוס, כלומר
-  /// "בלי `/DIR=`, שהמתקין יבחר".
-  ///
-  /// **למה לא ברירת מחדל משלנו:** [resolveDefaultInstallDir] נבנתה כדי
-  /// *לחזור* על ברירת המחדל של המתקין, והערך שבה (`{autopf}\Otzaria`) לא
-  /// תואם את ה-iss בפועל (`DefaultDirName=C:\אוצריא`). ניחוש שמתיישן הוא
-  /// גרוע מלא לנחש: המתקין יודע לאן הוא מתקין, והרג'יסטרי אומר לנו איפה
-  /// זה נגמר. ב-macOS אין מתקין שבוחר — ההתקנה היא העתקת bundle — ולכן שם
-  /// התיקייה נחוצה תמיד.
   Future<String?> _installDirFor(OtzariaInstallState? existing) async {
     if (existing != null) return existing.installDir;
     return _platform == OtzariaTargetPlatform.macos
@@ -563,8 +557,9 @@ class OtzariaManager {
   /// ההתקנה הראשונה שנמצאת ב-[_autoDetectDirs], או null. אינה נשמרת.
   Future<OtzariaInstallState?> _detectInKnownDirs({
     bool Function(OtzariaInstallState detected)? accept,
+    bool fresh = false,
   }) async {
-    for (final candidate in _autoDetectDirs) {
+    for (final candidate in await _autoDetectDirs(fresh: fresh)) {
       final detected = await detectExistingInstall(
         customDir: candidate.dir,
         isSharedDir: candidate.sharedDir,
