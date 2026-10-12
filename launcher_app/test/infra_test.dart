@@ -88,6 +88,22 @@ void main() {
       }
     });
 
+    test('שורות שנזרקו בעומס נספרות ונרשמות, לא נעלמות בשקט', () async {
+      final logger = await AppLogger.init(tmp.path);
+      await logger.flush();
+      for (var i = 0; i < 2000; i++) {
+        logger.info('עומס $i');
+      }
+      await logger.flush();
+
+      final content = logFile().readAsStringSync();
+      final kept = RegExp('עומס ').allMatches(content).length;
+      final notice =
+          RegExp(r'(\d+) log lines were dropped').firstMatch(content);
+      expect(notice, isNotNull);
+      expect(kept + int.parse(notice![1]!), 2000);
+    });
+
     test('maybeInstance הוא null לפני init ואינו זורק', () {
       expect(AppLogger.maybeInstance, isNull);
       expect(() => AppLogger.instance, throwsStateError);
