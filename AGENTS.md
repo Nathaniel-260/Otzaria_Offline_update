@@ -1534,8 +1534,8 @@ the user: a Hebrew category name leaves nothing latin, so it falls back to
 `CustomAppsController.fillMissingIcons` extracts the icon of the installed exe —
 or, on the online machine where the program is not installed, of the installer
 on the drive, which carries the same icon — for every app that has none. Four
-things hold it together: it runs on entering the screen, not at launch, because
-each attempt costs a PowerShell process; a failed attempt is remembered for the
+things hold it together: it runs on entering the screen, not at launch (GDI
+work in an isolate, `writeExeIconPng`); a failed attempt is remembered for the
 run (`_iconAttempts`), since an exe with no icon fails every time; it passes the
 existing screenshots back to `saveMedia`, which rewrites *all* media and would
 otherwise delete them; and `readOnly` stops it, because it writes to the drive.
@@ -1730,8 +1730,11 @@ exe into `mirror/launcher/`, copies it over the stub (two renames, rollback on f
   `AbsorbPointer`/`ExcludeFocus`, `downloadAll` refuses, queued dialogs wait and the
   auto-install skips, since `exit(0)` follows. "Restart as administrator" obeys the same
   guard: the offer is deferred during such a task (and re-offered when a download ends),
-  and `Elevation.restartElevated` waits for PowerShell's `Start-Process -Verb RunAs` and
-  quits only on exit code 0, so a declined UAC leaves the launcher running.
+  and `Elevation.restartElevated` waits for `ShellExecuteExW` "runas"
+  (`ElevatedProcess.start`, in an isolate) and quits only on success, so a
+  declined UAC leaves the launcher running. Dart FFI clobbers `GetLastError`
+  after a non-leaf call, so a decline is read from `hInstApp`
+  (`shellExecuteFailureCode`: access denied under runas = 1223).
 - **Closing the window during a long task asks first.** AppShell._confirmClose is
   `LauncherCrashSession.closeGuard`, consulted by `onWindowClose` and by the
   `AppLifecycleListener.onExitRequested` that macOS Cmd+Q / Dock > Quit reach

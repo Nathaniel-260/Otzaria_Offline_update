@@ -1,25 +1,21 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
-typedef ElevationQuery = Future<ProcessResult> Function();
+import 'package:ffi/ffi.dart';
+import 'package:win32/win32.dart';
+
+typedef ElevationQuery = Future<bool> Function();
 
 class ElevatedProcess {
   const ElevatedProcess._();
 
   static const elevationRequiredCode = 740;
 
-  static const cancelledCode = 1223;
+  static const cancelledCode = ERROR_CANCELLED;
 
   static const elevationQueryTimeout = Duration(seconds: 10);
-
-  static const elevationQueryArgs = [
-    '-NoProfile',
-    '-NonInteractive',
-    '-Command',
-    '([Security.Principal.WindowsPrincipal]'
-        '[Security.Principal.WindowsIdentity]::GetCurrent())'
-        '.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)',
-  ];
 
   static bool isElevationRequired(Object error) =>
       error is ProcessException && error.errorCode == elevationRequiredCode;
@@ -29,7 +25,7 @@ class ElevatedProcess {
 
   static Future<bool> isCurrentProcessElevated() {
     if (!Platform.isWindows) return Future.value(false);
-    return resolveElevated(_runElevationQuery);
+    return resolveElevated(() async => _tokenIsElevated());
   }
 
   static Future<bool> resolveElevated(
@@ -47,17 +43,12 @@ class ElevatedProcess {
     _pendingElevated = null;
   }
 
-  static bool parseElevatedResult(int exitCode, Object? stdout) =>
-      exitCode == 0 && '$stdout'.trim().toLowerCase() == 'true';
-
   static Future<bool> _queryElevated(
     ElevationQuery query,
     Duration timeout,
   ) async {
     try {
-      final result = await query().timeout(timeout);
-      return _currentElevated =
-          parseElevatedResult(result.exitCode, result.stdout);
+      return _currentElevated = await query().timeout(timeout);
     } on TimeoutException {
       return false;
     } catch (_) {
@@ -65,89 +56,38 @@ class ElevatedProcess {
     }
   }
 
-  static Future<ProcessResult> _runElevationQuery() async {
-    final process = await Process.start('powershell', elevationQueryArgs);
-    final stdout = process.stdout.transform(systemEncoding.decoder).join();
-    unawaited(process.stderr.drain<void>());
-    try {
-      final exitCode = await process.exitCode.timeout(elevationQueryTimeout);
-      return ProcessResult(process.pid, exitCode, await stdout, '');
-    } on TimeoutException {
-      process.kill();
-      rethrow;
-    }
-  }
-
+  /// Runs [executable] through `ShellExecuteExW` and waits for it. A failure
+  /// to start (UAC declined = [cancelledCode]) is reported as the exit code.
   static Future<ProcessResult> run(
     String executable,
     List<String> arguments, {
     bool elevate = true,
     bool rawLastArgument = false,
-  }) =>
-      Process.run(
-        'powershell',
-        powershellArgs(
+  }) {
+    final parameters =
+        buildCommandLine(arguments, rawLastArgument: rawLastArgument);
+    return Isolate.run(() => shellExecute(
           executable,
-          arguments,
-          elevate: elevate,
-          rawLastArgument: rawLastArgument,
-        ),
-      );
+          parameters,
+          verb: elevate ? 'runas' : null,
+          wait: true,
+        ));
+  }
 
+  /// Like [run], elevated, without waiting for the program to exit.
   static Future<ProcessResult> start(
     String executable,
     List<String> arguments, {
     String? workingDirectory,
-  }) =>
-      Process.run(
-        'powershell',
-        powershellArgs(
+  }) {
+    final parameters = buildCommandLine(arguments);
+    return Isolate.run(() => shellExecute(
           executable,
-          arguments,
+          parameters,
+          verb: 'runas',
           wait: false,
           workingDirectory: workingDirectory,
-        ),
-      );
-
-  static List<String> powershellArgs(
-    String executable,
-    List<String> arguments, {
-    bool wait = true,
-    bool elevate = true,
-    bool rawLastArgument = false,
-    String? workingDirectory,
-  }) {
-    final commandLine =
-        buildCommandLine(arguments, rawLastArgument: rawLastArgument);
-    final script = [
-      r"$ErrorActionPreference = 'Stop'",
-      'try {',
-      r'  $i = New-Object Diagnostics.ProcessStartInfo',
-      '  \$i.FileName = ${_psQuote(executable)}',
-      '  \$i.Arguments = ${_psQuote(commandLine)}',
-      if (workingDirectory != null)
-        '  \$i.WorkingDirectory = ${_psQuote(workingDirectory)}',
-      if (elevate) r"  $i.Verb = 'runas'",
-      r'  $i.UseShellExecute = $true',
-      r'  $p = [Diagnostics.Process]::Start($i)',
-      wait ? r'  $p.WaitForExit(); exit $p.ExitCode' : '  exit 0',
-      '} catch {',
-      r'  $e = $_.Exception',
-      r'  while ($e) {',
-      r'    if ($e -is [ComponentModel.Win32Exception]) { exit $e.NativeErrorCode }',
-      r'    $e = $e.InnerException',
-      '  }',
-      r'  [Console]::Error.WriteLine($_); exit 1',
-      '}',
-    ].join('\n');
-    return [
-      '-NoProfile',
-      '-NonInteractive',
-      '-WindowStyle',
-      'Hidden',
-      '-Command',
-      script,
-    ];
+        ));
   }
 
   static String buildCommandLine(
@@ -186,7 +126,99 @@ class ElevatedProcess {
       ..write('"');
     return out.toString();
   }
+}
 
-  static String _psQuote(String s) =>
-      "'${s.replaceAllMapped(RegExp("['\u2018-\u201B]"), (m) => m[0]! * 2)}'";
+const _seeMaskNoCloseProcess = 0x00000040;
+const _seeMaskNoAsync = 0x00000100;
+const _seeMaskFlagNoUi = 0x00000400;
+
+const _seErrAccessDenied = 5;
+
+/// Dart FFI clobbers `GetLastError` after a non-leaf call, so the cause comes
+/// from `hInstApp`; a declined UAC prompt is reported there as access denied.
+int shellExecuteFailureCode(int hInstApp, {String? verb}) {
+  if (verb == 'runas' && hInstApp == _seErrAccessDenied) {
+    return ElevatedProcess.cancelledCode;
+  }
+  return hInstApp > 0 && hInstApp <= 32 ? hInstApp : 1;
+}
+
+/// Blocks until the program exits when [wait] — call it inside an isolate.
+ProcessResult shellExecute(
+  String executable,
+  String parameters, {
+  String? verb,
+  required bool wait,
+  String? workingDirectory,
+}) {
+  final info = calloc<SHELLEXECUTEINFO>();
+  final file = executable.toNativeUtf16();
+  final params = parameters.toNativeUtf16();
+  final verbPtr = verb == null ? nullptr : verb.toNativeUtf16();
+  final dir =
+      workingDirectory == null ? nullptr : workingDirectory.toNativeUtf16();
+  final exitCode = calloc<Uint32>();
+  try {
+    info.ref
+      ..cbSize = sizeOf<SHELLEXECUTEINFO>()
+      ..fMask = _seeMaskNoCloseProcess | _seeMaskNoAsync | _seeMaskFlagNoUi
+      ..lpVerb = verbPtr
+      ..lpFile = file
+      ..lpParameters = params
+      ..lpDirectory = dir
+      ..nShow = SW_SHOWNORMAL;
+    if (ShellExecuteEx(info) == 0) {
+      final error = shellExecuteFailureCode(info.ref.hInstApp, verb: verb);
+      return ProcessResult(0, error, '', 'ShellExecuteEx failed: $error');
+    }
+    final process = info.ref.hProcess;
+    if (process == 0) return ProcessResult(0, 0, '', '');
+    try {
+      final pid = GetProcessId(process);
+      if (!wait) return ProcessResult(pid, 0, '', '');
+      WaitForSingleObject(process, INFINITE);
+      if (GetExitCodeProcess(process, exitCode) == 0) {
+        final error = GetLastError();
+        return ProcessResult(pid, error, '', 'GetExitCodeProcess: $error');
+      }
+      return ProcessResult(pid, exitCode.value, '', '');
+    } finally {
+      CloseHandle(process);
+    }
+  } finally {
+    free(info);
+    free(file);
+    free(params);
+    if (verbPtr != nullptr) free(verbPtr);
+    if (dir != nullptr) free(dir);
+    free(exitCode);
+  }
+}
+
+bool _tokenIsElevated() {
+  final token = calloc<IntPtr>();
+  final elevation = calloc<Uint32>();
+  final length = calloc<Uint32>();
+  try {
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, token) == 0) {
+      return false;
+    }
+    try {
+      return GetTokenInformation(
+                token.value,
+                TokenElevation,
+                elevation,
+                sizeOf<Uint32>(),
+                length,
+              ) !=
+              0 &&
+          elevation.value != 0;
+    } finally {
+      CloseHandle(token.value);
+    }
+  } finally {
+    free(token);
+    free(elevation);
+    free(length);
+  }
 }

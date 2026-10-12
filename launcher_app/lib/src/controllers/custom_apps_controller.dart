@@ -686,11 +686,11 @@ class CustomAppsController extends ChangeNotifier
         appDir: CustomAppStore(mirrorRootDir: _mirrorRootDir).dirFor(id),
       );
 
-  /// חילוץ האייקון מקובץ הרצה. תפר לבדיקות — האמיתי מריץ PowerShell.
+  /// חילוץ האייקון מקובץ הרצה. תפר לבדיקות.
   late final ExeIconExtraction _extractIcon;
 
-  /// המזהים שכבר ניסינו למלא להם אייקון בהרצה הזו. ניסיון עולה תהליך
-  /// PowerShell, ואין טעם לשלם עליו שוב על תוכנה שאין לה אייקון בקובץ.
+  /// המזהים שכבר ניסינו למלא להם אייקון בהרצה הזו — אין טעם לחזור על
+  /// ניסיון לתוכנה שאין לה אייקון בקובץ.
   final Set<String> _iconAttempts = {};
 
   bool _fillingIcons = false;

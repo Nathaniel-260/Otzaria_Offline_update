@@ -438,14 +438,6 @@ void main() {
       );
     });
 
-    test('בלי elevate — אין runas', () {
-      final script =
-          ElevatedProcess.powershellArgs(r'C:\a.exe', const [], elevate: false)
-              .last;
-      expect(script, isNot(contains('runas')));
-      expect(script, contains('UseShellExecute'));
-    });
-
     test('ציטוט כמו של Dart — רווחים, מרכאות ולוכסן בסוף', () {
       expect(ElevatedProcess.quoteWindowsArg('/S'), '/S');
       expect(ElevatedProcess.quoteWindowsArg(''), '""');
@@ -455,75 +447,54 @@ void main() {
       expect(ElevatedProcess.quoteWindowsArg('a"b'), r'"a\"b"');
     });
 
-    test('גרש בנתיב אינו שובר את פקודת PowerShell', () {
-      final script = ElevatedProcess.powershellArgs(
-        r"C:\O'Brien\setup.exe",
+    test('ShellExecuteEx על קובץ שאינו קיים מחזיר את קוד השגיאה, לא זורק',
+        () async {
+      final result = await ElevatedProcess.run(
+        r'C:\no\such\dir\setup.exe',
         const ['/S'],
-      ).last;
+        elevate: false,
+      );
+      expect(result.exitCode, 2);
+      expect('${result.stderr}', contains('ShellExecuteEx'));
+    }, testOn: 'windows');
 
-      expect(script, contains(r"$i.FileName = 'C:\O''Brien\setup.exe'"));
-      expect(script, contains(r"$i.Arguments = '/S'"));
-      expect(script, contains('WaitForExit'));
+    test('סירוב ל-UAC (access denied תחת runas) הוא ביטול, ובלי runas לא', () {
+      expect(shellExecuteFailureCode(5, verb: 'runas'),
+          ElevatedProcess.cancelledCode);
+      expect(shellExecuteFailureCode(5), 5);
+      expect(shellExecuteFailureCode(2, verb: 'runas'), 2);
+      expect(shellExecuteFailureCode(0, verb: 'runas'), 1);
     });
 
-    test('גרש טיפוגרפי בנתיב מוכפל כמו גרש רגיל', () {
-      final script = ElevatedProcess.powershellArgs(
-        'C:\\David\u2019s USB\\setup.exe',
-        const ['/D=C:\\A\u2018b\u201Ac\u201Bd'],
-        rawLastArgument: true,
-        workingDirectory: 'C:\\David\u2019s USB',
-      ).last;
-
-      expect(
-        script,
-        contains("\$i.FileName = 'C:\\David\u2019\u2019s USB\\setup.exe'"),
+    test('בלי runas התוכנה רצה, וקוד היציאה שלה חוזר', () async {
+      final result = await ElevatedProcess.run(
+        'cmd.exe',
+        const ['/c', 'exit 7'],
+        elevate: false,
       );
-      expect(
-        script,
-        contains(
-            "\$i.Arguments = '/D=C:\\A\u2018\u2018b\u201A\u201Ac\u201B\u201Bd'"),
-      );
-      expect(
-        script,
-        contains("\$i.WorkingDirectory = 'C:\\David\u2019\u2019s USB'"),
-      );
-    });
-
-    test('הפעלת תוכנה אינה ממתינה לסגירתה', () {
-      final script =
-          ElevatedProcess.powershellArgs(r'C:\a.exe', const [], wait: false)
-              .last;
-
-      expect(script, isNot(contains('WaitForExit')));
-    });
+      expect(result.exitCode, 7);
+    }, testOn: 'windows');
   });
 
   group('בדיקת הרשאות מנהל של התהליך', () {
     setUp(ElevatedProcess.resetElevatedCache);
     tearDown(ElevatedProcess.resetElevatedCache);
 
-    ProcessResult result(int exitCode, String stdout) =>
-        ProcessResult(0, exitCode, stdout, '');
-
-    test('פענוח הפלט וקוד היציאה', () {
-      expect(ElevatedProcess.parseElevatedResult(0, 'True\r\n'), isTrue);
-      expect(ElevatedProcess.parseElevatedResult(0, ' true '), isTrue);
-      expect(ElevatedProcess.parseElevatedResult(0, 'False\r\n'), isFalse);
-      expect(ElevatedProcess.parseElevatedResult(1, 'True'), isFalse);
-      expect(ElevatedProcess.parseElevatedResult(0, ''), isFalse);
-    });
+    test('שאילתת ה-token האמיתית עונה, בלי PowerShell', () async {
+      expect(await ElevatedProcess.isCurrentProcessElevated(), isA<bool>());
+    }, testOn: 'windows');
 
     test('התשובה נשמרת, והשאילתה רצה פעם אחת גם בקריאות מקבילות', () async {
       var calls = 0;
-      final gate = Completer<ProcessResult>();
-      Future<ProcessResult> query() {
+      final gate = Completer<bool>();
+      Future<bool> query() {
         calls++;
         return gate.future;
       }
 
       final first = ElevatedProcess.resolveElevated(query);
       final second = ElevatedProcess.resolveElevated(query);
-      gate.complete(result(0, 'True'));
+      gate.complete(true);
 
       expect(await first, isTrue);
       expect(await second, isTrue);
@@ -531,11 +502,11 @@ void main() {
       expect(calls, 1);
     });
 
-    test('קוד יציאה שאינו אפס נשמר כ-false', () async {
+    test('תשובה שלילית נשמרת כ-false', () async {
       var calls = 0;
-      Future<ProcessResult> query() async {
+      Future<bool> query() async {
         calls++;
-        return result(1, 'True');
+        return false;
       }
 
       expect(await ElevatedProcess.resolveElevated(query), isFalse);
@@ -545,9 +516,9 @@ void main() {
 
     test('חריגה בהרצה מחזירה false ונשמרת', () async {
       var calls = 0;
-      Future<ProcessResult> query() async {
+      Future<bool> query() async {
         calls++;
-        throw const ProcessException('powershell', [], 'not found', 2);
+        throw const OSError('token', 5);
       }
 
       expect(await ElevatedProcess.resolveElevated(query), isFalse);
@@ -555,13 +526,10 @@ void main() {
       expect(calls, 1);
     });
 
-    test('PowerShell תקוע — false אחרי ה-timeout, ולא נשמר', () async {
+    test('שאילתה תקועה — false אחרי ה-timeout, ולא נשמר', () async {
       var calls = 0;
-      final answers = [
-        Completer<ProcessResult>().future,
-        Future.value(result(0, 'True')),
-      ];
-      Future<ProcessResult> query() => answers[calls++];
+      final answers = [Completer<bool>().future, Future.value(true)];
+      Future<bool> query() => answers[calls++];
 
       expect(
         await ElevatedProcess.resolveElevated(
