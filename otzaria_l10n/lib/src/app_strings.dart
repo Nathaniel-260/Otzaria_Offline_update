@@ -1489,6 +1489,7 @@ abstract class PluginsDomainStrings {
   String syncScreenshotFailed(String name, String error);
   String syncPluginFileFailed(String name, String error);
   String get downloadedFileNotPlugin;
+  String get downloadedFileNotImage;
   String get downloadedFileHashMismatch;
   String get downloadedFileWrongBuild;
   String get siteClosedForShabbat;

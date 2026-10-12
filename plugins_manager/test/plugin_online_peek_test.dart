@@ -31,7 +31,7 @@ class _Site {
           );
         }
         return http.Response.bytes(
-          const [137, 80, 78, 71],
+          const [137, 80, 78, 71, 13, 10, 26, 10],
           200,
           headers: {'content-type': 'image/png'},
         );

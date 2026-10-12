@@ -11,6 +11,7 @@ import '../models/plugin_sync_progress.dart';
 import '../models/plugin_version_entry.dart';
 import '../models/store_plugin.dart';
 import 'download_pool.dart';
+import 'media_sniffer.dart';
 import 'plugin_build_check.dart';
 import 'plugin_manifest_reader.dart';
 import 'plugin_mirror_store.dart';
@@ -449,6 +450,7 @@ class PluginMirrorSync {
           plugin.remoteImageUrl,
           p.join(dir, 'image'),
           checkCancelled: () => _throwIfCancelled(cancelled),
+          rejection: _imageRejection,
         );
         result = result.copyWith(imagePath: store.relativePath(asset.path));
       } catch (e) {
@@ -484,6 +486,7 @@ class PluginMirrorSync {
                 shotUrls[i],
                 p.join(dir, 'screenshot-$i'),
                 checkCancelled: () => _throwIfCancelled(cancelled),
+                rejection: _imageRejection,
               );
               downloaded[i] = store.relativePath(asset.path);
             } catch (e) {
@@ -518,6 +521,11 @@ class PluginMirrorSync {
 
     return result;
   }
+
+  static Future<String?> _imageRejection(String path) async =>
+      await MediaSniffer.isImageFile(path)
+          ? null
+          : AppL10n.strings.pluginsDomain.downloadedFileNotImage;
 
   static bool _recentlyTargeted(PluginLocalFile file, DateTime now) {
     final targetedAt = file.targetedAt;

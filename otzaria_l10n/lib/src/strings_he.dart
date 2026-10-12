@@ -2555,6 +2555,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   @override
   String get downloadedFileNotPlugin => 'הקובץ שירד אינו קובץ תוסף תקין';
   @override
+  String get downloadedFileNotImage =>
+      'הקובץ שירד אינו תמונה (ייתכן שזה דף חסימה של סינון)';
+  @override
   String get downloadedFileHashMismatch =>
       'הקובץ שירד אינו תואם לחתימה שהאתר פרסם';
   @override

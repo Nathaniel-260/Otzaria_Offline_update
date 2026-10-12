@@ -2739,6 +2739,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   String get downloadedFileNotPlugin =>
       'the downloaded file is not a valid plugin';
   @override
+  String get downloadedFileNotImage =>
+      'the downloaded file is not an image (it may be a filter block page)';
+  @override
   String get downloadedFileHashMismatch =>
       'the downloaded file does not match the checksum the site published';
   @override
