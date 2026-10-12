@@ -1657,6 +1657,12 @@ class _SetupError extends SetupErrorStrings {
   @override
   String get runningFromTempTitle =>
       'Extract the file to a drive before running it';
+  @override
+  String get macVolumeAccessDenied =>
+      'macOS did not allow this program to access the removable drive. Open '
+      'System Settings → Privacy & Security → Files and Folders (or Full Disk '
+      'Access), allow Otzaria Updates to access "Removable Volumes", and open '
+      'the program again.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {

@@ -239,6 +239,18 @@ void main() {
     });
   });
 
+  test('macOS: EPERM על כונן נשלף מסביר איפה לאשר גישה (TCC)', () {
+    const eperm = FileSystemException('x', '/Volumes/USB', OSError('x', 1));
+    expect(
+      AppPaths.writeFailureMessage(eperm, isMacOS: true),
+      AppL10n.strings.setupError.macVolumeAccessDenied,
+    );
+    expect(
+      AppPaths.writeFailureMessage(eperm, isMacOS: false),
+      AppL10n.strings.setupError.cannotWriteToDataDir('x'),
+    );
+  });
+
   group('הפעלה מתוך zip או מתיקייה זמנית', () {
     const temp = [r'C:\Users\u\AppData\Local\Temp'];
 

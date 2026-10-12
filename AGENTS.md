@@ -1811,7 +1811,10 @@ administrator privileges` runs a *shell command* as root, not the app, behind a 
 indistinguishable from phishing). So `restartElevated` refuses there, `AppShell` never
 offers it, and `describe` appends `macHint` (pick a writable location, or grant Full
 Disk Access). Detection differs too: macOS returns `EPERM` (1) as well as `EACCES` (13)
-for a protected directory, while Windows counts only 5.
+for a protected directory, while Windows counts only 5. A removable volume the user never
+allowed (TCC) fails the data-folder probe with `EPERM`: `AppPaths.writeFailureMessage`
+says where to allow it, and `Info.plist` carries
+`NSRemovableVolumesUsageDescription` so macOS asks at all.
 
 **Nothing blocks the UI isolate at startup — on Windows it is the platform thread.**
 A synchronous native call there (`sqlite3` FFI, a registry write, `Process.run`)

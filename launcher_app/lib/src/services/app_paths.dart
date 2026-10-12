@@ -122,8 +122,7 @@ class AppPaths {
     throw AppPathsException(
       message: diskFull
           ? AppL10n.strings.setupError.driveFull
-          : AppL10n.strings.setupError.cannotWriteToDataDir(
-              failure.osError?.message ?? failure.message),
+          : writeFailureMessage(failure, isMacOS: macOS),
       attemptedDir: dataDir,
       kind: diskFull ? AppPathsFailure.driveFull : AppPathsFailure.cannotWrite,
     );
@@ -173,6 +172,19 @@ class AppPaths {
       free(buffer);
     }
     return dirs.toList();
+  }
+
+  /// On macOS a removable volume the user never allowed (TCC) fails with
+  /// EPERM; the OS text says nothing about where to allow it.
+  static String writeFailureMessage(
+    FileSystemException failure, {
+    required bool isMacOS,
+  }) {
+    final t = AppL10n.strings.setupError;
+    if (isMacOS && failure.osError?.errorCode == 1) {
+      return t.macVolumeAccessDenied;
+    }
+    return t.cannotWriteToDataDir(failure.osError?.message ?? failure.message);
   }
 
   static bool _isDiskFull(FileSystemException error) {

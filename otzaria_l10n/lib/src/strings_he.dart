@@ -1560,6 +1560,11 @@ class _SetupError extends SetupErrorStrings {
       'קבועה בדיסק) ולהפעיל אותו משם.';
   @override
   String get runningFromTempTitle => 'חלץ את הקובץ לכונן לפני ההפעלה';
+  @override
+  String get macVolumeAccessDenied =>
+      'macOS לא אישר לתוכנה גישה לכונן הנשלף. יש לפתוח את הגדרות המערכת ← '
+      'פרטיות ואבטחה ← קבצים ותיקיות (או גישה מלאה לדיסק), לאפשר לעדכוני '
+      'אוצריא גישה ל"כוננים נשלפים", ולפתוח את התוכנה מחדש.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {

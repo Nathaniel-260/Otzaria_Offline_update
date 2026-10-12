@@ -928,6 +928,9 @@ abstract class SetupErrorStrings {
   String get appTranslocatedTitle;
   String get runningFromTemp;
   String get runningFromTempTitle;
+
+  /// macOS (TCC) חסם גישה לכונן נשלף — EPERM, לא הרשאות קובץ.
+  String get macVolumeAccessDenied;
 }
 
 // ── כונן מוגן-כתיבה: מצב קריאה ────────────────────────────────────────────────
