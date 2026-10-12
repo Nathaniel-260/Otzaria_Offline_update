@@ -1120,6 +1120,12 @@ class _Plugins extends PluginsStrings {
       'עדכון זמין (מותקן $installedVersion)';
   @override
   String get installChipIncompatible => 'דורש אוצריא חדשה יותר';
+  @override
+  String get installChipDisabled => 'מותקן, מושבת באוצריא';
+  @override
+  String get installChipDisabledUpdate => 'עדכון זמין, מושבת באוצריא';
+  @override
+  String get installChipDevelopment => 'גרסת פיתוח מקומית';
 
   @override
   String get infoPanelTitle => 'מידע כללי';

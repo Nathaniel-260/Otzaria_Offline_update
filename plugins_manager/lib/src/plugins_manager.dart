@@ -11,6 +11,7 @@ import 'models/plugin_version_entry.dart';
 import 'models/plugins_online_status.dart';
 import 'models/store_app_release.dart';
 import 'models/store_plugin.dart';
+import 'services/installed_plugins_registry.dart';
 import 'services/installed_plugins_scanner.dart';
 import 'services/plugin_build_check.dart';
 import 'services/plugin_direct_installer.dart';
@@ -29,6 +30,8 @@ class PluginStoreView {
     required this.catalog,
     required this.installed,
     required this.pluginsDir,
+    this.disabled = const {},
+    this.development = const {},
   });
 
   final PluginCatalog catalog;
@@ -38,6 +41,9 @@ class PluginStoreView {
 
   /// שורש קובצי החנות במראה — הממשק מרכיב ממנו נתיבים מוחלטים לתמונות.
   final String pluginsDir;
+
+  final Set<String> disabled;
+  final Set<String> development;
 }
 
 /// נקודת הכניסה היחידה שמודול ה-UI אמור להשתמש בה לחנות התוספים.
@@ -106,19 +112,23 @@ class PluginsManager {
   /// זו הפעולה שרצה בפתיחת המסך.
   Future<PluginStoreView> load() async {
     final store = await _store();
+    final installed = await scanInstalled();
 
     return PluginStoreView(
       catalog: await store.load(),
-      installed: await scanInstalled(),
+      installed: installed.versions,
       pluginsDir: store.pluginsDir,
+      disabled: installed.disabled,
+      development: installed.development,
     );
   }
 
-  Future<Map<String, String>> scanInstalled() async => InstalledPluginsScanner(
+  Future<InstalledPluginsState> scanInstalled() async =>
+      InstalledPluginsScanner(
         customPluginsDir: await resolvePluginsDir?.call(),
         otzariaLaunchPath: await otzariaLaunchPath?.call(),
         locatePluginsDb: locatePluginsDb,
-      ).scan();
+      ).scanState();
 
   /// מסנכרן את הקטלוג והקבצים מהאתר אל המראה. דורש אינטרנט. מוריד **רק**
   /// את מה שחסר או השתנה — ראו [PluginSyncOutcome].

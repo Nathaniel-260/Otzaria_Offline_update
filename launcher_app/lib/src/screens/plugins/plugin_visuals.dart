@@ -105,10 +105,14 @@ class PluginInstallChip extends StatelessWidget {
     required this.status,
     this.installedVersion,
     this.compact = false,
+    this.disabled = false,
+    this.development = false,
   });
 
   final PluginInstallStatus status;
   final String? installedVersion;
+  final bool disabled;
+  final bool development;
 
   /// בלי הגרסה המותקנת בסוגריים. בכרטיס שברשת אין לשבב מקום להתארך —
   /// `StatusChip` אינו מקצר את עצמו והוא היה גולש מהכרטיס. הפירוט המלא
@@ -119,6 +123,22 @@ class PluginInstallChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.strings.plugins;
 
+    if (development && status == PluginInstallStatus.upToDate) {
+      return StatusChip(
+        kind: StatusKind.unknown,
+        label: t.installChipDevelopment,
+      );
+    }
+    if (disabled &&
+        (status == PluginInstallStatus.upToDate ||
+            status == PluginInstallStatus.updateAvailable)) {
+      return StatusChip(
+        kind: StatusKind.needsAction,
+        label: status == PluginInstallStatus.upToDate
+            ? t.installChipDisabled
+            : t.installChipDisabledUpdate,
+      );
+    }
     return switch (status) {
       PluginInstallStatus.upToDate => StatusChip(
           kind: StatusKind.ok,

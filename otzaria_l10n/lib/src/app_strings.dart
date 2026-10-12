@@ -691,6 +691,9 @@ abstract class PluginsStrings {
   /// היה נראה כתקלה. בכל שאר המצבים הבחירה שקופה — מוצג פשוט מספר הגרסה
   /// שתותקן.
   String get installChipIncompatible;
+  String get installChipDisabled;
+  String get installChipDisabledUpdate;
+  String get installChipDevelopment;
 
   String get infoPanelTitle;
   String get tagsPanelTitle;

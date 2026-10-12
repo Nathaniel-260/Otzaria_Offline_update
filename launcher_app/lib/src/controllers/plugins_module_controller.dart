@@ -127,6 +127,18 @@ class PluginsModuleController extends ChangeNotifier
   }
 
   Map<String, String> _installed = const {};
+
+  Set<String> get disabledInOtzaria => _disabled;
+  Set<String> get developmentInOtzaria => _development;
+  Set<String> _disabled = const {};
+  Set<String> _development = const {};
+
+  void _applyInstalledState(InstalledPluginsState state) {
+    _disabled = state.disabled;
+    _development = state.development;
+    installed = state.versions;
+  }
+
   DateTime? lastSync;
 
   /// שורש קובצי החנות במראה — ממנו נבנים נתיבי התמונות המוחלטים.
@@ -286,7 +298,13 @@ class PluginsModuleController extends ChangeNotifier
       categories = snapshot.catalog.categories;
       home = snapshot.catalog.home;
       lastSync = snapshot.catalog.lastSync;
-      installed = snapshot.installed;
+      _applyInstalledState(
+        InstalledPluginsState(
+          versions: snapshot.installed,
+          disabled: snapshot.disabled,
+          development: snapshot.development,
+        ),
+      );
       pluginsDir = snapshot.pluginsDir;
       storeApp = await _manager.loadStoreApp();
       await _loadStoreDestination();
@@ -316,13 +334,16 @@ class PluginsModuleController extends ChangeNotifier
     try {
       final scanned = await _manager.scanInstalled();
       final version = await installedAppVersion?.call();
-      if (!mapEquals(installed, scanned) || version != appVersion) {
+      if (!mapEquals(installed, scanned.versions) ||
+          !setEquals(_disabled, scanned.disabled) ||
+          !setEquals(_development, scanned.development) ||
+          version != appVersion) {
         appVersion = version;
-        installed = scanned;
+        _applyInstalledState(scanned);
         _invalidateDerived();
         notifyListeners();
       }
-      _settleInstallWatch(scanned);
+      _settleInstallWatch(scanned.versions);
     } catch (e, st) {
       AppLogger.instance.error('סריקת התוספים המותקנים נכשלה', e, st);
     }
@@ -610,8 +631,17 @@ class PluginsModuleController extends ChangeNotifier
 
   StorePlugin? byId(String id) => _pluginsById[id];
 
-  PluginInstallStatus statusOf(StorePlugin plugin) =>
-      plugin.statusAgainst(installed, appVersion: appVersion);
+  PluginInstallStatus statusOf(StorePlugin plugin) => plugin.statusAgainst(
+        installed,
+        appVersion: appVersion,
+        development: _development,
+      );
+
+  bool isDisabledInOtzaria(StorePlugin plugin) =>
+      _disabled.contains(plugin.manifestId);
+
+  bool isDevelopmentInOtzaria(StorePlugin plugin) =>
+      _development.contains(plugin.manifestId);
 
   /// הגרסה המותקנת של התוסף, או null אם אינו מותקן.
   String? installedVersionOf(StorePlugin plugin) =>

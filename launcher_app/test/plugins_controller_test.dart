@@ -719,6 +719,51 @@ void main() {
       expect(c.installed, {pluginId: '1.5.0'});
     });
 
+    test('תוסף מושבת ותוסף בפיתוח באוצריא מזוהים מהרישום', () async {
+      launchPath = exe;
+      final dbPath = p.join(
+        p.dirname(exe),
+        InstalledPluginsScanner.portableDataFolderName,
+        'databases',
+        pluginsRegistryFileName,
+      );
+      Directory(p.dirname(dbPath)).createSync(recursive: true);
+      sqlite3.open(dbPath)
+        ..execute(
+          'CREATE TABLE plugin_installation (plugin_id TEXT PRIMARY KEY, '
+          'version TEXT NOT NULL, enabled INTEGER NOT NULL, source_type TEXT)',
+        )
+        ..execute(
+          'INSERT INTO plugin_installation VALUES (?, ?, 0, ?), (?, ?, 1, ?)',
+          ['off', '1.0.0', 'packaged', 'dev', '0.1.0', 'development'],
+        )
+        ..close();
+      await saveCatalog(
+        PluginCatalog(
+          plugins: [
+            plugin('a', 'א', version: '2.0.0', manifestId: 'off'),
+            plugin('b', 'ב', version: '2.0.0', manifestId: 'dev'),
+          ],
+        ),
+      );
+      final c = PluginsModuleController(
+        mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        otzariaLaunchPath: () async => launchPath,
+        locatePluginsDb: PluginsModuleController.locateOtzariaPluginsDb,
+      );
+      addTearDown(c.dispose);
+
+      await c.load();
+      final off = c.byId('a')!;
+      final dev = c.byId('b')!;
+
+      expect(c.isDisabledInOtzaria(off), isTrue);
+      expect(c.statusOf(off), PluginInstallStatus.updateAvailable);
+      expect(c.isDevelopmentInOtzaria(dev), isTrue);
+      expect(c.statusOf(dev), PluginInstallStatus.upToDate);
+      expect(c.updatablePlugins.map((p) => p.id), ['a']);
+    });
+
     test('refreshInstalled סורק מחדש אחרי שנתיב ההתקנה התברר', () async {
       final c = portableController();
       await c.load();

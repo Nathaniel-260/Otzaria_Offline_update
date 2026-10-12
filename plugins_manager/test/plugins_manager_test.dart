@@ -146,7 +146,8 @@ void main() {
       final manager = portableManager(portableInstall());
       await store.save(PluginCatalog(plugins: [plugin()]));
 
-      expect(await manager.scanInstalled(), (await manager.load()).installed);
+      expect((await manager.scanInstalled()).versions,
+          (await manager.load()).installed);
     });
   });
 

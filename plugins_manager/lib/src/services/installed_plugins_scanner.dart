@@ -33,15 +33,17 @@ class InstalledPluginsScanner {
   static const String portableMarkerFileName = 'portable.marker';
   static const String portableDataFolderName = 'otzaria_data';
 
-  Future<Map<String, String>> scan() async {
+  Future<Map<String, String>> scan() async => (await scanState()).versions;
+
+  Future<InstalledPluginsState> scanState() async {
     final root = resolveInstalledDir();
-    if (root == null) return const {};
+    if (root == null) return InstalledPluginsState.empty;
 
     final registered = await _readRegistry(root);
     if (registered != null) return registered;
 
     final dir = Directory(root);
-    if (!await dir.exists()) return const {};
+    if (!await dir.exists()) return InstalledPluginsState.empty;
 
     final result = <String, String>{};
     try {
@@ -51,12 +53,12 @@ class InstalledPluginsScanner {
         if (version != null) result[p.basename(entry.path)] = version;
       }
     } on FileSystemException {
-      return result;
+      return InstalledPluginsState(versions: result);
     }
-    return result;
+    return InstalledPluginsState(versions: result);
   }
 
-  Future<Map<String, String>?> _readRegistry(String installedDir) async {
+  Future<InstalledPluginsState?> _readRegistry(String installedDir) async {
     final locate = locatePluginsDb;
     if (locate == null) return null;
     try {

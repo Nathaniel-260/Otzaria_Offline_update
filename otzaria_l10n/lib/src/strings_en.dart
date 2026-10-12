@@ -1180,6 +1180,13 @@ class _Plugins extends PluginsStrings {
       'Update available (you have $installedVersion)';
   @override
   String get installChipIncompatible => 'Needs a newer Otzaria';
+  @override
+  String get installChipDisabled => 'Installed, disabled in Otzaria';
+  @override
+  String get installChipDisabledUpdate =>
+      'Update available, disabled in Otzaria';
+  @override
+  String get installChipDevelopment => 'Local development copy';
 
   @override
   String get infoPanelTitle => 'General Information';

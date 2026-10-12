@@ -255,6 +255,7 @@ class StorePlugin extends Equatable {
   PluginInstallStatus statusAgainst(
     Map<String, String> installed, {
     String? appVersion,
+    Set<String> development = const {},
   }) {
     final target = installTarget(appVersion);
     if (target == null) return PluginInstallStatus.incompatible;
@@ -263,6 +264,7 @@ class StorePlugin extends Equatable {
     if (key == null || key.isEmpty) return PluginInstallStatus.unknown;
     final installedVersion = installed[key];
     if (installedVersion == null) return PluginInstallStatus.notInstalled;
+    if (development.contains(key)) return PluginInstallStatus.upToDate;
     return comparePluginVersions(target.version, installedVersion) > 0
         ? PluginInstallStatus.updateAvailable
         : PluginInstallStatus.upToDate;
