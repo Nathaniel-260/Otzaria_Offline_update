@@ -2688,6 +2688,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   String get localPluginFileMissing =>
       'The local plugin file is missing. Please sync again.';
   @override
+  String get localPluginFileCorrupt =>
+      'The plugin file on the drive is damaged or is not the selected version. Download the store again on the online computer.';
+  @override
   String get badPluginExtension =>
       'The plugin file does not have a valid otzplugin extension.';
   @override
@@ -2735,6 +2738,15 @@ class _PluginsDomain extends PluginsDomainStrings {
   @override
   String get downloadedFileNotPlugin =>
       'the downloaded file is not a valid plugin';
+  @override
+  String get downloadedFileHashMismatch =>
+      'the downloaded file does not match the checksum the site published';
+  @override
+  String get downloadedFileWrongBuild =>
+      'the downloaded file is not the selected version of the plugin';
+  @override
+  String get siteClosedForShabbat =>
+      'The Otzaria site is closed on Shabbat and Yom Tov. The store already on the drive keeps working; updates can be downloaded after Shabbat ends.';
 
   @override
   String get whatPluginList => 'the plugin list';

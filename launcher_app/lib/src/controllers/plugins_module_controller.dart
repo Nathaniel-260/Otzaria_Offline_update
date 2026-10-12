@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:plugins_manager/plugins_manager.dart';
@@ -46,10 +47,12 @@ class PluginsModuleController extends ChangeNotifier
     this.ensureAppVersionsKnown,
     this.installWatchInterval = const Duration(seconds: 1),
     this.installWatchTimeout = const Duration(minutes: 5),
+    http.Client? httpClient,
   })  : _manager = PluginsManager(
           resolveMirrorDir: () async => mirrorRootDir,
           otzariaLaunchPath: otzariaLaunchPath,
           locatePluginsDb: locatePluginsDb,
+          httpClient: httpClient,
         ),
         mirrorDirs = PluginsManager.mirrorDirsIn(mirrorRootDir),
         _known = stateDir == null ? null : KnownPluginsStore(stateDir),
@@ -246,8 +249,12 @@ class PluginsModuleController extends ChangeNotifier
   /// שרץ אחד בהרצה הזו.
   PluginSyncOutcome? lastSyncOutcome;
 
+  String? shabbatNotice;
+
   bool get lastSyncFailed =>
-      errorMessage != null || (lastSyncOutcome?.hasFailures ?? false);
+      errorMessage != null ||
+      shabbatNotice != null ||
+      (lastSyncOutcome?.hasFailures ?? false);
 
   String? syncMessage;
   double? syncProgress;
@@ -457,6 +464,7 @@ class PluginsModuleController extends ChangeNotifier
   Future<void> _sync({bool Function()? isCancelled}) async {
     status = PluginsModuleStatus.syncing;
     errorMessage = null;
+    shabbatNotice = null;
     lastSyncOutcome = null;
     syncMessage = AppL10n.strings.plugins.syncingOverlayStarting;
     syncProgress = null;
@@ -503,6 +511,10 @@ class PluginsModuleController extends ChangeNotifier
         onlineCheckedAt = DateTime.now();
         onlineCheckError = null;
       }
+      await load();
+    } on PluginStoreShabbatException catch (e) {
+      shabbatNotice = e.message;
+      AppLogger.instance.info('סנכרון חנות התוספים נדחה: האתר סגור בשבת');
       await load();
     } catch (e, st) {
       status = PluginsModuleStatus.error;

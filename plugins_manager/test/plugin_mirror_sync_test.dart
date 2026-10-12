@@ -135,6 +135,18 @@ class _Site {
   List<String> requestsMatching(String suffix) =>
       requests.where((r) => r.endsWith(suffix)).toList();
 
+  ({String id, String version}) buildOf(String path, String? pinned) {
+    final ref = path.split('/')[3];
+    final at = ref.indexOf('@');
+    final id = at < 0 ? ref : ref.substring(0, at);
+    final live = plugins.where((plugin) => plugin['id'] == id).firstOrNull;
+    return (
+      id: id,
+      version: pinned ??
+          (at < 0 ? '${live?['version'] ?? ''}' : ref.substring(at + 1)),
+    );
+  }
+
   http.Client build() => MockClient((request) async {
         final path = request.url.path;
         requests.add(path);
@@ -155,8 +167,11 @@ class _Site {
           return jsonResponse(category);
         }
         if (path.endsWith('/download')) {
+          final build = buildOf(path, request.url.queryParameters['version']);
           return http.Response.bytes(
-            pluginBytes('{"id":"manifest-${path.split('/')[3]}"}'),
+            pluginBytes(
+              '{"id":"manifest-${build.id}","version":"${build.version}"}',
+            ),
             200,
             headers: {
               'content-disposition':
@@ -1520,7 +1535,7 @@ void main() {
         baseUrl: 'https://otzaria.test',
         httpClient: MockClient(
           (_) async => http.Response.bytes(
-            pluginBytes('{"id":"manifest-a"}'),
+            pluginBytes('{"id":"manifest-a","version":"1.5.0"}'),
             200,
             headers: {
               'content-disposition': 'attachment; filename="plugin.zip"',

@@ -2508,6 +2508,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   String get localPluginFileMissing =>
       'קובץ התוסף המקומי חסר. יש לבצע סנכרון מחדש.';
   @override
+  String get localPluginFileCorrupt =>
+      'קובץ התוסף שבכונן פגום או אינו הגרסה שנבחרה. יש להוריד את החנות מחדש במחשב המחובר לרשת.';
+  @override
   String get badPluginExtension => 'קובץ התוסף אינו בסיומת otzplugin תקינה.';
   @override
   String get otzariaOpenFailedHint =>
@@ -2551,6 +2554,15 @@ class _PluginsDomain extends PluginsDomainStrings {
       'לא ניתן להוריד את קובץ התוסף $name: $error';
   @override
   String get downloadedFileNotPlugin => 'הקובץ שירד אינו קובץ תוסף תקין';
+  @override
+  String get downloadedFileHashMismatch =>
+      'הקובץ שירד אינו תואם לחתימה שהאתר פרסם';
+  @override
+  String get downloadedFileWrongBuild =>
+      'הקובץ שירד אינו הגרסה שנבחרה של התוסף';
+  @override
+  String get siteClosedForShabbat =>
+      'אתר אוצריא סגור בשבת ובימים טובים. החנות שכבר בכונן ממשיכה לעבוד, ואפשר להוריד עדכונים אחרי צאת השבת.';
 
   @override
   String get whatPluginList => 'רשימת התוספים';

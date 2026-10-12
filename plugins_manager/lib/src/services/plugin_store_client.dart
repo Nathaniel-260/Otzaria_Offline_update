@@ -90,6 +90,9 @@ class PluginStoreClient {
     } catch (e) {
       throw PluginStoreException(strings.siteUnreachable(describeError(e)));
     }
+    if (isShabbatResponse(response.statusCode, response.bodyBytes)) {
+      throw PluginStoreShabbatException(strings.siteClosedForShabbat);
+    }
     if (response.statusCode != 200) {
       throw PluginStoreException(strings.loadFailed(what, response.statusCode));
     }
@@ -97,6 +100,16 @@ class PluginStoreClient {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } catch (_) {
       throw PluginStoreException(strings.responseNotJson(what));
+    }
+  }
+
+  static bool isShabbatResponse(int status, List<int> body) {
+    if (status != 503) return false;
+    try {
+      final decoded = jsonDecode(utf8.decode(body));
+      return decoded is Map && decoded['error'] == 'shabbat';
+    } on FormatException {
+      return false;
     }
   }
 
@@ -112,8 +125,9 @@ class PluginStoreClient {
     String? preferredExt,
     String? requiredExt,
     int? expectedSize,
+    String? expectedSha256,
     void Function()? checkCancelled,
-    bool Function(String path)? isValid,
+    FutureOr<String?> Function(String path)? rejection,
   }) async {
     final target = absolute(url);
     final targetUri = Uri.tryParse(target);
@@ -142,12 +156,18 @@ class PluginStoreClient {
       sizeError: (actual, expected) => PluginStoreException(
         AppL10n.strings.appDomain.installerSizeMismatch(actual, expected),
       ),
+      calculateSha256: expectedSha256 != null,
     );
-    if (isValid != null && !isValid(stagingPath)) {
+    if (expectedSha256 != null && response.sha256 != expectedSha256) {
       await File(stagingPath).delete();
       throw PluginStoreException(
-        AppL10n.strings.pluginsDomain.downloadedFileNotPlugin,
+        AppL10n.strings.pluginsDomain.downloadedFileHashMismatch,
       );
+    }
+    final rejected = await rejection?.call(stagingPath);
+    if (rejected != null) {
+      await File(stagingPath).delete();
+      throw PluginStoreException(rejected);
     }
 
     final fromDisposition = parseContentDisposition(
@@ -261,4 +281,8 @@ class PluginStoreException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class PluginStoreShabbatException extends PluginStoreException {
+  const PluginStoreShabbatException(super.message);
 }

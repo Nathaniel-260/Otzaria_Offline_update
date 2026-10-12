@@ -1260,11 +1260,17 @@ platform references.
 
 **Install-state matching uses `manifestId`, not the catalog `id`.** The `id` from
 `/api/plugins` is the website's database id; Otzaria installs under
-`plugins/installed/<manifest.id>/`. `manifestId` comes from the `manifest.json` inside
-the downloaded `.otzplugin` (`PluginManifestReader`, BOM-stripped like
-`LogicalContentHasher`). Compare by catalog id and *nothing* is ever detected as
-installed. A plugin whose file is not downloaded yet correctly reports
+`plugins/installed/<manifest.id>/`. `manifestId` is the site's `pluginUid`, or — on a
+site without it — the `manifest.json` inside the downloaded `.otzplugin`
+(`PluginManifestReader`, BOM-stripped like `LogicalContentHasher`). Compare by catalog
+id and *nothing* is ever detected as installed. A plugin with neither correctly reports
 `PluginInstallStatus.unknown` — not an error.
+
+**Every downloaded build is checked against the build it was fetched for**
+(`PluginBuildCheck`): manifest id and version, plus `sha256` when the site publishes it.
+The live `/download` URL serves whatever is live *now*, so a plugin updated mid-sync was
+saved as `plugin-<old version>.otzplugin`. A site that publishes `sha256` also gets
+version-pinned URLs (`?version=`); the same check runs again from the drive at install.
 
 **Otzaria has two on-disk layouts, and `InstalledPluginsScanner` must read both.**
 Older installs use `installed/<manifest.id>/current/`; newer ones
@@ -1285,9 +1291,9 @@ as `0.9.97.2+800` is not above a `maxAppVersion` of `0.9.97`.
 **The mirror carries the plugin build that will *run*, not the newest one published.**
 Every build declares `compatibleWith` (minimum Otzaria version) and `maxAppVersion`,
 and `/api/plugins` returns the whole `versions[]` history.
-`plugins_manager/lib/src/services/plugin_compatibility.dart` is a 1:1 port of the
-site's `src/lib/pluginCompatibility.js`: pick the **highest build whose range contains
-the app version**. Before this the sync always fetched the live build, so an offline
+`plugins_manager/lib/src/services/plugin_compatibility.dart` follows the site's
+`src/lib/pluginCompatibility.js` rule — pick the **highest build whose range contains
+the app version** — but compares app versions like Otzaria (core only, see above). Before this the sync always fetched the live build, so an offline
 machine got plugins that would not load — 8 of the 37 plugins on the site required a
 newer Otzaria than the latest stable when this was written.
 

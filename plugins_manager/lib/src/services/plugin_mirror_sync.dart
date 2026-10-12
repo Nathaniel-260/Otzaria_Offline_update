@@ -11,6 +11,7 @@ import '../models/plugin_sync_progress.dart';
 import '../models/plugin_version_entry.dart';
 import '../models/store_plugin.dart';
 import 'download_pool.dart';
+import 'plugin_build_check.dart';
 import 'plugin_manifest_reader.dart';
 import 'plugin_mirror_store.dart';
 import 'plugin_store_client.dart';
@@ -270,7 +271,7 @@ class PluginMirrorSync {
           ? const []
           : previous?.screenshotPaths ?? const [],
       localFiles: previous?.localFiles,
-      manifestId: previous?.manifestId,
+      manifestId: remote.manifestId ?? previous?.manifestId,
     );
 
     final keep = <String, PluginLocalFile>{};
@@ -596,30 +597,63 @@ class PluginMirrorSync {
       target,
       local!.sourceUrl ?? known?.downloadUrl ?? '',
       local.size,
+      recordedSha256: local.sha256,
     );
   }
 
   static bool buildMatches(
     PluginVersionEntry target,
     String recordedSource,
-    int recordedSize,
-  ) =>
-      (target.fileSize <= 0 ||
-          recordedSize <= 0 ||
-          recordedSize == target.fileSize) &&
-      _sameBuildSource(recordedSource, target.downloadUrl, target.version);
+    int recordedSize, {
+    String? recordedSha256,
+  }) {
+    final expected = target.sha256;
+    if (expected != null && recordedSha256 != null) {
+      return expected == recordedSha256;
+    }
+    return (target.fileSize <= 0 ||
+            recordedSize <= 0 ||
+            recordedSize == target.fileSize) &&
+        _sameBuildSource(recordedSource, target.downloadUrl, target.version);
+  }
 
   static bool _sameBuildSource(
     String recorded,
     String current,
     String version,
-  ) {
-    if (_sameSource(recorded, current)) return true;
+  ) =>
+      _sameSource(recorded, current) ||
+      _canonicalBuildSource(recorded, version) ==
+          _canonicalBuildSource(current, version);
+
+  static String _canonicalBuildSource(String url, String version) {
+    var path = url;
+    final queryStart = url.indexOf('?');
+    if (queryStart >= 0) {
+      final query = Uri.splitQueryString(url.substring(queryStart + 1));
+      if (query.length != 1 || query['version'] != version) return url;
+      path = url.substring(0, queryStart);
+    }
     const suffix = '/download';
-    if (!recorded.endsWith(suffix) || !current.endsWith(suffix)) return false;
-    final before = recorded.substring(0, recorded.length - suffix.length);
-    final after = current.substring(0, current.length - suffix.length);
-    return after == '$before@$version' || before == '$after@$version';
+    if (!path.endsWith(suffix)) return url;
+    final base = path.substring(0, path.length - suffix.length);
+    return base.endsWith('@$version') ? path : '$base@$version$suffix';
+  }
+
+  static String? buildRejection(
+    Map<String, dynamic>? manifest,
+    PluginVersionEntry target,
+    String? expectedId,
+  ) {
+    final strings = AppL10n.strings.pluginsDomain;
+    if (manifest == null) return strings.downloadedFileNotPlugin;
+    return PluginBuildCheck.manifestMatches(
+      manifest,
+      version: target.version,
+      expectedId: expectedId,
+    )
+        ? null
+        : strings.downloadedFileWrongBuild;
   }
 
   static void _throwIfCancelled(bool Function() cancelled) {
@@ -662,10 +696,11 @@ class PluginMirrorSync {
           preferredExt: PluginMirrorStore.pluginFileExt,
           requiredExt: PluginMirrorStore.pluginFileExt,
           expectedSize: target.fileSize,
+          expectedSha256: target.sha256,
           checkCancelled: () => _throwIfCancelled(cancelled),
-          isValid: (path) {
+          rejection: (path) {
             manifest = PluginManifestReader.read(path);
-            return manifest != null;
+            return buildRejection(manifest, target, manifestId);
           },
         );
         files[target.version] = PluginLocalFile(
@@ -675,6 +710,7 @@ class PluginMirrorSync {
           size: asset.size,
           sourceUrl: target.downloadUrl,
           targetedAt: now,
+          sha256: target.sha256,
         );
         manifestId ??= PluginManifestReader.idOf(manifest);
       } catch (e) {

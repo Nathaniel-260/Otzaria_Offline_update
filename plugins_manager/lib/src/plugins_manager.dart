@@ -12,6 +12,7 @@ import 'models/plugins_online_status.dart';
 import 'models/store_app_release.dart';
 import 'models/store_plugin.dart';
 import 'services/installed_plugins_scanner.dart';
+import 'services/plugin_build_check.dart';
 import 'services/plugin_direct_installer.dart';
 import 'services/plugin_manifest_reader.dart';
 import 'services/plugin_mirror_store.dart';
@@ -294,8 +295,18 @@ class PluginsManager {
       }
     }
 
+    final path = store.absolutePath(local.relativePath);
+    if (!await PluginBuildCheck.verifyLocal(
+      path,
+      local: local,
+      target: target,
+      expectedId: plugin.manifestId,
+    )) {
+      return PluginInstallResult.failure(strings.localPluginFileCorrupt);
+    }
+
     return PluginDirectInstaller.install(
-      store.absolutePath(local.relativePath),
+      path,
       otzariaLaunchPath: await otzariaLaunchPath?.call(),
     );
   }
@@ -328,9 +339,14 @@ class PluginsManager {
         preferredExt: PluginMirrorStore.pluginFileExt,
         requiredExt: PluginMirrorStore.pluginFileExt,
         expectedSize: target.fileSize,
-        isValid: (path) {
+        expectedSha256: target.sha256,
+        rejection: (path) {
           manifest = PluginManifestReader.read(path);
-          return manifest != null;
+          return PluginMirrorSync.buildRejection(
+            manifest,
+            target,
+            plugin.manifestId,
+          );
         },
       );
 
@@ -341,6 +357,7 @@ class PluginsManager {
         size: asset.size,
         sourceUrl: target.downloadUrl,
         targetedAt: DateTime.now(),
+        sha256: target.sha256,
       );
       final updated = await _withCatalogLock<StorePlugin?>(() async {
         final catalog = await store.load();

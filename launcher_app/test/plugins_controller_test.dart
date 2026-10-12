@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -1067,6 +1069,34 @@ void main() {
       expect(identical(first, second), isTrue);
       await first;
       expect(controller.isSyncing, isFalse);
+    });
+
+    test('שבת: המראה הקיימת נשארת מוכנה, עם הודעה ייעודית ובלי שגיאה',
+        () async {
+      await saveCatalog(PluginCatalog(plugins: [plugin('a', 'א')]));
+      final closed = PluginsModuleController(
+        mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({'error': 'shabbat', 'message': 'x'}),
+            503,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+      addTearDown(closed.dispose);
+      await closed.load();
+
+      await closed.sync();
+
+      expect(closed.status, PluginsModuleStatus.ready);
+      expect(closed.errorMessage, isNull);
+      expect(
+        closed.shabbatNotice,
+        AppL10n.strings.pluginsDomain.siteClosedForShabbat,
+      );
+      expect(closed.plugins.map((plugin) => plugin.id), ['a']);
+      expect(closed.lastSyncFailed, isTrue);
     });
 
     test('a new sync drops the previous outcome', () async {

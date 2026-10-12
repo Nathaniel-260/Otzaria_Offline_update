@@ -224,6 +224,7 @@ class StoreAppExporter {
           ext: entry.value.ext,
           size: entry.value.size,
           sourceUrl: entry.value.sourceUrl,
+          sha256: entry.value.sha256,
         );
       }
 

@@ -55,7 +55,8 @@ void main() {
   StorePlugin withLocalFile({String id = 'a'}) {
     final file = File(p.join(store.pluginDir(id), 'plugin.otzplugin'));
     file.parent.createSync(recursive: true);
-    file.writeAsBytesSync(pluginBytes('{"id":"manifest-$id"}'));
+    file.writeAsBytesSync(
+        pluginBytes('{"id":"manifest-$id","version":"1.0.0"}'));
 
     return plugin(id: id).copyWith(
       localFiles: {
@@ -285,7 +286,7 @@ void main() {
           baseUrl: 'https://otzaria.test',
           httpClient: MockClient(
             (_) async => http.Response.bytes(
-              pluginBytes('{"id":"manifest-a"}'),
+              pluginBytes('{"id":"manifest-a","version":"1.0.0"}'),
               200,
               headers: {
                 'content-disposition': 'attachment; filename="plugin.zip"',
@@ -334,7 +335,7 @@ void main() {
           baseUrl: 'https://otzaria.test',
           httpClient: MockClient(
             (_) async => http.Response.bytes(
-              pluginBytes('{"id":"manifest-a"}'),
+              pluginBytes('{"id":"manifest-a","version":"1.0.0"}'),
               200,
               headers: {
                 'content-disposition': 'attachment; filename="plugin.zip"',
@@ -432,7 +433,7 @@ void main() {
         if (path.endsWith('/download')) {
           downloads.add(path);
           return http.Response.bytes(
-            pluginBytes('{"id":"manifest-a"}'),
+            pluginBytes('{"id":"manifest-a","version":"1.0.0"}'),
             200,
             headers: {
               'content-disposition': 'attachment; filename="p.otzplugin"'

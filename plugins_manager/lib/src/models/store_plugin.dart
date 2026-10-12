@@ -14,6 +14,7 @@ class PluginLocalFile extends Equatable {
     required this.size,
     this.sourceUrl,
     this.targetedAt,
+    this.sha256,
   });
 
   /// יחסי לשורש תיקיית התוספים במראה — כך שהעתקת התיקייה לכונן אחר
@@ -26,6 +27,8 @@ class PluginLocalFile extends Equatable {
 
   final DateTime? targetedAt;
 
+  final String? sha256;
+
   PluginLocalFile copyWith({String? sourceUrl, DateTime? targetedAt}) =>
       PluginLocalFile(
         relativePath: relativePath,
@@ -34,6 +37,7 @@ class PluginLocalFile extends Equatable {
         size: size,
         sourceUrl: sourceUrl ?? this.sourceUrl,
         targetedAt: targetedAt ?? this.targetedAt,
+        sha256: sha256,
       );
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +48,7 @@ class PluginLocalFile extends Equatable {
         if (sourceUrl != null) 'sourceUrl': sourceUrl,
         if (targetedAt != null)
           'targetedAt': targetedAt!.toUtc().toIso8601String(),
+        if (sha256 != null) 'sha256': sha256,
       };
 
   static PluginLocalFile? fromJson(Object? json) {
@@ -60,6 +65,7 @@ class PluginLocalFile extends Equatable {
       targetedAt: json['targetedAt'] is String
           ? DateTime.tryParse(json['targetedAt'] as String)
           : null,
+      sha256: PluginVersionEntry.normalizeSha256(json['sha256']),
     );
   }
 
@@ -71,6 +77,7 @@ class PluginLocalFile extends Equatable {
         size,
         sourceUrl,
         targetedAt,
+        sha256,
       ];
 }
 
@@ -360,7 +367,12 @@ class StorePlugin extends Equatable {
       ratingVerifiedCount: _int(json['ratingVerifiedCount']),
       ratingBreakdown: _breakdown(json['ratingBreakdown']),
       remoteDownloadUrl: _absolute(_string(json['downloadUrl']), baseUrl),
-      versions: _sortedDescending(_versions(json['versions'], baseUrl)),
+      versions: _sortedDescending(_pinned(
+        _versions(json['versions'], baseUrl),
+        json,
+        baseUrl,
+      )),
+      manifestId: _nonEmpty(json['pluginUid']),
       // כמו שהאתר שלח, בלי להפוך למוחלט: הן נשמרות כדי להשוות מול התשובה
       // הבאה, וההורדה עצמה כבר יודעת להשלים כתובת יחסית.
       remoteImageUrl: _string(json['image']),
@@ -451,14 +463,38 @@ class StorePlugin extends Equatable {
       categorySlugs: _stringList(json['categories']),
       versions: _sortedDescending(_versions(json['versions'], '')),
       localFiles: _localFiles(json, version),
-      manifestId: json['manifestId'] is String &&
-              (json['manifestId'] as String).isNotEmpty
-          ? json['manifestId'] as String
-          : null,
+      manifestId: _nonEmpty(json['manifestId']),
     );
   }
 
   static String _string(Object? value) => value is String ? value : '';
+
+  static String? _nonEmpty(Object? value) =>
+      value is String && value.trim().isNotEmpty ? value.trim() : null;
+
+  static bool _advertisesPinnedDownloads(Map<String, dynamic> json) {
+    if (json.containsKey('sha256')) return true;
+    final versions = json['versions'];
+    return versions is List &&
+        versions.any((entry) => entry is Map && entry.containsKey('sha256'));
+  }
+
+  static List<PluginVersionEntry> _pinned(
+    List<PluginVersionEntry> entries,
+    Map<String, dynamic> json,
+    String baseUrl,
+  ) {
+    final id = _string(json['id']);
+    if (!_advertisesPinnedDownloads(json) || !isValidId(id)) return entries;
+    return [
+      for (final entry in entries)
+        entry.withDownloadUrl(pinnedDownloadUrl(baseUrl, id, entry.version)),
+    ];
+  }
+
+  static String pinnedDownloadUrl(String baseUrl, String id, String version) =>
+      '$baseUrl/api/plugins/$id/download'
+      '?version=${Uri.encodeQueryComponent(version)}';
 
   /// `ratingAvg` חוזר מהאתר כשלם כשאין לו שבר (`5` ולא `5.0`).
   static double _double(Object? value) => value is num ? value.toDouble() : 0;

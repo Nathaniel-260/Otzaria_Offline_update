@@ -1461,6 +1461,7 @@ abstract class PluginsDomainStrings {
   /// אין לתוסף אף בילד שירוץ על גרסת אוצריא שבמחשב הזה.
   String get noCompatibleBuild;
   String get localPluginFileMissing;
+  String get localPluginFileCorrupt;
   String get badPluginExtension;
   String get otzariaOpenFailedHint;
   String otzariaOpenFailed(String error);
@@ -1488,6 +1489,9 @@ abstract class PluginsDomainStrings {
   String syncScreenshotFailed(String name, String error);
   String syncPluginFileFailed(String name, String error);
   String get downloadedFileNotPlugin;
+  String get downloadedFileHashMismatch;
+  String get downloadedFileWrongBuild;
+  String get siteClosedForShabbat;
 
   String get whatPluginList;
   String get whatStoreStructure;
