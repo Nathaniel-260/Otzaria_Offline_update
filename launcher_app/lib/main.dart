@@ -119,7 +119,10 @@ void main() {
         return;
       }
       final instanceLock = await InstanceLock.acquire(paths.stateFilesDir);
-      if (instanceLock == InstanceLockResult.heldElsewhere) {
+      final machineLock = instanceLock == InstanceLockResult.heldElsewhere
+          ? instanceLock
+          : await InstanceLock.acquireMachineWide();
+      if (machineLock == InstanceLockResult.heldElsewhere) {
         debugPrint(
             '${InstanceLock.fileName} held by another launcher, exiting');
         InstanceLock.focusOtherInstance();

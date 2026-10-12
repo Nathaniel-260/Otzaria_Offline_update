@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/services/instance_lock.dart';
@@ -44,6 +45,41 @@ void main() {
         isFalse,
       );
     });
+  });
+
+  group('InstanceLock machine-wide mutex', () {
+    String uniqueName() =>
+        'Local\\OtzariaOfflineUpdateTest-$pid-${DateTime.now().microsecondsSinceEpoch}';
+
+    test('a free name is owned, and owning it again on this thread is fine',
+        () {
+      final name = uniqueName();
+      final first = InstanceLock.tryOwnMutex(name);
+      expect(first.result, InstanceLockResult.acquired);
+      final again = InstanceLock.tryOwnMutex(name);
+      expect(again.result, InstanceLockResult.acquired);
+    }, skip: !Platform.isWindows);
+
+    test('a name owned by another thread is held elsewhere', () async {
+      final name = uniqueName();
+      final release = ReceivePort();
+      final owned = ReceivePort();
+      final holder = await Isolate.spawn((List<Object> args) async {
+        final result = InstanceLock.tryOwnMutex(args[0] as String);
+        final stop = ReceivePort();
+        (args[1] as SendPort).send([result.result.name, stop.sendPort]);
+        await stop.first;
+      }, [name, owned.sendPort]);
+      addTearDown(() {
+        holder.kill();
+        release.close();
+      });
+      final reply = await owned.first as List;
+      expect(reply[0], InstanceLockResult.acquired.name);
+
+      expect(InstanceLock.tryOwnMutex(name).result,
+          InstanceLockResult.heldElsewhere);
+    }, skip: !Platform.isWindows);
   });
 
   group('InstanceLock.acquire', () {

@@ -1902,6 +1902,11 @@ never blocks the next run; the attempt retries for ~2s so a self-relaunch
 (`isContention`) counts as "already running": a drive whose filesystem cannot
 lock runs unguarded rather than refusing to start. The write probe in
 `AppPaths` is per-process (`.write-test-<pid>`) for the same reason.
+**One launcher per PC session too: `Local\OtzariaOfflineUpdate`.** The file
+lock is per drive, so two drives could apply to one `seforim.db` at once.
+`InstanceLock.acquireMachineWide` owns a named mutex (`CreateMutexW` +
+`WaitForSingleObject(0)`, no `GetLastError`, which Dart FFI clobbers); a
+mutex that cannot be opened runs unguarded, like the file lock.
 
 **The background flush must never fail loudly.** A disk error goes to the
 injected `log`, never an uncaught error — that line is itself crash

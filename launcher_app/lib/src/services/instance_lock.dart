@@ -79,6 +79,64 @@ abstract final class InstanceLock {
     return errorCode == 11 || errorCode == 13;
   }
 
+  /// One launcher per PC session, whatever drive it runs from: two drives
+  /// applying to the same `seforim.db` at once is what the file lock, being
+  /// per drive, cannot see.
+  static const String machineMutexName = r'Local\OtzariaOfflineUpdate';
+
+  static int _machineMutex = 0;
+
+  /// [InstanceLockResult.unavailable] when the mutex cannot be opened at all
+  /// (another account's elevated launcher): the drive lock still applies.
+  static Future<InstanceLockResult> acquireMachineWide({
+    Duration wait = const Duration(seconds: 2),
+    Duration retryInterval = const Duration(milliseconds: 250),
+    String name = machineMutexName,
+  }) async {
+    if (!Platform.isWindows) return InstanceLockResult.acquired;
+    if (_machineMutex != 0) return InstanceLockResult.acquired;
+    final deadline = DateTime.now().add(wait);
+    while (true) {
+      final result = tryOwnMutex(name);
+      if (result.handle != 0) _machineMutex = result.handle;
+      if (result.result != InstanceLockResult.heldElsewhere ||
+          !DateTime.now().isBefore(deadline)) {
+        return result.result;
+      }
+      await Future<void>.delayed(retryInterval);
+    }
+  }
+
+  /// Ownership is per thread; the Windows UI isolate stays on the platform
+  /// thread, and the OS releases an abandoned mutex when the process dies.
+  static ({InstanceLockResult result, int handle}) tryOwnMutex(String name) {
+    final native = name.toNativeUtf16();
+    try {
+      final handle = _createMutex(nullptr, 0, native);
+      if (handle == 0) {
+        return (result: InstanceLockResult.unavailable, handle: 0);
+      }
+      final waited = WaitForSingleObject(handle, 0);
+      if (waited == WAIT_OBJECT_0 || waited == WAIT_ABANDONED) {
+        return (result: InstanceLockResult.acquired, handle: handle);
+      }
+      CloseHandle(handle);
+      return (
+        result: waited == WAIT_TIMEOUT
+            ? InstanceLockResult.heldElsewhere
+            : InstanceLockResult.unavailable,
+        handle: 0,
+      );
+    } finally {
+      free(native);
+    }
+  }
+
+  static final int Function(Pointer, int, Pointer<Utf16>) _createMutex =
+      DynamicLibrary.open('kernel32.dll').lookupFunction<
+          IntPtr Function(Pointer, Int32, Pointer<Utf16>),
+          int Function(Pointer, int, Pointer<Utf16>)>('CreateMutexW');
+
   static void focusOtherInstance() {
     if (!Platform.isWindows) return;
     final className = windowClassName.toNativeUtf16();
