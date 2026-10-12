@@ -311,6 +311,44 @@ void main() {
     expect(registrations, 1);
   });
 
+  group('המפתח הפרטי בכונן', () {
+    File carriedKey() => File(p.join(
+        destination, identity.keyId, SearchFeedbackIdentityStore.fileName));
+
+    test('איסוף שלא העביר אף מקטע אינו מעתיק את המפתח', () async {
+      await queue.purge();
+      final transport = SearchFeedbackTransport(destination);
+      addTearDown(transport.close);
+
+      expect(await transport.collect(source, mayCollect: () async => true), 0);
+      expect(carriedKey().existsSync(), isFalse);
+    });
+
+    test('נמחק מהכונן כשכל המקטעים נשלחו, ונשאר כשנותר מה לשלוח', () async {
+      identity.registeredKeyId = identity.keyId;
+      await SearchFeedbackIdentityStore(() async => Directory(source))
+          .save(identity);
+      var accept = false;
+      final transport =
+          SearchFeedbackTransport(destination, client: MockClient((_) async {
+        return accept
+            ? http.Response('{"accepted":1}', 200)
+            : http.Response('', 503);
+      }));
+      addTearDown(transport.close);
+      await transport.collect(source, mayCollect: () async => true);
+      expect(carriedKey().existsSync(), isTrue);
+
+      expect((await transport.upload()).remaining, 1);
+      expect(carriedKey().existsSync(), isTrue);
+
+      accept = true;
+      await File(p.join(destination, 'retry-at.txt')).delete();
+      expect(await transport.upload(), (sent: 1, rejected: 0, remaining: 0));
+      expect(carriedKey().existsSync(), isFalse);
+    });
+  });
+
   group('carriedOffline (C6)', () {
     Future<void> addOld() => queue.append({
           'type': 'search',

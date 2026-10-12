@@ -114,7 +114,7 @@ class SearchFeedbackTransport {
       );
       final carriedIdentity = await destinationIdentity.load();
       if (carriedIdentity?.blocked == true) return 0;
-      if (carriedIdentity == null) await destinationIdentity.save(identity);
+      var keyCarried = carriedIdentity != null;
       var collected = 0;
       for (final name in await source.sealAndList()) {
         if (!await mayCollect()) break;
@@ -122,6 +122,10 @@ class SearchFeedbackTransport {
         if (claimed == null) continue;
         final batch = await source.read(claimed);
         if (batch == null) continue;
+        if (!keyCarried) {
+          await destinationIdentity.save(identity);
+          keyCarried = true;
+        }
         final lock = await SearchFeedbackQueueLock.acquire('$destination.lock');
         try {
           // נשמר לפני המחיקה במקור, ושם המקטע מאפשר חזרה אחרי קריסה.
@@ -318,6 +322,9 @@ class SearchFeedbackTransport {
               await defer(outcome);
           }
           if (_stopped) break;
+        }
+        if (!identity.blocked && await pending(entity.path) == 0) {
+          await store.delete();
         }
       }
       return (sent: sent, rejected: rejected, remaining: await count());

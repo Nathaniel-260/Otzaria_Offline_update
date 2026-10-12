@@ -2421,7 +2421,8 @@ class _LibraryDomain extends LibraryDomainStrings {
       'Collect smart search training data';
   @override
   String semanticFeedbackCollectBody(int count) =>
-      'Otzaria has $count records of smart search usage data collected with your consent. Transfer them to the drive for sending from the online computer? They will be removed from Otzaria’s queue only after being saved to the drive.';
+      'Otzaria has $count records of smart search usage data collected with your consent. Transfer them to the drive for sending from the online computer? They will be removed from Otzaria’s queue only after being saved to the drive.\n\n'
+      'Note: the records, including the search queries, are stored on the drive unencrypted until they are sent, together with the anonymous key that signs them. The key is deleted from the drive once all records have been sent.';
   @override
   String get semanticFeedbackUploadTitle => 'Send training data to Otzaria';
   @override
@@ -3351,7 +3352,11 @@ class _ErrorReports extends ErrorReportsStrings {
       'Otzaria has $count ${_reports(count)} about books, the app and plugins '
       'that have not been '
       'sent yet.\n\nCollect them to the drive, so they can be sent to Otzaria '
-      'from the computer that is online?';
+      'from the computer that is online?\n\n'
+      'Note: the reports are stored on the drive as they are, unencrypted, '
+      'until they are sent — your email address, the text you wrote, log '
+      'excerpts, screenshots and, for a crash report you approved, a memory '
+      'dump. Anyone holding the drive can read them.';
   @override
   String get collectConfirm => 'Collect';
   @override
