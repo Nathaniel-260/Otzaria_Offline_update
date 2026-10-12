@@ -547,19 +547,14 @@ class OtzariaManager {
     String rawDiskVersion,
     String diskVersion,
     String tagName,
-  ) {
-    final pattern = OtzariaUpdateCheckResult.carriesVersionCode(rawDiskVersion)
-        ? RegExp(r'^\d+(?:\.\d+){0,3}')
-        : RegExp(r'^\d+(?:\.\d+){0,2}');
-    final disk = pattern
-        .firstMatch(OtzariaUpdateCheckResult.normalizeVersion(diskVersion))
-        ?.group(0);
-    final tag = pattern
-        .firstMatch(OtzariaUpdateCheckResult.normalizeVersion(tagName))
-        ?.group(0);
-    if (disk == null || tag == null) return false;
-    return OtzariaUpdateCheckResult.compareVersions(disk, tag) == 0;
-  }
+  ) =>
+      OtzariaUpdateCheckResult.compareBases(
+        diskVersion,
+        tagName,
+        leftCarriesHotfix:
+            OtzariaUpdateCheckResult.carriesVersionCode(rawDiskVersion),
+      ) ==
+      0;
 
   /// ההתקנה הראשונה שנמצאת ב-[_autoDetectDirs], או null. אינה נשמרת.
   Future<OtzariaInstallState?> _detectInKnownDirs({

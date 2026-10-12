@@ -106,6 +106,11 @@ class OtzariaUpdateCheckResult {
 
     final installedBase = _baseVersion(installed);
     final tagBase = _baseVersion(tag);
+    if (installed == installedBase &&
+        tag == tagBase &&
+        compareBases(installedVersion, tagName) == 0) {
+      return true;
+    }
     if (installedBase != tagBase) return false;
     return installedBase == installed && tagBase != tag;
   }
@@ -124,16 +129,8 @@ class OtzariaUpdateCheckResult {
     final leftBase = _baseVersion(left);
     final rightBase = _baseVersion(right);
 
-    final leftParts = _numericParts(leftBase);
-    final rightParts = _numericParts(rightBase);
-    final count = leftParts.length > rightParts.length
-        ? leftParts.length
-        : rightParts.length;
-    for (var i = 0; i < count; i++) {
-      final leftPart = i < leftParts.length ? leftParts[i] : 0;
-      final rightPart = i < rightParts.length ? rightParts[i] : 0;
-      if (leftPart != rightPart) return leftPart < rightPart ? -1 : 1;
-    }
+    final bases = compareBases(a, b);
+    if (bases != 0) return bases;
 
     final leftHasSuffix = left != leftBase;
     final rightHasSuffix = right != rightBase;
@@ -192,6 +189,26 @@ class OtzariaUpdateCheckResult {
   }
 
   static bool carriesVersionCode(String raw) => _hotfixOf(raw) != null;
+
+  static int compareBases(String a, String b, {bool? leftCarriesHotfix}) {
+    var left = _numericParts(_baseVersion(normalizeVersion(a)));
+    var right = _numericParts(_baseVersion(normalizeVersion(b)));
+    if (!((leftCarriesHotfix ?? _carriesHotfix(a)) && _carriesHotfix(b))) {
+      left = left.take(3).toList();
+      right = right.take(3).toList();
+    }
+    final count = left.length > right.length ? left.length : right.length;
+    for (var i = 0; i < count; i++) {
+      final leftPart = i < left.length ? left[i] : 0;
+      final rightPart = i < right.length ? right[i] : 0;
+      if (leftPart != rightPart) return leftPart < rightPart ? -1 : 1;
+    }
+    return 0;
+  }
+
+  static bool _carriesHotfix(String raw) =>
+      _numericParts(_baseVersion(normalizeVersion(raw))).length >= 4 ||
+      _buildSuffix(raw) == null;
 
   static String versionFromDisk(String raw) {
     final version = normalizeVersion(raw);

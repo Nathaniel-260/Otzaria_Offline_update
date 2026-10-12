@@ -857,19 +857,14 @@ class OtzariaInstaller {
     return stat.size == before.size && stat.modified == before.modified;
   }
 
-  static bool _isOlderBase(String installed, String tagName) {
-    final pattern = OtzariaUpdateCheckResult.carriesVersionCode(installed)
-        ? RegExp(r'^\d+(?:\.\d+){0,3}')
-        : RegExp(r'^\d+(?:\.\d+){0,2}');
-    final a = pattern
-        .firstMatch(OtzariaUpdateCheckResult.versionFromDisk(installed))
-        ?.group(0);
-    final b = pattern
-        .firstMatch(OtzariaUpdateCheckResult.normalizeVersion(tagName))
-        ?.group(0);
-    if (a == null || b == null) return false;
-    return OtzariaUpdateCheckResult.compareVersions(a, b) < 0;
-  }
+  static bool _isOlderBase(String installed, String tagName) =>
+      OtzariaUpdateCheckResult.compareBases(
+        OtzariaUpdateCheckResult.versionFromDisk(installed),
+        tagName,
+        leftCarriesHotfix:
+            OtzariaUpdateCheckResult.carriesVersionCode(installed),
+      ) <
+      0;
 
   String? _readVersionQuietly(String launchPath) {
     try {

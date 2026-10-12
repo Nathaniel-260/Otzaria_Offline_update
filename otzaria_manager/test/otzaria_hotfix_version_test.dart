@@ -39,6 +39,34 @@ void main() {
     });
   });
 
+  group('השוואה מול תגי גיטהאב אמיתיים', () {
+    test('hotfix מהדיסק שווה לתג בן שלושה חלקים עם build', () {
+      expect(
+        OtzariaUpdateCheckResult.compareVersions('0.9.97.2', '0.9.97+789'),
+        0,
+      );
+      expect(
+        OtzariaUpdateCheckResult.sameVersion('0.9.97.2', '0.9.97+789'),
+        isTrue,
+      );
+    });
+
+    test('hotfix נספר כששני הצדדים נושאים אותו', () {
+      expect(
+        OtzariaUpdateCheckResult.compareVersions('0.9.97', '0.9.97.2'),
+        lessThan(0),
+      );
+      expect(
+        OtzariaUpdateCheckResult.compareVersions('0.9.97.2+800', '0.9.97.3'),
+        lessThan(0),
+      );
+      expect(
+        OtzariaUpdateCheckResult.compareVersions('0.9.96+736', '0.9.96+741'),
+        lessThan(0),
+      );
+    });
+  });
+
   group('התקנת hotfix מזוהה כגרסה שהותקנה', () {
     late Directory root;
     late String exe;
@@ -102,6 +130,23 @@ void main() {
       expect(check.currentState!.installedTagName, '0.9.97.2');
       expect(check.updateAvailable, isFalse);
       expect(check.installedIsNewer, isFalse);
+    });
+
+    test('exe של hotfix מול תג pre-release בן שלושה חלקים — מעודכן', () async {
+      File(exe).writeAsStringSync('0.9.97+99702');
+      await writeMirror('0.9.97+789');
+
+      final check = await manager().checkForUpdate();
+
+      expect(check.updateAvailable, isFalse);
+      expect(check.installedIsNewer, isFalse);
+    });
+
+    test('exe בלי hotfix מול תג hotfix — יש עדכון', () async {
+      File(exe).writeAsStringSync('0.9.97+99700');
+      await writeMirror('0.9.97.2');
+
+      expect((await manager().checkForUpdate()).updateAvailable, isTrue);
     });
 
     test('hotfix חדש יותר במראה עדיין מוצע', () async {
