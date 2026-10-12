@@ -1963,8 +1963,8 @@ mid-request: the in-flight POST is aborted (`AbortableRequest`, also on timeout)
 file stays, and a re-send of what the server already got answers `duplicate`.
 
 **Only a 2xx whose body is a JSON object with `success:true` deletes a file as sent
-(a filter's 200 HTML page must not); 400/409/413/422 and a non-`https://otzaria.org`
-endpoint delete it as rejected; anything else keeps it and stops the run.** A first 409
+(a filter's 200 HTML page must not); 400/409/413/422 and an endpoint other than the
+three `https://otzaria.org` report paths (no query) delete it as rejected; anything else keeps it and stops the run.** A first 409
 means "this content was not ingested under that id": as in Otzaria, the report gets a
 new id (`report_id` / `reportId`), is rewritten in the outbox under it, and is re-sent
 once. A 503 `{"error":"shabbat"}` stops the run with its own message. A drive

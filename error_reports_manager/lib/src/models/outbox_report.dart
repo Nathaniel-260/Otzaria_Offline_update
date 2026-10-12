@@ -105,5 +105,17 @@ class OutboxReport {
       endpoint.scheme == 'https' &&
       endpoint.host.toLowerCase() == 'otzaria.org' &&
       endpoint.userInfo.isEmpty &&
-      (!endpoint.hasPort || endpoint.port == 443);
+      (!endpoint.hasPort || endpoint.port == 443) &&
+      !endpoint.hasQuery &&
+      !endpoint.hasFragment &&
+      _allowedPaths.contains(endpoint.path);
+
+  static final Set<String> _allowedPaths = {
+    for (final url in [
+      reportingEndpoint,
+      appReportingEndpoint,
+      pluginReportingEndpoint,
+    ])
+      Uri.parse(url).path,
+  };
 }

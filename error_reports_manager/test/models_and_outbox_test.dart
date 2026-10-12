@@ -21,6 +21,19 @@ void main() {
       expect(allowed('https://otzaria.org:8443/api'), isFalse);
     });
 
+    test('רק שלוש נקודות הקצה של הדיווחים, בלי query', () {
+      bool allowed(String url) =>
+          OutboxReport.fromJson(reportJson('a', endpoint: url), filePath: 'a')
+              .isAllowedEndpoint;
+      expect(allowed(OutboxReport.appReportingEndpoint), isTrue);
+      expect(allowed(OutboxReport.pluginReportingEndpoint), isTrue);
+      expect(allowed('https://otzaria.org/api/auth/signin'), isFalse);
+      expect(allowed('https://otzaria.org/api/reportingerrors/x'), isFalse);
+      expect(allowed('https://otzaria.org/api/reportingerrors?to=x'), isFalse);
+      expect(allowed('https://otzaria.org/api/reportingerrors#x'), isFalse);
+      expect(allowed('https://otzaria.org/'), isFalse);
+    });
+
     test('שדה חובה חסר זורק', () {
       final json = reportJson('a')..remove('body');
       expect(
