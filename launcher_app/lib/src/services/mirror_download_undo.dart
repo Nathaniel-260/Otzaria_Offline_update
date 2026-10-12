@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
@@ -34,6 +35,15 @@ class MirrorDownloadUndo {
   /// צילום של [rootDirs]. תיקייה שאינה קיימת היא מצב תקין ושכיח (הורדה
   /// ראשונה) — ביטול פשוט ימחק אותה כולה.
   static Future<MirrorDownloadUndo> capture(List<String> rootDirs) async {
+    final (undo, notes) = await Isolate.run(() => _capture(rootDirs));
+    notes.forEach(AppLogger.instance.info);
+    return undo;
+  }
+
+  /// Synchronous I/O over the whole mirror; runs inside an isolate, so log
+  /// lines are returned instead of written.
+  static (MirrorDownloadUndo, List<String>) _capture(List<String> rootDirs) {
+    final notes = <String>[];
     final roots = <({String path, bool existed})>[];
     final files = <String, _FileSnapshot>{};
     final dirs = <String>{};
@@ -45,8 +55,7 @@ class MirrorDownloadUndo {
       roots.add((path: rootDir, existed: existed));
       if (!existed) continue;
 
-      await for (final entity
-          in root.list(recursive: true, followLinks: false)) {
+      for (final entity in root.listSync(recursive: true, followLinks: false)) {
         if (entity is Directory) {
           dirs.add(entity.path);
           continue;
@@ -62,13 +71,12 @@ class MirrorDownloadUndo {
           );
         } catch (error) {
           untouched.add(entity.path);
-          AppLogger.instance
-              .info('צילום המראה לא קרא את ${entity.path}: $error');
+          notes.add('צילום המראה לא קרא את ${entity.path}: $error');
         }
       }
     }
 
-    return MirrorDownloadUndo._(roots, files, dirs, untouched);
+    return (MirrorDownloadUndo._(roots, files, dirs, untouched), notes);
   }
 
   /// קובצי הצד של ההורדה (`<נכס>.resume`) קטנים כמו מניפסט, וההורדה כותבת
@@ -80,23 +88,31 @@ class MirrorDownloadUndo {
       length <= _rememberedContentLimit;
 
   Future<void> revert() async {
+    final undo = this;
+    final notes = await Isolate.run(() => undo._revert());
+    notes.forEach(AppLogger.instance.info);
+  }
+
+  List<String> _revert() {
+    final notes = <String>[];
     for (final root in _roots) {
       final dir = Directory(root.path);
       if (!dir.existsSync()) continue;
       if (!root.existed) {
         if (_keepsFileUnder(root.path)) {
-          await _revertInto(dir);
+          _revertInto(dir, notes);
         } else {
-          _quietly(() => dir.deleteSync(recursive: true), root.path);
+          _quietly(() => dir.deleteSync(recursive: true), root.path, notes);
         }
         continue;
       }
       if (_lostFileUnder(root.path) case final lost?) {
-        AppLogger.instance.info('Cancel keeps ${root.path}: $lost was pruned');
+        notes.add('Cancel keeps ${root.path}: $lost was pruned');
         continue;
       }
-      await _revertInto(dir);
+      _revertInto(dir, notes);
     }
+    return notes;
   }
 
   String? _lostFileUnder(String rootPath) {
@@ -117,10 +133,10 @@ class MirrorDownloadUndo {
   bool _keepsFileUnder(String rootPath) =>
       _keptFileNames.any((name) => File(p.join(rootPath, name)).existsSync());
 
-  Future<void> _revertInto(Directory root) async {
+  void _revertInto(Directory root, List<String> notes) {
     final files = <File>[];
     final newDirs = <String>[];
-    await for (final entity in root.list(recursive: true, followLinks: false)) {
+    for (final entity in root.listSync(recursive: true, followLinks: false)) {
       if (entity is Directory) {
         if (!_dirs.contains(entity.path)) newDirs.add(entity.path);
       } else if (entity is File) {
@@ -132,23 +148,23 @@ class MirrorDownloadUndo {
       if (_untouched.contains(file.path) || _isKept(root, file.path)) continue;
       final before = _files[file.path];
       if (before == null) {
-        _quietly(() => file.deleteSync(), file.path);
+        _quietly(() => file.deleteSync(), file.path, notes);
         continue;
       }
-      _quietly(() => before.restoreInto(file), file.path);
+      _quietly(() => before.restoreInto(file), file.path, notes);
     }
 
     newDirs.sort((a, b) => b.length.compareTo(a.length));
     for (final dir in newDirs) {
-      _quietly(() => Directory(dir).deleteSync(recursive: true), dir);
+      _quietly(() => Directory(dir).deleteSync(recursive: true), dir, notes);
     }
   }
 
-  void _quietly(void Function() action, String path) {
+  void _quietly(void Function() action, String path, List<String> notes) {
     try {
       action();
     } catch (error) {
-      AppLogger.instance.info('ניקוי אחרי ביטול ההורדה דילג על $path: $error');
+      notes.add('ניקוי אחרי ביטול ההורדה דילג על $path: $error');
     }
   }
 }
