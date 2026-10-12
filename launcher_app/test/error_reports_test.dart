@@ -24,6 +24,7 @@ import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 
 import 'test_harness.dart';
 import 'test_support.dart';
@@ -512,23 +513,108 @@ void main() {
             p.join(dataRoot, 'databases', 'user_state.db'));
       });
 
+      Future<List<String>> unmigrated() =>
+          ErrorReportsController.unmigratedLegacyReports(
+            launchPath: launch,
+            locator: LibraryDbLocator(
+              stateStore: LibraryStateStore(p.join(temp.path, 's.json')),
+            ),
+          );
+
+      void userStateDb({List<String> kinds = const []}) {
+        final path = p.join(dataRoot, 'databases', 'user_state.db');
+        Directory(p.dirname(path)).createSync(recursive: true);
+        final db = sqlite3.open(path)
+          ..execute(
+            'CREATE TABLE pending_reports (id INTEGER PRIMARY KEY, '
+            'kind TEXT NOT NULL, payload_json TEXT NOT NULL, '
+            'created_at INTEGER NOT NULL)',
+          );
+        for (final kind in kinds) {
+          db.execute(
+            'INSERT INTO pending_reports (kind, payload_json, created_at) '
+            "VALUES (?, '{}', 0)",
+            [kind],
+          );
+        }
+        db.close();
+      }
+
       for (final box in [
         'error_reports_queue',
         'app_reports_queue',
         'plugin_reports_queue',
       ]) {
-        test('$box עדיין ב-Hive — לא נוגעים', () async {
-          File(p.join(dataRoot, 'databases', 'user_state.db'))
-              .createSync(recursive: true);
+        test('$box.hive שנשאר אחרי ההעברה אינו חוסם את האיסוף', () async {
+          userStateDb(kinds: ['$box/sent_reports']);
+          File(p.join(dataRoot, '$box.hive')).writeAsBytesSync([1, 2, 3]);
+
+          expect(await resolve(), isA<UserStateReportQueue>());
+          expect(await unmigrated(), isEmpty);
+        });
+
+        test('$box.hive ריק אינו נחשב תור שלא הועבר', () async {
+          userStateDb();
           File(p.join(dataRoot, '$box.hive')).createSync();
-          expect(await resolve(), isNull);
+
+          expect(await resolve(), isA<UserStateReportQueue>());
+          expect(await unmigrated(), isEmpty);
+        });
+
+        test('$box.hive עם תוכן ובלי שום שורה שלו במסד — מדווח, והאיסוף ממשיך',
+            () async {
+          userStateDb();
+          File(p.join(dataRoot, '$box.hive')).writeAsBytesSync([1, 2, 3]);
+
+          expect(await resolve(), isA<UserStateReportQueue>());
+          expect(await unmigrated(), [box]);
         });
       }
+
+      test('reportsQueueFormat מ-otzaria_capabilities.json עובר לתור',
+          () async {
+        userStateDb();
+        File(p.join(dataRoot, OtzariaCapabilities.fileName))
+            .writeAsStringSync('{"formatVersion":1,"reportsQueueFormat":1}');
+
+        final queue = await resolve() as UserStateReportQueue;
+
+        expect(queue.reportsQueueFormat, 1);
+      });
+
+      test('בלי otzaria_capabilities.json — לפי user_version כמו קודם',
+          () async {
+        userStateDb();
+
+        final queue = await resolve() as UserStateReportQueue;
+
+        expect(queue.reportsQueueFormat, isNull);
+      });
 
       test('אין מסד — null, ושום תיקייה אינה נוצרת', () async {
         expect(await resolve(), isNull);
         expect(Directory(dataRoot).existsSync(), isFalse);
       });
+    });
+
+    testWidgets('תורי Hive שלא הועברו — הודעה ברורה, ואחריה ההצעה לאסוף',
+        (tester) async {
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => _FakeQueue(2),
+        findUnmigratedLegacy: () async => ['error_reports_queue'],
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+
+      unawaited(offer(ctx, c));
+      await tester.pumpAndSettle();
+      expect(find.text(t.legacyReportsDialogTitle), findsOneWidget);
+      expect(find.text(t.legacyReportsDialogContent), findsOneWidget);
+
+      await tester.tap(find.text(t.introDialogConfirm));
+      await tester.pumpAndSettle();
+      expect(find.text(t.collectDialogTitle), findsOneWidget);
     });
 
     test('כשל חלקי באיסוף — מה שהועבר נספר, והשגיאה נמסרת', () async {

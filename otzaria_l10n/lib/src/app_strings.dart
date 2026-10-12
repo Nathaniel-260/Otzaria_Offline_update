@@ -1867,6 +1867,10 @@ abstract class ErrorReportsStrings {
   /// אוצריא נפתחה בין האישור לאיסוף — הדיווחים נשארים בה עד ההפעלה הבאה.
   String get collectOtzariaOpenSnack;
 
+  /// קובץ Hive ישן של תור דיווחים שאוצריא הנוכחית אינה מעבירה עוד.
+  String get legacyReportsDialogTitle;
+  String get legacyReportsDialogContent;
+
   // ── הסבר חד-פעמי, בהרצה הראשונה במחשב ──
   String get introDialogTitle;
   String get introDialogContent;

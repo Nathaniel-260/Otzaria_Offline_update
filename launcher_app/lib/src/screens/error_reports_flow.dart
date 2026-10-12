@@ -47,9 +47,19 @@ Future<ReportOfferOutcome> offerErrorReportCollection(
   // לפני `pendingToOffer`: אוצריא פתוחה אינה "מנצלת" את ההצעה של ההרצה.
   if (await isOtzariaRunning()) return ReportOfferOutcome.notOffered;
   final count = await controller.pendingToOffer();
-  if (count <= 0 || !context.mounted) return ReportOfferOutcome.notOffered;
-
+  if (!context.mounted) return ReportOfferOutcome.notOffered;
   final t = context.strings.errorReports;
+  if (controller.unmigratedLegacy.isNotEmpty) {
+    await showSingleActionDialog(
+      context: context,
+      title: t.legacyReportsDialogTitle,
+      content: t.legacyReportsDialogContent,
+      confirmText: t.introDialogConfirm,
+    );
+    if (!context.mounted) return ReportOfferOutcome.notOffered;
+  }
+  if (count <= 0) return ReportOfferOutcome.notOffered;
+
   final approved = await showTwoActionsDialog(
     context: context,
     title: t.collectDialogTitle,

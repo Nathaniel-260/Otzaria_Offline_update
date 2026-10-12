@@ -1918,10 +1918,13 @@ and `lib/utils/canonical_json.dart`, plus `AppReport` and `PluginReportRecord`.
 by Otzaria's own code (commit named in the fixture); a change there must be re-ported
 and the vectors regenerated, or the server receives a body Otzaria would never send.
 
-**Never write to a DB we do not understand.** `PRAGMA user_version` above
-`UserStateReportQueue.knownSchemaVersion`, a missing `pending_reports` table, a
-book report's `schemaVersion` above 2, or a still-present report queue `.hive` file
-(queue not yet migrated out of Hive) all mean "no offer" and no write. The DB and its
+**Never write to a DB we do not understand.** A `reportsQueueFormat` other than 1 in
+`otzaria_capabilities.json` (or, without that file, `PRAGMA user_version` above
+`UserStateReportQueue.knownSchemaVersion`), a missing `pending_reports` table, or a
+book report's `schemaVersion` above 2 all mean "no offer" and no write. A leftover
+queue `.hive` does **not** block: current Otzaria no longer migrates Hive, so a file
+left behind blocked collection forever; one with no rows of its box in the DB is
+reported to the user as old reports nobody will migrate. The DB and its
 folder are never created. Unsendable reports (`isSendable`, Otzaria's own export filter
 plus the 256KB book limit), invalid app/plugin records and oversized app requests
 stay in the queue. App attachments travel in the outbox, not the sent history.

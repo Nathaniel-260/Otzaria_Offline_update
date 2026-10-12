@@ -3370,6 +3370,14 @@ class _ErrorReports extends ErrorReportsStrings {
   String get collectOtzariaOpenSnack =>
       'Otzaria is open, so the reports were not collected. You will be asked '
       'again next launch';
+  @override
+  String get legacyReportsDialogTitle => 'Old reports that were not migrated';
+  @override
+  String get legacyReportsDialogContent =>
+      'This computer still has reports saved by an old version of Otzaria, in '
+      'a format the current Otzaria no longer migrates. Otzaria Offline Update '
+      'therefore cannot collect them either.\n\n'
+      'All other reports are collected and sent as usual.';
 
   @override
   String get introDialogTitle => 'Reports to Otzaria and plugin developers';

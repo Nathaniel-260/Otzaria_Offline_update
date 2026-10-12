@@ -83,8 +83,10 @@ Flutter), במקביל ל-`custom_apps_manager`.
 שקורא מעותק). **לעולם לא נוצר מסד או תיקייה**: אין מסד — אין מה להציע.
 
 קובץ `.hive` של `error_reports_queue`, `plugin_reports_queue` או
-`app_reports_queue` שעוד קיים פירושו שהתור לא הועבר מ-Hive —
-ואז לא נוגעים בכלום.
+`app_reports_queue` אינו חוסם את האיסוף: אוצריא הנוכחית כבר אינה מעבירה מ-Hive,
+וקובץ שנשאר אחרי ההעברה חסם עד עכשיו את האיסוף לתמיד. קובץ לא ריק שאין לו אף שורה
+(ממתינה או בהיסטוריה) ב-`user_state.db` מדווח למשתמש (`findUnmigratedReportBoxes`) —
+יש בו דיווחים ישנים שאיש כבר לא יעביר.
 
 ## מה נקרא, ומה נכתב
 
@@ -92,7 +94,9 @@ Flutter), במקביל ל-`custom_apps_manager`.
 | --- | --- |
 | קריאה | `pending_reports` בסוגי `error_reports_queue/pending_reports`, `app_reports_queue/pending_reports`, `plugin_reports_queue/pending_reports`, עם `busy_timeout=5000` |
 | איפה זה רץ | כל עבודת ה-SQLite — פתיחה, בדיקת הסכמה, פענוח, ה-digest והסימון — ב-`Isolate.run` (מוזרק: `runIsolated`); רק כתיבת הקבצים לתיבה נשארת ב-isolate הראשי, אסינכרונית. FFI סינכרוני ב-isolate של הממשק מקפיא אותו בעלייה (AGENTS §5.9) |
-| שמירת סכמה | `PRAGMA user_version` גבוה מ-`knownSchemaVersion` (1), או בלי הטבלה — לא נוגעים, אין הצעה |
+| שמירת סכמה | `reportsQueueFormat` מ-`otzaria_capabilities.json` (C1) שאינו 1, או בלי הטבלה — לא נוגעים, אין הצעה. בלי הקובץ (אוצריא ישנה): `PRAGMA user_version` גבוה מ-`knownSchemaVersion` (1) |
+| קריאה בזיכרון | המעבר הראשון שומר לכל שורה רק מזהה ו-SHA-256 של ה-payload; כל דיווח נקרא ומקודד שוב ב-isolate משלו רק לפני כתיבתו לתיבה |
+| ההיסטוריה | הרשומה שעוברת ל-`sent_reports` מקבלת `carriedBy: "offline-update"` ו-`carriedAt` (C3), ואוצריא מציגה אותה "הועבר לשליחה דרך עדכוני אוצריא" |
 | דיווח שלא יישלח | `schemaVersion` חדש מ-2, `fromJson` שנכשל, surrogate בודד (אין digest), גוף מעל 256KB — נשאר בתור |
 | הסימון | `markPendingReportAsSent` של אוצריא, **בטרנזקציה אחת** (`BEGIN IMMEDIATE`): השורה לא השתנתה מאז הקריאה, רשומה באותו מזהה בהיסטוריה מוחלפת, הוספה, חיתוך ל-100, המונה, ומחיקה מהתור |
 | המונה | `lists` (`sent_reports_total` בקופסה של כל סוג דיווח) — גם הוא ב-`user_state.db`, ולכן מתעדכן באותה טרנזקציה, כמו `SentReportsCounter.increment(floor:)` |

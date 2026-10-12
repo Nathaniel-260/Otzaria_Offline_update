@@ -3140,6 +3140,14 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String get collectOtzariaOpenSnack =>
       'אוצריא פתוחה, ולכן הדיווחים לא נאספו. השאלה תחזור בהפעלה הבאה';
+  @override
+  String get legacyReportsDialogTitle => 'דיווחים ישנים שלא הועברו';
+  @override
+  String get legacyReportsDialogContent =>
+      'במחשב הזה נשארו דיווחים שנשמרו בגרסה ישנה של אוצריא, במבנה שגרסת '
+      'אוצריא הנוכחית כבר אינה מעבירה. לכן גם עדכוני אוצריא אינם יכולים '
+      'לאסוף אותם.\n\n'
+      'שאר הדיווחים נאספים ונשלחים כרגיל.';
 
   @override
   String get introDialogTitle => 'דיווחים לאוצריא ולמפתחי התוספים';

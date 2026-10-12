@@ -100,7 +100,7 @@ void main() {
     }
   }
 
-  test('כל עבודת ה-SQLite עוברת ב-isolate: אחת לספירה, שתיים לאיסוף', () async {
+  test('כל עבודת ה-SQLite עוברת ב-isolate, ובאיסוף שורה אחת בכל פעם', () async {
     final db = create();
     insert(db, pending, _stored('a'));
     db.close();
@@ -116,7 +116,7 @@ void main() {
     expect(calls, 1);
     final result = await queue.collectTo(MemoryOutbox(const []));
     expect(result.collected, 1);
-    expect(calls, 3);
+    expect(calls, 4);
   });
 
   test('כשל של שלב הסימון כולו — כל הקבצים נמחקים, והשורות נשארות', () async {
@@ -126,13 +126,13 @@ void main() {
     db.close();
 
     var calls = 0;
-    Future<R> failSecond<R>(FutureOr<R> Function() computation) {
-      if (++calls == 2) return Future.error(StateError('database is locked'));
+    Future<R> failMark<R>(FutureOr<R> Function() computation) {
+      if (++calls == 4) return Future.error(StateError('database is locked'));
       return Isolate.run(computation);
     }
 
     final outbox = MemoryOutbox(const []);
-    final queue = UserStateReportQueue(dbPath, runIsolated: failSecond);
+    final queue = UserStateReportQueue(dbPath, runIsolated: failMark);
     await expectLater(queue.collectTo(outbox), throwsStateError);
     expect(outbox.reports, isEmpty);
     expect(rows(pending), hasLength(2));
@@ -187,7 +187,7 @@ void main() {
 
     var calls = 0;
     Future<R> deleteBeforeMark<R>(FutureOr<R> Function() computation) {
-      if (++calls == 2) File(dbPath).deleteSync();
+      if (++calls == 3) File(dbPath).deleteSync();
       return Isolate.run(computation);
     }
 
@@ -304,6 +304,8 @@ void main() {
     ]) {
       expect(rows('$box/pending_reports'), isEmpty);
       final history = rows('$box/sent_reports').single;
+      expect(history['carriedBy'], UserStateReportQueue.carriedBy);
+      expect(DateTime.tryParse(history['carriedAt'] as String), isNotNull);
       if (box == 'app_reports_queue') {
         expect(history.containsKey('images'), isFalse);
         expect(history.containsKey('diagnostics'), isFalse);
@@ -525,6 +527,60 @@ void main() {
     expect((await queue.collectTo(MemoryOutbox(const []))).collected, 0);
     expect(rows(pending), hasLength(1));
     expect(File(dbPath).readAsBytesSync(), before);
+  });
+
+  group('פורמט התור מ-otzaria_capabilities.json (C3)', () {
+    test('פורמט 1 — נאסף גם כש-user_version עלה מסיבה אחרת', () async {
+      final db =
+          create(userVersion: UserStateReportQueue.knownSchemaVersion + 1);
+      insert(db, pending, _stored('a'));
+      db.close();
+
+      final queue = UserStateReportQueue(dbPath, reportsQueueFormat: 1);
+      expect(await queue.countSendable(), 1);
+      expect((await queue.collectTo(MemoryOutbox(const []))).collected, 1);
+    });
+
+    test('פורמט לא מוכר — לא נוגעים בכלום, גם ב-user_version מוכר', () async {
+      final db = create();
+      insert(db, pending, _stored('a'));
+      db.close();
+      final before = File(dbPath).readAsBytesSync();
+
+      final queue = UserStateReportQueue(dbPath, reportsQueueFormat: 2);
+      expect(await queue.countSendable(), 0);
+      expect((await queue.collectTo(MemoryOutbox(const []))).collected, 0);
+      expect(File(dbPath).readAsBytesSync(), before);
+    });
+  });
+
+  test('שורה שהשתנתה בין הקריאה לכתיבת הקובץ — אינה נכתבת', () async {
+    final db = create();
+    insert(db, pending, _stored('a'));
+    db.close();
+
+    var calls = 0;
+    Future<R> editBeforeEncode<R>(FutureOr<R> Function() computation) {
+      if (++calls == 2) {
+        final other = sqlite3.open(dbPath);
+        other.execute(
+          'UPDATE pending_reports SET payload_json = ? WHERE id = 1',
+          [
+            jsonEncode(_stored('a', extra: {'errorDetails': 'נערך'}))
+          ],
+        );
+        other.close();
+      }
+      return Isolate.run(computation);
+    }
+
+    final outbox = MemoryOutbox(const []);
+    final result =
+        await UserStateReportQueue(dbPath, runIsolated: editBeforeEncode)
+            .collectTo(outbox);
+    expect(result.collected, 0);
+    expect(outbox.reports, isEmpty);
+    expect(rows(pending), hasLength(1));
   });
 
   test('אין מסד — אין מה להציע, ושום קובץ אינו נוצר', () async {
