@@ -1362,6 +1362,13 @@ internal registry beyond the `installed/` directory, and a manual unpack bypasse
 `install-local` reads from disk and needs no network; the older `install?url=` does and
 is deliberately unused.
 
+**Install completion comes from Otzaria's result file when it writes one, else from
+polling.** When `otzaria_capabilities.json` says `pluginInstallResults >= 1`,
+`plugin_install_results.jsonl` in Otzaria's data root is matched by the exact handed-off
+path and `at` ≥ the handoff, so a cancel or a rejection is reported at once. Without
+it (older Otzaria) the 5-minute rescan is the only signal, and a cancel looks like a
+timeout.
+
 **Everything about plugins hangs off the launch path the launcher already detected**
 (`OtzariaModuleController.launchPath`). Two consequences, both load-bearing for a
 **portable** Otzaria:

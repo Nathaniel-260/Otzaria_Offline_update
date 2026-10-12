@@ -123,6 +123,14 @@ class PluginsManager {
     );
   }
 
+  Future<String?> otzariaDataRoot() async {
+    final installed = InstalledPluginsScanner(
+      customPluginsDir: await resolvePluginsDir?.call(),
+      otzariaLaunchPath: await otzariaLaunchPath?.call(),
+    ).resolveInstalledDir();
+    return installed == null ? null : p.dirname(p.dirname(installed));
+  }
+
   Future<InstalledPluginsState> scanInstalled() async =>
       InstalledPluginsScanner(
         customPluginsDir: await resolvePluginsDir?.call(),

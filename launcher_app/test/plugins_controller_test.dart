@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -904,6 +905,111 @@ void main() {
 
       expect(c.isAwaitingInstall, isFalse);
       expect(announced, isFalse);
+    });
+
+    group('תוצאת ההתקנה שאוצריא כותבת (C2)', () {
+      late String dataRoot;
+      late String delivered;
+
+      setUp(() {
+        dataRoot = p.dirname(p.dirname(installedDir));
+        delivered = p.join(tempDir.path, 'plugin-1.0.0.otzplugin');
+      });
+
+      void capabilities(int pluginInstallResults) => File(
+            p.join(dataRoot, OtzariaCapabilities.fileName),
+          ).writeAsStringSync(
+            jsonEncode({
+              'formatVersion': 1,
+              'pluginInstallResults': pluginInstallResults,
+            }),
+          );
+
+      void otzariaReports(String outcome, {String? message}) {
+        final line = jsonEncode({
+          'path': delivered,
+          'pluginId': manifestId,
+          'version': '2.0.0',
+          'outcome': outcome,
+          'message': message,
+          'at': DateTime.now().toUtc().toIso8601String(),
+        });
+        File(p.join(dataRoot, PluginInstallResults.fileName))
+            .writeAsStringSync('$line\n', mode: FileMode.append);
+      }
+
+      test('ביטול באוצריא נסגר מיד ומדווח, בלי לחכות לפסק הזמן', () async {
+        capabilities(1);
+        final c = watching();
+        await c.load();
+        final rejected = c.installRejections.first;
+        var succeeded = false;
+        c.installCompletions.listen((_) => succeeded = true);
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('cancelled');
+
+        final entry = await rejected;
+        expect(entry.name, 'תוסף');
+        expect(entry.report.cancelled, isTrue);
+        expect(c.isAwaitingInstall, isFalse);
+        expect(succeeded, isFalse);
+      });
+
+      test('כשל עם הודעה מאוצריא עובר הלאה', () async {
+        capabilities(1);
+        final c = watching();
+        await c.load();
+        final rejected = c.installRejections.first;
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('rejected_incompatible', message: 'דורש 0.9.99');
+
+        expect((await rejected).report.message, 'דורש 0.9.99');
+      });
+
+      test('הצלחה מהקובץ מודיעה כמו הסריקה', () async {
+        capabilities(1);
+        final c = watching();
+        await c.load();
+        final announced = c.installCompletions.first;
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('installed');
+
+        expect(await announced, 'תוסף');
+      });
+
+      test('אוצריא ישנה בלי היכולת — הקובץ אינו נקרא, הסריקה ממשיכה', () async {
+        final c = watching(timeout: const Duration(milliseconds: 150));
+        await c.load();
+        var rejected = false;
+        c.installRejections.listen((_) => rejected = true);
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('cancelled');
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+
+        expect(c.isAwaitingInstall, isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(rejected, isFalse);
+      });
     });
 
     test('תוסף בלי מזהה מניפסט אינו נכנס להמתנה', () async {

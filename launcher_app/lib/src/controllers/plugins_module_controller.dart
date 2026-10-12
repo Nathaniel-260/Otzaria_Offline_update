@@ -343,7 +343,7 @@ class PluginsModuleController extends ChangeNotifier
         _invalidateDerived();
         notifyListeners();
       }
-      _settleInstallWatch(scanned.versions);
+      _settleInstallWatch(scanned.versions, reports: await _installReports());
     } catch (e, st) {
       AppLogger.instance.error('סריקת התוספים המותקנים נכשלה', e, st);
     }
@@ -364,6 +364,11 @@ class PluginsModuleController extends ChangeNotifier
       StreamController<String>.broadcast();
   Stream<String> get installCompletions => _installDone.stream;
 
+  final StreamController<({String name, PluginInstallReport report})>
+      _installRejected = StreamController.broadcast();
+  Stream<({String name, PluginInstallReport report})> get installRejections =>
+      _installRejected.stream;
+
   /// האם ממתינים כרגע לאוצריא שתסיים התקנה כלשהי.
   bool get isAwaitingInstall => _pendingInstalls.isNotEmpty;
 
@@ -372,7 +377,11 @@ class PluginsModuleController extends ChangeNotifier
 
   /// מתחיל להמתין להתקנה של [plugin] באוצריא. ציבורי כדי שבדיקות יוכלו
   /// להריץ את ההמתנה בלי למסור URL למערכת ההפעלה.
-  void watchForInstall(StorePlugin plugin) {
+  void watchForInstall(
+    StorePlugin plugin, {
+    String? deliveredPath,
+    DateTime? handedOffAt,
+  }) {
     final manifestId = plugin.manifestId;
     // בלי מזהה מניפסט אין מה לזהות בסריקה — התוסף לא ייספר כמותקן ממילא.
     if (manifestId == null) return;
@@ -382,6 +391,8 @@ class PluginsModuleController extends ChangeNotifier
       manifestId: manifestId,
       versionBefore: installed[manifestId],
       deadline: DateTime.now().add(installWatchTimeout),
+      deliveredPath: deliveredPath,
+      handedOffAt: handedOffAt ?? DateTime.now(),
     );
     _installWatch ??= Timer.periodic(installWatchInterval, _tick);
     notifyListeners();
@@ -399,13 +410,49 @@ class PluginsModuleController extends ChangeNotifier
 
   /// סוגר את מה שהסריקה הוכיחה: גרסה שהשתנתה = ההתקנה הסתיימה, ומועד
   /// שעבר = הפסקנו לחכות (המשתמש ביטל בחלון של אוצריא, או שלא סיים).
-  void _settleInstallWatch(Map<String, String> scanned) {
+  Future<Map<String, PluginInstallReport>> _installReports() async {
+    final watched = {
+      for (final entry in _pendingInstalls.entries)
+        if (entry.value.deliveredPath != null) entry.key: entry.value,
+    };
+    if (watched.isEmpty) return const {};
+    final root = await _manager.otzariaDataRoot();
+    if (root == null) return const {};
+    final capabilities = await OtzariaCapabilities.read(root);
+    if ((capabilities?.pluginInstallResults ?? 0) < 1) return const {};
+    final reports = await PluginInstallResults.read(root);
+    return {
+      for (final entry in watched.entries)
+        if (PluginInstallResults.latestFor(
+          reports,
+          entry.value.deliveredPath!,
+          entry.value.handedOffAt,
+        )
+            case final report?)
+          entry.key: report,
+    };
+  }
+
+  void _settleInstallWatch(
+    Map<String, String> scanned, {
+    Map<String, PluginInstallReport> reports = const {},
+  }) {
     if (_pendingInstalls.isEmpty) return;
 
     final now = DateTime.now();
     final countBefore = _pendingInstalls.length;
     final done = <String>[];
+    final rejected = <({String name, PluginInstallReport report})>[];
     _pendingInstalls.removeWhere((id, pending) {
+      final report = reports[id];
+      if (report != null) {
+        if (report.succeeded) {
+          done.add(pending.name);
+        } else {
+          rejected.add((name: pending.name, report: report));
+        }
+        return true;
+      }
       if (scanned[pending.manifestId] != pending.versionBefore) {
         done.add(pending.name);
         return true;
@@ -424,6 +471,13 @@ class PluginsModuleController extends ChangeNotifier
     for (final name in done) {
       AppLogger.instance.info('אוצריא סיימה להתקין את $name');
       if (!_installDone.isClosed) _installDone.add(name);
+    }
+    for (final entry in rejected) {
+      AppLogger.instance.info(
+        'אוצריא לא התקינה את ${entry.name}: ${entry.report.outcome}'
+        '${entry.report.message == null ? '' : ' (${entry.report.message})'}',
+      );
+      if (!_installRejected.isClosed) _installRejected.add(entry);
     }
   }
 
@@ -679,6 +733,7 @@ class PluginsModuleController extends ChangeNotifier
       _manager.saveCopy(plugin, destPath, appVersion: appVersion);
 
   Future<PluginInstallResult> directInstall(StorePlugin plugin) async {
+    final handedOffAt = DateTime.now();
     var current = plugin;
     final result = await _manager.directInstall(
       plugin,
@@ -689,7 +744,11 @@ class PluginsModuleController extends ChangeNotifier
       },
     );
     if (result.success) {
-      watchForInstall(current);
+      watchForInstall(
+        current,
+        deliveredPath: result.deliveredPath,
+        handedOffAt: handedOffAt,
+      );
     } else {
       AppLogger.instance.error(
         'התקנה ישירה של ${plugin.name} נכשלה: ${result.error}',
@@ -970,6 +1029,7 @@ class PluginsModuleController extends ChangeNotifier
   void dispose() {
     _installWatch?.cancel();
     unawaited(_installDone.close());
+    unawaited(_installRejected.close());
     _manager.dispose();
     super.dispose();
   }
@@ -983,10 +1043,14 @@ class _PendingInstall {
     required this.manifestId,
     required this.versionBefore,
     required this.deadline,
+    required this.handedOffAt,
+    this.deliveredPath,
   });
 
   final String name;
   final String manifestId;
   final String? versionBefore;
   final DateTime deadline;
+  final DateTime handedOffAt;
+  final String? deliveredPath;
 }

@@ -949,6 +949,12 @@ class _Plugins extends PluginsStrings {
   String installDoneSnack(String pluginName) =>
       'התוסף $pluginName הותקן בהצלחה';
   @override
+  String installCancelledSnack(String pluginName) =>
+      'התקנת $pluginName בוטלה באוצריא';
+  @override
+  String installRejectedSnack(String pluginName, String? reason) =>
+      'אוצריא לא התקינה את $pluginName${reason == null ? '' : ': $reason'}';
+  @override
   String get installFailedSnack => 'ההתקנה נכשלה';
 
   @override

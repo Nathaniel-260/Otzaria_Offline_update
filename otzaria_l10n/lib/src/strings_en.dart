@@ -1007,6 +1007,12 @@ class _Plugins extends PluginsStrings {
   String installDoneSnack(String pluginName) =>
       '$pluginName was installed successfully';
   @override
+  String installCancelledSnack(String pluginName) =>
+      'Installing $pluginName was cancelled in Otzaria';
+  @override
+  String installRejectedSnack(String pluginName, String? reason) =>
+      'Otzaria did not install $pluginName${reason == null ? '' : ': $reason'}';
+  @override
   String get installFailedSnack => 'The installation failed';
 
   @override

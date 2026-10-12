@@ -13,6 +13,7 @@ export 'src/services/installed_plugins_registry.dart';
 export 'src/services/installed_plugins_scanner.dart';
 export 'src/services/plugin_compatibility.dart';
 export 'src/services/plugin_direct_installer.dart';
+export 'src/services/plugin_install_results.dart';
 export 'src/services/plugin_manifest_reader.dart';
 export 'src/services/plugin_mirror_store.dart';
 export 'src/services/plugin_online_peek.dart';

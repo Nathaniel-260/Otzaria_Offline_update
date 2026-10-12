@@ -598,6 +598,8 @@ abstract class PluginsStrings {
 
   /// אחרי שהסריקה הוכיחה שאוצריא סיימה — ולא כשהמסירה אליה הצליחה.
   String installDoneSnack(String pluginName);
+  String installCancelledSnack(String pluginName);
+  String installRejectedSnack(String pluginName, String? reason);
   String get installFailedSnack;
 
   String get loadingCatalog;
