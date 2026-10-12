@@ -15,4 +15,10 @@ void main() {
     await trustNetfreeCertificates();
     expect(SecurityContext.defaultContext, isNotNull);
   });
+
+  test('תעודה חסרה אינה עוצרת את העלייה', () async {
+    await trustNetfreeCertificates(
+      assets: const ['assets/ca/missing.pem', 'assets/ca/netfree_cas.pem'],
+    );
+  });
 }
