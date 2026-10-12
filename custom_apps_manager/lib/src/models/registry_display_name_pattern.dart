@@ -28,9 +28,9 @@ abstract final class RegistryDisplayNamePattern {
 
     final prefix = trimmed.replaceFirst(_versionTail, '').trim();
     final base = prefix.length >= _minPrefixLength ? prefix : trimmed;
-    // ה-lookahead הוא ASCII בכוונה: `\p{L}` דורש את דגל ה-unicode, ובלעדיו
-    // Dart היה מפרש אותו כתווים מילוליים — תבנית ששותקת ולא מתאימה לכלום.
-    return '^${RegExp.escape(base)}(?![A-Za-z\\d])';
+    // טווח מפורש ולא `\p{L}`: בלי דגל ה-unicode Dart מפרש אותו מילולית.
+    // העברית בפנים, אחרת "קול" היה מתאים ל"קולמוס".
+    return '^${RegExp.escape(base)}(?![A-Za-z\\d֐-׿])';
   }
 
   /// האם [displayName] תואם ל-[pattern]. תבנית פגומה אינה מפילה את הבדיקה,

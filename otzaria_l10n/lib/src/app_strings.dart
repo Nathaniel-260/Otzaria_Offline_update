@@ -1767,6 +1767,13 @@ abstract class CustomAppsStrings {
 
   String installedSnack(String name);
 
+  String get trustDialogTitle;
+  String trustDialogContent(String name, String source);
+  String get trustDialogConfirm;
+  String get unverifiedDialogTitle;
+  String unverifiedDialogContent(String fileName);
+  String get unverifiedDialogConfirm;
+
   /// מוצג כל זמן שממתינים לרישום ההסרה אחרי ההתקנה. חייב להיות שם: הסקירה
   /// החוזרת יכולה להימשך עד דקה, ובלי הודעה זה נראה כתקיעה.
   String get learningLabel;
@@ -1818,6 +1825,12 @@ abstract class CustomAppsDomainStrings {
   String installerElevatedRetryDeclined(int firstExitCode);
   String get installerElevationDeclined;
   String get installerDigestMismatch;
+
+  /// קובץ התקנה בלי sha256 שמור אינו מורץ עד שמישהו מאשר אותו כאן.
+  String get installerUnverified;
+
+  /// רשומה שהגיעה ממחשב אחר אינה מותקנת לפני אישור במחשב הזה.
+  String get appNotTrustedHere;
   String fileCopyFailed(String error);
   String portableFileInUse(String fileName, String error);
   String launchFileMissing(String launchPath);

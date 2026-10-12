@@ -20,6 +20,7 @@ import 'services/custom_app_locator.dart';
 import 'services/custom_app_media.dart';
 import 'services/custom_app_order_store.dart';
 import 'services/custom_app_store.dart';
+import 'services/custom_app_trust_store.dart';
 import 'services/elevated_process.dart';
 import 'services/file_digest.dart';
 import 'services/github_app_client.dart';
@@ -61,7 +62,9 @@ class CustomAppsManager {
     GithubAppClient? githubClient,
     InstallLearner? learner,
     void Function(String id, FileSystemException error)? onLearnedRulesNotSaved,
+    Future<String> Function()? machineKey,
   })  : _onLearnedRulesNotSaved = onLearnedRulesNotSaved,
+        _machineKey = machineKey ?? _hostnameKey,
         _locator = CustomAppLocator(
           readVersion: readVersion,
           lookupUninstallDirs: lookupUninstallDirs,
@@ -92,6 +95,9 @@ class CustomAppsManager {
   final InstallLearner _learner;
   final void Function(String id, FileSystemException error)?
       _onLearnedRulesNotSaved;
+  final Future<String> Function() _machineKey;
+
+  static Future<String> _hostnameKey() async => Platform.localHostname;
 
   /// לאן מגיעה תוכנה מסוג ארכיון.
   String get downloadsDir => _installer.downloadsDir;
@@ -111,11 +117,59 @@ class CustomAppsManager {
 
   Future<Set<String>> takenIds() async => (await _store()).takenIds();
 
-  /// רושם תוכנה חדשה. **התיאור נוצר תמיד כאן, מתוך הטופס** — אין ייבוא
-  /// של תיאור מקובץ חיצוני, ולכן אין תיאור שהגיע מגורם שהמשתמש אינו
-  /// מכיר. זה מה שמייתר דיאלוג אמון: הוא בחר בעצמו את הריפו ואת הקובץ.
-  Future<void> add(AppDescriptor descriptor) async =>
-      (await _store()).add(descriptor);
+  /// רושם תוכנה חדשה מהטופס, ומסמן אותה כמאושרת במחשב הזה בלבד. תיקייה
+  /// שהועתקה ממחשב אחר מגיעה בלי האישור הזה — ראו [installPreflight].
+  Future<void> add(AppDescriptor descriptor) async {
+    final store = await _store();
+    await store.add(descriptor);
+    await CustomAppTrustStore(store.dirFor(descriptor.id))
+        .trust(await _machineKey());
+  }
+
+  /// What [install] would refuse: a record not confirmed on this machine, or
+  /// an installer with no stored sha256. The UI asks, then calls [trustHere]
+  /// or [recordInstallerHash].
+  Future<({bool needsTrust, bool needsHash})> installPreflight(
+    String id,
+  ) async {
+    final store = await _store();
+    final entry = await store.load(id);
+    final trusted = await CustomAppTrustStore(store.dirFor(id))
+        .isTrusted(await _machineKey());
+    return (
+      needsTrust: !trusted,
+      needsHash: entry?.installer != null && entry!.installer!.sha256 == null,
+    );
+  }
+
+  Future<void> trustHere(String id) async {
+    final store = await _store();
+    await CustomAppTrustStore(store.dirFor(id)).trust(await _machineKey());
+  }
+
+  /// Stores the sha256 of the installer as it is now, after the user
+  /// confirmed it; from then on [install] verifies against it.
+  Future<void> recordInstallerHash(String id) async {
+    final t = AppL10n.strings.customAppsDomain;
+    final store = await _store();
+    final entry = await store.load(id);
+    final installer = entry?.installer;
+    if (installer == null) throw AppDescriptorException(t.noInstallerInMirror);
+    final path = store.installerPathFor(id, installer);
+    if (!await File(path).exists()) {
+      throw AppDescriptorException(t.installerFileMissing(path));
+    }
+    await store.saveInstaller(
+      id,
+      StoredInstaller(
+        fileName: installer.fileName,
+        version: installer.version,
+        sizeBytes: installer.sizeBytes,
+        addedAt: installer.addedAt,
+        sha256: await sha256OfFile(path),
+      ),
+    );
+  }
 
   /// מעדכן רשומה שכבר קיימת — מה שהטופס עושה כשפותחים אותו לעריכה.
   ///
@@ -424,6 +478,13 @@ class CustomAppsManager {
     final installer = entry.installer;
     if (installer == null) {
       throw AppDescriptorException(t.noInstallerInMirror);
+    }
+    if (!await CustomAppTrustStore(store.dirFor(id))
+        .isTrusted(await _machineKey())) {
+      throw AppDescriptorException(t.appNotTrustedHere);
+    }
+    if (installer.sha256 == null) {
+      throw AppDescriptorException(t.installerUnverified);
     }
 
     final installerPath = store.installerPathFor(id, installer);

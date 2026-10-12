@@ -1486,6 +1486,13 @@ load-bearing details:
   `UninstallDirLookup` turns it into detection. With only one wired, the record
   updates and the app still reports "not installed".
 
+**An installer runs only when this machine trusts the record and its file
+has a stored sha256.** Copying `apps/<id>/` is how a program is handed over,
+so a record from another machine ran its installer unasked, and a missing
+`sha256` skipped verification. `CustomAppTrustStore` (`trust.json`, machine
+keys from `LibraryStateStore.currentMachineKey`) and `installPreflight` →
+`trustHere` / `recordInstallerHash`; the UI asks in `installCustomApp`.
+
 **Never pick the first `.exe` when learning either.** The learned exe name goes
 through `OtzariaAppLocator.findIn(nameMatches:)` — the same verified scanner with an
 injected name predicate. The form's suggestion used to take the first `.exe` from

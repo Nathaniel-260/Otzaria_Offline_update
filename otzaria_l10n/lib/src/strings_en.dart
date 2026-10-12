@@ -2874,6 +2874,14 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'The installer on the drive is damaged — it does not match the file '
       'that was stored. Download or add it again on a computer with internet';
   @override
+  String get installerUnverified =>
+      'The installer has no stored fingerprint, so there is no way to tell '
+      'whether it was changed. Approve it before installing';
+  @override
+  String get appNotTrustedHere =>
+      'This program was added on another computer. Approve it on this '
+      'computer before installing';
+  @override
   String fileCopyFailed(String error) => 'Copying the file failed: $error';
   @override
   String portableFileInUse(String fileName, String error) =>
@@ -3298,6 +3306,25 @@ class _CustomApps extends CustomAppsStrings {
 
   @override
   String installedSnack(String name) => '$name was installed';
+  @override
+  String get trustDialogTitle => 'A program added on another computer';
+  @override
+  String trustDialogContent(String name, String source) =>
+      '"$name" was not added on this computer — it came on the drive from '
+      'elsewhere ($source). Installing runs its installer on this computer. '
+      'Continue only if you know who added it and what it is.';
+  @override
+  String get trustDialogConfirm => 'I trust this program, install';
+  @override
+  String get unverifiedDialogTitle => 'An installer without a fingerprint';
+  @override
+  String unverifiedDialogContent(String fileName) =>
+      '$fileName has no stored fingerprint (sha256), so there is no way to '
+      'tell whether it is the file that was originally added. Approving '
+      'computes and stores it now; from then on any change to the file is '
+      'blocked.';
+  @override
+  String get unverifiedDialogConfirm => 'Verify and save';
   @override
   String get learningLabel => 'Identifying the installation...';
   @override

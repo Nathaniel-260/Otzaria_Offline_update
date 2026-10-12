@@ -2674,6 +2674,13 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'קובץ ההתקנה שעל הכונן פגום — הוא אינו זהה לקובץ שנשמר. יש להוריד '
       'או לצרף אותו מחדש במחשב שיש בו אינטרנט';
   @override
+  String get installerUnverified =>
+      'לקובץ ההתקנה אין טביעת אצבע שמורה, ולכן אי אפשר לוודא שלא שונה. יש '
+      'לאשר אותו לפני ההתקנה';
+  @override
+  String get appNotTrustedHere =>
+      'התוכנה נוספה במחשב אחר. יש לאשר אותה במחשב הזה לפני ההתקנה';
+  @override
   String fileCopyFailed(String error) => 'העתקת הקובץ נכשלה: $error';
   @override
   String portableFileInUse(String fileName, String error) =>
@@ -3074,6 +3081,24 @@ class _CustomApps extends CustomAppsStrings {
 
   @override
   String installedSnack(String name) => '$name הותקנה';
+  @override
+  String get trustDialogTitle => 'תוכנה שנוספה במחשב אחר';
+  @override
+  String trustDialogContent(String name, String source) =>
+      'את "$name" לא הוסיפו במחשב הזה — היא הגיעה על הכונן ממקום אחר '
+      '($source). התקנה מריצה את קובץ ההתקנה שלה במחשב הזה. להמשיך רק אם '
+      'ידוע מי הוסיף אותה ומה היא.';
+  @override
+  String get trustDialogConfirm => 'אני סומך על התוכנה, התקן';
+  @override
+  String get unverifiedDialogTitle => 'קובץ התקנה בלי טביעת אצבע';
+  @override
+  String unverifiedDialogContent(String fileName) =>
+      'ל-$fileName אין טביעת אצבע (sha256) שמורה, ולכן אי אפשר לוודא שהוא '
+      'הקובץ שצורף במקור. אישור יחשב אותה עכשיו וישמור אותה, ומכאן והלאה '
+      'כל שינוי בקובץ ייחסם.';
+  @override
+  String get unverifiedDialogConfirm => 'אמת ושמור';
   @override
   String get learningLabel => 'מזהה את ההתקנה...';
   @override

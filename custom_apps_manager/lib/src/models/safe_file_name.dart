@@ -8,8 +8,15 @@ String? safeFileName(Object? value) {
   // Windows silently strips trailing spaces and dots, so the name on disk
   // would differ from the stored one; this also rejects `.` and `..`.
   if (value != value.trim() || value.endsWith('.')) return null;
-  if (value.contains('/') || value.contains(r'\') || value.contains(':')) {
-    return null;
-  }
+  if (_forbiddenChars.hasMatch(value)) return null;
+  if (_reservedDeviceName.hasMatch(value)) return null;
   return value;
 }
+
+final RegExp _forbiddenChars = RegExp(r'[\x00-\x1F<>:"/\\|?*]');
+
+/// `CON.txt` opens the console device on Windows, whatever the extension.
+final RegExp _reservedDeviceName = RegExp(
+  r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)',
+  caseSensitive: false,
+);

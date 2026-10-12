@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:custom_apps_manager/custom_apps_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'package:library_manager/library_manager.dart' show LibraryStateStore;
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
@@ -122,6 +123,7 @@ class CustomAppsController extends ChangeNotifier
           lookupInstalledExe: findInstalledExe,
           onLearningStarted: _markLearning,
           onLearnedRulesNotSaved: logLearnedRulesNotSaved,
+          machineKey: LibraryStateStore.currentMachineKey,
         );
   }
 
@@ -643,6 +645,28 @@ class CustomAppsController extends ChangeNotifier
       notifyListeners();
     }
     return stored;
+  }
+
+  /// What [install] would refuse here — asked before it, see
+  /// `CustomAppsManager.installPreflight`.
+  Future<({bool needsTrust, bool needsHash})?> installPreflight(String id) =>
+      _guard(() => _manager.installPreflight(id));
+
+  Future<bool> trustHere(String id) async =>
+      await _guard(() async {
+        await _manager.trustHere(id);
+        return true;
+      }) ??
+      false;
+
+  Future<bool> recordInstallerHash(String id) async {
+    final ok = await _guard(() async {
+          await _manager.recordInstallerHash(id);
+          return true;
+        }) ??
+        false;
+    if (ok) await load();
+    return ok;
   }
 
   Future<({bool ok, String? copiedPath, String? learnedExeName})> install(
