@@ -1369,8 +1369,9 @@ is deliberately unused.
 - `InstalledPluginsScanner` derives the plugins folder from it —
   `<exeDir>/otzaria_data/plugins` when `portable.marker` sits next to the executable
   **or that data folder already exists** (deliberately wider than `LibraryDbLocator`,
-  which demands the marker), otherwise `%APPDATA%\otzaria\plugins`, then the
-  system-wide install. The marker and data-folder names are duplicated in
+  which demands the marker), otherwise `%APPDATA%\otzaria\plugins`. There is no
+  system-wide candidate: Otzaria keeps plugins under its user data root only
+  (`AppPaths.getPluginsRootPath`). The marker and data-folder names are duplicated in
   `plugins_manager` and `library_manager`;
   `launcher_app/test/portable_paths_test.dart` verifies they never drift.
 - `PluginDirectInstaller` hands the `otzaria://…` URL straight to that executable as

@@ -87,11 +87,7 @@ class InstalledPluginsScanner {
     final portable = portablePluginsDir(otzariaLaunchPath);
     if (portable != null) return portable;
 
-    final candidates = defaultPluginsDirs();
-    for (final dir in candidates) {
-      if (Directory(p.join(dir, installedDirName)).existsSync()) return dir;
-    }
-    return candidates.isEmpty ? null : candidates.first;
+    return defaultPluginsDir();
   }
 
   /// תיקיית התוספים של התקנה **ניידת** — `<exeDir>/otzaria_data/plugins` —
@@ -122,42 +118,22 @@ class InstalledPluginsScanner {
     return p.dirname(launchPath);
   }
 
-  /// `%APPDATA%\otzaria\plugins` בווינדוס,
-  /// `~/Library/Application Support/otzaria/plugins` ב-macOS.
+  /// `<dataRoot>/plugins` של אוצריא (`AppPaths.getPluginsRootPath`) — היא
+  /// אינה שומרת תוספים מחוץ לשורש הנתונים של המשתמש.
   static String? defaultPluginsDir() {
-    final dirs = defaultPluginsDirs();
-    return dirs.isEmpty ? null : dirs.first;
-  }
-
-  /// כל שורשי הנתונים של אוצריא בפלטפורמה הזו, לפי סדר עדיפות — התקנה
-  /// למשתמש הנוכחי לפני התקנה מערכתית, כמו ב-`LibraryDbLocator`.
-  static List<String> defaultPluginsDirs() {
     final env = Platform.environment;
-    final dirs = <String>[];
-
     if (Platform.isWindows) {
       final appData = env['APPDATA'];
-      if (appData != null && appData.isNotEmpty) {
-        dirs.add(p.join(appData, 'otzaria', 'plugins'));
-      }
-      final programData = env['ProgramData'];
-      if (programData != null && programData.isNotEmpty) {
-        dirs.add(p.join(programData, 'otzaria', 'plugins'));
-      }
-      return dirs;
+      if (appData == null || appData.isEmpty) return null;
+      return p.join(appData, 'otzaria', 'plugins');
     }
-
     if (Platform.isMacOS) {
       final home = env['HOME'];
-      if (home != null && home.isNotEmpty) {
-        dirs.add(p.join(
-            home, 'Library', 'Application Support', 'otzaria', 'plugins'));
-      }
-      dirs.add(p.join('/Library', 'Application Support', 'otzaria', 'plugins'));
-      return dirs;
+      if (home == null || home.isEmpty) return null;
+      return p.join(
+          home, 'Library', 'Application Support', 'otzaria', 'plugins');
     }
-
-    return dirs;
+    return null;
   }
 
   /// הגרסה המותקנת של תוסף אחד — מתוך תיקיית ההוצאה הפעילה שלו.

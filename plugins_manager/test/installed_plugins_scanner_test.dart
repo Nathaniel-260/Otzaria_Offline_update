@@ -285,6 +285,24 @@ void main() {
       }
     });
 
+    test('ברירת המחדל היא שורש הנתונים של המשתמש בלבד, כמו AppPaths באוצריא',
+        () {
+      final dir = InstalledPluginsScanner.defaultPluginsDir();
+      if (Platform.isWindows) {
+        expect(
+          dir,
+          p.join(Platform.environment['APPDATA']!, 'otzaria', 'plugins'),
+        );
+      } else if (Platform.isMacOS) {
+        expect(
+          dir,
+          p.join(Platform.environment['HOME']!, 'Library',
+              'Application Support', 'otzaria', 'plugins'),
+        );
+      }
+      expect(dir ?? '', isNot(contains('ProgramData')));
+    });
+
     test('דריסה במחרוזת ריקה נופלת לברירת המחדל', () {
       const scanner = InstalledPluginsScanner(customPluginsDir: '');
       const fallback = InstalledPluginsScanner();
