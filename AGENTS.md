@@ -1580,6 +1580,13 @@ output is `launcher_app/build/עדכוני אוצריא.exe` (uploaded via a `bu
 not by its Hebrew name). Do not reintroduce an installer step without adding the
 dependency back first — that mismatch kept CI red from July 24 to August 6, 2026.
 
+**Builds are reproducible: every package commits its `pubspec.lock`, and CI
+resolves with `--enforce-lockfile`.** CI used to resolve fresh on every run, so
+the same commit could ship different dependencies. Flutter (`flutter-version`),
+the Dart SDK (`setup-dart` `sdk:`) and every action (commit SHA) are pinned in
+`.github/workflows/`; bump the toolchain and regenerate the locks together, and
+never change a lock without its `pubspec.yaml` in an unrelated change.
+
 **The distributed exe carries the whole file pile inside it.** `launcher_app.exe`
 cannot ship alone: `flutter_windows.dll` is a load-time import and `data/` is resolved
 relative to the exe's directory. So what ships is a tiny C stub
