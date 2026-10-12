@@ -1953,6 +1953,19 @@ class _LibraryDomain extends LibraryDomainStrings {
       'הגרסה האחרונה של הספרייה ($latestVersion) בנויה על סכמת מסד '
       '$schemaVersion, שגרסה זו של התוכנה אינה יודעת להחיל דרך קובצי עדכון';
   @override
+  String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion) =>
+      'גרסת הספרייה $latestVersion דורשת גרסה חדשה יותר של אוצריא: הגרסה '
+      'המותקנת קוראת מסד עד סכמה $readableSchema בלבד. יש לעדכן קודם את '
+      'אוצריא, ואחר כך את הספרייה.';
+  @override
+  String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion) =>
+      'הספרייה תעודכן עד גרסה $reachedVersion. גרסה $latestVersion דורשת '
+      'גרסה חדשה יותר של אוצריא — אחרי עדכון אוצריא אפשר להמשיך.';
+  @override
+  String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion) =>
+      'בכונן יש את אוצריא $otzariaVersion, שקוראת את הספרייה החדשה: יש לעדכן '
+      'קודם את אוצריא, ואחר כך את הספרייה.';
+  @override
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion) =>
       'קובצי העדכון של הגרסה האחרונה ($latestVersion) בנויים בפורמט '
       '$patchFormatVersion, שגרסה זו של התוכנה אינה יודעת להחיל';
@@ -2166,6 +2179,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get fullDbNeedsNativeZstd =>
       'חילוץ ה-DB המלא דורש את ספריית zstd, והיא אינה זמינה במחשב הזה';
+  @override
+  String get patchNeedsNativeZstd =>
+      'חילוץ קובץ העדכון דורש את ספריית zstd, והיא אינה זמינה במחשב הזה';
   @override
   String versionMismatchAfterWrite(int? actual, int? expected) =>
       'אחרי כתיבת ה-DB המלא, הגרסה שנקראה ($actual) לא תואמת ליעד '

@@ -1196,6 +1196,9 @@ abstract class LibraryDomainStrings {
   );
   String planNoFullDbEither(String reason);
   String planPatchSchemaTooNew(int schemaVersion, int latestVersion);
+  String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion);
+  String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion);
+  String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion);
 
   /// אותו מצב על ציר פורמט ה-patch: הסכמה מוכרת, הפורמט לא.
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion);
@@ -1288,6 +1291,7 @@ abstract class LibraryDomainStrings {
   String get fullDbAssetMissingFromPlan;
   String get fullDbExtractionFailed;
   String get fullDbNeedsNativeZstd;
+  String get patchNeedsNativeZstd;
   String versionMismatchAfterWrite(int? actual, int? expected);
   String get updateCancelled;
 

@@ -2088,6 +2088,19 @@ class _LibraryDomain extends LibraryDomainStrings {
       'schema $schemaVersion, which this version of the software does not '
       'know how to apply through update files';
   @override
+  String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion) =>
+      'Library release $latestVersion needs a newer Otzaria: the installed '
+      'version reads databases up to schema $readableSchema only. Update '
+      'Otzaria first, then the library.';
+  @override
+  String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion) =>
+      'The library will be updated to release $reachedVersion. Release '
+      '$latestVersion needs a newer Otzaria — update Otzaria to continue.';
+  @override
+  String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion) =>
+      'The drive carries Otzaria $otzariaVersion, which reads the new library: '
+      'update Otzaria first, then the library.';
+  @override
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion) =>
       'The update files of the newest release ($latestVersion) are built in '
       'format $patchFormatVersion, which this version of the software does '
@@ -2324,6 +2337,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get fullDbNeedsNativeZstd =>
       'Extracting the full database requires the zstd library, which is not available on this computer';
+  @override
+  String get patchNeedsNativeZstd =>
+      'Extracting the update file requires the zstd library, which is not available on this computer';
   @override
   String versionMismatchAfterWrite(int? actual, int? expected) =>
       'After writing the full database, the version read back ($actual) does '
