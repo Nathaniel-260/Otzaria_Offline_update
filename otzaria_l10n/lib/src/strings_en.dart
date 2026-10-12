@@ -236,6 +236,10 @@ class _Home extends HomeStrings {
   @override
   String get libraryUpdateConfirm => 'Update Now';
   @override
+  String libraryApplyEstimate(int lowMinutes, int highMinutes) =>
+      'Expected to take about $lowMinutes to $highMinutes minutes, depending '
+      'on the computer.';
+  @override
   String libraryUpdatedSnack(String version) =>
       'The database was updated to version $version';
 

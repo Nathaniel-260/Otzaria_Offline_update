@@ -161,6 +161,17 @@ class LibraryModuleController extends ChangeNotifier
   bool needsElevation = false;
 
   /// גודל ההורדה של אותה ספרייה מלאה, בבייטים — לתצוגה לפני שמאשרים.
+  /// "צפוי כ-X–Y דקות" for the plan being confirmed, or the one running.
+  ({int low, int high})? applyEstimateFor({bool fullDownload = false}) {
+    final plan = _applyingPlan ??
+        (fullDownload
+            ? _lastCheck?.plan?.fullDownloadFallback
+            : _lastCheck?.plan);
+    return libraryApplyMinutes(plan);
+  }
+
+  LibraryUpdatePlan? _applyingPlan;
+
   int? get fullDownloadFallbackSize =>
       _lastCheck?.plan?.fullDownloadFallback?.totalDownloadSize;
 
@@ -709,6 +720,7 @@ class LibraryModuleController extends ChangeNotifier
 
     final plan =
         useFullDownloadFallback ? check.plan?.fullDownloadFallback : check.plan;
+    _applyingPlan = plan;
     AppLogger.instance.info(
       'update() מתחיל: kind=${plan?.kind} local=${plan?.localVersion} target=${plan?.targetVersion}',
     );
@@ -760,6 +772,7 @@ class LibraryModuleController extends ChangeNotifier
         );
       } finally {
         _applying = false;
+        _applyingPlan = null;
       }
       AppLogger.instance.info(
         'החלת העדכון הסתיימה, נלווים שנכשלו=${companionFailures.length}',
@@ -876,4 +889,32 @@ class LibraryModuleController extends ChangeNotifier
     _manager.dispose();
     super.dispose();
   }
+}
+
+/// Measured runs spread 3–5x between machines around [ApplyTimeEstimate]'s
+/// figure (129–581s against 262s), so the range is shown, not one number.
+({int low, int high})? libraryApplyMinutes(
+  LibraryUpdatePlan? plan, {
+  ApplyTimeEstimate estimate = const ApplyTimeEstimate(),
+}) {
+  if (plan == null) return null;
+  final double seconds;
+  switch (plan.kind) {
+    case LibraryUpdatePlanKind.delta:
+      seconds = estimate
+          .deltaRouteSeconds(plan.deltaSteps.map((s) => s.compressedSize));
+    case LibraryUpdatePlanKind.fullDownload:
+      final size = plan.fullDbAsset?.size ?? 0;
+      if (size <= 0) return null;
+      final followUp = plan.followUpDelta?.deltaSteps ?? const [];
+      seconds = estimate.fullRouteSeconds(size) +
+          estimate.deltaRouteSeconds(followUp.map((s) => s.compressedSize));
+    default:
+      return null;
+  }
+  if (seconds <= 0) return null;
+  return (
+    low: ApplyTimeEstimate.minutesOf(seconds * 0.5),
+    high: ApplyTimeEstimate.minutesOf(seconds * 2.5),
+  );
 }

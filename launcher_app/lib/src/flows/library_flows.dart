@@ -52,9 +52,25 @@ Widget libraryApplyProgressRow(
         stage: c.stageText ?? context.strings.libraryScreen.updatingProgress,
         progress: c.applyProgress,
         detail: formatBytesProgress(c.applyReceivedBytes, c.applyTotalBytes),
-        warning: context.strings.home.doNotRemoveDriveWarning,
+        warning: _withEstimate(
+          context,
+          context.strings.home.doNotRemoveDriveWarning,
+          c.applyEstimateFor(),
+        ),
       ),
     );
+
+String _withEstimate(
+  BuildContext context,
+  String text,
+  ({int low, int high})? estimate,
+) =>
+    estimate == null
+        ? text
+        : '${context.strings.home.libraryApplyEstimate(
+            estimate.low,
+            estimate.high,
+          )}\n$text';
 
 Future<bool> _blockedByRunningOtzaria(
   Future<bool> Function() isOtzariaRunning,
@@ -100,7 +116,11 @@ Future<void> confirmLibraryUpdate(
           .companionsOnlyPrompt(c.pendingCompanionNames),
       _ => home.libraryUpdatePrompt('${c.localVersion}', '${c.targetVersion}'),
     },
-    subtitle: home.doNotRemoveDriveWarning,
+    subtitle: _withEstimate(
+      context,
+      home.doNotRemoveDriveWarning,
+      c.companionsOnly ? null : c.applyEstimateFor(),
+    ),
     confirmText: home.libraryUpdateConfirm,
   );
   if (!approved) return;
@@ -132,7 +152,11 @@ Future<void> confirmLibraryFullDownload(
           ? formatBytes(size)
           : context.strings.common.unknownValue,
     ),
-    subtitle: context.strings.home.doNotRemoveDriveWarning,
+    subtitle: _withEstimate(
+      context,
+      context.strings.home.doNotRemoveDriveWarning,
+      c.applyEstimateFor(fullDownload: true),
+    ),
     confirmText: context.strings.common.install,
   );
   if (!approved) return;

@@ -226,6 +226,9 @@ class _Home extends HomeStrings {
   @override
   String get libraryUpdateConfirm => 'עדכן עכשיו';
   @override
+  String libraryApplyEstimate(int lowMinutes, int highMinutes) =>
+      'צפוי כ-$lowMinutes עד $highMinutes דקות, לפי מהירות המחשב.';
+  @override
   String libraryUpdatedSnack(String version) => 'המסד עודכן לגרסה $version';
 
   @override

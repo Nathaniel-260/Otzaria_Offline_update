@@ -150,6 +150,9 @@ abstract class HomeStrings {
   String libraryFreshInstallPrompt(String targetVersion);
   String libraryUpdatePrompt(String localVersion, String targetVersion);
   String get libraryUpdateConfirm;
+
+  /// טווח ולא מספר: הזמן בפועל משתנה פי 3–5 בין מחשבים.
+  String libraryApplyEstimate(int lowMinutes, int highMinutes);
   String libraryUpdatedSnack(String version);
 
   /// אזהרה לפני עדכון הספרייה ולאורכו — התוכנה והעדכונים יושבים על הכונן
