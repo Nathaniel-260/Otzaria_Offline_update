@@ -97,7 +97,25 @@ void main() {
       );
     });
 
+    test('כשל מוחלט של הבדיקה חוסם כתיבה למסד', () async {
+      if (!Platform.isWindows) {
+        markTestSkipped('מסלול ה-locator רץ רק בווינדוס');
+        return;
+      }
+      expect(
+        await const OtzariaProcessGuard(
+          locator: _FailingLocator(),
+        ).isAnyRunning(OtzariaProcessGuard.processNamesFor('windows')),
+        isTrue,
+      );
+      RunningOtzariaLocator.lastProbeFailure = null;
+    });
+
     test('השומר עונה לפי בדיקת התהליך של RunningOtzariaLocator', () async {
+      if (!Platform.isWindows) {
+        markTestSkipped('מסלול ה-locator רץ רק בווינדוס');
+        return;
+      }
       expect(
         await const OtzariaProcessGuard(
           locator: _FixedLocator(true),
@@ -110,6 +128,18 @@ void main() {
         ).isAnyRunning(OtzariaProcessGuard.processNamesFor('windows')),
         isFalse,
       );
+    });
+  });
+
+  group('OtzariaProcessGuard (macOS/לינוקס בלבד)', () {
+    test('pgrep על שם שאינו קיים מחזיר "לא רץ" (קוד יציאה 1)', () async {
+      if (!Platform.isMacOS && !Platform.isLinux) {
+        markTestSkipped('בדיקת pgrep רצה רק ב-macOS/לינוקס');
+        return;
+      }
+
+      const guard = OtzariaProcessGuard();
+      expect(await guard.isRunning('no-such-process-9f2c'), isFalse);
     });
   });
 
@@ -171,4 +201,14 @@ class _FixedLocator extends RunningOtzariaLocator {
   @override
   Future<RunningOtzariaProbe> probe() async =>
       (isRunning: running, launchPath: null);
+}
+
+class _FailingLocator extends RunningOtzariaLocator {
+  const _FailingLocator();
+
+  @override
+  Future<RunningOtzariaProbe> probe() async {
+    RunningOtzariaLocator.lastProbeFailure = 'probe failed';
+    return (isRunning: false, launchPath: null);
+  }
 }

@@ -1183,17 +1183,16 @@ and crashed on the next thing it loaded. `OtzariaManager._refuseIfRunningOnMac` 
 signed; `unzip` / `package:archive` destroy the symlinks and xattrs, and therefore the
 signature, and macOS refuses to run it.
 
-**"Otzaria is running" is its single-instance mutex, probed off the UI
-isolate.** `RunningOtzariaLocator.probe` opens `OtzariaAppSingleInstance`
-(contract C7) with `OpenMutexW` inside `Isolate.run`; only when it is present
-(or the answer is unknown) does one FFI process enumeration look for
-`otzaria.exe` by exact name, never the launcher itself. `tasklist` cost ~300ms
-per call and a blocked one meant "running forever"; a failed probe now counts
-as closed and is logged (`lastProbeFailure`). Resolve `GetLastError` before
-`OpenMutexW` — its lazy lookup clobbers the error. A process that holds the
-mutex itself (library apply) passes `isMutexHeldByThisProcess`.
-`OtzariaProcessGuard` (`library_manager`) delegates to it, and `AppShell`
-waits for the process to exit instead of polling every 3s.
+**"Otzaria is running" = its mutex *or* an `otzaria.exe` process, probed off the
+UI isolate.** `RunningOtzariaLocator.probe` runs in `Isolate.run`: `OpenMutexW` on
+`OtzariaAppSingleInstance` (contract C7) plus, always, one
+`CreateToolhelp32Snapshot` scan by image *name* — portable builds, Otzaria before
+0.9.96 and other users' or elevated processes hold no mutex we can see or hide
+their path. Paths are only enrichment. `tasklist` cost ~300ms per call. A total
+failure is logged (`lastProbeFailure`) and **blocks** in `OtzariaProcessGuard`
+(which keeps `pgrep -x` on macOS). Resolve `GetLastError` before `OpenMutexW` —
+its lazy lookup clobbers the error. OU's own lock sets
+`OtzariaSelfLock.isHeldByThisProcess` so its mutex is not mistaken for Otzaria.
 
 **The Windows uninstall registry beats every guess.** `WindowsInstallRegistry` reads
 `InstallLocation` from the Inno entries under `…\CurrentVersion\Uninstall` (HKCU, then

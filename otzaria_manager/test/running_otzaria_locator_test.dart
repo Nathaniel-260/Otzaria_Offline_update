@@ -182,17 +182,16 @@ void main() {
       }
 
       expect(paths, contains(fakeOtzaria));
-      expect(await const RunningOtzariaLocator().findLaunchPath(), isNull);
-
-      final mutexName = 'OtzariaLocatorTest-$pid';
-      final mutex = _createMutex(mutexName);
-      addTearDown(() => CloseHandle(mutex));
-      final probe = await RunningOtzariaLocator(mutexName: mutexName).probe();
-      expect(probe.isRunning, isTrue);
-      expect(probe.launchPath, isNotNull);
+      // אוצריא ישנה (בלי מיוטקס) או ניידת: התהליך לבדו מספיק.
+      expect(await const RunningOtzariaLocator().findLaunchPath(), isNotNull);
+      expect((await const RunningOtzariaLocator().probe()).isRunning, isTrue);
     });
 
     test('המיוטקס של אוצריא הוא הסימן ל"רצה"', () async {
+      if ((await RunningOtzariaLocator.windowsOtzariaPids()).isNotEmpty) {
+        markTestSkipped('אוצריא אמיתית פתוחה במכונה הזו');
+        return;
+      }
       final mutexName = 'OtzariaLocatorMutexTest-$pid';
       final locator = RunningOtzariaLocator(mutexName: mutexName);
       expect(
@@ -224,6 +223,22 @@ void main() {
 
       final otzariaPids = await RunningOtzariaLocator.windowsOtzariaPids();
       expect(probe.isRunning, otzariaPids.isNotEmpty);
+    });
+
+    test('OtzariaSelfLock: מיוטקס שהלאנצ׳ר מחזיק אינו "אוצריא רצה"', () async {
+      if ((await RunningOtzariaLocator.windowsOtzariaPids()).isNotEmpty) {
+        markTestSkipped('אוצריא אמיתית פתוחה במכונה הזו');
+        return;
+      }
+      final mutexName = 'OtzariaSelfLockTest-$pid';
+      final mutex = _createMutex(mutexName);
+      addTearDown(() => CloseHandle(mutex));
+      final locator = RunningOtzariaLocator(mutexName: mutexName);
+
+      expect((await locator.probe()).isRunning, isTrue);
+      OtzariaSelfLock.isHeldByThisProcess = () => true;
+      addTearDown(() => OtzariaSelfLock.isHeldByThisProcess = () => false);
+      expect((await locator.probe()).isRunning, isFalse);
     });
 
     test('waitForExit חוזר מיד כשאין תהליך להמתין לו', () async {

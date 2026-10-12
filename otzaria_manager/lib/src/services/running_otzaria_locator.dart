@@ -71,7 +71,7 @@ class RunningOtzariaLocator {
   Future<RunningOtzariaProbe> _probeWindows() async {
     final mutex = mutexName;
     final self = Platform.resolvedExecutable;
-    final ownMutex = isMutexHeldByThisProcess?.call() ?? false;
+    final ownMutex = (isMutexHeldByThisProcess ?? OtzariaSelfLock.isHeld)();
     final result = await _offUiIsolate(
       () => windowsProbeSync(mutex, self, mutexHeldByThisProcess: ownMutex),
     );
@@ -89,9 +89,6 @@ class RunningOtzariaLocator {
     final mutex = mutexHeldByThisProcess
         ? WindowsMutexState.unknown
         : windowsMutexState(mutexName);
-    if (mutex == WindowsMutexState.absent) {
-      return (isRunning: false, launchPath: null, failure: null);
-    }
     final running = _otzariaProcesses(selfPath);
     if (running == null) {
       return mutex == WindowsMutexState.present
@@ -99,7 +96,7 @@ class RunningOtzariaLocator {
           : (
               isRunning: false,
               launchPath: null,
-              failure: 'OpenMutexW and EnumProcesses both failed',
+              failure: 'CreateToolhelp32Snapshot failed',
             );
     }
     final path = running.map((process) => process.path).nonNulls.firstOrNull;
@@ -150,7 +147,8 @@ class RunningOtzariaLocator {
   static List<int> _pidsOfImage(String imagePath) => [
         for (final process in _processesNamed(p.basename(imagePath)) ??
             const <({int pid, String? path})>[])
-          if (p.equals(process.path!, imagePath)) process.pid,
+          if (process.path == null || p.equals(process.path!, imagePath))
+            process.pid,
       ];
 
   static bool? _waitForPidSync(int processId, int timeoutMillis) {
@@ -213,31 +211,72 @@ class RunningOtzariaLocator {
     );
   }
 
-  static List<({int pid, String? path})>? _otzariaProcesses(String selfPath) =>
-      _processesNamed(processNamesFor('windows').single)
-          ?.where((process) => !p.equals(process.path!, selfPath))
-          .toList();
+  static List<({int pid, String? path})>? _otzariaProcesses(String selfPath) {
+    final self = pid;
+    return _processesNamed(processNamesFor('windows').single)
+        ?.where(
+          (process) =>
+              process.pid != self &&
+              (process.path == null || !p.equals(process.path!, selfPath)),
+        )
+        .toList();
+  }
 
   static List<({int pid, String? path})>? _processesNamed(String imageName) {
-    final pids = _windowsAllPids();
-    if (pids == null) return null;
     final target = imageName.toLowerCase();
-    final found = <({int pid, String? path})>[];
+    final snapshot = _createSnapshot(_th32csSnapProcess, 0);
+    if (snapshot == INVALID_HANDLE_VALUE || snapshot == 0) return null;
+    final entry = calloc<_ProcessEntry32W>();
     final buffer = malloc<Uint16>(_maxPathChars).cast<Utf16>();
     final sizePtr = calloc<Uint32>();
     try {
-      for (final processId in pids) {
-        final path = _imagePathOf(processId, buffer, sizePtr);
-        if (path != null && p.basename(path).toLowerCase() == target) {
-          found.add((pid: processId, path: path));
-        }
+      entry.ref.dwSize = sizeOf<_ProcessEntry32W>();
+      final found = <({int pid, String? path})>[];
+      for (var more = _process32First(snapshot, entry) != 0;
+          more;
+          more = _process32Next(snapshot, entry) != 0) {
+        if (_exeFileOf(entry.ref).toLowerCase() != target) continue;
+        final processId = entry.ref.th32ProcessID;
+        found.add((
+          pid: processId,
+          path: _imagePathOf(processId, buffer, sizePtr),
+        ));
       }
+      return found;
     } finally {
+      CloseHandle(snapshot);
+      calloc.free(entry);
       malloc.free(buffer);
       calloc.free(sizePtr);
     }
-    return found;
   }
+
+  static String _exeFileOf(_ProcessEntry32W entry) {
+    final units = <int>[];
+    for (var i = 0; i < _maxPath; i++) {
+      final unit = entry.szExeFile[i];
+      if (unit == 0) break;
+      units.add(unit);
+    }
+    return String.fromCharCodes(units);
+  }
+
+  static const int _maxPath = 260;
+  static const int _th32csSnapProcess = 0x2;
+
+  static final _kernel32 = DynamicLibrary.open('kernel32.dll');
+
+  static final _createSnapshot = _kernel32.lookupFunction<
+      IntPtr Function(Uint32, Uint32),
+      int Function(int, int)>('CreateToolhelp32Snapshot');
+
+  static final _process32First = _kernel32.lookupFunction<
+      Int32 Function(IntPtr, Pointer<_ProcessEntry32W>),
+      int Function(int, Pointer<_ProcessEntry32W>)>('Process32FirstW');
+
+  static final _process32Next = _kernel32.lookupFunction<
+      Int32 Function(IntPtr, Pointer<_ProcessEntry32W>),
+      int Function(int, Pointer<_ProcessEntry32W>)>('Process32NextW');
 
   static WindowsMutexState windowsMutexState(String name) {
     if (!Platform.isWindows) return WindowsMutexState.unknown;
@@ -381,4 +420,37 @@ class _ProbeFailure implements Exception {
 
   @override
   String toString() => '$cause';
+}
+
+final class _ProcessEntry32W extends Struct {
+  @Uint32()
+  external int dwSize;
+  @Uint32()
+  external int cntUsage;
+  @Uint32()
+  external int th32ProcessID;
+  @UintPtr()
+  external int th32DefaultHeapID;
+  @Uint32()
+  external int th32ModuleID;
+  @Uint32()
+  external int cntThreads;
+  @Uint32()
+  external int th32ParentProcessID;
+  @Int32()
+  external int pcPriClassBase;
+  @Uint32()
+  external int dwFlags;
+  @Array(260)
+  external Array<Uint16> szExeFile;
+}
+
+class OtzariaSelfLock {
+  const OtzariaSelfLock._();
+
+  static bool Function() isHeldByThisProcess = _never;
+
+  static bool isHeld() => isHeldByThisProcess();
+
+  static bool _never() => false;
 }
