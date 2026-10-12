@@ -20,22 +20,7 @@ abstract final class MediaSniffer {
       _startsWith(head, ascii.encode('GIF89a')) ||
       (_startsWith(head, ascii.encode('RIFF')) &&
           head.length >= 12 &&
-          ascii.decode(head.sublist(8, 12), allowInvalid: true) == 'WEBP') ||
-      _isSvg(head);
-
-  static bool _isSvg(List<int> head) {
-    final text = utf8
-        .decode(head, allowMalformed: true)
-        .replaceFirst('﻿', '')
-        .trimLeft()
-        .toLowerCase();
-    if (!(text.startsWith('<svg') ||
-        text.startsWith('<?xml') ||
-        text.startsWith('<!--'))) {
-      return false;
-    }
-    return text.contains('<svg') && !text.contains('<html');
-  }
+          ascii.decode(head.sublist(8, 12), allowInvalid: true) == 'WEBP');
 
   static bool _startsWith(List<int> data, List<int> prefix) {
     if (data.length < prefix.length) return false;

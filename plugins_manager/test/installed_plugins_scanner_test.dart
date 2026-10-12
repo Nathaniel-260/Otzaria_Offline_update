@@ -39,7 +39,7 @@ void main() {
     });
 
     test('BOM במניפסט המותקן אינו מפיל את הקריאה', () async {
-      install(temp.path, 'bom', '﻿{"id":"bom","version":"2.0.0"}');
+      install(temp.path, 'bom', '\uFEFF{"id":"bom","version":"2.0.0"}');
 
       final scanner = InstalledPluginsScanner(customPluginsDir: temp.path);
       expect(await scanner.scan(), {'bom': '2.0.0'});

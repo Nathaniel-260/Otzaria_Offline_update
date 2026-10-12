@@ -23,7 +23,7 @@ void main() {
   });
 
   test('השדות נקראים, גם אחרי BOM; מפתח חסר או מסוג אחר הוא לא ידוע', () async {
-    write('﻿{"formatVersion":1,"reportsQueueFormat":1,'
+    write('\uFEFF{"formatVersion":1,"reportsQueueFormat":1,'
         '"pluginInstallResults":"1","appVersion":"0.9.98"}');
 
     final caps = await OtzariaCapabilities.read(temp.path);

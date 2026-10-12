@@ -17,7 +17,7 @@ class OtzariaCapabilities {
   static Future<OtzariaCapabilities?> read(String dataRoot) async {
     try {
       final text = await File(p.join(dataRoot, fileName)).readAsString();
-      final decoded = jsonDecode(text.replaceFirst('﻿', ''));
+      final decoded = jsonDecode(text.replaceFirst('\uFEFF', ''));
       if (decoded is! Map) return null;
       int? field(String key) =>
           decoded[key] is int ? decoded[key] as int : null;

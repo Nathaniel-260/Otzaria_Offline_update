@@ -188,7 +188,8 @@ class InstalledPluginsScanner {
     try {
       final file = File(p.join(releaseDir, 'manifest.json'));
       if (!file.existsSync()) return null;
-      final decoded = jsonDecode(file.readAsStringSync().replaceFirst('﻿', ''));
+      final decoded =
+          jsonDecode(file.readAsStringSync().replaceFirst('\uFEFF', ''));
       if (decoded is! Map) return null;
       final version = decoded['version'];
       return version is String && version.isNotEmpty ? version : null;

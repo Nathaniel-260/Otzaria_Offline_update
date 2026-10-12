@@ -11,10 +11,6 @@ void main() {
     expect(MediaSniffer.isImage(ascii.encode('GIF89a....')), isTrue);
     expect(MediaSniffer.isImage(ascii.encode('RIFF\x00\x00\x00\x00WEBPVP8 ')),
         isTrue);
-    expect(
-      MediaSniffer.isImage(utf8.encode('﻿  <?xml version="1.0"?><svg/>')),
-      isTrue,
-    );
   });
 
   test('דף HTML, JSON או קובץ קטוע אינם תמונה', () {
@@ -23,5 +19,9 @@ void main() {
     expect(MediaSniffer.isImage(utf8.encode('{"error":"shabbat"}')), isFalse);
     expect(MediaSniffer.isImage(const [137, 80, 78, 71]), isFalse);
     expect(MediaSniffer.isImage(const []), isFalse);
+    expect(
+      MediaSniffer.isImage(utf8.encode('\uFEFF<?xml version="1.0"?><svg/>')),
+      isFalse,
+    );
   });
 }
