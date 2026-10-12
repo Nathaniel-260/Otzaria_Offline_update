@@ -140,8 +140,8 @@ class DirectoryReportOutbox implements ReportOutbox {
   }
 
   /// המזהה מגיע ממסד של אוצריא — רק תווים בטוחים לשם קובץ.
-  String _pathFor(String reportId) {
-    final safe = reportId.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-    return p.join(directory, '$safe.json');
-  }
+  String _pathFor(String reportId) => p.join(directory, fileNameFor(reportId));
+
+  static String fileNameFor(String reportId) =>
+      '${reportId.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')}.json';
 }

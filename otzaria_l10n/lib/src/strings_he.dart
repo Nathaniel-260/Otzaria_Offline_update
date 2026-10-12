@@ -3202,6 +3202,9 @@ class _ErrorReportsDomain extends ErrorReportsDomainStrings {
   @override
   String uploadHttpStatus(int statusCode) => 'השרת השיב בקוד $statusCode';
   @override
+  String get uploadShabbat =>
+      'אתר אוצריא סגור בשבת ובימים טובים. הדיווחים נשמרו בכונן ויישלחו בפעם הבאה, אחרי צאת השבת.';
+  @override
   String get uploadTimedOut => 'השרת לא השיב בזמן';
   @override
   String uploadNetworkError(String error) => 'אין חיבור לשרת: $error';

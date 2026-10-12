@@ -3435,6 +3435,9 @@ class _ErrorReportsDomain extends ErrorReportsDomainStrings {
   String uploadHttpStatus(int statusCode) =>
       'The server answered with code $statusCode';
   @override
+  String get uploadShabbat =>
+      'The Otzaria site is closed on Shabbat and Yom Tov. The reports stay on the drive and will be sent next time, after Shabbat ends.';
+  @override
   String get uploadTimedOut => 'The server did not respond in time';
   @override
   String uploadNetworkError(String error) => 'Cannot reach the server: $error';

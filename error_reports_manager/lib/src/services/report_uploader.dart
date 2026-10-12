@@ -5,9 +5,11 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/outbox_report.dart';
 import '../models/upload_result.dart';
+import '../port/app_report.dart';
 import 'report_outbox.dart';
 
 typedef ReportDelay = Future<void> Function(Duration duration);
@@ -94,7 +96,7 @@ class ErrorReportUploader {
           waitRemaining: wait,
         ));
 
-    for (final item in reports) {
+    for (var item in reports) {
       if ((_unconfirmed[item.reportId] ?? 0) >= maxUnconfirmedAnswers &&
           _clock().isBefore(_unconfirmedUntil[item.reportId]!)) {
         stuckStatus = _unconfirmedStatus[item.reportId];
@@ -132,6 +134,7 @@ class ErrorReportUploader {
       }
 
       var retries = 0;
+      var renewedId = false;
       while (true) {
         if (!await _waitForWindow(report, cancellation)) {
           return stop(cancelled: true);
@@ -174,6 +177,33 @@ class ErrorReportUploader {
             continue;
           }
         }
+        if (status == 409 && !renewedId) {
+          final renewed = _withNewReportId(item, body);
+          if (renewed != null) {
+            try {
+              await outbox.write(
+                renewed.report.reportId,
+                OutboxReport.encodeFile(OutboxReport.fileJson(
+                  reportId: renewed.report.reportId,
+                  bookTitle: item.bookTitle,
+                  createdAt: item.createdAt?.toUtc().toIso8601String() ?? '',
+                  endpoint: item.endpoint.toString(),
+                  body: renewed.body,
+                )),
+              );
+            } on Object catch (e) {
+              return stop(
+                error:
+                    AppL10n.strings.errorReportsDomain.outboxUnreadable('$e'),
+              );
+            }
+            await _removeQuietly(outbox, item);
+            renewedId = true;
+            item = renewed.report;
+            body = Uint8List.fromList(utf8.encode(jsonEncode(renewed.body)));
+            continue;
+          }
+        }
         if (status >= 200 && status < 300 && attempt.accepted) {
           _unconfirmed.remove(item.reportId);
           _unconfirmedStatus.remove(item.reportId);
@@ -198,7 +228,9 @@ class ErrorReportUploader {
           stuckStatus = status;
         } else {
           return stop(
-            error: AppL10n.strings.errorReportsDomain.uploadHttpStatus(status),
+            error: attempt.shabbat
+                ? AppL10n.strings.errorReportsDomain.uploadShabbat
+                : AppL10n.strings.errorReportsDomain.uploadHttpStatus(status),
           );
         }
         break;
@@ -276,6 +308,7 @@ class ErrorReportUploader {
       responseBody.length > 200 ? responseBody.substring(0, 200) : responseBody,
       accepted: _isProtocolSuccess(responseBody),
       rejectedField: status == 422 ? _rejectedField(responseBody) : null,
+      shabbat: status == 503 && _isShabbat(responseBody),
     );
   }
 
@@ -283,6 +316,15 @@ class ErrorReportUploader {
     try {
       final json = jsonDecode(body);
       return json is Map && json['success'] == true;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  static bool _isShabbat(String body) {
+    try {
+      final json = jsonDecode(body);
+      return json is Map && json['error'] == 'shabbat';
     } on FormatException {
       return false;
     }
@@ -340,6 +382,35 @@ class ErrorReportUploader {
     }
   }
 
+  static ({OutboxReport report, Map<String, dynamic> body})? _withNewReportId(
+    OutboxReport item,
+    Uint8List bytes,
+  ) {
+    final decoded = jsonDecode(utf8.decode(bytes));
+    if (decoded is! Map<String, dynamic>) return null;
+    final isBookReport = decoded.containsKey('report_id');
+    final key = isBookReport ? 'report_id' : 'reportId';
+    if (decoded[key] is! String) return null;
+    final newId = isBookReport
+        ? '${DateTime.now().microsecondsSinceEpoch}-${item.reportId.hashCode.abs()}'
+        : AppReport.generateReportId();
+    return (
+      report: OutboxReport(
+        reportId: newId,
+        endpoint: item.endpoint,
+        bookTitle: item.bookTitle,
+        createdAt: item.createdAt,
+        filePath: p.join(
+          p.dirname(item.filePath),
+          DirectoryReportOutbox.fileNameFor(newId),
+        ),
+        hasImages: item.hasImages,
+        hasMinidump: item.hasMinidump,
+      ),
+      body: Map<String, dynamic>.of(decoded)..[key] = newId,
+    );
+  }
+
   static Future<void> _removeQuietly(
     ReportOutbox outbox,
     OutboxReport report,
@@ -361,10 +432,11 @@ class ErrorReportUploader {
 
 class _Attempt {
   const _Attempt(this.statusCode, this.excerpt,
-      {required this.accepted, this.rejectedField});
+      {required this.accepted, this.rejectedField, this.shabbat = false});
 
   final int statusCode;
   final String excerpt;
   final bool accepted;
   final String? rejectedField;
+  final bool shabbat;
 }

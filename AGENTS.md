@@ -1961,7 +1961,10 @@ file stays, and a re-send of what the server already got answers `duplicate`.
 
 **Only a 2xx whose body is a JSON object with `success:true` deletes a file as sent
 (a filter's 200 HTML page must not); 400/409/413/422 and a non-`https://otzaria.org`
-endpoint delete it as rejected; anything else keeps it and stops the run.** A drive
+endpoint delete it as rejected; anything else keeps it and stops the run.** A first 409
+means "this content was not ingested under that id": as in Otzaria, the report gets a
+new id (`report_id` / `reportId`), is rewritten in the outbox under it, and is re-sent
+once. A 503 `{"error":"shabbat"}` stops the run with its own message. A drive
 file can come from anywhere, so the endpoint is checked before any POST — and before
 the rate-limit wait, since it is not a request. Rejection reasons go to the log only.
 One exception, as in Otzaria: an app report carrying the consented crash `minidump`

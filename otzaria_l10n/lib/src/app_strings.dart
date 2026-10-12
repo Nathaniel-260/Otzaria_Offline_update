@@ -1899,6 +1899,7 @@ abstract class ErrorReportsDomainStrings {
   String get someNotCollected;
 
   String uploadHttpStatus(int statusCode);
+  String get uploadShabbat;
   String get uploadTimedOut;
   String uploadNetworkError(String error);
   String outboxUnreadable(String error);
