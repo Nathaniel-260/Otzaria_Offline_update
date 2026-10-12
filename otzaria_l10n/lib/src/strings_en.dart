@@ -210,6 +210,19 @@ class _Home extends HomeStrings {
       'Otzaria opened when the installation finished, and it locks the '
       'library file. Close it and press "Try again" to continue installing '
       'the library.';
+  @override
+  String get closeOtzariaForAppInstallDialogTitle => 'Otzaria is open';
+  @override
+  String get closeOtzariaForAppInstallPrompt =>
+      'Otzaria must be closed to install the new version. Close it now and '
+      'continue with the installation?';
+  @override
+  String get closeOtzariaAndInstallConfirm => 'Close and install';
+  @override
+  String get elevatedAsOtherUserWarning =>
+      'This program runs as administrator under a different user name — a '
+      '"current user" installation will go into the administrator\'s account, '
+      'not yours. It is better to start it without "Run as administrator".';
 
   @override
   String get autoInstallSkippedTitle => 'The automatic update was not applied';
@@ -2562,6 +2575,15 @@ class _AppDomain extends AppDomainStrings {
   String get wizardStillOpen =>
       'The Otzaria installer was opened. When you finish it, press "Check '
       'again" so the program detects the installation.';
+  @override
+  String get wizardEndedWithoutInstall =>
+      'The installer closed, but the new version was not found on this '
+      'computer. If you installed it into another folder, choose it with '
+      '"Choose location manually"; otherwise install again.';
+  @override
+  String get setupContinuesElsewhere =>
+      'The installer is updating Otzaria in its own window — waiting for it '
+      'to finish…';
 
   @override
   String get noInstallableReleaseForPlatform =>
@@ -2594,6 +2616,11 @@ class _AppDomain extends AppDomainStrings {
   @override
   String installerDownloadFailed(int statusCode) =>
       'Downloading the installer failed: HTTP $statusCode';
+  @override
+  String get installerDigestMismatch =>
+      'The Otzaria installer in the folder is damaged — it does not match '
+      'the checksum GitHub publishes for it. Download it again on a computer '
+      'with internet.';
   @override
   String installerSizeMismatch(int received, int expected) =>
       'The downloaded installer is not the expected size ($received bytes '
@@ -2659,6 +2686,18 @@ class _AppDomain extends AppDomainStrings {
     };
     return 'GitHub has temporarily limited requests from this network. $retry';
   }
+
+  @override
+  String networkBlockedByFilter(int statusCode, String host) =>
+      'Access to $host was blocked (status $statusCode). An internet filter '
+      '(such as NetFree) is probably blocking the address — ask for it to be '
+      'opened, or download from another computer.';
+  @override
+  String networkCertificateRejected(String host) =>
+      'The secure connection to $host failed: the security certificate it '
+      'presented is not trusted. If this computer goes through a filter such '
+      'as NetFree, install the filter\'s certificate, or download from '
+      'another computer.';
 
   @override
   String noReleasesAtAll(String repo) => 'No releases at all were found in '

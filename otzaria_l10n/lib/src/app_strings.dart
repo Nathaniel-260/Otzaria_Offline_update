@@ -138,6 +138,10 @@ abstract class HomeStrings {
   /// הצליחה — רק אז מבקשים מהמשתמש לסגור ידנית.
   String get closeOtzariaForLibraryDialogTitle;
   String get closeOtzariaForLibraryPrompt;
+  String get closeOtzariaForAppInstallDialogTitle;
+  String get closeOtzariaForAppInstallPrompt;
+  String get closeOtzariaAndInstallConfirm;
+  String get elevatedAsOtherUserWarning;
 
   String get otzariaOpenSnack;
 
@@ -1408,6 +1412,8 @@ abstract class AppDomainStrings {
   /// האשף רץ, סיים, וההתקנה עדיין לא נראית על הדיסק — כמעט תמיד משמע
   /// שהמשתמש עוד באמצע. לא שגיאה: הודעה שאומרת מה לעשות.
   String get wizardStillOpen;
+  String get wizardEndedWithoutInstall;
+  String get setupContinuesElsewhere;
 
   String get noInstallableReleaseForPlatform;
   String get mirrorEmptyRunDownload;
@@ -1422,6 +1428,7 @@ abstract class AppDomainStrings {
 
   String installerDownloadFailed(int statusCode);
   String installerSizeMismatch(int received, int expected);
+  String get installerDigestMismatch;
   String installerExitCode(int exitCode, String output);
   String installerLogTail(String tail);
   String get macAppNotFoundInArchive;
@@ -1444,6 +1451,8 @@ abstract class AppDomainStrings {
   String launchFailed(int exitCode, String stderr);
   String githubStatus(int statusCode, String uri);
   String githubRateLimited(int? retryAfterMinutes);
+  String networkBlockedByFilter(int statusCode, String host);
+  String networkCertificateRejected(String host);
   String noReleasesAtAll(String repo);
   String get windowsOnlyReader;
   String get macOnlyReader;

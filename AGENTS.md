@@ -1073,7 +1073,8 @@ saved click. `HomeScreen._confirmAppInstall` offers both when
 
 **When the *user* installs, Otzaria's own wizard opens**
 (`update(check, useWizard: true)` → `OtzariaInstaller.installWithWizard`, no flags
-but `/LOG=`). Its two pages carry
+but `/LOG=`, `/NOLAUNCH=1` and, from an elevated launcher, `/CURRENTUSER`). Its two
+pages carry
 decisions only the person at the machine can make: which folder, and whether to
 create a desktop shortcut. `/VERYSILENT` deleted both pages — that is what the report
 "it didn't open the installer's dialog and made no shortcut" was. Do not "fix" it back
@@ -1088,8 +1089,10 @@ The dir we passed also **outranks detection** when deciding what got installed; 
 if no executable is there does detection answer.
 
 **Auto-install stays silent** (`AutoInstallFlow.run` passes `useWizard: false`): a
-wizard waiting for a click is not "install by itself", and that is the only path where
-`/MERGETASKS=desktopicon` still does anything.
+wizard waiting for a click is not "install by itself". `/MERGETASKS=desktopicon` goes
+only with a *fresh* silent install (`installDir == null`): `otzaria.iss` sets
+`UsePreviousTasks=no`, so sending it on every update recreated a shortcut the user
+had deleted.
 
 **A silent update must keep the install's scope.** Under `WizardSilent`,
 `otzaria.iss` returns from `InitializeSetup` before any scope detection, and its
@@ -1110,6 +1113,19 @@ both after relaunching itself (elevated, or silent for a 0.9.88+ upgrade) and af
 user refused UAC. So after exit 1 the exe that was in `installDir` counts as the update
 only once it changed (version, size or timestamp); an untouched exe, including a
 reinstall of the same build, ends as `OtzariaWizardStillOpen`, never as "installed".
+The relaunched setup is the same `{srcexe}`, so after exit 1 the installer waits for
+a process with that image path to exit (`RunningOtzariaLocator.waitForImageToExit`,
+up to `relaunchedSetupTimeout`) and shows `setupContinuesElsewhere`; it used to give
+up after 20s while the silent upgrade was still running. Older installers do not
+forward `/NOLAUNCH`, so Otzaria may open afterwards — the following recheck sees it.
+
+**An elevated launcher must not run Otzaria elevated or turn a per-user install
+into an all-users one.** Elevated, `otzaria.iss` relaunches an upgrade with
+`/ALLUSERS`, and `Process.start` gave Otzaria the admin token. So per-user scopes
+always pass `/CURRENTUSER`, `OtzariaLauncher` starts Otzaria with the shell's token
+(`WindowsElevation.launchUnelevated`, `CreateProcessWithTokenW`, falling back to a
+plain start), and the install dialog warns when elevated as another user, whose
+profile (`HKCU`, `%LOCALAPPDATA%`) is the one detection and Inno would use.
 
 **A silent install must pass `/NOLAUNCH=1`, and the library goes first.**
 `otzaria.iss` carries a *second* `[Run]` entry firing **only** under `WizardSilent`,

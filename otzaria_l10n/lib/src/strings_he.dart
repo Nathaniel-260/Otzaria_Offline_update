@@ -203,6 +203,18 @@ class _Home extends HomeStrings {
   String get closeOtzariaForLibraryPrompt =>
       'אוצריא נפתחה בסיום ההתקנה, והיא נועלת את קובץ הספרייה. סגור אותה '
       'ולחץ "נסה שוב" כדי להמשיך בהתקנת הספרייה.';
+  @override
+  String get closeOtzariaForAppInstallDialogTitle => 'אוצריא פתוחה';
+  @override
+  String get closeOtzariaForAppInstallPrompt =>
+      'כדי להתקין את הגרסה החדשה יש לסגור את אוצריא. לסגור אותה עכשיו '
+      'ולהמשיך בהתקנה?';
+  @override
+  String get closeOtzariaAndInstallConfirm => 'סגירה והתקנה';
+  @override
+  String get elevatedAsOtherUserWarning =>
+      'התוכנה רצה כמנהל בשם משתמש אחר — התקנה "למשתמש הנוכחי" תיכנס לחשבון '
+      'של המנהל ולא לחשבון שלך. מומלץ להפעיל אותה בלי "הפעל כמנהל".';
 
   @override
   String get otzariaOpenSnack => 'אוצריא פתוחה — יש לסגור אותה ואז לנסות שוב.';
@@ -2390,6 +2402,13 @@ class _AppDomain extends AppDomainStrings {
   String get wizardStillOpen =>
       'המתקין של אוצריא נפתח. כשתסיים אותו, לחץ "בדיקה מחדש" כדי שהתוכנה '
       'תזהה את ההתקנה.';
+  @override
+  String get wizardEndedWithoutInstall =>
+      'המתקין נסגר, אבל הגרסה החדשה לא נמצאה על המחשב. אם התקנת לתיקייה '
+      'אחרת, אפשר לבחור אותה ב"בחירת מיקום ידנית"; אחרת יש להתקין שוב.';
+  @override
+  String get setupContinuesElsewhere =>
+      'המתקין ממשיך לעדכן את אוצריא בחלון משלו — ממתינים לסיומו…';
 
   @override
   String get noInstallableReleaseForPlatform =>
@@ -2425,6 +2444,10 @@ class _AppDomain extends AppDomainStrings {
   String installerSizeMismatch(int received, int expected) =>
       'קובץ ההתקנה שהורד לא בגודל הצפוי (התקבלו $received בתים, '
       'צפוי $expected) — כנראה שהורדה נקטעה.';
+  @override
+  String get installerDigestMismatch =>
+      'קובץ ההתקנה של אוצריא שבתיקייה פגום — הוא אינו תואם לחתימה שגיטהאב '
+      'מפרסם לו. יש להוריד אותו מחדש במחשב שיש בו אינטרנט.';
   @override
   String installerExitCode(int exitCode, String output) =>
       'ריצת ה-installer החזירה קוד יציאה $exitCode.\n$output';
@@ -2481,6 +2504,17 @@ class _AppDomain extends AppDomainStrings {
     };
     return 'גיטהאב הגביל זמנית את מספר הבקשות מהרשת הזאת. $retry';
   }
+
+  @override
+  String networkBlockedByFilter(int statusCode, String host) =>
+      'הגישה אל $host נחסמה (סטטוס $statusCode). כנראה סינון האינטרנט '
+      '(למשל נטפרי) חוסם את הכתובת — יש לבקש לפתוח אותה בסינון, או להוריד '
+      'ממחשב אחר.';
+  @override
+  String networkCertificateRejected(String host) =>
+      'החיבור המאובטח אל $host נכשל: האישור (תעודת האבטחה) שהתקבל אינו '
+      'מוכר. אם המחשב מחובר דרך סינון כמו נטפרי, יש להתקין את תעודת הסינון '
+      'במחשב, או להוריד ממחשב אחר.';
 
   @override
   String noReleasesAtAll(String repo) => 'לא נמצאו releases בכלל ב-$repo.';

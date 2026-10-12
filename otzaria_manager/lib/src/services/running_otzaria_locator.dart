@@ -120,7 +120,41 @@ class RunningOtzariaLocator {
   static bool? _waitForExitSync(String selfPath, int timeoutMillis) {
     final processes = _otzariaProcesses(selfPath);
     if (processes == null || processes.isEmpty) return null;
-    final handle = OpenProcess(SYNCHRONIZE, FALSE, processes.first.pid);
+    return _waitForPidSync(processes.first.pid, timeoutMillis);
+  }
+
+  static Future<bool?> waitForImageToExit(
+    String imagePath,
+    Duration timeout, {
+    Duration pollInterval = const Duration(seconds: 2),
+  }) async {
+    if (!Platform.isWindows) return null;
+    final deadline = DateTime.now().add(timeout);
+    var seen = false;
+    while (true) {
+      final pids = await _offUiIsolate(() => _pidsOfImage(imagePath));
+      if (pids.isEmpty) return seen ? true : null;
+      seen = true;
+      final remaining = deadline.difference(DateTime.now());
+      if (remaining <= Duration.zero) return false;
+      final slice = remaining < const Duration(seconds: 30)
+          ? remaining
+          : const Duration(seconds: 30);
+      final pid = pids.first;
+      final millis = slice.inMilliseconds;
+      final waited = await _offUiIsolate(() => _waitForPidSync(pid, millis));
+      if (waited == null) await Future<void>.delayed(pollInterval);
+    }
+  }
+
+  static List<int> _pidsOfImage(String imagePath) => [
+        for (final process in _processesNamed(p.basename(imagePath)) ??
+            const <({int pid, String? path})>[])
+          if (p.equals(process.path!, imagePath)) process.pid,
+      ];
+
+  static bool? _waitForPidSync(int processId, int timeoutMillis) {
+    final handle = OpenProcess(SYNCHRONIZE, FALSE, processId);
     if (handle == 0) return null;
     try {
       return WaitForSingleObject(handle, timeoutMillis) == WAIT_OBJECT_0;

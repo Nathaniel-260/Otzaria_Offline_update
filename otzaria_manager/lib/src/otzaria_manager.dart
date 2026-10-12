@@ -21,6 +21,7 @@ import 'services/otzaria_release_client.dart';
 import 'services/otzaria_state_store.dart';
 import 'services/running_otzaria_locator.dart';
 import 'services/windows_arch.dart';
+import 'services/windows_elevation.dart';
 import 'services/windows_install_registry.dart';
 
 /// נקודת הכניסה היחידה שמודול ה-UI (הדשבורד ב-Flutter) אמור להשתמש בה.
@@ -102,6 +103,10 @@ class OtzariaManager {
   /// (pre-release), `false` = היציבה. ניתן לשינוי בזמן ריצה, ונכנס לתוקף
   /// בבדיקה/התקנה הבאה. אינו משפיע על ההורדה — היא תמיד מביאה את שתיהן.
   bool preferPrerelease;
+
+  bool get elevatedAsOtherUser =>
+      _platform == OtzariaTargetPlatform.windows &&
+      WindowsElevation.isElevatedAsOtherUser;
 
   /// הזמן הקצוב לכל פעולת רשת של המודול — נכנס לתוקף בבקשה הבאה, כדי
   /// שההגדרה בלאנצ'ר לא תדרוש בנייה מחדש של הלקוחות.
@@ -395,6 +400,7 @@ class OtzariaManager {
   Future<OtzariaInstallState> update(
     OtzariaUpdateCheckResult check, {
     bool useWizard = false,
+    void Function()? onSetupContinuesElsewhere,
   }) async {
     final mirrored = await _mirrorFor(check.currentState);
     final selected = mirrored.select(preferPrerelease: preferPrerelease);
@@ -416,6 +422,7 @@ class OtzariaManager {
             locateInstalled: (accept) =>
                 _detectInKnownDirs(accept: accept, fresh: true),
             installDir: installDir,
+            onSetupContinuesElsewhere: onSetupContinuesElsewhere,
           )
         : await _installer.installFromFile(
             release: selected.release,

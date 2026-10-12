@@ -101,6 +101,8 @@ class OtzariaModuleController extends ChangeNotifier
   String? latestVersion;
   String? errorMessage;
 
+  String? installStage;
+
   /// הודעה שאינה שגיאה — "ביטלת באשף", "האשף עוד פתוח". נפרדת מ-
   /// [errorMessage] כדי שהממשק לא יצבע בחירה של המשתמש כתקלה אדומה.
   String? noticeMessage;
@@ -157,6 +159,8 @@ class OtzariaModuleController extends ChangeNotifier
       onlineChannels?.select(preferPrerelease: preferPrerelease);
 
   bool get canLaunch => currentVersion != null;
+
+  bool get elevatedAsOtherUser => _manager.elevatedAsOtherUser;
 
   /// התיקייה שלצד התוכנה שממנה מותקנת/מתעדכנת אוצריא — המקור היחיד.
   String get mirrorDir => _manager.mirrorDir;
@@ -456,7 +460,14 @@ class OtzariaModuleController extends ChangeNotifier
 
     var recheck = false;
     try {
-      final state = await _manager.update(check, useWizard: useWizard);
+      final state = await _manager.update(
+        check,
+        useWizard: useWizard,
+        onSetupContinuesElsewhere: () {
+          installStage = AppL10n.strings.appDomain.setupContinuesElsewhere;
+          if (!isDisposed) notifyListeners();
+        },
+      );
       currentVersion = state.installedTagName;
       status = OtzariaModuleStatus.upToDate;
       AppLogger.instance.info('התקנת אוצריא הסתיימה בהצלחה');
@@ -477,6 +488,7 @@ class OtzariaModuleController extends ChangeNotifier
       AppLogger.instance.error('התקנת אוצריא נכשלה', e, st);
     } finally {
       _installing = false;
+      installStage = null;
       _manager.preferPrerelease = _preferPrerelease;
     }
     if (recheck || _recheckAfterInstall) {

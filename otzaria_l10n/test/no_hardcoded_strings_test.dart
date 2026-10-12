@@ -29,7 +29,6 @@ const _exemptFiles = <String, String>{
   // נתיבי התקנה ושמות תהליכים — אין מה לתרגם בשם תיקייה.
   'otzaria_manager/lib/src/otzaria_manager.dart': 'נתיבי התקנה',
   'library_manager/lib/src/services/library_db_locator.dart': 'נתיב ברירת מחדל',
-  'library_manager/lib/src/services/otzaria_process_guard.dart': 'שם תהליך',
   // גימטריה ושמות חודשים עבריים — התוצאה עברית מעצם טבעה.
   'launcher_app/lib/src/services/hebrew_date.dart': 'לוח השנה העברי',
   // בלוק ה-fallback נשלח לשרת בנוסח של אוצריא, מילה במילה — חלק מה-digest.

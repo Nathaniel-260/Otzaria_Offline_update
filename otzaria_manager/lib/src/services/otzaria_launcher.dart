@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
+import 'windows_elevation.dart';
+
 /// מפעיל את ההתקנה שהתגלתה — קובץ `.exe` בווינדוס, חבילת `.app` ב-macOS.
 /// נפרד מ-[OtzariaInstaller] כי "הפעלה" יכולה לקרות גם בלי שהתבצעה
 /// התקנה/עדכון בסשן הנוכחי (למשל בכל פתיחה של הלאנצ'ר, כשההתקנה כבר
@@ -51,9 +53,19 @@ class OtzariaLauncher {
       return;
     }
 
+    final arguments = [if (withUri != null) withUri];
+    if (Platform.isWindows &&
+        WindowsElevation.isElevated &&
+        WindowsElevation.launchUnelevated(
+          launchPath,
+          arguments,
+          workingDirectory: p.dirname(launchPath),
+        )) {
+      return;
+    }
     await Process.start(
       launchPath,
-      [if (withUri != null) withUri],
+      arguments,
       workingDirectory: p.dirname(launchPath),
       mode: ProcessStartMode.detached,
     );

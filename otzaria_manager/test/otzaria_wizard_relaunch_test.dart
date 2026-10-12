@@ -1,0 +1,219 @@
+import 'dart:io';
+
+import 'package:otzaria_manager/otzaria_manager.dart';
+import 'package:path/path.dart' as p;
+import 'package:test/test.dart';
+
+const _tag = '0.9.98';
+
+OtzariaRelease _release() => const OtzariaRelease(
+      tagName: _tag,
+      name: 'Otzaria $_tag',
+      isPrerelease: false,
+      isDraft: false,
+      publishedAt: null,
+      installerKind: OtzariaInstallerKind.windowsSetupExe,
+      installerAssetName: 'otzaria-$_tag-windows.exe',
+      installerDownloadUrl: 'https://example/otzaria.exe',
+      installerSizeBytes: 1,
+    );
+
+void main() {
+  late Directory temp;
+  late String installDir;
+  late String exe;
+  late String setup;
+
+  setUp(() async {
+    temp = await Directory.systemTemp.createTemp('otzaria-relaunch-test-');
+    installDir = p.join(temp.path, 'install');
+    exe = p.join(installDir, 'otzaria.exe');
+    Directory(installDir).createSync(recursive: true);
+    File(exe).writeAsStringSync('0.9.97+99700');
+    setup = await _exitScript(temp.path, exitCode: 1);
+  });
+
+  tearDown(() async {
+    if (await temp.exists()) await temp.delete(recursive: true);
+  });
+
+  OtzariaInstaller installerWith(
+    Future<bool?> Function(String installerPath, Duration timeout) wait,
+  ) =>
+      OtzariaInstaller(
+        cacheDir: p.join(temp.path, 'cache'),
+        appLocator: const OtzariaAppLocator(
+          platform: OtzariaTargetPlatform.windows,
+        ),
+        versionReader: const _FileContentVersionReader(),
+        pollInterval: const Duration(milliseconds: 20),
+        waitForRelaunchedSetup: wait,
+      );
+
+  test('exit 1: ממתינים למתקין שהופעל מחדש, ואז ההתקנה מזוהה', () async {
+    String? waitedFor;
+    var announced = false;
+    final installer = installerWith((path, _) async {
+      waitedFor = path;
+      expect(announced, isTrue);
+      File(exe).writeAsStringSync('0.9.98+99800');
+      return true;
+    });
+
+    final state = await installer.installWithWizard(
+      release: _release(),
+      installerPath: setup,
+      installDir: installDir,
+      locateInstalled: (_) async => null,
+      detectTimeout: Duration.zero,
+      onSetupContinuesElsewhere: () => announced = true,
+    );
+
+    expect(waitedFor, setup);
+    expect(state.launchPath, exe);
+    expect(state.installedTagName, _tag);
+  });
+
+  test('המתקין שהופעל מחדש עדיין רץ בתום ההמתנה — עדיין פתוח', () async {
+    final installer = installerWith((_, __) async => false);
+
+    await expectLater(
+      installer.installWithWizard(
+        release: _release(),
+        installerPath: setup,
+        installDir: installDir,
+        locateInstalled: (_) async => null,
+        detectTimeout: Duration.zero,
+      ),
+      throwsA(
+        isA<OtzariaWizardStillOpen>()
+            .having((e) => e.setupExited, 'setupExited', isFalse),
+      ),
+    );
+  });
+
+  test('אין מתקין שהופעל מחדש וההתקנה לא השתנתה — נסגר בלי להתקין', () async {
+    final installer = installerWith((_, __) async => null);
+
+    await expectLater(
+      installer.installWithWizard(
+        release: _release(),
+        installerPath: setup,
+        installDir: installDir,
+        locateInstalled: (_) async => null,
+        detectTimeout: Duration.zero,
+      ),
+      throwsA(
+        isA<OtzariaWizardStillOpen>()
+            .having((e) => e.setupExited, 'setupExited', isTrue),
+      ),
+    );
+  });
+
+  test('exit 0 אינו ממתין למתקין נוסף', () async {
+    var waited = false;
+    final finished = await _exitScript(
+      temp.path,
+      exitCode: 0,
+      name: 'finished',
+    );
+    File(exe).writeAsStringSync('0.9.98+99800');
+    final installer = installerWith((_, __) async {
+      waited = true;
+      return true;
+    });
+
+    await installer.installWithWizard(
+      release: _release(),
+      installerPath: finished,
+      installDir: installDir,
+      locateInstalled: (_) async => null,
+      detectTimeout: Duration.zero,
+    );
+
+    expect(waited, isFalse);
+  });
+
+  for (final elevated in [true, false]) {
+    test(
+      'מתהליך ${elevated ? 'מורם' : 'רגיל'}: /CURRENTUSER ${elevated ? 'נמסר' : 'אינו נמסר'} לאשף',
+      () async {
+        final argsFile = p.join(temp.path, 'args.txt');
+        final recorder = p.join(temp.path, 'record.bat');
+        File(recorder).writeAsStringSync(
+          '@echo off\r\necho %* > "$argsFile"\r\nexit /b 2\r\n',
+        );
+        final installer = OtzariaInstaller(
+          cacheDir: p.join(temp.path, 'cache'),
+          isElevated: () => elevated,
+        );
+
+        await expectLater(
+          installer.installWithWizard(
+            release: _release(),
+            installerPath: recorder,
+            installDir: installDir,
+            locateInstalled: (_) async => null,
+          ),
+          throwsA(isA<OtzariaInstallCancelled>()),
+        );
+
+        final args = File(argsFile).readAsStringSync();
+        expect(args, contains('/NOLAUNCH=1'));
+        expect(args.contains('/CURRENTUSER'), elevated);
+      },
+      testOn: 'windows',
+    );
+  }
+
+  test('ארגומנטים להפעלה לא-מורמת מצוטטים כמו ב-CommandLineToArgvW', () {
+    expect(WindowsElevation.quoteArgument('otzaria://x'), 'otzaria://x');
+    expect(
+      WindowsElevation.quoteArgument(r'C:\Program Files\o.exe'),
+      r'"C:\Program Files\o.exe"',
+    );
+    expect(WindowsElevation.quoteArgument(r'a"b'), r'"a\"b"');
+    expect(
+      WindowsElevation.quoteArgument('C:\\dir with space\\'),
+      '"C:\\dir with space\\\\"',
+    );
+    expect(WindowsElevation.quoteArgument(''), '""');
+  });
+
+  test('האשף מקבל /NOLAUNCH=1, שמתקין חדש מעביר להפעלה השקטה', () {
+    final source = File(
+      p.join('lib', 'src', 'services', 'otzaria_installer.dart'),
+    ).readAsStringSync();
+    final body = source.substring(
+      source.indexOf('Future<OtzariaInstallState> installWithWizard('),
+      source.indexOf('static const Duration wizardDetectTimeout'),
+    );
+    expect(body, contains("'/NOLAUNCH=1'"));
+  });
+}
+
+Future<String> _exitScript(
+  String dir, {
+  required int exitCode,
+  String name = 'fake-setup',
+}) async {
+  if (Platform.isWindows) {
+    final path = p.join(dir, '$name.bat');
+    await File(path).writeAsString('@echo off\r\nexit /b $exitCode\r\n');
+    return path;
+  }
+  final path = p.join(dir, '$name.sh');
+  await File(path).writeAsString('#!/bin/sh\nexit $exitCode\n');
+  await Process.run('chmod', ['+x', path]);
+  return path;
+}
+
+class _FileContentVersionReader implements InstalledVersionReader {
+  const _FileContentVersionReader();
+
+  @override
+  String? readVersion(String launchPath) {
+    final file = File(launchPath);
+    return file.existsSync() ? file.readAsStringSync().trim() : null;
+  }
+}

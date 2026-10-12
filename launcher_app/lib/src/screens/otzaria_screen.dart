@@ -108,6 +108,7 @@ class OtzariaScreen extends StatelessWidget {
             c.status,
             updateAvailable: t.readyToInstall,
             needsDownload: t.nothingDownloadedYet,
+            installStage: c.installStage,
           ),
         ),
         SettingsActionTile.text(

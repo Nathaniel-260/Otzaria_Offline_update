@@ -280,8 +280,13 @@ void main() {
 
     // המשימה מוגדרת `unchecked` ב-iss של אוצריא, ולכן בלי הדגל הזה התקנה
     // שקטה לא יוצרת קיצור-דרך בשולחן העבודה.
-    test('משימת קיצור-הדרך בשולחן העבודה נדלקת במפורש', () {
-      expect(args, contains('/MERGETASKS=desktopicon'));
+    test('עדכון אינו יוצר מחדש קיצור-דרך שהמשתמש מחק', () {
+      expect(args.where((a) => a.startsWith('/MERGETASKS')), isEmpty);
+    });
+
+    test('התקנה למשתמש הנוכחי נשארת כזו גם מתהליך מורם', () {
+      expect(args, contains('/CURRENTUSER'));
+      expect(args, isNot(contains('/ALLUSERS')));
     });
 
     // ב-`otzaria.iss` יש רשומת `[Run]` שרצה **רק** בהתקנה שקטה, ובלי הדגל
@@ -347,7 +352,9 @@ void main() {
         scope: OtzariaWindowsInstallScope.allUsers,
       );
 
-      expect(args, containsAll(['/ALLUSERS', '/MERGETASKS=desktopicon']));
+      expect(args, contains('/ALLUSERS'));
+      expect(args.where((a) => a.startsWith('/MERGETASKS')), isEmpty);
+      expect(args, isNot(contains('/CURRENTUSER')));
       expect(args, isNot(contains('/PORTABLE')));
     });
   });

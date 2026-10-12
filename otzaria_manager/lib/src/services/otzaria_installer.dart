@@ -13,6 +13,8 @@ import '../models/otzaria_release.dart';
 import '../models/otzaria_update_check_result.dart';
 import 'installed_version_reader.dart';
 import 'otzaria_app_locator.dart';
+import 'running_otzaria_locator.dart';
+import 'windows_elevation.dart';
 import 'windows_exe_version_reader.dart';
 
 /// נזרק כשהמשתמש ביטל את ההורדה. חריג נפרד ולא [StateError], כדי שהקורא
@@ -37,10 +39,14 @@ class OtzariaInstallCancelled implements Exception {
 /// [OtzariaInstaller.wizardDetectTimeout]. גם זה אינו כשל: המשתמש עוד
 /// באמצע, והממשק אומר לו ללחוץ "בדיקה מחדש" כשיסיים.
 class OtzariaWizardStillOpen implements Exception {
-  const OtzariaWizardStillOpen();
+  const OtzariaWizardStillOpen({this.setupExited = false});
+
+  final bool setupExited;
 
   @override
-  String toString() => AppL10n.strings.appDomain.wizardStillOpen;
+  String toString() => setupExited
+      ? AppL10n.strings.appDomain.wizardEndedWithoutInstall
+      : AppL10n.strings.appDomain.wizardStillOpen;
 }
 
 /// איך הסתיימה הרצת המתקין עם האשף — ראו
@@ -86,7 +92,14 @@ class OtzariaInstaller {
     this.connectTimeout = const Duration(seconds: 20),
     this.stallTimeout = const Duration(seconds: 30),
     this.pollInterval = const Duration(seconds: 2),
-  })  : _httpClient = httpClient ?? http.Client(),
+    this.relaunchedSetupTimeout = const Duration(minutes: 30),
+    Future<bool?> Function(String installerPath, Duration timeout)?
+        waitForRelaunchedSetup,
+    bool Function()? isElevated,
+  })  : _isElevated = isElevated ?? (() => WindowsElevation.isElevated),
+        _waitForRelaunchedSetup =
+            waitForRelaunchedSetup ?? RunningOtzariaLocator.waitForImageToExit,
+        _httpClient = httpClient ?? http.Client(),
         _appLocator = appLocator ?? const OtzariaAppLocator(),
         _versionReader = versionReader ?? const WindowsExeVersionReader();
 
@@ -96,6 +109,10 @@ class OtzariaInstaller {
   Duration connectTimeout;
   Duration stallTimeout;
   final Duration pollInterval;
+  final Duration relaunchedSetupTimeout;
+  final bool Function() _isElevated;
+  final Future<bool?> Function(String installerPath, Duration timeout)
+      _waitForRelaunchedSetup;
 
   /// התיקייה שבה נשמר קובץ ההתקנה עצמו לצמיתות, תחת תת-תיקייה לפי tag
   /// (למשל `<cacheDir>/v1.2.3/OtzariaSetup.exe`) — לא temp, לא נמחק.
@@ -202,7 +219,7 @@ class OtzariaInstaller {
     final expected = release.installerSha256;
     if (expected == null) return;
     if (await _sha256Of(File(installerPath)) != expected.toLowerCase()) {
-      throw StateError(AppL10n.strings.launcherUpdate.digestMismatch);
+      throw StateError(AppL10n.strings.appDomain.installerDigestMismatch);
     }
   }
 
@@ -272,6 +289,7 @@ class OtzariaInstaller {
     ) locateInstalled,
     String? installDir,
     Duration detectTimeout = wizardDetectTimeout,
+    void Function()? onSetupContinuesElsewhere,
   }) async {
     await _verifyInstallerDigest(release, installerPath);
     final logPath = p.join(
@@ -282,6 +300,11 @@ class OtzariaInstaller {
     final previousVersion = previousExe?.version;
     final result = await Process.run(installerPath, [
       if (installDir != null) '/DIR=$installDir',
+      '/NOLAUNCH=1',
+      if (_isElevated() &&
+          windowsInstallScopeOf(installDir) ==
+              OtzariaWindowsInstallScope.currentUser)
+        '/CURRENTUSER',
       '/LOG=$logPath',
     ]);
 
@@ -299,6 +322,15 @@ class OtzariaInstaller {
       case OtzariaWizardOutcome.finished:
       case OtzariaWizardOutcome.relaunched:
         _deleteQuietly(logPath);
+    }
+
+    if (outcome == OtzariaWizardOutcome.relaunched) {
+      onSetupContinuesElsewhere?.call();
+      final relaunchedFinished = await _waitForRelaunchedSetup(
+        installerPath,
+        relaunchedSetupTimeout,
+      );
+      if (relaunchedFinished == false) throw const OtzariaWizardStillOpen();
     }
 
     final staleVersion = previousVersion != null &&
@@ -341,7 +373,7 @@ class OtzariaInstaller {
     }
 
     final found = await _pollForInstalled(locate, detectTimeout);
-    if (found == null) throw const OtzariaWizardStillOpen();
+    if (found == null) throw const OtzariaWizardStillOpen(setupExited: true);
 
     return OtzariaInstallState(
       installedTagName: release.tagName,
@@ -351,10 +383,6 @@ class OtzariaInstaller {
     );
   }
 
-  /// כמה זמן מחכים שההתקנה תופיע אחרי שתהליך האשף חזר. קצר בכוונה: ב-Inno
-  /// שמתרומם להרשאות מנהל התהליך שהרצנו חוזר מיד, בעוד המשתמש עוד עומד
-  /// באשף — ואז "לא נמצא" אינו כשל אלא "עוד לא סיים", ואומרים לו זאת
-  /// במקום לתלות את התוכנה לחצי שעה.
   static const Duration wizardDetectTimeout = Duration(seconds: 20);
 
   static OtzariaWizardOutcome wizardOutcomeFor(int exitCode) =>
@@ -482,16 +510,12 @@ class OtzariaInstaller {
     if (expectedSha256 != null &&
         result.sha256 != expectedSha256.toLowerCase()) {
       await File(destinationPath).delete();
-      throw StateError(AppL10n.strings.launcherUpdate.digestMismatch);
+      throw StateError(AppL10n.strings.appDomain.installerDigestMismatch);
     }
   }
 
   // ---------------------------------------------------------------- Windows
 
-  /// המשימה שיוצרת קיצור-דרך בשולחן העבודה. גם ב-`otzaria.iss` וגם
-  /// ב-`otzaria_full.iss` היא מוגדרת `Flags: unchecked`, ולכן התקנה שקטה
-  /// דילגה עליה והמשתמש קיבל אוצריא בלי אייקון — בשונה מהתקנה ידנית, שבה
-  /// סימן את התיבה בעצמו. `/MERGETASKS` מוסיף אותה לברירת המחדל.
   static const String _desktopIconTask = 'desktopicon';
 
   static List<String> windowsSilentArgs({
@@ -507,7 +531,8 @@ class OtzariaInstaller {
         if (installDir != null) '/DIR=$installDir',
         if (scope == OtzariaWindowsInstallScope.portable) '/PORTABLE',
         if (scope == OtzariaWindowsInstallScope.allUsers) '/ALLUSERS',
-        if (scope != OtzariaWindowsInstallScope.portable)
+        if (scope == OtzariaWindowsInstallScope.currentUser) '/CURRENTUSER',
+        if (installDir == null && scope != OtzariaWindowsInstallScope.portable)
           '/MERGETASKS=$_desktopIconTask',
         '/LOG=$logPath',
       ];
