@@ -32,6 +32,7 @@ class ExternalUpdateNotice {
     int? dbVersion,
     String? releaseTag,
     DateTime? updatedAt,
+    void Function(Object error)? onError,
   }) async {
     try {
       final pending = await read(dbPath: dbPath);
@@ -56,7 +57,9 @@ class ExternalUpdateNotice {
             }.toList()..sort(),
         }),
       );
-    } catch (_) {}
+    } catch (e) {
+      onError?.call(e);
+    }
   }
 
   Future<ExternalUpdateNoticeData?> read({required String dbPath}) async {

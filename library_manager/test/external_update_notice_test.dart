@@ -115,12 +115,14 @@ void main() {
     expect(json.containsKey('fullReconcile'), isFalse);
   });
 
-  test('כשל כתיבה אינו זורק — העדכון עצמו כבר הצליח', () async {
-    // נתיב לתיקייה שאינה קיימת: הכתיבה נכשלת ונבלעת.
+  test('כשל כתיבה אינו זורק — העדכון עצמו כבר הצליח — אבל מדווח', () async {
+    final errors = <Object>[];
     await const ExternalUpdateNotice().write(
       dbPath: p.join(tempDir.path, 'nope', 'deeper', 'seforim.db'),
       route: ExternalUpdateNotice.routeDelta,
+      onError: errors.add,
     );
+    expect(errors, hasLength(1));
   });
 
   group('read — הסימון שהלאנצ׳ר קורא בעלייה', () {

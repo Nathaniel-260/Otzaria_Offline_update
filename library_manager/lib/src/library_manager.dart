@@ -822,6 +822,7 @@ class LibraryManager {
                 dbPath: dbPath,
                 route: ExternalUpdateNotice.routeDelta,
                 booksTouched: partial,
+                onError: onStateWarning,
               );
             }
             rethrow;
@@ -1041,6 +1042,7 @@ class LibraryManager {
       booksTouched: booksTouched,
       dbVersion: version,
       releaseTag: tag,
+      onError: onStateWarning,
     );
   }
 
