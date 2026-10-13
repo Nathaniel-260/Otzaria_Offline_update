@@ -38,7 +38,7 @@ void main() {
   });
 
   OtzariaInstaller installerWith(
-    Future<bool?> Function(String installerPath, Duration timeout) wait,
+    Future<bool?> Function(String, Duration, bool Function()) wait,
   ) =>
       OtzariaInstaller(
         cacheDir: p.join(temp.path, 'cache'),
@@ -53,7 +53,7 @@ void main() {
   test('exit 1: ממתינים למתקין שהופעל מחדש, ואז ההתקנה מזוהה', () async {
     String? waitedFor;
     var announced = false;
-    final installer = installerWith((path, _) async {
+    final installer = installerWith((path, _, __) async {
       waitedFor = path;
       expect(announced, isTrue);
       File(exe).writeAsStringSync('0.9.98+99800');
@@ -75,7 +75,7 @@ void main() {
   });
 
   test('המתקין שהופעל מחדש עדיין רץ בתום ההמתנה — עדיין פתוח', () async {
-    final installer = installerWith((_, __) async => false);
+    final installer = installerWith((_, __, ___) async => false);
 
     await expectLater(
       installer.installWithWizard(
@@ -93,7 +93,7 @@ void main() {
   });
 
   test('אין מתקין שהופעל מחדש וההתקנה לא השתנתה — נסגר בלי להתקין', () async {
-    final installer = installerWith((_, __) async => null);
+    final installer = installerWith((_, __, ___) async => null);
 
     await expectLater(
       installer.installWithWizard(
@@ -118,7 +118,7 @@ void main() {
       name: 'finished',
     );
     File(exe).writeAsStringSync('0.9.98+99800');
-    final installer = installerWith((_, __) async {
+    final installer = installerWith((_, __, ___) async {
       waited = true;
       return true;
     });
@@ -178,6 +178,57 @@ void main() {
       '"C:\\dir with space\\\\"',
     );
     expect(WindowsElevation.quoteArgument(''), '""');
+  });
+
+  test('ביטול ההמתנה מפסיק להמתין בלי לטעון שהמתקין נסגר', () async {
+    var cancelled = false;
+    final installer = installerWith((_, __, isCancelled) async {
+      cancelled = isCancelled();
+      return false;
+    });
+
+    await expectLater(
+      installer.installWithWizard(
+        release: _release(),
+        installerPath: setup,
+        installDir: installDir,
+        locateInstalled: (_) async => null,
+        isWaitCancelled: () => true,
+      ),
+      throwsA(
+        isA<OtzariaWizardStillOpen>()
+            .having((e) => e.setupExited, 'setupExited', isFalse),
+      ),
+    );
+    expect(cancelled, isTrue);
+  });
+
+  test('ההמתנה למתקין שרץ נעצרת כשמבטלים', () async {
+    final started = DateTime.now();
+    final result = await RunningOtzariaLocator.waitForImageToExit(
+      RunningOtzariaLocator.windowsImagePathOfPid(pid) ??
+          Platform.resolvedExecutable,
+      const Duration(minutes: 5),
+      () => DateTime.now().difference(started) > const Duration(seconds: 1),
+      pollInterval: const Duration(milliseconds: 200),
+    );
+    if (Platform.isWindows) {
+      expect(result, isFalse);
+      expect(
+        DateTime.now().difference(started),
+        lessThan(const Duration(seconds: 10)),
+      );
+    }
+  });
+
+  test('C:\\אוצריא בלי סמן נשאר התקנת מנהל, כמו ב-otzaria.iss', () {
+    expect(
+      OtzariaInstaller.windowsInstallScopeOf(
+        r'C:\אוצריא',
+        environment: const {},
+      ),
+      OtzariaWindowsInstallScope.allUsers,
+    );
   });
 
   test('האשף מקבל /NOLAUNCH=1, שמתקין חדש מעביר להפעלה השקטה', () {

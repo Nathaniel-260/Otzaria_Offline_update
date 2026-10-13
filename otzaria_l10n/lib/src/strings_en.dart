@@ -2584,6 +2584,8 @@ class _AppDomain extends AppDomainStrings {
   String get setupContinuesElsewhere =>
       'The installer is updating Otzaria in its own window — waiting for it '
       'to finish…';
+  @override
+  String get stopWaitingForSetup => 'Stop waiting';
 
   @override
   String get noInstallableReleaseForPlatform =>

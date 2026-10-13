@@ -103,6 +103,10 @@ class OtzariaModuleController extends ChangeNotifier
 
   String? installStage;
 
+  bool _stopSetupWait = false;
+
+  void stopWaitingForSetup() => _stopSetupWait = true;
+
   /// הודעה שאינה שגיאה — "ביטלת באשף", "האשף עוד פתוח". נפרדת מ-
   /// [errorMessage] כדי שהממשק לא יצבע בחירה של המשתמש כתקלה אדומה.
   String? noticeMessage;
@@ -447,6 +451,7 @@ class OtzariaModuleController extends ChangeNotifier
     if (check == null) return;
 
     _installing = true;
+    _stopSetupWait = false;
     _recheckAfterInstall = false;
     status = OtzariaModuleStatus.installing;
     needsElevation = false;
@@ -467,6 +472,7 @@ class OtzariaModuleController extends ChangeNotifier
           installStage = AppL10n.strings.appDomain.setupContinuesElsewhere;
           if (!isDisposed) notifyListeners();
         },
+        isWaitCancelled: () => _stopSetupWait || isDisposed,
       );
       currentVersion = state.installedTagName;
       status = OtzariaModuleStatus.upToDate;

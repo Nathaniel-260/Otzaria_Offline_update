@@ -122,7 +122,8 @@ class RunningOtzariaLocator {
 
   static Future<bool?> waitForImageToExit(
     String imagePath,
-    Duration timeout, {
+    Duration timeout,
+    bool Function() isCancelled, {
     Duration pollInterval = const Duration(seconds: 2),
   }) async {
     if (!Platform.isWindows) return null;
@@ -133,10 +134,8 @@ class RunningOtzariaLocator {
       if (pids.isEmpty) return seen ? true : null;
       seen = true;
       final remaining = deadline.difference(DateTime.now());
-      if (remaining <= Duration.zero) return false;
-      final slice = remaining < const Duration(seconds: 30)
-          ? remaining
-          : const Duration(seconds: 30);
+      if (remaining <= Duration.zero || isCancelled()) return false;
+      final slice = remaining < pollInterval ? remaining : pollInterval;
       final pid = pids.first;
       final millis = slice.inMilliseconds;
       final waited = await _offUiIsolate(() => _waitForPidSync(pid, millis));

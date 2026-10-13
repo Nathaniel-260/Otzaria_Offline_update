@@ -28,6 +28,8 @@ class WindowsElevation {
     return '"$escaped$trailing"';
   }
 
+  /// CreateProcessWithTokenW needs SeImpersonatePrivilege (elevated admins have
+  /// it) and the Secondary Logon service; on failure the caller starts directly.
   static bool launchUnelevated(
     String executable,
     List<String> arguments, {

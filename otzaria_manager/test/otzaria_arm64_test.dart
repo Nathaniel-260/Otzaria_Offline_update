@@ -286,6 +286,25 @@ void main() {
       expect(check.latestRelease!.installerArch, OtzariaArch.arm64);
     });
 
+    test('ARM64 ישן במראה אינו גובר על x64 חדש בהתקנה שאינה ARM64', () async {
+      await writeMirror(withArm64: true);
+      final mirrorFile = File(
+        p.join(temp.path, 'data', 'mirror', 'app', 'latest-release.json'),
+      );
+      final json =
+          jsonDecode(mirrorFile.readAsStringSync()) as Map<String, dynamic>;
+      final arm = (json['platforms'] as Map)['windows_arm64'] as Map;
+      (arm['stable'] as Map)['tagName'] = '1.5.0';
+      mirrorFile.writeAsStringSync(jsonEncode(json));
+
+      final x64Check = await managerFor(
+        installedExe: installedExe(),
+        exeArch: OtzariaArch.x64,
+      ).checkForUpdate();
+      expect(x64Check.latestRelease!.tagName, '2.0.0');
+      expect(x64Check.latestRelease!.installerArch, OtzariaArch.x64);
+    });
+
     test('התקנת ARM64 אינה מוחלפת ב-x64', () async {
       await writeMirror(withArm64: false);
 

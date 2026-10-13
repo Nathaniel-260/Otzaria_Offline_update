@@ -1414,6 +1414,7 @@ abstract class AppDomainStrings {
   String get wizardStillOpen;
   String get wizardEndedWithoutInstall;
   String get setupContinuesElsewhere;
+  String get stopWaitingForSetup;
 
   String get noInstallableReleaseForPlatform;
   String get mirrorEmptyRunDownload;

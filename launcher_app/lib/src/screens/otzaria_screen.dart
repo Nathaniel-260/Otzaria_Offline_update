@@ -111,6 +111,15 @@ class OtzariaScreen extends StatelessWidget {
             installStage: c.installStage,
           ),
         ),
+        if (c.installStage != null)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ActionButton.neutral(
+              text: context.strings.appDomain.stopWaitingForSetup,
+              icon: FluentIcons.dismiss_circle_24_regular,
+              onPressed: c.stopWaitingForSetup,
+            ),
+          ),
         SettingsActionTile.text(
           icon: FluentIcons.tag_24_regular,
           title: t.installedVersion,

@@ -87,10 +87,10 @@ class CustomAppLocator {
   }
 
   CustomAppInstallState _stateAt(String launchPath) => CustomAppInstallState(
-    version: readVersion(launchPath),
-    installDir: p.dirname(launchPath),
-    launchPath: launchPath,
-  );
+        version: readVersion(launchPath),
+        installDir: p.dirname(launchPath),
+        launchPath: launchPath,
+      );
 
   /// התיקיות שבהן מחפשים, לפי סדר עדיפות — מהעדות החזקה לניחוש.
   ///

@@ -2409,6 +2409,8 @@ class _AppDomain extends AppDomainStrings {
   @override
   String get setupContinuesElsewhere =>
       'המתקין ממשיך לעדכן את אוצריא בחלון משלו — ממתינים לסיומו…';
+  @override
+  String get stopWaitingForSetup => 'הפסקת ההמתנה';
 
   @override
   String get noInstallableReleaseForPlatform =>

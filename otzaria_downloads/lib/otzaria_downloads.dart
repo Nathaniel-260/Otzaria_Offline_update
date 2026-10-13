@@ -164,7 +164,7 @@ Future<FileDownloadResult> _downloadFile({
       }
       if (response.statusCode != 200 && response.statusCode != 206) {
         await response.stream.listen((_) {}).cancel();
-        if (isFilterBlockStatus(response.statusCode)) {
+        if (response.statusCode == 418) {
           throw NetworkBlockedException(
             uri: request.url,
             statusCode: response.statusCode,

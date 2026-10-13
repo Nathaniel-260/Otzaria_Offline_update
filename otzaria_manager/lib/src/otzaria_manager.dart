@@ -143,9 +143,24 @@ class OtzariaManager {
     final arm64 = await (arm64Load ?? _mirror.load(arch: OtzariaArch.arm64));
     final keepArm64 =
         current != null && _exeArchOf(current.launchPath) == OtzariaArch.arm64;
+    MirroredOtzariaRelease? pick(
+      MirroredOtzariaRelease? arm,
+      MirroredOtzariaRelease? x,
+    ) {
+      if (arm == null || keepArm64) return arm ?? (keepArm64 ? null : x);
+      if (x == null) return arm;
+      return OtzariaUpdateCheckResult.compareVersions(
+                arm.release.tagName,
+                x.release.tagName,
+              ) >=
+              0
+          ? arm
+          : x;
+    }
+
     return MirroredOtzariaReleases(
-      stable: arm64.stable ?? (keepArm64 ? null : x64.stable),
-      prerelease: arm64.prerelease ?? (keepArm64 ? null : x64.prerelease),
+      stable: pick(arm64.stable, x64.stable),
+      prerelease: pick(arm64.prerelease, x64.prerelease),
     );
   }
 
@@ -401,6 +416,7 @@ class OtzariaManager {
     OtzariaUpdateCheckResult check, {
     bool useWizard = false,
     void Function()? onSetupContinuesElsewhere,
+    bool Function()? isWaitCancelled,
   }) async {
     final mirrored = await _mirrorFor(check.currentState);
     final selected = mirrored.select(preferPrerelease: preferPrerelease);
@@ -423,6 +439,7 @@ class OtzariaManager {
                 _detectInKnownDirs(accept: accept, fresh: true),
             installDir: installDir,
             onSetupContinuesElsewhere: onSetupContinuesElsewhere,
+            isWaitCancelled: isWaitCancelled,
           )
         : await _installer.installFromFile(
             release: selected.release,

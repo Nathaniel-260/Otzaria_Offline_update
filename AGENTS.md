@@ -534,7 +534,8 @@ the "why did it not download the plugins" confusion.
 418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
 handshake dump. `otzaria_downloads` maps them to `NetworkBlockedException` /
 `NetworkCertificateException` (`githubGet` maps 418 only, since its callers read
-403 themselves; `downloadFile` and `OtzariaReleaseClient` map both), and `main.dart`
+403 themselves; `downloadFile` maps 418 only, since a 403 there is usually an
+expired signed URL; `OtzariaReleaseClient` maps both), and `main.dart`
 loads `assets/ca/*.pem` (copied from Otzaria) into
 `SecurityContext.defaultContext` — the one context every client in the UI
 isolate uses, `library_manager`'s included — before the first frame.
@@ -1124,7 +1125,8 @@ only once it changed (version, size or timestamp); an untouched exe, including a
 reinstall of the same build, ends as `OtzariaWizardStillOpen`, never as "installed".
 The relaunched setup is the same `{srcexe}`, so after exit 1 the installer waits for
 a process with that image path to exit (`RunningOtzariaLocator.waitForImageToExit`,
-up to `relaunchedSetupTimeout`) and shows `setupContinuesElsewhere`; it used to give
+up to `relaunchedSetupTimeout`, stoppable from the app screen; matched by image name,
+so another user's elevated setup still counts) and shows `setupContinuesElsewhere`; it used to give
 up after 20s while the silent upgrade was still running. Older installers do not
 forward `/NOLAUNCH`, so Otzaria may open afterwards — the following recheck sees it.
 

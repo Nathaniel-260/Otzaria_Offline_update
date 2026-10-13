@@ -93,8 +93,11 @@ class OtzariaInstaller {
     this.stallTimeout = const Duration(seconds: 30),
     this.pollInterval = const Duration(seconds: 2),
     this.relaunchedSetupTimeout = const Duration(minutes: 30),
-    Future<bool?> Function(String installerPath, Duration timeout)?
-        waitForRelaunchedSetup,
+    Future<bool?> Function(
+      String installerPath,
+      Duration timeout,
+      bool Function() isCancelled,
+    )? waitForRelaunchedSetup,
     bool Function()? isElevated,
   })  : _isElevated = isElevated ?? (() => WindowsElevation.isElevated),
         _waitForRelaunchedSetup =
@@ -111,8 +114,11 @@ class OtzariaInstaller {
   final Duration pollInterval;
   final Duration relaunchedSetupTimeout;
   final bool Function() _isElevated;
-  final Future<bool?> Function(String installerPath, Duration timeout)
-      _waitForRelaunchedSetup;
+  final Future<bool?> Function(
+    String installerPath,
+    Duration timeout,
+    bool Function() isCancelled,
+  ) _waitForRelaunchedSetup;
 
   /// התיקייה שבה נשמר קובץ ההתקנה עצמו לצמיתות, תחת תת-תיקייה לפי tag
   /// (למשל `<cacheDir>/v1.2.3/OtzariaSetup.exe`) — לא temp, לא נמחק.
@@ -290,6 +296,7 @@ class OtzariaInstaller {
     String? installDir,
     Duration detectTimeout = wizardDetectTimeout,
     void Function()? onSetupContinuesElsewhere,
+    bool Function()? isWaitCancelled,
   }) async {
     await _verifyInstallerDigest(release, installerPath);
     final logPath = p.join(
@@ -320,17 +327,16 @@ class OtzariaInstaller {
           AppL10n.strings.appDomain.installerExitCode(result.exitCode, details),
         );
       case OtzariaWizardOutcome.finished:
-      case OtzariaWizardOutcome.relaunched:
         _deleteQuietly(logPath);
-    }
-
-    if (outcome == OtzariaWizardOutcome.relaunched) {
-      onSetupContinuesElsewhere?.call();
-      final relaunchedFinished = await _waitForRelaunchedSetup(
-        installerPath,
-        relaunchedSetupTimeout,
-      );
-      if (relaunchedFinished == false) throw const OtzariaWizardStillOpen();
+      case OtzariaWizardOutcome.relaunched:
+        onSetupContinuesElsewhere?.call();
+        final relaunchedFinished = await _waitForRelaunchedSetup(
+          installerPath,
+          relaunchedSetupTimeout,
+          isWaitCancelled ?? () => false,
+        );
+        if (relaunchedFinished == false) throw const OtzariaWizardStillOpen();
+        _deleteQuietly(logPath);
     }
 
     final staleVersion = previousVersion != null &&
@@ -383,6 +389,8 @@ class OtzariaInstaller {
     );
   }
 
+  /// After the wizard exits: short, because it covers only the gap until the exe
+  /// lands — a relaunched setup is waited for separately.
   static const Duration wizardDetectTimeout = Duration(seconds: 20);
 
   static OtzariaWizardOutcome wizardOutcomeFor(int exitCode) =>
@@ -516,6 +524,8 @@ class OtzariaInstaller {
 
   // ---------------------------------------------------------------- Windows
 
+  /// `Flags: unchecked` in otzaria.iss: a silent fresh install gets no shortcut
+  /// without `/MERGETASKS`, while an update must not recreate a deleted one.
   static const String _desktopIconTask = 'desktopicon';
 
   static List<String> windowsSilentArgs({
@@ -539,6 +549,8 @@ class OtzariaInstaller {
 
   static const String portableMarkerFileName = 'portable.marker';
   static const String systemInstallMarkerFileName = 'system_install.marker';
+
+  static const String legacySystemInstallDir = r'C:\אוצריא';
   static const int _uacRefusedExitCode = 1223;
 
   static OtzariaWindowsInstallScope windowsInstallScopeOf(
@@ -549,7 +561,8 @@ class OtzariaInstaller {
     if (File(p.join(installDir, portableMarkerFileName)).existsSync()) {
       return OtzariaWindowsInstallScope.portable;
     }
-    if (File(p.join(installDir, systemInstallMarkerFileName)).existsSync()) {
+    if (File(p.join(installDir, systemInstallMarkerFileName)).existsSync() ||
+        p.windows.equals(installDir, legacySystemInstallDir)) {
       return OtzariaWindowsInstallScope.allUsers;
     }
     final env = environment ?? Platform.environment;

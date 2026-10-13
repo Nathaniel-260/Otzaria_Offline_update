@@ -62,13 +62,16 @@ void main() {
     );
   });
 
-  test('הורדה: 418 ו-403 הם חסימה, TLS הוא כשל אישור', () async {
-    for (final status in [418, 403]) {
-      await expectLater(
-        download(MockClient((_) async => http.Response('', status))),
-        throwsA(isA<NetworkBlockedException>()),
-      );
-    }
+  test('הורדה: 418 היא חסימה, 403 (קישור חתום שפג) כללי, TLS כשל אישור',
+      () async {
+    await expectLater(
+      download(MockClient((_) async => http.Response('', 418))),
+      throwsA(isA<NetworkBlockedException>()),
+    );
+    await expectLater(
+      download(MockClient((_) async => http.Response('', 403))),
+      throwsA(isA<StateError>()),
+    );
     await expectLater(
       download(
         MockClient((_) async => throw const HandshakeException('bad cert')),
