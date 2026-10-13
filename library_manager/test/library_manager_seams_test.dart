@@ -275,6 +275,41 @@ void main() {
       expect(warnings, hasLength(1));
       expect(warnings.single.$2, isNot(isA<OtzariaIsRunningException>()));
     });
+
+    test(
+      "the launcher holding Otzaria's mutex is not a running Otzaria",
+      () async {
+        const guard = OtzariaProcessGuard();
+        final names = OtzariaProcessGuard.processNamesFor(
+          Platform.operatingSystem,
+        );
+        if (await guard.isAnyRunning(names)) {
+          markTestSkipped('Otzaria is running on this machine');
+          return;
+        }
+        final warnings = <(String, Object)>[];
+        final manager = LibraryManager(
+          dataDir: p.join(temporary.path, 'drive'),
+          operatingSystem: Platform.operatingSystem,
+          environment: const {},
+          otzariaLaunchPath: () async => launch,
+          settingsReader: const _FixedSettingsReader(granted),
+          processGuard: guard,
+          instanceLock: const OtzariaInstanceLock(),
+        );
+        addTearDown(manager.dispose);
+
+        await manager.applyUpdate(
+          check(),
+          onCompanionWarning: (name, error) => warnings.add((name, error)),
+        );
+
+        expect(warnings, hasLength(1));
+        expect(warnings.single.$2, isNot(isA<OtzariaIsRunningException>()));
+        expect(OtzariaInstanceLock.isHeldByThisProcess, isFalse);
+      },
+      skip: Platform.isWindows ? false : 'Windows only',
+    );
   });
 
   group('dispose', () {

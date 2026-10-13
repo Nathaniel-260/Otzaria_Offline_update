@@ -2,6 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaSelfLock;
 
 import 'otzaria_process_guard.dart';
 
@@ -49,6 +50,7 @@ class OtzariaInstanceLock {
 
   Future<OtzariaInstanceLease> acquire({String? portableDataRoot}) async {
     if (!Platform.isWindows) return const _NoLease();
+    OtzariaSelfLock.isHeldByThisProcess = () => isHeldByThisProcess;
     final lease = _WindowsMutexLease.tryCreate(
       mutexNamesFor(portableDataRoot: portableDataRoot),
     );
