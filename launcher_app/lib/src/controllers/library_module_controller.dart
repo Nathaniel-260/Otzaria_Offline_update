@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 
 import '../services/app_logger.dart';

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:hive_ce/hive.dart';
 import 'package:library_manager/library_manager.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 

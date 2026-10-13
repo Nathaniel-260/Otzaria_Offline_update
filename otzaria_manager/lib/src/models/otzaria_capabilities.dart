@@ -21,8 +21,15 @@ class OtzariaCapabilities {
   });
 
   static const String fileName = 'otzaria_capabilities.json';
+  static const String libraryDatabasePathFileName = 'library_database_path.txt';
   static const String portableDataFolderName = 'otzaria_data';
   static const String portableMarkerFileName = 'portable.marker';
+
+  static const int legacyReadableDbSchemaVersion = 5;
+
+  static const List<(int, String)> _readableSchemaSinceAppVersion = [
+    (6, '0.9.98'),
+  ];
 
   final int? formatVersion;
   final String? appVersion;
@@ -43,20 +50,58 @@ class OtzariaCapabilities {
       return value is T ? value : null;
     }
 
+    String? text(String key) {
+      final value = field<String>(key);
+      return value == null || value.isEmpty ? null : value;
+    }
+
+    final schema = field<int>('readableDbSchemaVersion');
     final writtenAt = field<String>('writtenAt');
     return OtzariaCapabilities(
       formatVersion: field<int>('formatVersion'),
-      appVersion: field<String>('appVersion'),
+      appVersion: text('appVersion'),
       buildNumber: field<int>('buildNumber'),
-      arch: field<String>('arch'),
+      arch: text('arch'),
       portable: field<bool>('portable'),
-      exePath: field<String>('exePath'),
-      readableDbSchemaVersion: field<int>('readableDbSchemaVersion'),
-      libraryDbPath: field<String>('libraryDbPath'),
+      exePath: text('exePath'),
+      readableDbSchemaVersion: schema != null && schema > 0 ? schema : null,
+      libraryDbPath: text('libraryDbPath'),
       reportsQueueFormat: field<int>('reportsQueueFormat'),
       pluginInstallResults: field<int>('pluginInstallResults'),
       writtenAt: writtenAt == null ? null : DateTime.tryParse(writtenAt),
     );
+  }
+
+  static OtzariaCapabilities? _parse(List<int> bytes) =>
+      fromJson(jsonDecode(_withoutBom(utf8.decode(bytes))));
+
+  static String _withoutBom(String text) =>
+      text.startsWith('﻿') ? text.substring(1) : text;
+
+  static Future<OtzariaCapabilities?> read(String dataRoot) async {
+    try {
+      return _parse(await File(p.join(dataRoot, fileName)).readAsBytes());
+    } on FileSystemException {
+      return null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  static Future<String?> readLibraryDatabaseDir(String dataRoot) async {
+    try {
+      final text = _withoutBom(
+        utf8.decode(
+          await File(p.join(dataRoot, libraryDatabasePathFileName))
+              .readAsBytes(),
+        ),
+      ).trim();
+      return text.isEmpty ? null : text;
+    } on FileSystemException {
+      return null;
+    } on FormatException {
+      return null;
+    }
   }
 
   static String? dataRootFor(
@@ -95,9 +140,7 @@ class OtzariaCapabilities {
     );
     if (root == null) return null;
     try {
-      final file = File(p.join(root, fileName));
-      if (!file.existsSync()) return null;
-      return fromJson(jsonDecode(file.readAsStringSync()));
+      return _parse(File(p.join(root, fileName)).readAsBytesSync());
     } on FileSystemException {
       return null;
     } on FormatException {
@@ -111,5 +154,63 @@ class OtzariaCapabilities {
     if (p.equals(exe, launchPath)) return true;
     return p.isWithin(launchPath, exe) &&
         launchPath.toLowerCase().endsWith('.app');
+  }
+
+  static int? readableDbSchemaForAppVersion(String version) {
+    if (_numericParts(version).isEmpty) return null;
+    for (final (schema, since) in _readableSchemaSinceAppVersion.reversed) {
+      if (compareAppVersions(version, since) >= 0) return schema;
+    }
+    return legacyReadableDbSchemaVersion;
+  }
+
+  static int? resolveReadableDbSchema({
+    OtzariaCapabilities? capabilities,
+    String? installedVersion,
+    String? launchPath,
+  }) {
+    final trusted = capabilities?.exePath == null ||
+            launchPath == null ||
+            capabilities!.describesExe(launchPath)
+        ? capabilities
+        : null;
+    final declared = trusted?.readableDbSchemaVersion;
+    final fromInstalled = installedVersion == null
+        ? null
+        : readableDbSchemaForAppVersion(installedVersion);
+    if (declared == null) return fromInstalled;
+    final declaredFor = trusted?.appVersion;
+    if (fromInstalled == null || installedVersion == null) return declared;
+    if (declaredFor == null) return declared;
+    final order = compareAppVersions(installedVersion, declaredFor);
+    if (order == 0) return declared;
+    if (order > 0) return declared > fromInstalled ? declared : fromInstalled;
+    return fromInstalled;
+  }
+
+  static int compareAppVersions(String a, String b) {
+    final left = _numericParts(a);
+    final right = _numericParts(b);
+    final count = left.length > right.length ? left.length : right.length;
+    for (var i = 0; i < count; i++) {
+      final l = i < left.length ? left[i] : 0;
+      final r = i < right.length ? right[i] : 0;
+      if (l != r) return l < r ? -1 : 1;
+    }
+    return 0;
+  }
+
+  static List<int> _numericParts(String version) {
+    var base = version.trim();
+    if (base.startsWith('v') || base.startsWith('V')) base = base.substring(1);
+    final cut = base.indexOf(RegExp(r'[+\-\s]'));
+    if (cut >= 0) base = base.substring(0, cut);
+    final parts = <int>[];
+    for (final part in base.split('.')) {
+      final value = int.tryParse(part);
+      if (value == null) return parts;
+      parts.add(value);
+    }
+    return parts;
   }
 }

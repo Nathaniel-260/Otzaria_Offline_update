@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 

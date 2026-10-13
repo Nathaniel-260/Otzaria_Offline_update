@@ -23,6 +23,7 @@ import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 

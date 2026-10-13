@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:plugins_manager/plugins_manager.dart';
 import 'package:sqlite3/sqlite3.dart';

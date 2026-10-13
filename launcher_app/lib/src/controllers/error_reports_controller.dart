@@ -2,6 +2,7 @@ import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 
 import '../services/app_logger.dart';
 import 'dispose_guard.dart';

@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 
 import 'library_state_store.dart';
-import 'otzaria_capabilities.dart';
 import 'otzaria_settings_reader.dart';
 
 /// מוצא את נתיב `seforim.db` של המשתמש.

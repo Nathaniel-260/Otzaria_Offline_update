@@ -7,7 +7,6 @@ export 'src/services/external_update_notice.dart';
 export 'src/services/library_db_locator.dart';
 export 'src/services/library_state_store.dart';
 export 'src/services/library_updater_l10n.dart';
-export 'src/services/otzaria_capabilities.dart';
 export 'src/services/otzaria_instance_lock.dart';
 export 'src/services/otzaria_process_guard.dart';
 export 'src/services/otzaria_settings_reader.dart';

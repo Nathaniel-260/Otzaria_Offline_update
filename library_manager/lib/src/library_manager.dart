@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 
@@ -13,7 +14,6 @@ import 'services/library_db_locator.dart';
 import 'services/library_state_store.dart';
 import 'services/library_update_applier.dart';
 import 'services/library_updater_l10n.dart';
-import 'services/otzaria_capabilities.dart';
 import 'services/otzaria_instance_lock.dart';
 import 'services/otzaria_process_guard.dart';
 import 'services/otzaria_settings_reader.dart';
@@ -626,6 +626,7 @@ class LibraryManager {
     return OtzariaCapabilities.resolveReadableDbSchema(
       capabilities: root == null ? null : await OtzariaCapabilities.read(root),
       installedVersion: await _otzariaAppVersion?.call(),
+      launchPath: launch,
     );
   }
 
