@@ -1622,10 +1622,12 @@ just launch. Five load-bearing details:
   (`IsTemporaryLocation`; Dart twin `AppPaths.isTemporaryLocation` →
   `AppPathsFailure.runningFromTemp`). Explorer runs an exe opened in a zip from
   `%TEMP%\Temp1_<name>.zip\`, and everything downloaded there was discarded.
-- **It recovers a self-update cut between its two renames.** Run as
-  `.launcher-previous.exe` / `.launcher-update.exe` with no exe under the real
-  name, it renames the previous one back (`RecoverInterruptedUpdate`), and
-  `LauncherSelfInstaller.cleanupLeftovers` never deletes that last copy.
+- **It recovers a self-update cut between its two renames.** `_replaceFile`
+  writes the real exe name to `.launcher-update.target` before the first
+  rename (users rename the exe, e.g. `Otzaria-Updates (1).exe`); run as
+  `.launcher-previous.exe` / `.launcher-update.exe` while that name is
+  missing, the stub renames the previous one back to it
+  (`RecoverInterruptedUpdate`), and `cleanupLeftovers` never deletes it.
 
 **`package.ps1` must pack the payload before it compiles the stub.** `stub.rc` embeds
 `windows_stub/build/payload.otz`, so `rc.exe` needs that file to exist;

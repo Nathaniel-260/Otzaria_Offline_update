@@ -62,12 +62,11 @@ static const wchar_t kStubPathEnvVar[] = L"OTZARIA_LAUNCHER_STUB";
 // ל-`LauncherInstallLayout.payloadVersionEnvVar`.
 static const wchar_t kPayloadVersionEnvVar[] = L"OTZARIA_PAYLOAD_VERSION";
 
-// = `LauncherSelfInstaller.stagedName` / `.previousName` /
-// `LauncherInstallLayout.packagedExeName` / `.publishedExeName`.
+// = `LauncherSelfInstaller.stagedName` / `.previousName` / `.targetName`.
+// קובץ ה-target מחזיק את שם ה-exe שהוחלף בפועל — המשתמש יכול לשנות אותו.
 static const wchar_t kStagedExeName[] = L".launcher-update.exe";
 static const wchar_t kPreviousExeName[] = L".launcher-previous.exe";
-static const wchar_t kPackagedExeName[] = L"עדכוני אוצריא.exe";
-static const wchar_t kPublishedExeName[] = L"Otzaria-Updates.exe";
+static const wchar_t kTargetFileName[] = L".launcher-update.target";
 
 // הלוג של ה-stub, לצד `launcher.log` של הלאנצ'ר. בלעדיו כל מה שקורה כאן —
 // חילוץ שנכשל, קובץ שלא נכתב, מרקר שאינו תואם — קורה בשקט מוחלט, ודיווח על
@@ -827,8 +826,43 @@ static BOOL FileExists(const wchar_t *path) {
   return path != NULL && GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES;
 }
 
+// שם ה-exe שההחלפה כיוונה אליו, מתוך קובץ ה-target (UTF-8), או NULL.
+static wchar_t *ReadReplaceTarget(const wchar_t *stub_dir) {
+  wchar_t *path = FormatString(L"%s%s%s", stub_dir, SeparatorFor(stub_dir),
+                               kTargetFileName);
+  if (path == NULL) {
+    return NULL;
+  }
+  HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  FreeString(path);
+  if (file == INVALID_HANDLE_VALUE) {
+    return NULL;
+  }
+  char utf8[1024];
+  DWORD read = 0;
+  const BOOL ok = ReadFile(file, utf8, sizeof(utf8) - 1, &read, NULL);
+  CloseHandle(file);
+  if (!ok || read == 0) {
+    return NULL;
+  }
+  wchar_t name[MAX_PATH];
+  const int length =
+      MultiByteToWideChar(CP_UTF8, 0, utf8, (int)read, name, MAX_PATH - 1);
+  if (length <= 0) {
+    return NULL;
+  }
+  name[length] = L'\0';
+  if (wcschr(name, L'\\') != NULL || wcschr(name, L'/') != NULL ||
+      wcschr(name, L':') != NULL || _wcsicmp(name, kStagedExeName) == 0 ||
+      _wcsicmp(name, kPreviousExeName) == 0) {
+    return NULL;
+  }
+  return FormatString(L"%s%s%s", stub_dir, SeparatorFor(stub_dir), name);
+}
+
 // עדכון עצמי שנקטע בין שני ה-rename של `LauncherSelfInstaller` משאיר רק את
-// הקבצים הזמניים; מי מהם שיופעל מחזיר את הגרסה הקודמת לשם האמיתי.
+// הקבצים הזמניים; מי מהם שיופעל מחזיר את הגרסה הקודמת לשם שנרשם ב-target.
 // מחזיר נתיב להריץ במקומנו, או NULL כשממשיכים כרגיל.
 static wchar_t *RecoverInterruptedUpdate(const wchar_t *stub_dir,
                                          wchar_t **stub_path) {
@@ -839,33 +873,29 @@ static wchar_t *RecoverInterruptedUpdate(const wchar_t *stub_dir,
   if (!is_staged && !is_previous) {
     return NULL;
   }
-  const wchar_t *separator = SeparatorFor(stub_dir);
-  wchar_t *packaged =
-      FormatString(L"%s%s%s", stub_dir, separator, kPackagedExeName);
-  wchar_t *published =
-      FormatString(L"%s%s%s", stub_dir, separator, kPublishedExeName);
-  wchar_t *previous =
-      FormatString(L"%s%s%s", stub_dir, separator, kPreviousExeName);
-  wchar_t *relaunch = NULL;
-  if (packaged != NULL && published != NULL && !FileExists(packaged) &&
-      !FileExists(published)) {
-    const BOOL from_previous = FileExists(previous);
-    const wchar_t *source = from_previous ? previous : *stub_path;
-    if (MoveFileExW(source, packaged, 0)) {
-      LogLine(L"עדכון עצמי שנקטע: %s שוחזר אל %s", source, packaged);
-      if (is_previous || !from_previous) {
-        FreeString(*stub_path);
-        *stub_path = packaged;
-      } else {
-        relaunch = packaged;
-      }
-      packaged = NULL;
-    } else {
-      LogLine(L"שחזור %s נכשל בשגיאה %lu", source, GetLastError());
-    }
+  wchar_t *target = ReadReplaceTarget(stub_dir);
+  if (target == NULL || FileExists(target)) {
+    FreeString(target);
+    return NULL;
   }
-  FreeString(packaged);
-  FreeString(published);
+  wchar_t *previous = FormatString(L"%s%s%s", stub_dir, SeparatorFor(stub_dir),
+                                   kPreviousExeName);
+  wchar_t *relaunch = NULL;
+  const BOOL from_previous = FileExists(previous);
+  const wchar_t *source = from_previous ? previous : *stub_path;
+  if (MoveFileExW(source, target, 0)) {
+    LogLine(L"עדכון עצמי שנקטע: %s שוחזר אל %s", source, target);
+    if (is_previous || !from_previous) {
+      FreeString(*stub_path);
+      *stub_path = target;
+    } else {
+      relaunch = target;
+    }
+    target = NULL;
+  } else {
+    LogLine(L"שחזור %s נכשל בשגיאה %lu", source, GetLastError());
+  }
+  FreeString(target);
   FreeString(previous);
   return relaunch;
 }

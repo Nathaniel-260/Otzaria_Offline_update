@@ -938,6 +938,23 @@ void main() {
       expect(staged.existsSync(), isFalse);
     });
 
+    test('ההחלפה רושמת את שם היעד לפני ה-rename, ומוחקת אותו בסוף', () async {
+      final target = File(p.join(temp.path, LauncherSelfInstaller.targetName));
+      String? seenDuringRestart;
+      await LauncherSelfInstaller(
+        currentPid: 1,
+        operatingSystem: 'windows',
+        startDetached: (_, __) async {
+          seenDuringRestart =
+              target.existsSync() ? target.readAsStringSync() : null;
+        },
+        quit: () {},
+      ).apply(layout: layout, downloadedFilePath: downloaded.path);
+
+      expect(seenDuringRestart, isNull);
+      expect(target.existsSync(), isFalse);
+    });
+
     test('הלאנצ\'ר שרץ מקובץ השארית אינו מוחק את עצמו', () async {
       final previous =
           File(p.join(temp.path, LauncherSelfInstaller.previousName));

@@ -30,6 +30,10 @@ class LauncherSelfInstaller {
 
   static const String previousName = '.launcher-previous.exe';
 
+  /// שם ה-exe שמוחלף, נכתב לפני ה-rename הראשון — ה-stub משחזר רק אליו
+  /// (המשתמש יכול לקרוא לקובץ בכל שם). ראו `RecoverInterruptedUpdate`.
+  static const String targetName = '.launcher-update.target';
+
   /// תיקיית חילוץ זמנית ב-macOS, לצד חבילת ה-`.app`.
   static const String macStagingDirName = '.launcher-update-staging';
 
@@ -59,7 +63,7 @@ class LauncherSelfInstaller {
   /// שנוספו כאן הן נשארו על הכונן לנצח אחרי עדכון שנקטע.
   Future<void> cleanupLeftovers(LauncherInstallLayout layout) async {
     if (_operatingSystem == 'windows') await _restoreInterruptedReplace(layout);
-    for (final name in const [stagedName, previousName]) {
+    for (final name in const [stagedName, previousName, targetName]) {
       try {
         final file = File(p.join(layout.executableDir, name));
         if (p.equals(file.path, layout.executablePath)) continue;
@@ -108,11 +112,14 @@ class LauncherSelfInstaller {
     final dir = layout.executableDir;
     final staged = File(p.join(dir, stagedName));
     final previous = File(p.join(dir, previousName));
+    final target = File(p.join(dir, targetName));
 
     try {
       if (await staged.exists()) await staged.delete();
       if (await previous.exists()) await previous.delete();
       await File(sourcePath).copy(staged.path);
+      await target.writeAsString(p.basename(layout.executablePath),
+          flush: true);
     } on FileSystemException catch (e) {
       throw LauncherUpdateException(
         AppL10n.strings.launcherUpdate.replaceFailed(e.message),
@@ -120,22 +127,27 @@ class LauncherSelfInstaller {
     }
 
     try {
-      await File(layout.executablePath).rename(previous.path);
-    } on FileSystemException catch (e) {
-      throw LauncherUpdateException(
-        AppL10n.strings.launcherUpdate.replaceFailed(e.message),
-      );
-    }
-
-    try {
-      await staged.rename(layout.executablePath);
-    } catch (e) {
       try {
-        await previous.rename(layout.executablePath);
-      } catch (_) {}
-      throw LauncherUpdateException(
-        AppL10n.strings.launcherUpdate.replaceFailed('$e'),
-      );
+        await File(layout.executablePath).rename(previous.path);
+      } on FileSystemException catch (e) {
+        throw LauncherUpdateException(
+          AppL10n.strings.launcherUpdate.replaceFailed(e.message),
+        );
+      }
+      try {
+        await staged.rename(layout.executablePath);
+      } catch (e) {
+        try {
+          await previous.rename(layout.executablePath);
+        } catch (_) {}
+        throw LauncherUpdateException(
+          AppL10n.strings.launcherUpdate.replaceFailed('$e'),
+        );
+      }
+    } finally {
+      try {
+        await target.delete();
+      } on FileSystemException catch (_) {}
     }
   }
 

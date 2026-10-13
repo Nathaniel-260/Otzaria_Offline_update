@@ -99,14 +99,8 @@ void main() {
         stubC,
         contains(
             'kPreviousExeName[] = L"${LauncherSelfInstaller.previousName}"'));
-    expect(
-        stubC,
-        contains(
-            'kPackagedExeName[] = L"${LauncherInstallLayout.packagedExeName}"'));
-    expect(
-        stubC,
-        contains('kPublishedExeName[] = '
-            'L"${LauncherInstallLayout.publishedExeName}"'));
+    expect(stubC,
+        contains('kTargetFileName[] = L"${LauncherSelfInstaller.targetName}"'));
   });
 
   test('המרקר מושווה לגרסת ה-payload, ולא רק נבדק שהוא קיים', () {
