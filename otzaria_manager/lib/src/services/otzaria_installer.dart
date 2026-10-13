@@ -14,7 +14,6 @@ import '../models/otzaria_update_check_result.dart';
 import 'installed_version_reader.dart';
 import 'otzaria_app_locator.dart';
 import 'running_otzaria_locator.dart';
-import 'windows_elevation.dart';
 import 'windows_exe_version_reader.dart';
 
 /// נזרק כשהמשתמש ביטל את ההורדה. חריג נפרד ולא [StateError], כדי שהקורא

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:otzaria_downloads/otzaria_downloads.dart' show ElevatedProcess;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
@@ -21,7 +22,6 @@ import 'services/custom_app_media.dart';
 import 'services/custom_app_order_store.dart';
 import 'services/custom_app_store.dart';
 import 'services/custom_app_trust_store.dart';
-import 'services/elevated_process.dart';
 import 'services/file_digest.dart';
 import 'services/github_app_client.dart';
 import 'services/install_learner.dart';

@@ -11,6 +11,7 @@ export 'src/atomic_file.dart'
     show isAtomicTempNameOf, writeBytesAtomically, writeStringAtomically;
 export 'src/github_api.dart';
 export 'src/network_errors.dart';
+export 'src/windows_elevation.dart';
 
 class FileDownloadResult {
   const FileDownloadResult(this.size, this.headers, this.sha256);

@@ -1,9 +1,8 @@
 import 'dart:io';
 
+import 'package:otzaria_downloads/otzaria_downloads.dart' show WindowsElevation;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
-
-import 'windows_elevation.dart';
 
 /// מפעיל את ההתקנה שהתגלתה — קובץ `.exe` בווינדוס, חבילת `.app` ב-macOS.
 /// נפרד מ-[OtzariaInstaller] כי "הפעלה" יכולה לקרות גם בלי שהתבצעה

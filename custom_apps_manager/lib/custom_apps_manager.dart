@@ -20,7 +20,6 @@ export 'src/services/custom_app_media.dart';
 export 'src/services/custom_app_order_store.dart';
 export 'src/services/custom_app_store.dart';
 export 'src/services/custom_app_trust_store.dart';
-export 'src/services/elevated_process.dart';
 export 'src/services/github_app_client.dart';
 export 'src/services/install_learner.dart';
 export 'src/services/installer_kind_sniffer.dart';

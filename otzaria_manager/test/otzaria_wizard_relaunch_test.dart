@@ -166,20 +166,6 @@ void main() {
     );
   }
 
-  test('ארגומנטים להפעלה לא-מורמת מצוטטים כמו ב-CommandLineToArgvW', () {
-    expect(WindowsElevation.quoteArgument('otzaria://x'), 'otzaria://x');
-    expect(
-      WindowsElevation.quoteArgument(r'C:\Program Files\o.exe'),
-      r'"C:\Program Files\o.exe"',
-    );
-    expect(WindowsElevation.quoteArgument(r'a"b'), r'"a\"b"');
-    expect(
-      WindowsElevation.quoteArgument('C:\\dir with space\\'),
-      '"C:\\dir with space\\\\"',
-    );
-    expect(WindowsElevation.quoteArgument(''), '""');
-  });
-
   test('ביטול ההמתנה מפסיק להמתין בלי לטעון שהמתקין נסגר', () async {
     var cancelled = false;
     final installer = installerWith((_, __, isCancelled) async {

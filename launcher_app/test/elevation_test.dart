@@ -1,9 +1,8 @@
 import 'dart:io';
 
-import 'package:custom_apps_manager/custom_apps_manager.dart'
-    show ElevatedProcess;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/services/elevation.dart';
+import 'package:otzaria_downloads/otzaria_downloads.dart' show ElevatedProcess;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 /// הזיהוי כאן הוא מה שמפעיל את ההצעה "להפעיל כמנהל" (הצעה #25 בגיטהאב, אבל

@@ -1,6 +1,7 @@
 import 'dart:io'
     show Directory, FileSystemEntity, FileSystemEntityType, Platform;
 
+import 'package:otzaria_downloads/otzaria_downloads.dart' show WindowsElevation;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
@@ -21,7 +22,6 @@ import 'services/otzaria_release_client.dart';
 import 'services/otzaria_state_store.dart';
 import 'services/running_otzaria_locator.dart';
 import 'services/windows_arch.dart';
-import 'services/windows_elevation.dart';
 import 'services/windows_install_registry.dart';
 
 /// נקודת הכניסה היחידה שמודול ה-UI (הדשבורד ב-Flutter) אמור להשתמש בה.
