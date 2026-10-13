@@ -148,6 +148,9 @@ jobs:
           pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-build
       - run: flutter config --enable-windows-desktop
       - run: flutter create --no-pub --platforms=windows .
+      - name: Restore the lock and metadata flutter create rewrites
+        shell: bash
+        run: git checkout -- pubspec.lock .metadata
       - run: flutter pub get --enforce-lockfile
       - name: Locks unchanged by create/pub get
         shell: bash

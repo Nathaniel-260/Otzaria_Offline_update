@@ -1678,8 +1678,10 @@ resolves with `--enforce-lockfile`.** CI used to resolve fresh on every run, so
 the same commit could ship different dependencies. Flutter (`flutter-version`),
 the Dart SDK (`setup-dart` `sdk:`) and every action (commit SHA) are pinned in
 `.github/workflows/`; bump the toolchain and regenerate the locks together, and
-never change a lock without its `pubspec.yaml` in an unrelated change. Windows
-jobs run `flutter create --no-pub` and fail on any `pubspec.lock` diff after it.
+never change a lock without its `pubspec.yaml` in an unrelated change.
+`flutter create --platforms=windows` overwrites `pubspec.lock` and `.metadata`
+even with `--no-pub` (CI run 38382790213), so the Windows jobs `git checkout`
+both before `pub get --enforce-lockfile` and fail on any lock diff after it.
 
 **The distributed exe carries the whole file pile inside it.** `launcher_app.exe`
 cannot ship alone: `flutter_windows.dll` is a load-time import and `data/` is resolved

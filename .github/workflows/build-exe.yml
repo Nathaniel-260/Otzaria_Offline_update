@@ -18,6 +18,9 @@ jobs:
           flutter-version: 3.47.2
       - run: flutter config --enable-windows-desktop
       - run: flutter create --no-pub --platforms=windows .
+      - name: Restore the lock and metadata flutter create rewrites
+        shell: bash
+        run: git checkout -- pubspec.lock .metadata
       - run: flutter pub get --enforce-lockfile
       - name: Locks unchanged by create/pub get
         shell: bash
