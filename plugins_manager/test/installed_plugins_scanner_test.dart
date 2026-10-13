@@ -8,6 +8,7 @@ import 'package:test/test.dart';
 import 'support.dart';
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
 
   setUp(() => temp = createTempDir());
@@ -328,20 +329,27 @@ void main() {
 
     test('ברירת המחדל היא שורש הנתונים של המשתמש בלבד, כמו AppPaths באוצריא',
         () {
+      final env = InstalledPluginsScanner.environment();
       final dir = InstalledPluginsScanner.defaultPluginsDir();
       if (Platform.isWindows) {
-        expect(
-          dir,
-          p.join(Platform.environment['APPDATA']!, 'otzaria', 'plugins'),
-        );
+        expect(dir, p.join(env['APPDATA']!, 'otzaria', 'plugins'));
       } else if (Platform.isMacOS) {
         expect(
           dir,
-          p.join(Platform.environment['HOME']!, 'Library',
-              'Application Support', 'otzaria', 'plugins'),
+          p.join(env['HOME']!, 'Library', 'Application Support', 'otzaria',
+              'plugins'),
         );
       }
       expect(dir ?? '', isNot(contains('ProgramData')));
+    });
+
+    test('בדיקה שמגיעה לנתוני אוצריא האמיתיים נכשלת', () async {
+      final appData = Platform.environment['APPDATA'];
+      if (appData == null) return;
+      final real = InstalledPluginsScanner(
+        customPluginsDir: p.join(appData, 'otzaria', 'plugins'),
+      );
+      await expectLater(real.scan(), throwsStateError);
     });
 
     test('דריסה במחרוזת ריקה נופלת לברירת המחדל', () {

@@ -12,6 +12,7 @@ import 'package:test/test.dart';
 import 'support.dart';
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
   late PluginMirrorStore store;
   final strings = AppL10n.strings.pluginsDomain;

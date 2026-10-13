@@ -35,9 +35,39 @@ class InstalledPluginsScanner {
 
   Future<Map<String, String>> scan() async => (await scanState()).versions;
 
+  static Map<String, String> Function() environment =
+      () => Platform.environment;
+
+  static void Function(String path)? debugPathGuard;
+
+  /// מפנה את ברירת המחדל לתיקייה זמנית, ונכשל אם בדיקה מגיעה בכל זאת לנתוני
+  /// אוצריא האמיתיים של המחשב.
+  static void sandboxForTests(String sandboxRoot) {
+    final real = Platform.environment;
+    final forbidden = [
+      for (final key in const ['APPDATA', 'LOCALAPPDATA', 'ProgramData'])
+        if ((real[key] ?? '').isNotEmpty) p.join(real[key]!, 'otzaria'),
+      if ((real['HOME'] ?? '').isNotEmpty)
+        p.join(real['HOME']!, 'Library', 'Application Support', 'otzaria'),
+    ];
+    final sandbox = {
+      'APPDATA': p.join(sandboxRoot, 'Roaming'),
+      'HOME': p.join(sandboxRoot, 'home'),
+    };
+    environment = () => sandbox;
+    debugPathGuard = (path) {
+      for (final root in forbidden) {
+        if (p.equals(root, path) || p.isWithin(root, path)) {
+          throw StateError('A test reached a real Otzaria path: $path');
+        }
+      }
+    };
+  }
+
   Future<InstalledPluginsState> scanState() async {
     final root = resolveInstalledDir();
     if (root == null) return InstalledPluginsState.empty;
+    debugPathGuard?.call(root);
 
     final registered = await _readRegistry(root);
     if (registered != null) return registered;
@@ -64,6 +94,7 @@ class InstalledPluginsScanner {
     try {
       final dbPath = await locate(p.dirname(p.dirname(installedDir)));
       if (dbPath == null) return null;
+      debugPathGuard?.call(dbPath);
       return await Isolate.run(() => readInstalledPluginsRegistry(dbPath));
     } catch (_) {
       return null;
@@ -123,7 +154,7 @@ class InstalledPluginsScanner {
   /// `<dataRoot>/plugins` של אוצריא (`AppPaths.getPluginsRootPath`) — היא
   /// אינה שומרת תוספים מחוץ לשורש הנתונים של המשתמש.
   static String? defaultPluginsDir() {
-    final env = Platform.environment;
+    final env = environment();
     if (Platform.isWindows) {
       final appData = env['APPDATA'];
       if (appData == null || appData.isEmpty) return null;

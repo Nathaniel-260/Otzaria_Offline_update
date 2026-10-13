@@ -47,6 +47,7 @@ Map<String, dynamic> _plugin(String id, String version) => {
     };
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
 
   setUp(() => temp = createTempDir());

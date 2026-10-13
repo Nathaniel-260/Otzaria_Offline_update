@@ -1222,6 +1222,29 @@ void main() {
       expect(controller.isSyncing, isFalse);
     });
 
+    test('שבת בבדיקה הקלה — הודעת השבת, והמראה אינה נחשבת מעודכנת', () async {
+      final closed = PluginsModuleController(
+        mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({'error': 'shabbat'}),
+            503,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+      addTearDown(closed.dispose);
+      await closed.load();
+
+      await closed.checkOnline();
+
+      expect(closed.status, PluginsModuleStatus.ready);
+      expect(
+        closed.onlineCheckError,
+        AppL10n.strings.pluginsDomain.siteClosedForShabbat,
+      );
+    });
+
     test('שבת: המראה הקיימת נשארת מוכנה, עם הודעה ייעודית ובלי שגיאה',
         () async {
       await saveCatalog(PluginCatalog(plugins: [plugin('a', 'א')]));

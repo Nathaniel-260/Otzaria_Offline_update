@@ -188,6 +188,7 @@ class _Site {
 }
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
   final strings = AppL10n.strings.pluginsDomain;
 

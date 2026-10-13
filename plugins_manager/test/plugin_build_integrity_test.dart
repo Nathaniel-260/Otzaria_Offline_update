@@ -16,6 +16,7 @@ class _StopBeforeLaunch implements Exception {
 }
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
   late PluginMirrorStore store;
   final strings = AppL10n.strings.pluginsDomain;
@@ -127,6 +128,24 @@ void main() {
       expect(outcome.failed, isEmpty);
       expect(outcome.catalog.plugins.single.localFiles.keys, ['1.1.0']);
     });
+  });
+
+  test('השלמת קובץ חסר בהתקנה בשבת — הודעת השבת, לא "הקובץ אינו זמין"',
+      () async {
+    final plugin = StorePlugin.fromApi(apiPlugin(), 'https://otzaria.test');
+    await store.save(PluginCatalog(plugins: [plugin]));
+    final m = PluginsManager(
+      resolveMirrorDir: () async => temp.path,
+      resolvePluginsDir: () async => p.join(temp.path, 'otzaria', 'plugins'),
+      baseUrl: 'https://otzaria.test',
+      httpClient: MockClient(
+        (_) async => jsonResponse({'error': 'shabbat'}, status: 503),
+      ),
+    );
+
+    final result = await m.directInstall(plugin);
+
+    expect(result.error, strings.siteClosedForShabbat);
   });
 
   group('sha256 מהאתר', () {
