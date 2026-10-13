@@ -113,9 +113,18 @@ class CustomAppLocator {
     if (pattern != null && lookup != null) {
       yield* Stream.fromIterable(await lookup(pattern));
     }
-    if (descriptor.installDir case final dir? when dir.isNotEmpty) yield dir;
-    yield* Stream.fromIterable(descriptor.detect.dirs);
+    if (descriptor.installDir case final dir? when isFullyQualified(dir)) {
+      yield dir;
+    }
+    yield* Stream.fromIterable(descriptor.detect.dirs.where(isFullyQualified));
   }
+
+  /// `\x` ו-`C:x` נפתרים מול הכונן הנוכחי — על כונן נייד זו תיקייה בכונן
+  /// עצמו, שממנה הייתה מופעלת תוכנה שהגיעה עם הרשומה.
+  static bool isFullyQualified(String dir, {bool? windows}) =>
+      (windows ?? Platform.isWindows)
+          ? RegExp(r'^([A-Za-z]:[\\/]|[\\/]{2}[^\\/])').hasMatch(dir)
+          : dir.startsWith('/');
 
   /// חיפוש לרוחב אחרי [exeName] תחת [root], עד [_maxDepth].
   Future<String?> _findExeIn(String root, String exeName) async {

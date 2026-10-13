@@ -393,6 +393,40 @@ void main() {
       expect(
           (await here.installPreflight('org.example.app')).needsTrust, isTrue);
     });
+
+    test('כללי הזיהוי בטביעה, והפעלה של רשומה שלא אושרה נדחית', () async {
+      installerJson(sha: sha('MZ Inno Setup'));
+      final trustFile = p.join(tempMirrorRoot(), 'machine', 'trust.json');
+      final here = machine(trustFile);
+      await here.trustHere('org.example.app');
+      expect(await here.launchNeedsTrust('org.example.app'), isFalse);
+
+      final descriptorFile =
+          File(p.join(root, 'apps', 'org.example.app', 'descriptor.json'));
+      final json =
+          jsonDecode(descriptorFile.readAsStringSync()) as Map<String, dynamic>;
+      json['detect'] = {
+        'exeName': 'evil.exe',
+        'dirs': [r'D:\x'],
+      };
+      descriptorFile.writeAsStringSync(jsonEncode(json));
+
+      expect(await here.launchNeedsTrust('org.example.app'), isTrue);
+      final exe = File(p.join(tempMirrorRoot(), 'evil.exe'))
+        ..writeAsStringSync('x');
+      await expectLater(
+        here.launch(
+          'org.example.app',
+          CustomAppInstallState(
+            version: null,
+            installDir: exe.parent.path,
+            launchPath: exe.path,
+          ),
+        ),
+        throwsA(isA<AppDescriptorException>()),
+      );
+      expect(runner.calls, isEmpty);
+    });
   });
 
   group('downloadFromGithub עם release שהבדיקה כבר מצאה', () {

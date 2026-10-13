@@ -2823,6 +2823,10 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   String get appNotTrustedHere =>
       'התוכנה נוספה במחשב אחר. יש לאשר אותה במחשב הזה לפני ההתקנה';
   @override
+  String get appNotTrustedForLaunch =>
+      'הרשומה של התוכנה נוספה או שונתה במחשב אחר. יש לאשר אותה במחשב הזה '
+      'לפני ההפעלה';
+  @override
   String fileCopyFailed(String error) => 'העתקת הקובץ נכשלה: $error';
   @override
   String portableFileInUse(String fileName, String error) =>

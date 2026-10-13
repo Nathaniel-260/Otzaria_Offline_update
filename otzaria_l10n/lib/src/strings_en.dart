@@ -3040,6 +3040,10 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'This program was added on another computer. Approve it on this '
       'computer before installing';
   @override
+  String get appNotTrustedForLaunch =>
+      'This program\'s record was added or changed on another computer. '
+      'Approve it on this computer before running it';
+  @override
   String fileCopyFailed(String error) => 'Copying the file failed: $error';
   @override
   String portableFileInUse(String fileName, String error) =>

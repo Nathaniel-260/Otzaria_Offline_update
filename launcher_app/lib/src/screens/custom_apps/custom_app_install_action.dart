@@ -57,6 +57,37 @@ Future<bool> installCustomApp({
   return true;
 }
 
+/// רשומה שלא אושרה במחשב הזה מאושרת קודם — המנהל מסרב להפעיל אותה.
+Future<bool> launchCustomApp({
+  required BuildContext context,
+  required CustomAppsController controller,
+  required CustomAppView app,
+}) async {
+  final installed = app.installed;
+  if (installed == null) return false;
+  final id = app.descriptor.id;
+  final needsTrust = await controller.launchNeedsTrust(id);
+  if (needsTrust == null) {
+    UiSnack.showFailure(controller.errorMessage);
+    return false;
+  }
+  if (needsTrust) {
+    if (!context.mounted) return false;
+    final t = context.strings.customApps;
+    final approved = await showWarningDialog(
+      context: context,
+      title: t.trustDialogTitle,
+      content: t.trustDialogContent(
+        app.descriptor.name,
+        app.descriptor.github?.webUrl ?? app.descriptor.name,
+      ),
+      confirmText: t.trustDialogConfirm,
+    );
+    if (!approved || !await controller.trustHere(id)) return false;
+  }
+  return controller.launch(id, installed);
+}
+
 /// תוכן שלא אושר במחשב הזה, או קובץ בלי sha256 שמור, מאושר כאן קודם —
 /// אחרת המנהל מסרב להריץ אותו. אישור של קובץ בלי sha256 מאשר גם את התוכן.
 Future<bool> _confirmTrust(

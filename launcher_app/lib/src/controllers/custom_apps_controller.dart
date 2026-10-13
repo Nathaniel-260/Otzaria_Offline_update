@@ -687,9 +687,12 @@ class CustomAppsController extends ChangeNotifier
     );
   }
 
-  Future<bool> launch(CustomAppInstallState state) async {
+  Future<bool?> launchNeedsTrust(String id) =>
+      _guard(() => _manager.launchNeedsTrust(id));
+
+  Future<bool> launch(String id, CustomAppInstallState state) async {
     final ok = await _guard(() async {
-      await _manager.launch(state);
+      await _manager.launch(id, state);
       return true;
     });
     return ok == true;

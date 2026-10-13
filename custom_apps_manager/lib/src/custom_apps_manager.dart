@@ -117,8 +117,10 @@ class CustomAppsManager {
 
   /// רושם תוכנה חדשה מהטופס, ומסמן אותה כמאושרת במחשב הזה בלבד. תיקייה
   /// שהועתקה ממחשב אחר מגיעה בלי האישור הזה — ראו [installPreflight].
-  Future<void> add(AppDescriptor descriptor) async =>
-      (await _store()).add(descriptor);
+  Future<void> add(AppDescriptor descriptor) async {
+    await (await _store()).add(descriptor);
+    await _trust.trust(CustomAppTrustStore.keyFor(descriptor, null));
+  }
 
   /// מה ש-[install] יסרב לו: קובץ בלי sha256 שמור ([recordInstallerHash]),
   /// או תוכן שלא אושר במחשב הזה ([trustHere]). הממשק שואל לפני ההתקנה.
@@ -141,9 +143,21 @@ class CustomAppsManager {
 
   Future<void> trustHere(String id) async {
     final entry = await (await _store()).load(id);
-    final sha = entry?.installer?.sha256;
-    if (entry == null || sha == null) return;
-    await _trust.trust(CustomAppTrustStore.keyFor(entry.descriptor, sha));
+    if (entry == null) return;
+    final installer = entry.installer;
+    if (installer != null && installer.sha256 == null) return;
+    await _trust.trust(
+      CustomAppTrustStore.keyFor(entry.descriptor, installer?.sha256),
+    );
+  }
+
+  /// הפעלה מריצה קובץ שנגזר מהרשומה, ולכן גם היא דורשת אישור במחשב הזה.
+  Future<bool> launchNeedsTrust(String id) async {
+    final entry = await (await _store()).load(id);
+    if (entry == null) return false;
+    return !await _trust.isTrusted(
+      CustomAppTrustStore.keyFor(entry.descriptor, entry.installer?.sha256),
+    );
   }
 
   /// קובץ שהמחשב הזה הביא בעצמו (צירוף או הורדה) מאושר בלי לשאול.
@@ -193,7 +207,7 @@ class CustomAppsManager {
     final before = await store.load(descriptor.id);
     final sha = before?.installer?.sha256;
     final wasTrusted = before != null &&
-        sha != null &&
+        (sha != null || before.installer == null) &&
         await _trust
             .isTrusted(CustomAppTrustStore.keyFor(before.descriptor, sha));
     await store.saveDescriptor(descriptor);
@@ -580,6 +594,11 @@ class CustomAppsManager {
       await store.saveDescriptor(descriptor);
     } on FileSystemException catch (e) {
       _onLearnedRulesNotSaved?.call(descriptor.id, e);
+      return;
+    }
+    final sha = (await store.load(descriptor.id))?.installer?.sha256;
+    if (sha != null) {
+      await _trust.trust(CustomAppTrustStore.keyFor(descriptor, sha));
     }
   }
 
@@ -684,7 +703,12 @@ class CustomAppsManager {
 
   /// מפעיל את התוכנה המותקנת. מנותק מהתהליך שלנו — סגירת הלאנצ'ר לא
   /// אמורה לסגור אותה.
-  Future<void> launch(CustomAppInstallState state) async {
+  Future<void> launch(String id, CustomAppInstallState state) async {
+    if (await launchNeedsTrust(id)) {
+      throw AppDescriptorException(
+        AppL10n.strings.customAppsDomain.appNotTrustedForLaunch,
+      );
+    }
     if (!await File(state.launchPath).exists()) {
       throw AppDescriptorException(
         AppL10n.strings.customAppsDomain.launchFileMissing(state.launchPath),

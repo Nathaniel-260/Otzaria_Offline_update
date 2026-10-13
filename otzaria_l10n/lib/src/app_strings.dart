@@ -1879,6 +1879,7 @@ abstract class CustomAppsDomainStrings {
 
   /// רשומה שהגיעה ממחשב אחר אינה מותקנת לפני אישור במחשב הזה.
   String get appNotTrustedHere;
+  String get appNotTrustedForLaunch;
   String fileCopyFailed(String error);
   String portableFileInUse(String fileName, String error);
   String launchFileMissing(String launchPath);

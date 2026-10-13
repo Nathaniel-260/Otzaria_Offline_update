@@ -10,7 +10,7 @@ import '../models/app_descriptor.dart';
 /// שהגיעה על כונן לא תוכל להביא איתה אישור משלה.
 ///
 /// אישור קשור לתוכן: מזהה + sha256 של קובץ ההתקנה + טביעת התיאור (מקור,
-/// מיקום התקנה, שם). כל שינוי באחד מהם מבקש אישור מחדש.
+/// מיקום התקנה, שם, כללי הזיהוי — מהם נגזר מה מופעל). כל שינוי מבקש אישור.
 class CustomAppTrustStore {
   CustomAppTrustStore(this.filePath);
 
@@ -19,16 +19,17 @@ class CustomAppTrustStore {
 
   final Set<String> _session = {};
 
-  static String keyFor(AppDescriptor descriptor, String installerSha256) {
+  static String keyFor(AppDescriptor descriptor, String? installerSha256) {
     final json = descriptor.toJson();
     final relevant = {
       'id': json['id'],
       'name': json['name'],
       'source': json['source'],
       'install': json['install'],
+      'detect': json['detect'],
     };
     final digest = sha256.convert(utf8.encode(jsonEncode(relevant)));
-    return '${descriptor.id}|$installerSha256|$digest';
+    return '${descriptor.id}|${installerSha256 ?? '-'}|$digest';
   }
 
   Future<Set<String>> _stored() async {
