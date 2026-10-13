@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
@@ -269,6 +270,7 @@ class _AppShellState extends State<AppShell> {
     _customApps = CustomAppsController(
       mirrorRootDir: p.join(widget.dataDir, 'mirror'),
       stateDir: widget.stateFilesDir,
+      trustFilePath: _customAppsTrustFile(),
     )..addListener(_onChange);
     _launcherUpdate = LauncherUpdateController(dataDir: widget.dataDir)
       ..addListener(_onChange);
@@ -477,7 +479,7 @@ class _AppShellState extends State<AppShell> {
     } finally {
       if (mounted) setState(() => _elevationPending = false);
     }
-    if (failure != null) {
+    if (failure != null && failure != Elevation.cancelled) {
       UiSnack.showError(t.restartFailedSnack('$failure'));
     }
   }
@@ -1001,8 +1003,42 @@ class _AppShellState extends State<AppShell> {
           ),
       };
 
+  /// אישורי התוכנות הנוספות נשמרים במחשב, לעולם לא על הכונן.
+  static String? _customAppsTrustFile() {
+    final dir = AppPaths.machineStateDir(
+      Platform.environment,
+      isWindows: Platform.isWindows,
+      isMacOS: Platform.isMacOS,
+    );
+    return dir == null ? null : p.join(dir, 'custom_apps_trust.json');
+  }
+
+  /// Ctrl+R/F5: קורא מחדש מה מותקן ומה יש על הכונן, בלי ההצעות של העלייה.
+  /// לא פועל בזמן משימה ארוכה.
+  Future<void> _refreshFromKeyboard() async {
+    if (_longTaskRunning) return;
+    await _launcherFlow.checkMirror();
+    if (!mounted) return;
+    await _otzaria.checkForUpdate();
+    if (!mounted) return;
+    unawaited(_plugins.refreshInstalled());
+    await _library.checkForUpdate();
+  }
+
   @override
   Widget build(BuildContext context) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyR, control: true): () =>
+            unawaited(_refreshFromKeyboard()),
+        const SingleActivator(LogicalKeyboardKey.f5): () =>
+            unawaited(_refreshFromKeyboard()),
+      },
+      child: Focus(autofocus: true, child: _scaffold(context)),
+    );
+  }
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: AppSurfaces.panelBackground(context),
       // שורת הכותרת נפרסת על כל הרוחב — מעל סרגל הניווט ולא לצידו — כך שגרירת

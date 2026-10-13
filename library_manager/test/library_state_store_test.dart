@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/library_manager.dart';
@@ -863,4 +864,17 @@ void main() {
       expect(await store.lowestKnownDbVersion(), isNull);
     });
   });
+
+  test('MachineGuid נקרא מהרג׳יסטרי ב-isolate, בלי reg.exe', () async {
+    final id = await Isolate.run(readWindowsMachineGuid);
+    expect(id, matches(RegExp(r'^[0-9a-fA-F-]{36}$')));
+    final reg = await Process.run('reg', [
+      'query',
+      r'HKLM\SOFTWARE\Microsoft\Cryptography',
+      '/v',
+      'MachineGuid',
+      '/reg:64',
+    ]);
+    expect(id, LibraryStateStore.parseMachineId('${reg.stdout}'));
+  }, skip: !Platform.isWindows);
 }

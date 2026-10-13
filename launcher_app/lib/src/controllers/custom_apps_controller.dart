@@ -103,6 +103,7 @@ class CustomAppsController extends ChangeNotifier
   CustomAppsController({
     required String mirrorRootDir,
     String? stateDir,
+    String? trustFilePath,
     CustomAppsManager? manager,
     ExeIconExtraction? extractIcon,
     CustomAppDetectionSnapshot Function()? detectionSnapshot,
@@ -122,6 +123,7 @@ class CustomAppsController extends ChangeNotifier
           lookupInstalledExe: findInstalledExe,
           onLearningStarted: _markLearning,
           onLearnedRulesNotSaved: logLearnedRulesNotSaved,
+          trustFilePath: trustFilePath,
         );
   }
 
@@ -644,6 +646,28 @@ class CustomAppsController extends ChangeNotifier
     return stored;
   }
 
+  /// What [install] would refuse here — asked before it, see
+  /// `CustomAppsManager.installPreflight`.
+  Future<({bool needsTrust, bool needsHash})?> installPreflight(String id) =>
+      _guard(() => _manager.installPreflight(id));
+
+  Future<bool> trustHere(String id) async =>
+      await _guard(() async {
+        await _manager.trustHere(id);
+        return true;
+      }) ??
+      false;
+
+  Future<bool> recordInstallerHash(String id) async {
+    final ok = await _guard(() async {
+          await _manager.recordInstallerHash(id);
+          return true;
+        }) ??
+        false;
+    if (ok) await load();
+    return ok;
+  }
+
   Future<({bool ok, String? copiedPath, String? learnedExeName})> install(
     String id, {
     String? copyToDir,
@@ -685,11 +709,11 @@ class CustomAppsController extends ChangeNotifier
         appDir: CustomAppStore(mirrorRootDir: _mirrorRootDir).dirFor(id),
       );
 
-  /// חילוץ האייקון מקובץ הרצה. תפר לבדיקות — האמיתי מריץ PowerShell.
+  /// חילוץ האייקון מקובץ הרצה. תפר לבדיקות.
   late final ExeIconExtraction _extractIcon;
 
-  /// המזהים שכבר ניסינו למלא להם אייקון בהרצה הזו. ניסיון עולה תהליך
-  /// PowerShell, ואין טעם לשלם עליו שוב על תוכנה שאין לה אייקון בקובץ.
+  /// המזהים שכבר ניסינו למלא להם אייקון בהרצה הזו — אין טעם לחזור על
+  /// ניסיון לתוכנה שאין לה אייקון בקובץ.
   final Set<String> _iconAttempts = {};
 
   bool _fillingIcons = false;

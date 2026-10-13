@@ -72,9 +72,8 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
     _fillMissingIcons();
   }
 
-  /// מילוי האייקונים החסרים הוא **ברירת המחדל**, ורץ בכניסה למסך ולא
-  /// בעלייה: כל ניסיון הוא תהליך PowerShell, ומי שאינו נכנס ללשונית אינו
-  /// משלם עליו. הקונטרולר זוכר את מי כבר ניסה, ולכן הקריאה החוזרת זולה.
+  /// מילוי האייקונים החסרים רץ בכניסה למסך ולא בעלייה, כדי שמי שאינו נכנס
+  /// ללשונית לא ישלם עליו. הקונטרולר זוכר את מי כבר ניסה.
   void _fillMissingIcons() => unawaited(
         widget.controller.fillMissingIcons(readOnly: widget.readOnly),
       );

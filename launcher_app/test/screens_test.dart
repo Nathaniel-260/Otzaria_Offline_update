@@ -1950,6 +1950,11 @@ void main() {
       stringsOf().setupError.appTranslocatedTitle,
       stringsOf().setupError.appTranslocated,
     ),
+    (
+      AppPathsFailure.runningFromTemp,
+      stringsOf().setupError.runningFromTempTitle,
+      stringsOf().setupError.runningFromTemp,
+    ),
   ]) {
     testWidgets('מסך השגיאה עבור ${kind.name}: כותרת והנחיה ייעודיות בלבד', (
       tester,

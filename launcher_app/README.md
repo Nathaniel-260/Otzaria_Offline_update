@@ -335,7 +335,7 @@ fallback הוחלף באייקון `puzzle_piece` על רקע `primaryContainer`
 - **האייקון מתמלא לבד, בלי שהמשתמש יגדיר דבר**
   (`services/exe_icon_extractor.dart`, ווינדוס בלבד): במחשב המקוון התוכנה
   בדרך כלל אינה מותקנת, אבל המתקין שעל הכונן נושא כמעט תמיד את האייקון
-  שלה. החילוץ עובר ב-PowerShell מול `PrivateExtractIcons` ב-256×256, עם
+  שלה. החילוץ עובר ב-FFI (ב-isolate) מול `PrivateExtractIcons` ב-256×256, עם
   נפילה חזרה ל-`ExtractAssociatedIcon` שנותן 32×32 בלבד.
   `fillMissingIcons` רץ בכניסה למסך ולא בעלייה — כל ניסיון הוא תהליך —
   זוכר כישלונות לכל ההרצה, ואינו רץ כלל בכונן מוגן מפני כתיבה. בטופס

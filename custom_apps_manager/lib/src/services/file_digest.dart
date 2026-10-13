@@ -1,11 +1,12 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 
 /// ה-sha256 של קובץ, ב-hex קטן — אותו פורמט שגיטהאב מפרסם ב-`digest`.
-/// קורא בזרם, כי קובץ התקנה יכול להיות מאות MB.
-Future<String> sha256OfFile(String path) async =>
-    (await sha256.bind(File(path).openRead()).first).toString();
+/// קורא בזרם וב-isolate: קובץ התקנה של מאות MB חסם את ה-UI.
+Future<String> sha256OfFile(String path) => Isolate.run(
+    () async => (await sha256.bind(File(path).openRead()).first).toString());
 
 class _DigestCapture implements Sink<Digest> {
   late final Digest value;
@@ -19,8 +20,8 @@ class _DigestCapture implements Sink<Digest> {
 
 const copyFlushThreshold = 4 << 20;
 
-Future<String> copyFileWithSha256(String from, String to) =>
-    copyStreamWithSha256(File(from).openRead(), File(to).openWrite());
+Future<String> copyFileWithSha256(String from, String to) => Isolate.run(
+    () => copyStreamWithSha256(File(from).openRead(), File(to).openWrite()));
 
 Future<String> copyStreamWithSha256(
   Stream<List<int>> source,

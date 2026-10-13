@@ -76,7 +76,8 @@ Future<void> collect(Directory directory, bool flutter) async {
   final output = Directory.fromUri(directory.uri.resolve('build/coverage/'));
   if (await output.exists()) await output.delete(recursive: true);
   await output.create(recursive: true);
-  await command(directory, flutter ? 'flutter' : 'dart', ['pub', 'get']);
+  await command(directory, flutter ? 'flutter' : 'dart',
+      ['pub', 'get', '--enforce-lockfile']);
   final inventory =
       File.fromUri(directory.uri.resolve('test/coverage_inventory_test.dart'));
   if (await inventory.exists()) {

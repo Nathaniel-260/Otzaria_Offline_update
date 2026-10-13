@@ -35,7 +35,7 @@ jobs:
       version: ${{ steps.next.outputs.version }}
       tag: ${{ steps.next.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - id: next
@@ -58,69 +58,72 @@ jobs:
     env:
       REQUIRE_NATIVE_ZSTD: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
           pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-linux_checks
       - name: otzaria_offline_update (root tools)
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
-        run: flutter pub get && flutter analyze --no-fatal-infos && flutter test
+        run: flutter pub get --enforce-lockfile && flutter analyze --no-fatal-infos && flutter test
       - name: library_manager
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: library_manager
-        run: flutter pub get && flutter analyze --no-fatal-infos && flutter test
+        run: flutter pub get --enforce-lockfile && flutter analyze --no-fatal-infos && flutter test
       - name: otzaria_l10n
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: otzaria_l10n
-        run: dart pub get && dart analyze
+        run: dart pub get --enforce-lockfile && dart analyze
       - name: otzaria_downloads
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: otzaria_downloads
-        run: dart pub get && dart analyze
+        run: dart pub get --enforce-lockfile && dart analyze
       - name: otzaria_manager
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: otzaria_manager
-        run: dart pub get && dart analyze
+        run: dart pub get --enforce-lockfile && dart analyze
       - name: plugins_manager
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: plugins_manager
-        run: dart pub get && dart analyze
+        run: dart pub get --enforce-lockfile && dart analyze
       - name: custom_apps_manager
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: custom_apps_manager
-        run: dart pub get && dart analyze
+        run: dart pub get --enforce-lockfile && dart analyze
       - name: error_reports_manager
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: error_reports_manager
-        run: dart pub get && dart analyze
+        run: dart pub get --enforce-lockfile && dart analyze
 
   dart_packages_macos:
     name: dart packages (test) (macos-latest)
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: dart
-        uses: dart-lang/setup-dart@v1
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+        with:
+          sdk: 3.13.2
       - name: otzaria_manager
         if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
         working-directory: otzaria_manager
-        run: dart pub get && dart test
+        run: dart pub get --enforce-lockfile && dart test
       - name: error_reports_manager
         if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
         working-directory: error_reports_manager
-        run: dart pub get && dart test
+        run: dart pub get --enforce-lockfile && dart test
       - name: plugins_manager
         if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
         working-directory: plugins_manager
-        run: dart pub get && dart test
+        run: dart pub get --enforce-lockfile && dart test
       - name: custom_apps_manager
         if: ${{ !cancelled() && steps.dart.outcome == 'success' }}
         working-directory: custom_apps_manager
-        run: dart pub get && dart test
+        run: dart pub get --enforce-lockfile && dart test
 
   launcher_app:
     name: launcher_app (analyze + windows build)
@@ -131,20 +134,21 @@ jobs:
       run:
         working-directory: launcher_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Set the release version
         if: inputs.release
         shell: bash
         run: bash ../tool/set_launcher_version.sh "${{ needs.version.outputs.version }}"
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
           cache-key: flutter-:os:-:channel:-:version:-:arch:-:hash:-build
           pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-build
       - run: flutter config --enable-windows-desktop
       - run: flutter create --platforms=windows .
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - run: flutter analyze --no-fatal-infos
       - run: flutter build windows --release
       - name: Package portable build
@@ -152,7 +156,7 @@ jobs:
         run: .\windows_stub\package.ps1
         env:
           PAYLOAD_BUILD_ID: ${{ github.sha }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: launcher_app-windows-portable-ci
           path: launcher_app/build/*.exe
@@ -167,16 +171,17 @@ jobs:
       run:
         working-directory: launcher_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Set the release version
         if: inputs.release
         run: bash ../tool/set_launcher_version.sh "${{ needs.version.outputs.version }}"
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
       - run: flutter config --enable-macos-desktop
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - run: flutter analyze --no-fatal-infos
       - run: flutter build macos --release
       - name: Zip the .app bundle
@@ -185,7 +190,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             "Otzaria Launcher.app" \
             "$GITHUB_WORKSPACE/launcher_app/launcher_app-macos.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: launcher_app-macos
           path: launcher_app/launcher_app-macos.zip
@@ -200,25 +205,26 @@ jobs:
       run:
         working-directory: launcher_app
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Set the release version
         if: inputs.release
         run: bash ../tool/set_launcher_version.sh "${{ needs.version.outputs.version }}"
       - id: flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - run: flutter test
       - name: library_manager
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: library_manager
-        run: flutter pub get && flutter test
+        run: flutter pub get --enforce-lockfile && flutter test
       - name: otzaria_offline_update (root tools)
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: .
-        run: flutter pub get && flutter test
+        run: flutter pub get --enforce-lockfile && flutter test
 
   coverage:
     name: tests + coverage (windows, ${{ matrix.shard }})
@@ -241,19 +247,22 @@ jobs:
             packages: plugins_manager,custom_apps_manager,error_reports_manager
             flutter: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
         if: ${{ !matrix.flutter }}
-      - uses: subosito/flutter-action@v2
+        with:
+          sdk: 3.13.2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         if: ${{ matrix.flutter }}
         with:
           channel: stable
+          flutter-version: 3.47.2
           cache: true
           pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-coverage-${{ matrix.shard }}
       - run: dart pub global activate coverage 1.15.1
         if: ${{ !matrix.flutter }}
       - run: dart tool/coverage.dart --collect "--packages=${{ matrix.packages }}" --min=60 --target=0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
           name: coverage-${{ matrix.shard }}
@@ -270,14 +279,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+        with:
+          sdk: 3.13.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: coverage-*
           merge-multiple: true
       - run: dart tool/coverage.dart --min=60 --target=80
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
           name: test-coverage

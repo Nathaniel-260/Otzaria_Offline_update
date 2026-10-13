@@ -92,9 +92,15 @@ abstract final class LauncherCrashSession {
   }
 
   /// יציאה מסודרת מהתהליך: בלי מחיקת הנעילה ההפעלה הבאה נראית כקריסה.
-  static void exitCleanly([void Function(int code)? exitProcess]) {
+  /// הלוג נשטף לפני היציאה (חסום בזמן), אחרת השורות האחרונות אובדות.
+  static Future<void> exitCleanly(
+      [void Function(int code)? exitProcess]) async {
     try {
       markCleanExitSync();
+      await AppLogger.maybeInstance?.flush().timeout(
+            const Duration(milliseconds: 500),
+          );
+    } catch (_) {
     } finally {
       (exitProcess ?? exit)(0);
     }

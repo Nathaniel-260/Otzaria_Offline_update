@@ -1036,6 +1036,49 @@ void main() {
       );
     });
 
+    testWidgets('מד ההתקדמות מוקרא עם השלב והאחוז', (tester) async {
+      await tester.pumpWidget(
+        wrap(InfoProgressRow(
+            stage: he.libraryDomain.applyVerifying, progress: 0.42)),
+      );
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.semanticsLabel, he.libraryDomain.applyVerifying);
+      expect(bar.semanticsValue, '42%');
+    });
+
+    testWidgets('פריט בסרגל הניווט הוא כפתור אחד עם שם ומצב בחירה', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        wrap(
+          NavRailItem(
+            icon: FluentIcons.home_24_regular,
+            label: 'בית',
+            isSelected: true,
+            onTap: () {},
+          ),
+        ),
+      );
+      expect(
+        tester.getSemantics(find.byType(IconButton)),
+        matchesSemantics(
+          label: 'בית',
+          isButton: true,
+          isSelected: true,
+          hasSelectedState: true,
+          isEnabled: true,
+          hasEnabledState: true,
+          isFocusable: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+        ),
+      );
+      handle.dispose();
+    });
+
     testWidgets('CardActionsRow פורס את הפעולות שקיבל', (tester) async {
       await tester.pumpWidget(
         wrap(

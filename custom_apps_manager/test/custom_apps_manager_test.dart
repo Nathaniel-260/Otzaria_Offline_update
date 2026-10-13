@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:custom_apps_manager/custom_apps_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -272,10 +273,125 @@ void main() {
           'MZ Inno Setup');
       writeFile(
         p.join(root, 'apps', 'org.example.app', 'installer.json'),
-        jsonEncode({'fileName': 'setup.exe', 'version': '1'}),
+        jsonEncode({
+          'fileName': 'setup.exe',
+          'version': '1',
+          'sha256': sha256.convert(utf8.encode('MZ Inno Setup')).toString(),
+        }),
       );
+      await manager.trustHere('org.example.app');
       await manager.install('org.example.app');
       expect(runner.calls.single.executable, setup);
+    });
+  });
+
+  group('אמון ברשומה ובקובץ ההתקנה', () {
+    late String setup;
+
+    setUp(() async {
+      await manager.add(descriptor());
+      setup = writeFile(p.join(root, 'apps', 'org.example.app', 'setup.exe'),
+          'MZ Inno Setup');
+    });
+
+    void installerJson({String? sha}) => writeFile(
+          p.join(root, 'apps', 'org.example.app', 'installer.json'),
+          jsonEncode({
+            'fileName': 'setup.exe',
+            'version': '1',
+            if (sha != null) 'sha256': sha,
+          }),
+        );
+
+    test('קובץ בלי sha256 אינו מורץ — עד שמאשרים ושומרים טביעת אצבע', () async {
+      installerJson();
+      expect((await manager.installPreflight('org.example.app')).needsHash,
+          isTrue);
+      await expectLater(
+        manager.install('org.example.app'),
+        throwsA(isA<AppDescriptorException>()),
+      );
+      expect(runner.calls, isEmpty);
+
+      await manager.recordInstallerHash('org.example.app');
+
+      expect((await manager.installPreflight('org.example.app')).needsHash,
+          isFalse);
+      await manager.install('org.example.app');
+      expect(runner.calls.single.executable, setup);
+    });
+
+    CustomAppsManager machine(String trustFile) => CustomAppsManager(
+          resolveMirrorDir: () async => root,
+          readVersion: (_) => '1.4.2',
+          processRunner: runner.call,
+          downloadsDir: p.join(root, 'Downloads'),
+          trustFilePath: trustFile,
+        );
+
+    String sha(String content) =>
+        sha256.convert(utf8.encode(content)).toString();
+
+    test('רשומה שלא אושרה במחשב הזה מחכה לאישור, ואחריו אינה שואלת שוב',
+        () async {
+      installerJson(sha: sha('MZ Inno Setup'));
+      final trustFile = p.join(tempMirrorRoot(), 'machine', 'trust.json');
+      final here = machine(trustFile);
+
+      expect(
+          (await here.installPreflight('org.example.app')).needsTrust, isTrue);
+      await expectLater(
+        here.install('org.example.app'),
+        throwsA(isA<AppDescriptorException>()),
+      );
+      expect(runner.calls, isEmpty);
+
+      await here.trustHere('org.example.app');
+      await here.install('org.example.app');
+      expect(runner.calls, hasLength(1));
+
+      final restarted = machine(trustFile);
+      expect((await restarted.installPreflight('org.example.app')).needsTrust,
+          isFalse);
+    });
+
+    test('האישור נשמר במחשב, לא על הכונן', () async {
+      installerJson(sha: sha('MZ Inno Setup'));
+      final trustFile = p.join(tempMirrorRoot(), 'machine', 'trust.json');
+      await machine(trustFile).trustHere('org.example.app');
+
+      final onDrive = Directory(root)
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.readAsStringSync().contains('org.example.app|'));
+      expect(onDrive, isEmpty);
+      expect(
+        (await machine(p.join(tempMirrorRoot(), 'other', 'trust.json'))
+                .installPreflight('org.example.app'))
+            .needsTrust,
+        isTrue,
+      );
+    });
+
+    test('קובץ התקנה אחר או מקור אחר מבקשים אישור מחדש', () async {
+      installerJson(sha: sha('MZ Inno Setup'));
+      final trustFile = p.join(tempMirrorRoot(), 'machine', 'trust.json');
+      final here = machine(trustFile);
+      await here.trustHere('org.example.app');
+
+      installerJson(sha: sha('MZ something else'));
+      expect(
+          (await here.installPreflight('org.example.app')).needsTrust, isTrue);
+
+      installerJson(sha: sha('MZ Inno Setup'));
+      final descriptorFile =
+          File(p.join(root, 'apps', 'org.example.app', 'descriptor.json'));
+      final json =
+          jsonDecode(descriptorFile.readAsStringSync()) as Map<String, dynamic>;
+      json['install'] = {'dir': r'C:\Windows'};
+      descriptorFile.writeAsStringSync(jsonEncode(json));
+      expect(
+          (await here.installPreflight('org.example.app')).needsTrust, isTrue);
     });
   });
 
@@ -960,6 +1076,7 @@ void main() {
         downloadsDir: p.join(root, 'Downloads'),
       );
 
+      await m.trustHere('org.example.app');
       await m.install('org.example.app');
 
       final executable = runner.calls.single.executable;

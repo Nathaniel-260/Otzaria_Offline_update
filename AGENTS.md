@@ -285,10 +285,11 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
 
 ## 4. Code style
 
-- **Do not write comments in code.** Explanations go in the commit message
-  summary, not in the source — comments only weigh the code down. When you find a
-  comment in code you touch, delete it. Never record history in a comment ("used
-  to…", "changed in…", commented-out code) — git keeps that.
+- **Comments are rare and short.** Add one only for a non-obvious *why* or a
+  trap that would bring a bug back, at most two lines; the rest goes in the
+  commit message. Never record history in a comment ("used to…", "changed
+  in…", commented-out code) — git keeps that. The codebase still carries many
+  long comments: do not mass-edit them, but shorten one you touch anyway.
 - **Fix bugs at the root, minimally.** Investigate first — `git log` on the code,
   read it, name the cause — then prefer removing or reverting the code that caused
   it over adding more. A `try/catch` that silences an error, a null check that
@@ -1555,6 +1556,15 @@ load-bearing details:
   `UninstallDirLookup` turns it into detection. With only one wired, the record
   updates and the app still reports "not installed".
 
+**An installer runs only when this machine trusted that exact content.**
+Copying `apps/<id>/` is how a program is handed over, so a record from
+elsewhere ran its installer unasked, and a missing `sha256` skipped
+verification. Trust lives **on the machine** (`custom_apps_trust.json` in
+`AppPaths.machineStateDir`), never on the drive — a drive could carry its own
+— keyed by id + installer sha256 + a hash of name/source/install
+(`CustomAppTrustStore.keyFor`). A file this machine attached or downloaded is
+trusted automatically; anything else asks once (`installPreflight`).
+
 **Never pick the first `.exe` when learning either.** The learned exe name goes
 through `OtzariaAppLocator.findIn(nameMatches:)` — the same verified scanner with an
 injected name predicate. The form's suggestion used to take the first `.exe` from
@@ -1603,8 +1613,8 @@ the user: a Hebrew category name leaves nothing latin, so it falls back to
 `CustomAppsController.fillMissingIcons` extracts the icon of the installed exe —
 or, on the online machine where the program is not installed, of the installer
 on the drive, which carries the same icon — for every app that has none. Four
-things hold it together: it runs on entering the screen, not at launch, because
-each attempt costs a PowerShell process; a failed attempt is remembered for the
+things hold it together: it runs on entering the screen, not at launch (GDI
+work in an isolate, `writeExeIconPng`); a failed attempt is remembered for the
 run (`_iconAttempts`), since an exe with no icon fails every time; it passes the
 existing screenshots back to `saveMedia`, which rewrites *all* media and would
 otherwise delete them; and `readOnly` stops it, because it writes to the drive.
@@ -1649,6 +1659,13 @@ output is `launcher_app/build/עדכוני אוצריא.exe` (uploaded via a `bu
 not by its Hebrew name). Do not reintroduce an installer step without adding the
 dependency back first — that mismatch kept CI red from July 24 to August 6, 2026.
 
+**Builds are reproducible: every package commits its `pubspec.lock`, and CI
+resolves with `--enforce-lockfile`.** CI used to resolve fresh on every run, so
+the same commit could ship different dependencies. Flutter (`flutter-version`),
+the Dart SDK (`setup-dart` `sdk:`) and every action (commit SHA) are pinned in
+`.github/workflows/`; bump the toolchain and regenerate the locks together, and
+never change a lock without its `pubspec.yaml` in an unrelated change.
+
 **The distributed exe carries the whole file pile inside it.** `launcher_app.exe`
 cannot ship alone: `flutter_windows.dll` is a load-time import and `data/` is resolved
 relative to the exe's directory. So what ships is a tiny C stub
@@ -1667,8 +1684,20 @@ just launch. Five load-bearing details:
 - The completion guard is the `.ready` marker, not the presence of
   `launcher_app.exe`, so an interrupted extraction is never mistaken for a finished
   one.
-- Its single error message is the **one** user-visible string in this repo that is not
-  in `otzaria_l10n` — C cannot depend on a Dart package.
+- Its two message boxes (the failure, and "extract me first") are the **only**
+  user-visible strings in this repo outside `otzaria_l10n` — C cannot depend on
+  a Dart package.
+- **It refuses to run from under `%TEMP%`** (a temp that is a drive root
+  does not count; a folder merely named `*.zip` elsewhere is fine)
+  (`IsTemporaryLocation`; Dart twin `AppPaths.isTemporaryLocation` →
+  `AppPathsFailure.runningFromTemp`). Explorer runs an exe opened in a zip from
+  `%TEMP%\Temp1_<name>.zip\`, and everything downloaded there was discarded.
+- **It recovers a self-update cut between its two renames.** `_replaceFile`
+  writes the real exe name to `.launcher-update.target` before the first
+  rename (users rename the exe, e.g. `Otzaria-Updates (1).exe`); run as
+  `.launcher-previous.exe` / `.launcher-update.exe` while that name is
+  missing, the stub renames the previous one back to it
+  (`RecoverInterruptedUpdate`), and `cleanupLeftovers` never deletes it.
 
 **`package.ps1` must pack the payload before it compiles the stub.** `stub.rc` embeds
 `windows_stub/build/payload.otz`, so `rc.exe` needs that file to exist;
@@ -1783,8 +1812,11 @@ exe into `mirror/launcher/`, copies it over the stub (two renames, rollback on f
   `AbsorbPointer`/`ExcludeFocus`, `downloadAll` refuses, queued dialogs wait and the
   auto-install skips, since `exit(0)` follows. "Restart as administrator" obeys the same
   guard: the offer is deferred during such a task (and re-offered when a download ends),
-  and `Elevation.restartElevated` waits for PowerShell's `Start-Process -Verb RunAs` and
-  quits only on exit code 0, so a declined UAC leaves the launcher running.
+  and `Elevation.restartElevated` waits for `ShellExecuteExW` "runas"
+  (`ElevatedProcess.start`, in an isolate) and quits only on success, so a
+  declined UAC leaves the launcher running. Dart FFI clobbers `GetLastError`
+  after a non-leaf call, so a decline is read from `hInstApp`
+  (`shellExecuteFailureCode`: access denied under runas = 1223).
 - **Closing the window during a long task asks first.** AppShell._confirmClose is
   `LauncherCrashSession.closeGuard`, consulted by `onWindowClose` and by the
   `AppLifecycleListener.onExitRequested` that macOS Cmd+Q / Dock > Quit reach
@@ -1854,7 +1886,10 @@ administrator privileges` runs a *shell command* as root, not the app, behind a 
 indistinguishable from phishing). So `restartElevated` refuses there, `AppShell` never
 offers it, and `describe` appends `macHint` (pick a writable location, or grant Full
 Disk Access). Detection differs too: macOS returns `EPERM` (1) as well as `EACCES` (13)
-for a protected directory, while Windows counts only 5.
+for a protected directory, while Windows counts only 5. A removable volume the user never
+allowed (TCC) fails the data-folder probe with `EPERM`: `AppPaths.writeFailureMessage`
+says where to allow it, and `Info.plist` carries
+`NSRemovableVolumesUsageDescription` so macOS asks at all.
 
 **Nothing blocks the UI isolate at startup — on Windows it is the platform thread.**
 A synchronous native call there (`sqlite3` FFI, a registry write, `Process.run`)
@@ -1945,6 +1980,14 @@ never blocks the next run; the attempt retries for ~2s so a self-relaunch
 (`isContention`) counts as "already running": a drive whose filesystem cannot
 lock runs unguarded rather than refusing to start. The write probe in
 `AppPaths` is per-process (`.write-test-<pid>`) for the same reason.
+**One launcher per PC session too: `Local\OtzariaOfflineUpdate`.** The file
+lock is per drive, so two drives could apply to one `seforim.db` at once.
+`InstanceLock.acquireMachineWide` owns a named mutex (`CreateMutexW` +
+`WaitForSingleObject(0)`, no `GetLastError`, which Dart FFI clobbers). `Local\`
+is per logon session, so another user's launcher is not seen. An elevated
+holder makes `CreateMutexW` fail for a normal one, hence the
+`OpenMutexW(SYNCHRONIZE)` fallback; a mutex that cannot be opened at all runs
+unguarded, like the file lock.
 
 **The background flush must never fail loudly.** A disk error goes to the
 injected `log`, never an uncaught error — that line is itself crash

@@ -238,6 +238,9 @@ class _Home extends HomeStrings {
   @override
   String get libraryUpdateConfirm => 'עדכן עכשיו';
   @override
+  String libraryApplyEstimate(int lowMinutes, int highMinutes) =>
+      'צפוי כ-$lowMinutes עד $highMinutes דקות, לפי מהירות המחשב.';
+  @override
   String libraryUpdatedSnack(String version) => 'המסד עודכן לגרסה $version';
 
   @override
@@ -1457,7 +1460,9 @@ class _Faq extends FaqStrings {
   String get aLauncherSelfUpdate =>
       'כן. כשיש לה גרסה חדשה היא מציעה להוריד אותה במחשב שיש בו אינטרנט, ואז '
       'מחליפה את עצמה ונפתחת מחדש. ההגדרות, הספרים והתוספים שכבר על הכונן '
-      'נשארים כמו שהם.';
+      'נשארים כמו שהם. אם ההחלפה נקטעה (למשל בכיבוי המחשב) והקובץ של התוכנה '
+      'נעלם, יש להפעיל את ‎.launcher-previous.exe שלצידו — הוא משחזר את '
+      'הגרסה הקודמת בשמה הרגיל.';
   @override
   String get qFree => 'וואו, הכול בחינם?';
   @override
@@ -1574,6 +1579,19 @@ class _SetupError extends SetupErrorStrings {
       'אותה שוב.';
   @override
   String get appTranslocatedTitle => 'macOS מריץ את התוכנה מעותק זמני';
+  @override
+  String get runningFromTemp =>
+      'התוכנה הופעלה מתוך קובץ ZIP או מתיקייה זמנית, וכל מה שהיא תוריד משם '
+      'יימחק יחד עם התיקייה הזמנית. יש לחלץ את הקובץ לכונן הנייד (או לתיקייה '
+      'קבועה בדיסק) ולהפעיל אותו משם.';
+  @override
+  String get runningFromTempTitle => 'חלץ את הקובץ לכונן לפני ההפעלה';
+  @override
+  String get macVolumeAccessDenied =>
+      'macOS לא אישר לתוכנה לכתוב לתיקייה שלצידה. יש לפתוח את הגדרות '
+      'המערכת ← פרטיות ואבטחה ← קבצים ותיקיות (או גישה מלאה לדיסק), לאפשר '
+      'לעדכוני אוצריא גישה למיקום הזה — כונן נשלף, מסמכים, שולחן העבודה או '
+      'הורדות — ולפתוח את התוכנה מחדש.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {
@@ -2788,15 +2806,22 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String installerElevatedRetryDeclined(int firstExitCode) =>
       'ההתקנה הסתיימה בשגיאה (קוד $firstExitCode). ניסיון חוזר בהרשאות '
-      'מנהל לא בוצע, כי הבקשה נדחתה בחלון ההרשאות של ווינדוס.';
+      'מנהל לא בוצע: הבקשה נדחתה בחלון ההרשאות של ווינדוס, או שהגישה נחסמה.';
   @override
   String get installerElevationDeclined =>
-      'המתקין דורש הרשאות מנהל, והבקשה נדחתה. כדי להתקין, יש לאשר את '
-      'חלון ההרשאות של ווינדוס.';
+      'המתקין דורש הרשאות מנהל, והבקשה נדחתה או שהגישה נחסמה. כדי להתקין, '
+      'יש לאשר את חלון ההרשאות של ווינדוס.';
   @override
   String get installerDigestMismatch =>
       'קובץ ההתקנה שעל הכונן פגום — הוא אינו זהה לקובץ שנשמר. יש להוריד '
       'או לצרף אותו מחדש במחשב שיש בו אינטרנט';
+  @override
+  String get installerUnverified =>
+      'לקובץ ההתקנה אין טביעת אצבע שמורה, ולכן אי אפשר לוודא שלא שונה. יש '
+      'לאשר אותו לפני ההתקנה';
+  @override
+  String get appNotTrustedHere =>
+      'התוכנה נוספה במחשב אחר. יש לאשר אותה במחשב הזה לפני ההתקנה';
   @override
   String fileCopyFailed(String error) => 'העתקת הקובץ נכשלה: $error';
   @override
@@ -2808,7 +2833,7 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'קובץ ההרצה אינו נמצא: $launchPath';
   @override
   String get launchElevationDeclined =>
-      'התוכנה דורשת הרשאות מנהל, והבקשה נדחתה.';
+      'התוכנה דורשת הרשאות מנהל, והבקשה נדחתה או שהגישה נחסמה.';
 
   @override
   String mediaFileMissing(String path) => 'קובץ התמונה אינו נמצא: $path';
@@ -3198,6 +3223,24 @@ class _CustomApps extends CustomAppsStrings {
 
   @override
   String installedSnack(String name) => '$name הותקנה';
+  @override
+  String get trustDialogTitle => 'תוכנה שנוספה במחשב אחר';
+  @override
+  String trustDialogContent(String name, String source) =>
+      'את "$name" לא הוסיפו במחשב הזה — היא הגיעה על הכונן ממקום אחר '
+      '($source). התקנה מריצה את קובץ ההתקנה שלה במחשב הזה. להמשיך רק אם '
+      'ידוע מי הוסיף אותה ומה היא.';
+  @override
+  String get trustDialogConfirm => 'אני סומך על התוכנה, התקן';
+  @override
+  String get unverifiedDialogTitle => 'קובץ התקנה בלי טביעת אצבע';
+  @override
+  String unverifiedDialogContent(String fileName) =>
+      'ל-$fileName אין טביעת אצבע (sha256) שמורה, ולכן אי אפשר לוודא שהוא '
+      'הקובץ שצורף במקור. אישור יחשב אותה עכשיו וישמור אותה, ומכאן והלאה '
+      'כל שינוי בקובץ ייחסם.';
+  @override
+  String get unverifiedDialogConfirm => 'אמת ושמור';
   @override
   String get learningLabel => 'מזהה את ההתקנה...';
   @override

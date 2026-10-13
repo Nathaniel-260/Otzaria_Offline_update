@@ -19,6 +19,8 @@ Future<bool> installCustomApp({
 
   // כשהקובץ הוא התוכנה עצמה אין מה להתקין — רק להעתיק, והמשתמש הוא זה
   // שיודע לאן. ביטול הבחירה אינו שגיאה: פשוט לא קורה כלום.
+  if (!await _confirmTrust(context, controller, app)) return false;
+
   String? copyToDir;
   if (app.descriptor.portableFile) {
     copyToDir = await NativeFileDialogs.pickDirectory(
@@ -53,4 +55,45 @@ Future<bool> installCustomApp({
     UiSnack.show(strings.learnedDetectionSnack(exeName));
   }
   return true;
+}
+
+/// תוכן שלא אושר במחשב הזה, או קובץ בלי sha256 שמור, מאושר כאן קודם —
+/// אחרת המנהל מסרב להריץ אותו. אישור של קובץ בלי sha256 מאשר גם את התוכן.
+Future<bool> _confirmTrust(
+  BuildContext context,
+  CustomAppsController controller,
+  CustomAppView app,
+) async {
+  final t = context.strings.customApps;
+  final id = app.descriptor.id;
+  final preflight = await controller.installPreflight(id);
+  if (preflight == null) {
+    UiSnack.showFailure(controller.errorMessage);
+    return false;
+  }
+  if (preflight.needsHash) {
+    if (!context.mounted) return false;
+    final approved = await showWarningDialog(
+      context: context,
+      title: t.unverifiedDialogTitle,
+      content: t.unverifiedDialogContent(app.storedInstaller?.fileName ?? ''),
+      confirmText: t.unverifiedDialogConfirm,
+    );
+    if (!approved) return false;
+    if (!await controller.recordInstallerHash(id)) {
+      UiSnack.showFailure(controller.errorMessage);
+      return false;
+    }
+  } else if (preflight.needsTrust) {
+    if (!context.mounted) return false;
+    final source = app.descriptor.github?.webUrl ?? app.descriptor.name;
+    final approved = await showWarningDialog(
+      context: context,
+      title: t.trustDialogTitle,
+      content: t.trustDialogContent(app.descriptor.name, source),
+      confirmText: t.trustDialogConfirm,
+    );
+    if (!approved || !await controller.trustHere(id)) return false;
+  }
+  return context.mounted;
 }

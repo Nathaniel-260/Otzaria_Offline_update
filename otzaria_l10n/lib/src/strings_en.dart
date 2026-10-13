@@ -249,6 +249,10 @@ class _Home extends HomeStrings {
   @override
   String get libraryUpdateConfirm => 'Update Now';
   @override
+  String libraryApplyEstimate(int lowMinutes, int highMinutes) =>
+      'Expected to take about $lowMinutes to $highMinutes minutes, depending '
+      'on the computer.';
+  @override
   String libraryUpdatedSnack(String version) =>
       'The database was updated to version $version';
 
@@ -1546,7 +1550,10 @@ class _Faq extends FaqStrings {
   String get aLauncherSelfUpdate =>
       'Yes. When a new version exists it offers to download it on a computer '
       'with internet, then replaces itself and reopens. Your settings, books '
-      'and plugins already on the drive stay untouched.';
+      'and plugins already on the drive stay untouched. If the replacement '
+      'was interrupted (say, by a power cut) and the program file is gone, '
+      'run .launcher-previous.exe next to it — it restores the previous '
+      'version under its usual name.';
   @override
   String get qFree => 'Wow, is all of this really free?';
   @override
@@ -1669,6 +1676,22 @@ class _SetupError extends SetupErrorStrings {
   @override
   String get appTranslocatedTitle =>
       'macOS is running this program from a temporary copy';
+  @override
+  String get runningFromTemp =>
+      'This program was started from inside a ZIP file or a temporary folder, '
+      'and everything it downloads there would be deleted along with that '
+      'folder. Extract the file to the USB drive (or a permanent folder on '
+      'disk) and run it from there.';
+  @override
+  String get runningFromTempTitle =>
+      'Extract the file to a drive before running it';
+  @override
+  String get macVolumeAccessDenied =>
+      'macOS did not allow this program to write to the folder next to it. '
+      'Open System Settings → Privacy & Security → Files and Folders (or Full '
+      'Disk Access), allow Otzaria Updates to access that location — a '
+      'removable drive, Documents, Desktop or Downloads — and open the program '
+      'again.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {
@@ -2997,16 +3020,25 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String installerElevatedRetryDeclined(int firstExitCode) =>
       'The installation failed (exit code $firstExitCode). It was not '
-      'retried with administrator rights, because the Windows permission '
-      'prompt was declined.';
+      'retried with administrator rights: the Windows permission prompt was '
+      'declined, or access was denied.';
   @override
   String get installerElevationDeclined =>
       'The installer requires administrator rights, and the request was '
-      'declined. To install, approve the Windows permission prompt.';
+      'declined or access was denied. To install, approve the Windows '
+      'permission prompt.';
   @override
   String get installerDigestMismatch =>
       'The installer on the drive is damaged — it does not match the file '
       'that was stored. Download or add it again on a computer with internet';
+  @override
+  String get installerUnverified =>
+      'The installer has no stored fingerprint, so there is no way to tell '
+      'whether it was changed. Approve it before installing';
+  @override
+  String get appNotTrustedHere =>
+      'This program was added on another computer. Approve it on this '
+      'computer before installing';
   @override
   String fileCopyFailed(String error) => 'Copying the file failed: $error';
   @override
@@ -3019,7 +3051,7 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String get launchElevationDeclined =>
       'The program requires administrator rights, and the request was '
-      'declined.';
+      'declined or access was denied.';
 
   @override
   String mediaFileMissing(String path) => 'Image file not found: $path';
@@ -3432,6 +3464,25 @@ class _CustomApps extends CustomAppsStrings {
 
   @override
   String installedSnack(String name) => '$name was installed';
+  @override
+  String get trustDialogTitle => 'A program added on another computer';
+  @override
+  String trustDialogContent(String name, String source) =>
+      '"$name" was not added on this computer — it came on the drive from '
+      'elsewhere ($source). Installing runs its installer on this computer. '
+      'Continue only if you know who added it and what it is.';
+  @override
+  String get trustDialogConfirm => 'I trust this program, install';
+  @override
+  String get unverifiedDialogTitle => 'An installer without a fingerprint';
+  @override
+  String unverifiedDialogContent(String fileName) =>
+      '$fileName has no stored fingerprint (sha256), so there is no way to '
+      'tell whether it is the file that was originally added. Approving '
+      'computes and stores it now; from then on any change to the file is '
+      'blocked.';
+  @override
+  String get unverifiedDialogConfirm => 'Verify and save';
   @override
   String get learningLabel => 'Identifying the installation...';
   @override

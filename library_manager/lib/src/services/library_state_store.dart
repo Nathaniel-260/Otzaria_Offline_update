@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
+import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
+import 'package:win32/win32.dart';
 
 import 'atomic_file.dart';
 
@@ -110,15 +114,7 @@ class LibraryStateStore {
   static Future<String?> _readMachineId() async {
     try {
       if (Platform.isWindows) {
-        final result = await Process.run('reg', [
-          'query',
-          r'HKLM\SOFTWARE\Microsoft\Cryptography',
-          '/v',
-          'MachineGuid',
-          '/reg:64',
-        ]);
-        if (result.exitCode != 0) return null;
-        return parseMachineId(result.stdout.toString());
+        return await Isolate.run(readWindowsMachineGuid);
       }
       if (Platform.isMacOS) {
         final result = await Process.run('/usr/sbin/ioreg', [
@@ -462,5 +458,34 @@ class LibraryStateStore {
     return rest.contains('/') ||
         rest.contains(r'\') ||
         rest.toLowerCase().endsWith('.db');
+  }
+}
+
+/// `MachineGuid` ישר מהרג'יסטרי (תצוגת 64 סיביות), במקום `reg.exe` שעולה
+/// כשנייה במחשבים מסוננים.
+String? readWindowsMachineGuid() {
+  final subKey = r'SOFTWARE\Microsoft\Cryptography'.toNativeUtf16();
+  final value = 'MachineGuid'.toNativeUtf16();
+  const capacity = 128;
+  final data = calloc<Uint16>(capacity);
+  final size = calloc<Uint32>()..value = capacity * 2;
+  try {
+    final status = RegGetValue(
+      HKEY_LOCAL_MACHINE,
+      subKey,
+      value,
+      RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY,
+      nullptr,
+      data,
+      size,
+    );
+    if (status != ERROR_SUCCESS) return null;
+    final id = data.cast<Utf16>().toDartString().trim();
+    return id.isEmpty ? null : id;
+  } finally {
+    free(subKey);
+    free(value);
+    free(data);
+    free(size);
   }
 }

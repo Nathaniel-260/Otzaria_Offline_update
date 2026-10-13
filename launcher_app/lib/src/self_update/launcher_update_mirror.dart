@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:otzaria_downloads/otzaria_downloads.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
+import 'package:seforim_library_updater/seforim_library_updater.dart'
+    show Sha256Stream;
 
 import '../services/app_logger.dart';
 import 'launcher_release.dart';
@@ -149,8 +150,17 @@ class LauncherUpdateMirror {
     );
   }
 
-  static Future<String> _sha256Of(String path) async =>
-      (await sha256.bind(File(path).openRead()).first).toString();
+  static Future<String> _sha256Of(String path) async {
+    final hash = Sha256Stream();
+    try {
+      await for (final chunk in File(path).openRead()) {
+        hash.add(chunk);
+      }
+      return hash.close();
+    } finally {
+      hash.dispose();
+    }
+  }
 
   Future<Map<String, dynamic>?> _readMetadata() async {
     final file = File(_metadataPath);

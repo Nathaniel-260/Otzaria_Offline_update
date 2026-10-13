@@ -19,6 +19,11 @@ class FileDownloadResult {
   final String? sha256;
 }
 
+/// מתחיל את ה-SHA-256 המוזרם של [downloadFile]. אפליקציית Flutter מציבה
+/// כאן מימוש נייטיבי; `close` חייב גם לשחרר את מה שהוא מחזיק.
+ByteConversionSink Function(Sink<Digest> output) startSha256 =
+    sha256.startChunkedConversion;
+
 /// החלקי נשמר בנפרד מהיעד, ורק ETag חזק מאפשר לחבר אליו בייטים חדשים.
 Future<FileDownloadResult> downloadFile({
   required http.Client client,
@@ -223,7 +228,7 @@ Future<FileDownloadResult> _downloadFile({
         await _delete(metadata);
       }
       if (calculateSha256) {
-        hasher = sha256.startChunkedConversion(
+        hasher = startSha256(
           ChunkedConversionSink<Digest>.withCallback(
               (value) => digest = value.single),
         );

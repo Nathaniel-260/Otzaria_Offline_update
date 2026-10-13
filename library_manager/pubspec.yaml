@@ -28,6 +28,7 @@ dependencies:
   # (~1.1GB) ב-RAM, וזה מה שמאפשר לחלץ קובץ-לקובץ בלי זה.
   zstandard_native: ^1.5.0
   ffi: ^2.1.3
+  win32: ^5.5.4
   path: ^1.9.1
   http: ^1.2.2
   # `PRAGMA quick_check` על המסד המחולץ לפני שהוא מחליף את החי — בדיוק

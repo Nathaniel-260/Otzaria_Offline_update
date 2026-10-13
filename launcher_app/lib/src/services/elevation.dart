@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:custom_apps_manager/custom_apps_manager.dart'
+    show ElevatedProcess;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
@@ -62,6 +64,10 @@ class Elevation {
     return '$error\n\n${macOS ? t.macHint : t.hint}';
   }
 
+  /// מה ש-[restartElevated] מחזיר כשחלון ה-UAC נסגר בלי אישור (או שהגישה
+  /// נחסמה): בחירה של המשתמש ולא תקלה, ולכן בלי הודעת שגיאה.
+  static const Object cancelled = _ElevationCancelled();
+
   static Future<Object?> restartElevated({
     Future<int> Function(String executable, List<String> arguments)? run,
     void Function()? quit,
@@ -70,17 +76,11 @@ class Elevation {
     final exe = Platform.resolvedExecutable;
     final int exitCode;
     try {
-      exitCode = await (run ?? _defaultRun)('powershell', [
-        '-NoProfile',
-        '-WindowStyle',
-        'Hidden',
-        '-Command',
-        "try { Start-Process -FilePath '${exe.replaceAll("'", "''")}' "
-            '-Verb RunAs -ErrorAction Stop } catch { exit 1 }',
-      ]);
+      exitCode = await (run ?? _defaultRun)(exe, const []);
     } catch (e) {
       return e;
     }
+    if (exitCode == ElevatedProcess.cancelledCode) return cancelled;
     if (exitCode != 0) return 'exit code $exitCode';
     (quit ?? _defaultQuit)();
     return null;
@@ -90,13 +90,20 @@ class Elevation {
     String executable,
     List<String> arguments,
   ) async {
-    final result = await Process.run(
+    final result = await ElevatedProcess.start(
       executable,
       arguments,
-      workingDirectory: p.dirname(Platform.resolvedExecutable),
+      workingDirectory: p.dirname(executable),
     );
     return result.exitCode;
   }
 
   static void _defaultQuit() => LauncherCrashSession.exitCleanly();
+}
+
+class _ElevationCancelled {
+  const _ElevationCancelled();
+
+  @override
+  String toString() => 'cancelled';
 }

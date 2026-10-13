@@ -168,6 +168,14 @@ class LibraryModuleController extends ChangeNotifier
   /// זה להפעיל מחדש כמנהל, ולכן זה נדלק בכשל ונכבה בכל ניסיון חדש.
   bool needsElevation = false;
 
+  /// "צפוי כ-X עד Y דקות" לתוכנית שמאושרת עכשיו — בדיאלוג האישור בלבד.
+  ({int low, int high})? applyEstimateFor({bool fullDownload = false}) =>
+      libraryApplyMinutes(
+        fullDownload
+            ? _lastCheck?.plan?.fullDownloadFallback
+            : _lastCheck?.plan,
+      );
+
   /// גודל ההורדה של אותה ספרייה מלאה, בבייטים — לתצוגה לפני שמאשרים.
   int? get fullDownloadFallbackSize =>
       _lastCheck?.plan?.fullDownloadFallback?.totalDownloadSize;
@@ -898,4 +906,32 @@ class LibraryModuleController extends ChangeNotifier
     _manager.dispose();
     super.dispose();
   }
+}
+
+/// הריצות שנמדדו מתפזרות פי 3–5 סביב האומדן של [ApplyTimeEstimate]
+/// (129–581 שניות מול 262), ולכן מוצג טווח ולא מספר אחד.
+({int low, int high})? libraryApplyMinutes(
+  LibraryUpdatePlan? plan, {
+  ApplyTimeEstimate estimate = const ApplyTimeEstimate(),
+}) {
+  if (plan == null) return null;
+  final double seconds;
+  switch (plan.kind) {
+    case LibraryUpdatePlanKind.delta:
+      seconds = estimate
+          .deltaRouteSeconds(plan.deltaSteps.map((s) => s.compressedSize));
+    case LibraryUpdatePlanKind.fullDownload:
+      final size = plan.fullDbAsset?.size ?? 0;
+      if (size <= 0) return null;
+      final followUp = plan.followUpDelta?.deltaSteps ?? const [];
+      seconds = estimate.fullRouteSeconds(size) +
+          estimate.deltaRouteSeconds(followUp.map((s) => s.compressedSize));
+    default:
+      return null;
+  }
+  if (seconds <= 0) return null;
+  return (
+    low: ApplyTimeEstimate.minutesOf(seconds * 0.5),
+    high: ApplyTimeEstimate.minutesOf(seconds * 2.5),
+  );
 }

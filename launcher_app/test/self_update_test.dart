@@ -921,6 +921,52 @@ void main() {
       expect(leftover.existsSync(), isFalse);
     });
 
+    test('החלפה שנקטעה בין שני ה-rename — הגרסה הקודמת חוזרת, לא נמחקת',
+        () async {
+      await stub.rename(p.join(temp.path, LauncherSelfInstaller.previousName));
+      final staged = File(p.join(temp.path, LauncherSelfInstaller.stagedName));
+      await staged.writeAsString('גרסה חדשה');
+
+      await installer().cleanupLeftovers(layout);
+
+      expect(await stub.readAsString(), 'גרסה ישנה');
+      expect(
+        File(p.join(temp.path, LauncherSelfInstaller.previousName))
+            .existsSync(),
+        isFalse,
+      );
+      expect(staged.existsSync(), isFalse);
+    });
+
+    test('ההחלפה רושמת את שם היעד לפני ה-rename, ומוחקת אותו בסוף', () async {
+      final target = File(p.join(temp.path, LauncherSelfInstaller.targetName));
+      String? seenDuringRestart;
+      await LauncherSelfInstaller(
+        currentPid: 1,
+        operatingSystem: 'windows',
+        startDetached: (_, __) async {
+          seenDuringRestart =
+              target.existsSync() ? target.readAsStringSync() : null;
+        },
+        quit: () {},
+      ).apply(layout: layout, downloadedFilePath: downloaded.path);
+
+      expect(seenDuringRestart, isNull);
+      expect(target.existsSync(), isFalse);
+    });
+
+    test('הלאנצ\'ר שרץ מקובץ השארית אינו מוחק את עצמו', () async {
+      final previous =
+          File(p.join(temp.path, LauncherSelfInstaller.previousName));
+      await previous.writeAsString('אני');
+
+      await installer().cleanupLeftovers(
+        LauncherInstallLayout(executablePath: previous.path),
+      );
+
+      expect(previous.existsSync(), isTrue);
+    });
+
     // ב-macOS השאריות הן **תיקיות** — תיקיית ה-staging וחבילת ה-.app
     // הקודמת, מאות מגה-בייט כל אחת. הניקוי טיפל רק בקבצים של ווינדוס,
     // ולכן עדכון שנקטע השאיר אותן על הכונן לנצח.

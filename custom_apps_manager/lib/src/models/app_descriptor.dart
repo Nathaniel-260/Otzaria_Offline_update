@@ -160,7 +160,7 @@ class AppDescriptor {
 
     GithubSource? github;
     if (sourceKind == AppSourceKind.github) {
-      if (source['owner'] is! String || source['repo'] is! String) {
+      if (!GithubSource.isValidRepo(source['owner'], source['repo'])) {
         throw AppDescriptorException(t.descriptorMissingField('source.repo'));
       }
       github = GithubSource.fromJson(source);
