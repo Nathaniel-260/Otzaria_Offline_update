@@ -1925,8 +1925,9 @@ and the vectors regenerated, or the server receives a body Otzaria would never s
 `UserStateReportQueue.knownSchemaVersion`), a missing `pending_reports` table, or a
 book report's `schemaVersion` above 2 all mean "no offer" and no write. A leftover
 queue `.hive` does **not** block: current Otzaria no longer migrates Hive, so a file
-left behind blocked collection forever; one with no rows of its box in the DB is
-reported to the user as old reports nobody will migrate. The DB and its
+left behind blocked collection forever. Only a box whose last `pending_reports` frame
+is a non-empty list (`hivePendingReportCount`, read from hive_ce's frame format), with
+no rows of its box in the DB, is reported — once per computer (`NoticesSeenStore`). The DB and its
 folder are never created. Unsendable reports (`isSendable`, Otzaria's own export filter
 plus the 256KB book limit), invalid app/plugin records and oversized app requests
 stay in the queue. App attachments travel in the outbox, not the sent history.

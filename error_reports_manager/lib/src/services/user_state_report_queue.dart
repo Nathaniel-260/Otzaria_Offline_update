@@ -66,8 +66,8 @@ const List<String> legacyReportBoxes = [
   'plugin_reports_queue',
 ];
 
-/// תורי Hive שלא הועברו: קובץ `.hive` לא ריק בלי שום שורה שלו ב-`user_state.db`.
-/// אוצריא הנוכחית כבר אינה מעבירה אותם, ולכן הם אינם חוסמים את האיסוף.
+/// תורי Hive שלא הועברו: ב-`.hive` יש דיווחים **ממתינים**, ואין לתור אף שורה
+/// ב-`user_state.db`. אוצריא הנוכחית כבר אינה מעבירה אותם, ולכן אינם חוסמים.
 Future<List<String>> findUnmigratedReportBoxes({
   required String dataRoot,
   String? userStateDb,
@@ -75,10 +75,54 @@ Future<List<String>> findUnmigratedReportBoxes({
   final candidates = <String>[];
   for (final box in legacyReportBoxes) {
     final file = File(p.join(dataRoot, '$box.hive'));
-    if (await file.exists() && await file.length() > 0) candidates.add(box);
+    if (!await file.exists()) continue;
+    final bytes = await file.readAsBytes();
+    if ((await Isolate.run(() => hivePendingReportCount(bytes)) ?? 0) > 0) {
+      candidates.add(box);
+    }
   }
   if (candidates.isEmpty || userStateDb == null) return candidates;
   return Isolate.run(() => _boxesWithoutRows(userStateDb, candidates));
+}
+
+/// מספר הפריטים ברשימה `pending_reports` בקובץ box של hive_ce (המסגרת האחרונה
+/// של המפתח קובעת). `null` כשהקובץ אינו בפורמט המוכר.
+int? hivePendingReportCount(Uint8List bytes) {
+  const key = 'pending_reports';
+  final data = ByteData.sublistView(bytes);
+  int? count;
+  var offset = 0;
+  while (offset + 4 <= bytes.length) {
+    final length = data.getUint32(offset, Endian.little);
+    if (length < 10 || offset + length > bytes.length) return null;
+    final frameEnd = offset + length - 4;
+    var pos = offset + 4;
+    final keyType = bytes[pos++];
+    String? name;
+    if (keyType == 1) {
+      final keyLength = bytes[pos++];
+      if (pos + keyLength > frameEnd) return null;
+      name = utf8.decode(bytes.sublist(pos, pos + keyLength),
+          allowMalformed: true);
+      pos += keyLength;
+    } else if (keyType == 0) {
+      pos += 4;
+    } else {
+      return null;
+    }
+    if (name == key) {
+      if (pos >= frameEnd) {
+        count = 0;
+      } else {
+        final type = bytes[pos];
+        count = (type == 9 || type == 10) && pos + 5 <= frameEnd
+            ? data.getUint32(pos + 1, Endian.little)
+            : 0;
+      }
+    }
+    offset += length;
+  }
+  return count;
 }
 
 List<String> _boxesWithoutRows(String dbPath, List<String> boxes) {

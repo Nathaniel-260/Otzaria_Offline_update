@@ -553,6 +553,7 @@ class _AppShellState extends State<AppShell> {
         _errorReports,
         readOnly: widget.readOnly,
         isOtzariaRunning: refreshProcessState,
+        notices: _notices,
       );
       if (!mounted) return;
       await offerSearchFeedbackCollection(

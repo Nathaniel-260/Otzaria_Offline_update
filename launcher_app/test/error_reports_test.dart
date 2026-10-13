@@ -36,6 +36,15 @@ Map<String, dynamic> _report(String id) => OutboxReport.fileJson(
       body: {'report_id': id},
     );
 
+// box של hive_ce 2.20.2 עם שני דיווחים ב-pending_reports ואחד ב-sent_reports.
+final _hiveWithPending = base64.decode(
+  'UQAAAAEPcGVuZGluZ19yZXBvcnRzCgIAAAALAgAAAAQCAAAAaWQEAQAAAHgEAQAAAG4BAAAAAAAA'
+  '8D8LAQAAAAQCAAAAaWQEAQAAAHmDJV/vLQAAAAEMc2VudF9yZXBvcnRzCgEAAAALAQAAAAQCAAAA'
+  'aWQEAQAAAHrN8gho',
+);
+const _hiveSentOnly =
+    'LQAAAAEMc2VudF9yZXBvcnRzCgEAAAALAQAAAAQCAAAAaWQEAQAAAHFFK9r/';
+
 class _MemoryOutbox implements ReportOutbox {
   final reports = <OutboxReport>[];
 
@@ -550,7 +559,8 @@ void main() {
       ]) {
         test('$box.hive שנשאר אחרי ההעברה אינו חוסם את האיסוף', () async {
           userStateDb(kinds: ['$box/sent_reports']);
-          File(p.join(dataRoot, '$box.hive')).writeAsBytesSync([1, 2, 3]);
+          File(p.join(dataRoot, '$box.hive'))
+              .writeAsBytesSync(_hiveWithPending);
 
           expect(await resolve(), isA<UserStateReportQueue>());
           expect(await unmigrated(), isEmpty);
@@ -564,10 +574,20 @@ void main() {
           expect(await unmigrated(), isEmpty);
         });
 
-        test('$box.hive עם תוכן ובלי שום שורה שלו במסד — מדווח, והאיסוף ממשיך',
+        test('$box.hive עם היסטוריה בלבד — אין הודעה', () async {
+          userStateDb();
+          File(p.join(dataRoot, '$box.hive'))
+              .writeAsBytesSync(base64.decode(_hiveSentOnly));
+
+          expect(await unmigrated(), isEmpty);
+        });
+
+        test(
+            '$box.hive עם ממתינים ובלי שום שורה שלו במסד — מדווח, והאיסוף ממשיך',
             () async {
           userStateDb();
-          File(p.join(dataRoot, '$box.hive')).writeAsBytesSync([1, 2, 3]);
+          File(p.join(dataRoot, '$box.hive'))
+              .writeAsBytesSync(_hiveWithPending);
 
           expect(await resolve(), isA<UserStateReportQueue>());
           expect(await unmigrated(), [box]);
@@ -609,8 +629,14 @@ void main() {
       );
       addTearDown(c.dispose);
       final ctx = await host(tester);
+      final notices = MemoryNoticesStore();
 
-      unawaited(offer(ctx, c));
+      unawaited(offerErrorReportCollection(
+        ctx,
+        c,
+        isOtzariaRunning: () async => false,
+        notices: notices,
+      ));
       await tester.pumpAndSettle();
       expect(find.text(t.legacyReportsDialogTitle), findsOneWidget);
       expect(find.text(t.legacyReportsDialogContent), findsOneWidget);
@@ -618,6 +644,29 @@ void main() {
       await tester.tap(find.text(t.introDialogConfirm));
       await tester.pumpAndSettle();
       expect(find.text(t.collectDialogTitle), findsOneWidget);
+      expect(notices.marked, [NoticesSeenStore.legacyReportsNotice]);
+    });
+
+    testWidgets('הודעת ה-Hive הישן — פעם אחת בלבד במחשב', (tester) async {
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => _FakeQueue(0),
+        findUnmigratedLegacy: () async => ['error_reports_queue'],
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+
+      unawaited(offerErrorReportCollection(
+        ctx,
+        c,
+        isOtzariaRunning: () async => false,
+        notices: MemoryNoticesStore(
+          seen: {NoticesSeenStore.legacyReportsNotice},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.legacyReportsDialogTitle), findsNothing);
     });
 
     test('כשל חלקי באיסוף — מה שהועבר נספר, והשגיאה נמסרת', () async {

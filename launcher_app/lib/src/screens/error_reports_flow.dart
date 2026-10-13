@@ -42,6 +42,7 @@ Future<ReportOfferOutcome> offerErrorReportCollection(
   ErrorReportsController controller, {
   bool readOnly = false,
   required Future<bool> Function() isOtzariaRunning,
+  NoticesSeenStore? notices,
 }) async {
   if (readOnly) return ReportOfferOutcome.notOffered;
   // לפני `pendingToOffer`: אוצריא פתוחה אינה "מנצלת" את ההצעה של ההרצה.
@@ -49,13 +50,18 @@ Future<ReportOfferOutcome> offerErrorReportCollection(
   final count = await controller.pendingToOffer();
   if (!context.mounted) return ReportOfferOutcome.notOffered;
   final t = context.strings.errorReports;
-  if (controller.unmigratedLegacy.isNotEmpty) {
+  const legacyKey = NoticesSeenStore.legacyReportsNotice;
+  if (controller.unmigratedLegacy.isNotEmpty &&
+      notices != null &&
+      !await notices.hasSeen(legacyKey) &&
+      context.mounted) {
     await showSingleActionDialog(
       context: context,
       title: t.legacyReportsDialogTitle,
       content: t.legacyReportsDialogContent,
       confirmText: t.introDialogConfirm,
     );
+    await notices.markSeen(legacyKey);
     if (!context.mounted) return ReportOfferOutcome.notOffered;
   }
   if (count <= 0) return ReportOfferOutcome.notOffered;
