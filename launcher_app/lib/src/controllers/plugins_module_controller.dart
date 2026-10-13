@@ -502,6 +502,10 @@ class PluginsModuleController extends ChangeNotifier
   Future<void> _peekCatalog(List<String> appVersions) async {
     try {
       onlineStatus = await _manager.peekOnlineUpdates(appVersions: appVersions);
+    } on PluginStoreShabbatException catch (e) {
+      onlineStatus = null;
+      onlineCheckError = e.message;
+      AppLogger.instance.info('בדיקת עדכונים ברשת (תוספים): האתר סגור בשבת');
     } catch (e) {
       onlineStatus = null;
       onlineCheckError = e.toString();

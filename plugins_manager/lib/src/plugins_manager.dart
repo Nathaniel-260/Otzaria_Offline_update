@@ -307,7 +307,11 @@ class PluginsManager {
 
     var local = plugin.localFileFor(target.version);
     if (local == null || !await store.hasFileFor(plugin, target.version)) {
-      local = await _fetchMissingFile(store, plugin, target, onPluginUpdated);
+      try {
+        local = await _fetchMissingFile(store, plugin, target, onPluginUpdated);
+      } on PluginStoreShabbatException catch (e) {
+        return PluginInstallResult.failure(e.message);
+      }
       if (local == null) {
         return PluginInstallResult.failure(strings.pluginFileNotAvailable);
       }
@@ -401,6 +405,8 @@ class PluginsManager {
       });
       if (updated != null) onPluginUpdated?.call(updated);
       return file;
+    } on PluginStoreShabbatException {
+      rethrow;
     } catch (_) {
       return null;
     }

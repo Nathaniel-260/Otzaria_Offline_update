@@ -334,6 +334,31 @@ void main() {
   });
 
   group('downloadAsset', () {
+    test('503 של שבת בהורדה — חריג ייעודי', () async {
+      final client = clientFor(
+        (_) async => jsonResponse({'error': 'shabbat'}, status: 503),
+      );
+
+      await expectLater(
+        client.downloadAsset('/api/plugins/a/download', p.join(temp.path, 'x')),
+        throwsA(isA<PluginStoreShabbatException>()),
+      );
+    });
+
+    test('503 אחר בהורדה אינו שבת', () async {
+      final client = clientFor((_) async => http.Response('busy', 503));
+
+      await expectLater(
+        client.downloadAsset('/api/plugins/a/download', p.join(temp.path, 'x')),
+        throwsA(
+          predicate(
+            (e) =>
+                e is PluginStoreException && e is! PluginStoreShabbatException,
+          ),
+        ),
+      );
+    });
+
     http.Response asset(List<int> bytes, Map<String, String> headers) =>
         http.Response.bytes(bytes, 200, headers: headers);
 

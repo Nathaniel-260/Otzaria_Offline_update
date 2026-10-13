@@ -103,6 +103,15 @@ class PluginStoreClient {
     }
   }
 
+  Future<bool> _isShabbat(String url) async {
+    try {
+      final response = await _client.get(Uri.parse(url)).timeout(timeout);
+      return isShabbatResponse(response.statusCode, response.bodyBytes);
+    } catch (_) {
+      return false;
+    }
+  }
+
   static bool isShabbatResponse(int status, List<int> body) {
     if (status != 503) return false;
     try {
@@ -142,22 +151,33 @@ class PluginStoreClient {
       );
     }
     final stagingPath = '$destPathNoExt.download';
-    final response = await downloadFile(
-      client: _client,
-      url: target,
-      destinationPath: stagingPath,
-      connectTimeout: timeout,
-      stallTimeout: stallTimeout,
-      expectedSize: expectedSize,
-      checkCancelled: checkCancelled,
-      statusError: (status) => PluginStoreException(
-        AppL10n.strings.pluginsDomain.httpStatusFor(status, url),
-      ),
-      sizeError: (actual, expected) => PluginStoreException(
-        AppL10n.strings.appDomain.installerSizeMismatch(actual, expected),
-      ),
-      calculateSha256: expectedSha256 != null,
-    );
+    final FileDownloadResult response;
+    try {
+      response = await downloadFile(
+        client: _client,
+        url: target,
+        destinationPath: stagingPath,
+        connectTimeout: timeout,
+        stallTimeout: stallTimeout,
+        expectedSize: expectedSize,
+        checkCancelled: checkCancelled,
+        statusError: (status) => _HttpStatusException(
+          AppL10n.strings.pluginsDomain.httpStatusFor(status, url),
+          status,
+        ),
+        sizeError: (actual, expected) => PluginStoreException(
+          AppL10n.strings.appDomain.installerSizeMismatch(actual, expected),
+        ),
+        calculateSha256: expectedSha256 != null,
+      );
+    } on _HttpStatusException catch (e) {
+      if (e.status == 503 && await _isShabbat(target)) {
+        throw PluginStoreShabbatException(
+          AppL10n.strings.pluginsDomain.siteClosedForShabbat,
+        );
+      }
+      rethrow;
+    }
     if (expectedSha256 != null && response.sha256 != expectedSha256) {
       await File(stagingPath).delete();
       throw PluginStoreException(
@@ -281,6 +301,11 @@ class PluginStoreException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class _HttpStatusException extends PluginStoreException {
+  const _HttpStatusException(super.message, this.status);
+  final int status;
 }
 
 class PluginStoreShabbatException extends PluginStoreException {
