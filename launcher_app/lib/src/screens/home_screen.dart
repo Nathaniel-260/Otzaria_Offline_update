@@ -196,8 +196,8 @@ class HomeScreen extends StatelessWidget {
         installStage: c.installStage,
       ),
       primaryActionText: switch (c.status) {
-        OtzariaModuleStatus.updateAvailable => common.install,
         _ when c.libraryApplyActive => t.libraryApplyActive,
+        OtzariaModuleStatus.updateAvailable => common.install,
         _ => c.canLaunch ? common.launch : null,
       },
       primaryActionIcon: switch (c.status) {
@@ -207,6 +207,7 @@ class HomeScreen extends StatelessWidget {
       },
       primaryActionLoading: isBusy,
       onPrimaryAction: switch (c.status) {
+        _ when c.libraryApplyActive => null,
         OtzariaModuleStatus.updateAvailable => () => _confirmAppInstall(
               context,
             ),

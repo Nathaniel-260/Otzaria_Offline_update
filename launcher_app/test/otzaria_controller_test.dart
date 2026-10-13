@@ -495,6 +495,24 @@ void main() {
     );
 
     test(
+      'בזמן עדכון ספרייה אין גם התקנה של אוצריא',
+      () async {
+        if (!writeManagedInstall()) return;
+        final t = controllerWith(libraryApplying: true);
+        await t.controller.checkForUpdate();
+
+        await t.controller.install();
+
+        expect(t.controller.status, isNot(OtzariaModuleStatus.installing));
+        expect(
+          t.controller.noticeMessage,
+          AppL10n.strings.home.libraryApplyActive,
+        );
+      },
+      testOn: 'windows',
+    );
+
+    test(
       'בלי בקשה ממתינה ההפעלה נשארת הפעלה רגילה',
       () async {
         if (!writeManagedInstall()) return;

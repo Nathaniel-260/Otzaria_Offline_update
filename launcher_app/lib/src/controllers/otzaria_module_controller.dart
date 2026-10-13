@@ -446,6 +446,7 @@ class OtzariaModuleController extends ChangeNotifier
 
   Future<void> install({bool useWizard = true}) async {
     if (_lastCheck == null || _installing) return;
+    if (_refuseWhileLibraryApplies()) return;
     for (var pending = _checkInFlight;
         pending != null;
         pending = _checkInFlight) {
