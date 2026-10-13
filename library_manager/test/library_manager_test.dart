@@ -836,6 +836,62 @@ void main() {
       },
     );
 
+    test('"מה חדש" שבמראה לטווח שהוחל נמסר לאוצריא הניידת', () async {
+      if (bindings == null) {
+        markTestSkipped('אין ספריית zstd לטעינה בסביבה הזו');
+        return;
+      }
+      if (await const OtzariaProcessGuard().isAnyRunning(
+        OtzariaProcessGuard.processNamesFor(Platform.operatingSystem),
+      )) {
+        markTestSkipped('אוצריא פתוחה — ההחלה נחסמת בכוונה');
+        return;
+      }
+      await installExistingDb(4, appliedTag: 'v4');
+      await writeMirror(
+        tag: 'v5',
+        compressedDb: compressWithZstd(bindings, buildRealDb(5)),
+      );
+      final changes = Directory(p.join(mirrorDir, 'changes'))
+        ..createSync(recursive: true);
+      for (final tag in ['v4-1', 'v5-1', 'v6-1']) {
+        File(p.join(changes.path, '$tag.md')).writeAsStringSync('# $tag');
+      }
+      final exeDir = p.join(tempDir.path, 'portable-otzaria');
+      Directory(exeDir).createSync(recursive: true);
+      File(
+        p.join(exeDir, LibraryDbLocator.portableMarkerFileName),
+      ).writeAsStringSync('');
+
+      await _withoutNetwork((_) async {
+        final manager = LibraryManager(
+          dataDir: dataDir,
+          operatingSystem: 'linux',
+          environment: hermeticEnvironment(),
+          otzariaLaunchPath: () async => p.posix.join(exeDir, 'otzaria'),
+        );
+        addTearDown(manager.dispose);
+        final check = await manager.checkForUpdate();
+        expect(
+          (await manager.pendingChangesNotes(check)).map((n) => n.releaseTag),
+          ['v5-1'],
+        );
+
+        final warnings = <Object>[];
+        await manager.applyUpdate(check, onStateWarning: warnings.add);
+
+        expect(warnings, isEmpty);
+        final pending = Directory(
+          p.join(exeDir, 'otzaria_data', 'pending_library_changes'),
+        );
+        expect(pending.listSync().map((e) => p.basename(e.path)), ['v5-1.md']);
+        expect(
+          File(p.join(pending.path, 'v5-1.md')).readAsStringSync(),
+          '# v5-1',
+        );
+      });
+    });
+
     // המראה שומרת בכוונה מסד מלא ישן מ-latest כשיש ממנו מסלול patches (ראו
     // `LibraryMirrorExporter._chooseFullDbCarrier`), ולכן ההשלמה רצה באותה
     // החלה — ומה שנרשם הוא הגרסה והתגית של סופה, לא של המסד שירד.

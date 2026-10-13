@@ -204,6 +204,13 @@ class LibraryModuleController extends ChangeNotifier
 
   bool semanticPending = false;
   bool semanticConsentGranted = false;
+
+  /// "מה חדש בספרייה": לפני ההחלה — של העדכון המוצע; אחריה — של מה שהותקן
+  /// בהרצה הזו ([changesNotesApplied]). [changesNotesVersion] היא גרסת היעד.
+  List<LibraryChangesNote> changesNotes = const [];
+  bool changesNotesApplied = false;
+  int? changesNotesVersion;
+  ({int version, List<LibraryChangesNote> notes})? _appliedChangesNotes;
   bool get semanticConsentRequired =>
       semanticPending && !semanticConsentGranted;
 
@@ -643,6 +650,7 @@ class LibraryModuleController extends ChangeNotifier
       mirroredCompanions = const {};
       AppLogger.instance.error('checkForUpdate נכשל${_sqliteDetail(e)}', e, st);
     }
+    await _refreshChangesNotes(check);
     // הבדיקה עצמה כבר איתרה את הנתיב — גם כשהיא נכשלה אחר כך (למשל אין
     // מראה). קריאה נפרדת ל-`currentDbPath()` הייתה חוזרת על כל האיתור.
     dbPath = _manager.lastResolvedDbPath;
@@ -665,6 +673,48 @@ class LibraryModuleController extends ChangeNotifier
       'mirrorMissing=$mirrorMissing reindex=$hasPendingReindex db=$dbPath',
     );
     notifyListeners();
+  }
+
+  /// קוסמטי: כשל בקריאת ההערות מהכונן נרשם ללוג ואינו מכשיל את הבדיקה.
+  Future<void> _refreshChangesNotes(LibraryUpdateCheckResult? check) async {
+    try {
+      final pending =
+          check != null && status == LibraryModuleStatus.updateAvailable
+              ? await _manager.pendingChangesNotes(check)
+              : const <LibraryChangesNote>[];
+      final applied = _appliedChangesNotes;
+      if (pending.isNotEmpty || applied == null) {
+        changesNotes = pending;
+        changesNotesApplied = false;
+        changesNotesVersion = targetVersion;
+      } else {
+        changesNotes = applied.notes;
+        changesNotesApplied = true;
+        changesNotesVersion = applied.version;
+      }
+    } catch (e) {
+      changesNotes = const [];
+      AppLogger.instance.info('קריאת "מה חדש בספרייה" מהכונן נכשלה: $e');
+    }
+  }
+
+  Future<void> _rememberAppliedChangesNotes(LocalDbVersion? before) async {
+    final reached = localVersion;
+    if (before == null ||
+        !before.hasVersionMeta ||
+        reached == null ||
+        reached <= before.dbVersion) {
+      return;
+    }
+    try {
+      _appliedChangesNotes = (
+        version: reached,
+        notes: await _manager.changesNotesBetween(before.dbVersion, reached),
+      );
+    } catch (e) {
+      AppLogger.instance.info('קריאת "מה חדש בספרייה" מהכונן נכשלה: $e');
+    }
+    await _refreshChangesNotes(_lastCheck);
   }
 
   Future<String?> _otzariaFirstMessage(LibraryUpdateCheckResult check) async {
@@ -799,6 +849,7 @@ class LibraryModuleController extends ChangeNotifier
       // עדיף על קביעה ידנית של upToDate, כי זה קורא בפועל את הגרסה
       // שנכתבה ל-DB במקום להניח שהיא תואמת ליעד.
       await checkForUpdate();
+      await _rememberAppliedChangesNotes(check.localVersion);
       // המסד עודכן, אבל קובץ נלווה שלא נרשם כמותקן משאיר את הבדיקה על
       // "יש עדכון" — והמשתמש קיבל את אותה הצעה בכל פתיחה בלי הודעה ובלי
       // שגיאה. עכשיו נאמר לו מה נכשל, ונדלקת הצעת ההרשאות כשזו הסיבה.

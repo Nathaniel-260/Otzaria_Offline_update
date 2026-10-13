@@ -180,6 +180,22 @@ class LibraryScreen extends StatelessWidget {
             subtitle: t.otzariaRunningSubtitle,
             actions: [CloseOtzariaButton(onClose: onCloseOtzaria)],
           ),
+        if (c.changesNotes.isNotEmpty)
+          SettingsActionTile.text(
+            icon: FluentIcons.news_24_regular,
+            title: t.changesTitle,
+            subtitle: c.changesNotesApplied
+                ? t.changesAppliedSubtitle('${c.changesNotesVersion}')
+                : t.changesPendingSubtitle('${c.changesNotesVersion}'),
+            actions: [
+              ActionButton.neutral(
+                text: t.changesButton,
+                icon: FluentIcons.document_text_24_regular,
+                onPressed: () =>
+                    showLibraryChangesDialog(context, c.changesNotes),
+              ),
+            ],
+          ),
         // האינדקס של אוצריא אינו יודע שהמסד התחלף מתחתיו, ולכן חיפוש בספר
         // שהשתנה מחזיר תוכן ישן עד שהבקשה נמסרת.
         if (c.hasPendingReindex)

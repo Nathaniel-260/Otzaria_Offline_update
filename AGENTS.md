@@ -574,6 +574,14 @@ The exporter reads it best-effort — an unreadable record counts as empty.
 reached several gigabytes. Ten releases cover a machine that updates occasionally;
 anything older falls back to the full-DB route, always present in the mirror.
 
+**"What's new" notes live in `mirror/library/changes/<tag>.md`, never under
+`assets/`.** The exporter's `_pruneStaleAssets` and `MirrorJunkSweeper` delete
+anything there that `releases.json` does not name, so notes there would vanish
+on every download. `LibraryChangesNotes.syncMirror` fetches them after the
+export (asset list only; 404 = not uploaded yet, retried next run) and never
+fails the download; after an apply they go to Otzaria's
+`pending_library_changes` (issue Otzaria/otzaria#1966).
+
 **What goes into the mirror is decided by how long the update will take on the
 *offline* machine, not by which files are smaller.** A patch pays a full-database
 hash scan **per chain** on top of the apply; the full route is one decompress.

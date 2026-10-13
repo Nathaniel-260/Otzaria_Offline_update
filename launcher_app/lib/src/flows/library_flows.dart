@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:library_manager/library_manager.dart' show LibraryChangesNote;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../controllers/library_module_controller.dart';
@@ -77,6 +80,7 @@ Future<bool> _blockedByRunningOtzaria(
 }
 
 Future<void> applyLibraryAndReport(
+  BuildContext context,
   LibraryModuleController library,
   Future<void> Function() apply, {
   required Future<void> Function() onRequestReindex,
@@ -88,6 +92,39 @@ Future<void> applyLibraryAndReport(
     );
   }
   await onRequestReindex();
+  if (library.changesNotesApplied &&
+      library.changesNotes.isNotEmpty &&
+      context.mounted) {
+    await showLibraryChangesDialog(context, library.changesNotes);
+  }
+}
+
+/// "מה חדש בספרייה" — ההערות של כל הגרסאות שבטווח, החדשה קודם.
+Future<void> showLibraryChangesDialog(
+  BuildContext context,
+  List<LibraryChangesNote> notes,
+) async {
+  final parts = <String>[];
+  for (final note in notes) {
+    try {
+      final markdown = (await note.readMarkdown()).trim();
+      if (markdown.isNotEmpty) parts.add(markdown);
+    } on FileSystemException {
+      // כונן שנשלף — מה שנקרא מוצג, והשאר נאמר כ"לא נמצא".
+    }
+  }
+  if (!context.mounted) return;
+  final t = context.strings.libraryScreen;
+  await showSingleActionDialog(
+    context: context,
+    title: t.changesTitle,
+    confirmText: context.strings.common.close,
+    customContent: WhatsNewView(
+      markdown: parts.join('\n\n---\n\n'),
+      emptyText: t.changesNotFound,
+      maxHeight: 480,
+    ),
+  );
 }
 
 Future<void> confirmLibraryUpdate(
@@ -121,7 +158,9 @@ Future<void> confirmLibraryUpdate(
   );
   if (!approved) return;
 
+  if (!context.mounted) return;
   await applyLibraryAndReport(
+    context,
     c,
     c.update,
     onRequestReindex: onRequestReindex,
@@ -157,7 +196,9 @@ Future<void> confirmLibraryFullDownload(
   );
   if (!approved) return;
 
+  if (!context.mounted) return;
   await applyLibraryAndReport(
+    context,
     c,
     c.updateWithFullDownload,
     onRequestReindex: onRequestReindex,

@@ -348,6 +348,13 @@ abstract class LibraryScreenStrings {
   String get installUpdateButton;
   String get updateDialogTitle;
 
+  /// "מה חדש בספרייה" — `library-changes.md` של הגרסאות שבטווח העדכון.
+  String get changesTitle;
+  String changesPendingSubtitle(String version);
+  String changesAppliedSubtitle(String version);
+  String get changesButton;
+  String get changesNotFound;
+
   /// בקשת עדכון אינדקס החיפוש באוצריא, אחרי שהמסד הוחלף מבחוץ.
   String get reindexTitle;
   String get reindexPendingSubtitle;
@@ -1367,6 +1374,7 @@ abstract class LibraryDomainStrings {
   String get companionCatalogName;
   String get companionDictionaryName;
   String get companionSemanticName;
+  String get libraryChangesNotesName;
   String get semanticDownloading;
   String get semanticInstalling;
   String get semanticDownloadPrompt;

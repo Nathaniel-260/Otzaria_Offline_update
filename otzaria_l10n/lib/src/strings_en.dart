@@ -554,6 +554,21 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get installUpdateButton => 'Install the update';
   @override
   String get updateDialogTitle => 'Update the book library';
+  @override
+  String get changesTitle => "What's new in the library";
+  @override
+  String changesPendingSubtitle(String version) =>
+      'The books added and changed up to version $version, which this update '
+      'installs.';
+  @override
+  String changesAppliedSubtitle(String version) =>
+      'The books added and changed up to version $version, now installed. '
+      'Otzaria shows the list too the next time it opens.';
+  @override
+  String get changesButton => 'Show';
+  @override
+  String get changesNotFound =>
+      'The list of changes was not found on the drive.';
 
   @override
   String get reindexTitle => 'Otzaria\'s search index';
@@ -2530,6 +2545,8 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get companionDictionaryName => 'Fuzzy-search dictionary';
   @override
   String get companionSemanticName => 'Smart search';
+  @override
+  String get libraryChangesNotesName => "The library's what's-new list";
   @override
   String get semanticDownloading => 'Downloading smart search files';
   @override

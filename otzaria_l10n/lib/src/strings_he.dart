@@ -525,6 +525,19 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get installUpdateButton => 'התקנת העדכון';
   @override
   String get updateDialogTitle => 'עדכון ספריית הספרים';
+  @override
+  String get changesTitle => 'מה חדש בספרייה';
+  @override
+  String changesPendingSubtitle(String version) =>
+      'הספרים שנוספו והשתנו עד גרסה $version, שהעדכון יתקין.';
+  @override
+  String changesAppliedSubtitle(String version) =>
+      'הספרים שנוספו והשתנו עד גרסה $version, שהותקנה. '
+      'אוצריא תציג את הרשימה גם בפתיחה הבאה.';
+  @override
+  String get changesButton => 'הצגה';
+  @override
+  String get changesNotFound => 'רשימת השינויים לא נמצאה על הכונן.';
 
   @override
   String get reindexTitle => 'אינדקס החיפוש של אוצריא';
@@ -2348,6 +2361,8 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get companionDictionaryName => 'מילון החיפוש המקורב';
   @override
   String get companionSemanticName => 'החיפוש החכם';
+  @override
+  String get libraryChangesNotesName => 'רשימת "מה חדש בספרייה"';
   @override
   String get semanticDownloading => 'מוריד את קובצי החיפוש החכם';
   @override
