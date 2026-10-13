@@ -1913,8 +1913,11 @@ lock runs unguarded rather than refusing to start. The write probe in
 **One launcher per PC session too: `Local\OtzariaOfflineUpdate`.** The file
 lock is per drive, so two drives could apply to one `seforim.db` at once.
 `InstanceLock.acquireMachineWide` owns a named mutex (`CreateMutexW` +
-`WaitForSingleObject(0)`, no `GetLastError`, which Dart FFI clobbers); a
-mutex that cannot be opened runs unguarded, like the file lock.
+`WaitForSingleObject(0)`, no `GetLastError`, which Dart FFI clobbers). `Local\`
+is per logon session, so another user's launcher is not seen. An elevated
+holder makes `CreateMutexW` fail for a normal one, hence the
+`OpenMutexW(SYNCHRONIZE)` fallback; a mutex that cannot be opened at all runs
+unguarded, like the file lock.
 
 **The background flush must never fail loudly.** A disk error goes to the
 injected `log`, never an uncaught error — that line is itself crash

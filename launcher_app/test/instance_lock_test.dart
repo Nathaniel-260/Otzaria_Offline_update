@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/services/instance_lock.dart';
@@ -48,37 +47,71 @@ void main() {
   });
 
   group('InstanceLock machine-wide mutex', () {
-    String uniqueName() =>
-        'Local\\OtzariaOfflineUpdateTest-$pid-${DateTime.now().microsecondsSinceEpoch}';
+    String uniqueName() => 'Local\\OtzariaOfflineUpdateTest-$pid-'
+        '${DateTime.now().microsecondsSinceEpoch}';
 
-    test('a free name is owned, and owning it again on this thread is fine',
-        () {
-      final name = uniqueName();
-      final first = InstanceLock.tryOwnMutex(name);
-      expect(first.result, InstanceLockResult.acquired);
-      final again = InstanceLock.tryOwnMutex(name);
-      expect(again.result, InstanceLockResult.acquired);
+    Future<Process> ownInOtherProcess(String name) async {
+      final dir = await Directory.systemTemp.createTemp('mutex-test-');
+      addTearDown(() => dir.delete(recursive: true));
+      final script = File(p.join(dir.path, 'own_mutex.dart'))
+        ..writeAsStringSync('''
+import 'dart:ffi';
+import 'dart:io';
+
+void main(List<String> args) async {
+  final kernel32 = DynamicLibrary.open('kernel32.dll');
+  final alloc = kernel32.lookupFunction<IntPtr Function(Uint32, IntPtr),
+      int Function(int, int)>('GlobalAlloc');
+  final create = kernel32.lookupFunction<
+      IntPtr Function(Pointer, Int32, Pointer<Uint16>),
+      int Function(Pointer, int, Pointer<Uint16>)>('CreateMutexW');
+  final name = args[0];
+  final text = Pointer<Uint16>.fromAddress(alloc(0x40, (name.length + 1) * 2));
+  for (var i = 0; i < name.length; i++) {
+    text[i] = name.codeUnitAt(i);
+  }
+  stdout.writeln(create(nullptr, 1, text) == 0 ? 'failed' : 'owned');
+  await stdin.drain<void>();
+}
+''');
+      final process = await Process.start(_dartExecutable(), [
+        script.path,
+        name,
+      ]);
+      final first = await process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .first
+          .timeout(const Duration(seconds: 60));
+      expect(first, 'owned');
+      return process;
+    }
+
+    test('a free name is owned and released', () {
+      final owned = InstanceLock.tryOwnMutex(uniqueName());
+      expect(owned.result, InstanceLockResult.acquired);
+      InstanceLock.releaseMutex(owned.handle);
     }, skip: !Platform.isWindows);
 
-    test('a name owned by another thread is held elsewhere', () async {
+    test('a name another process owns is held elsewhere, until it dies',
+        () async {
       final name = uniqueName();
-      final release = ReceivePort();
-      final owned = ReceivePort();
-      final holder = await Isolate.spawn((List<Object> args) async {
-        final result = InstanceLock.tryOwnMutex(args[0] as String);
-        final stop = ReceivePort();
-        (args[1] as SendPort).send([result.result.name, stop.sendPort]);
-        await stop.first;
-      }, [name, owned.sendPort]);
-      addTearDown(() {
-        holder.kill();
-        release.close();
-      });
-      final reply = await owned.first as List;
-      expect(reply[0], InstanceLockResult.acquired.name);
+      final holder = await ownInOtherProcess(name);
 
       expect(InstanceLock.tryOwnMutex(name).result,
           InstanceLockResult.heldElsewhere);
+
+      holder.kill(ProcessSignal.sigkill);
+      await holder.exitCode;
+      var owned = InstanceLock.tryOwnMutex(name);
+      for (var i = 0;
+          i < 100 && owned.result == InstanceLockResult.heldElsewhere;
+          i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        owned = InstanceLock.tryOwnMutex(name);
+      }
+      expect(owned.result, InstanceLockResult.acquired);
+      InstanceLock.releaseMutex(owned.handle);
     }, skip: !Platform.isWindows);
   });
 
@@ -150,8 +183,13 @@ Future<void> main(List<String> args) async {
       holder.kill(ProcessSignal.sigkill);
       await holder.exitCode;
 
+      // dart.exe מריץ תהליך-בן; הנעילה משתחררת רגע אחרי היציאה, לא בה.
       expect(
-        await InstanceLock.acquire(lockDir, wait: Duration.zero),
+        await InstanceLock.acquire(
+          lockDir,
+          wait: const Duration(seconds: 5),
+          retryInterval: const Duration(milliseconds: 50),
+        ),
         InstanceLockResult.acquired,
       );
     });

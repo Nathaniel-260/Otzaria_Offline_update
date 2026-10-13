@@ -79,15 +79,14 @@ abstract final class InstanceLock {
     return errorCode == 11 || errorCode == 13;
   }
 
-  /// One launcher per PC session, whatever drive it runs from: two drives
-  /// applying to the same `seforim.db` at once is what the file lock, being
-  /// per drive, cannot see.
+  /// לאנצ'ר אחד בכל סשן של המחשב, מכל כונן שהוא — נעילת הקובץ היא לכל כונן,
+  /// ושני כוננים החילו עדכון על אותו `seforim.db` במקביל. `Local\` = לכל סשן.
   static const String machineMutexName = r'Local\OtzariaOfflineUpdate';
 
   static int _machineMutex = 0;
 
-  /// [InstanceLockResult.unavailable] when the mutex cannot be opened at all
-  /// (another account's elevated launcher): the drive lock still applies.
+  /// [InstanceLockResult.unavailable] כשאי אפשר לפתוח את ה-mutex בכלל; נעילת
+  /// הכונן עדיין חלה.
   static Future<InstanceLockResult> acquireMachineWide({
     Duration wait = const Duration(seconds: 2),
     Duration retryInterval = const Duration(milliseconds: 250),
@@ -107,12 +106,15 @@ abstract final class InstanceLock {
     }
   }
 
-  /// Ownership is per thread; the Windows UI isolate stays on the platform
-  /// thread, and the OS releases an abandoned mutex when the process dies.
+  /// הבעלות היא לכל thread (ה-UI isolate בווינדוס נשאר על thread הפלטפורמה),
+  /// ומערכת ההפעלה משחררת mutex נטוש כשהתהליך מת.
   static ({InstanceLockResult result, int handle}) tryOwnMutex(String name) {
     final native = name.toNativeUtf16();
     try {
-      final handle = _createMutex(nullptr, 0, native);
+      var handle = _createMutex(nullptr, 0, native);
+      // mutex של מופע מורם מסרב ל-CreateMutexW ממופע רגיל; פתיחה ל-SYNCHRONIZE
+      // בלבד מצליחה. GetLastError אינו אמין אחרי קריאת FFI, ולכן אין בו שימוש.
+      if (handle == 0) handle = _openMutex(SYNCHRONIZE, 0, native);
       if (handle == 0) {
         return (result: InstanceLockResult.unavailable, handle: 0);
       }
@@ -132,10 +134,26 @@ abstract final class InstanceLock {
     }
   }
 
+  /// משחרר בעלות שהתקבלה מ-[tryOwnMutex] וסוגר את ה-handle.
+  static void releaseMutex(int handle) {
+    if (handle == 0) return;
+    _releaseMutex(handle);
+    CloseHandle(handle);
+  }
+
+  static final DynamicLibrary _kernel32 = DynamicLibrary.open('kernel32.dll');
+
   static final int Function(Pointer, int, Pointer<Utf16>) _createMutex =
-      DynamicLibrary.open('kernel32.dll').lookupFunction<
-          IntPtr Function(Pointer, Int32, Pointer<Utf16>),
+      _kernel32.lookupFunction<IntPtr Function(Pointer, Int32, Pointer<Utf16>),
           int Function(Pointer, int, Pointer<Utf16>)>('CreateMutexW');
+
+  static final int Function(int, int, Pointer<Utf16>) _openMutex =
+      _kernel32.lookupFunction<IntPtr Function(Uint32, Int32, Pointer<Utf16>),
+          int Function(int, int, Pointer<Utf16>)>('OpenMutexW');
+
+  static final int Function(int) _releaseMutex =
+      _kernel32.lookupFunction<Int32 Function(IntPtr), int Function(int)>(
+          'ReleaseMutex');
 
   static void focusOtherInstance() {
     if (!Platform.isWindows) return;
