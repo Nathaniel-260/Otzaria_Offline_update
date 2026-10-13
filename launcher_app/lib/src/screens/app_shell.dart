@@ -448,7 +448,11 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _maybeOfferElevation() async {
     if (_offeredElevation || !Platform.isWindows) return;
-    if (!_library.needsElevation && !_otzaria.needsElevation) return;
+    if (!_library.needsElevation &&
+        !_otzaria.needsElevation &&
+        !_launcherUpdate.needsElevation) {
+      return;
+    }
     if (_exitWouldInterrupt) return;
     _offeredElevation = true;
     await Future<void>.delayed(Duration.zero);

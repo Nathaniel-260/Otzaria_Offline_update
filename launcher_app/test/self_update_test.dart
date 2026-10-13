@@ -1183,6 +1183,17 @@ void main() {
     group('LauncherUpdateController', () {
       setUp(() => AppLogger.init(temp.path));
 
+      test('החלפה שנכשלה על הרשאות מבקשת הפעלה כמנהל', () async {
+        final controller = LauncherUpdateController(
+          dataDir: temp.path,
+          updater: _DeniedUpdater(),
+        );
+        addTearDown(controller.dispose);
+
+        expect(await controller.install(), isFalse);
+        expect(controller.needsElevation, isTrue);
+      });
+
       test('גרסה ותיקה במראה אינה מסתירה שהגרסה שברשת כבר רצה', () {
         final controller = LauncherUpdateController(
           dataDir: temp.path,
@@ -1393,4 +1404,22 @@ class _NoRestartInstaller extends LauncherSelfInstaller {
 
   @override
   Future<void> cleanupLeftovers(LauncherInstallLayout layout) async {}
+}
+
+class _DeniedUpdater implements LauncherSelfUpdater {
+  @override
+  Future<bool> applyUpdate() async => throw FileSystemException(
+        'rename',
+        'launcher.exe',
+        OSError('denied', Platform.isWindows ? 5 : 13),
+      );
+
+  @override
+  void dispose() {}
+
+  @override
+  String get currentVersion => '1.0.0';
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
