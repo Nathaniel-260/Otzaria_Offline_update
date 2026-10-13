@@ -712,8 +712,8 @@ class LibraryManager {
   /// מחיל בפועל את [check.plan] על ה-DB **החי** — זה הצעד שחסר עד עכשיו:
   /// [checkForUpdate] רק בודק ותכנן, הפונקציה הזו בפועל מורידה ומתקינה.
   ///
-  /// זורק [OtzariaIsRunningException] אם אוצריא פתוחה — `tasklist` בווינדוס,
-  /// `pgrep -x` ב-macOS/לינוקס. זורק [LibraryApplyException] על
+  /// זורק [OtzariaIsRunningException] אם אוצריא פתוחה — [OtzariaProcessGuard].
+  /// זורק [LibraryApplyException] על
   /// כשלים אחרים (חיבור/אימות/גרסה לא תואמת) — בכל אחד מהם ה-DB הקיים נשאר
   /// כמו שהיה: מסלול delta אטומי, ומסלול המסד המלא מאמת את הקובץ החדש לפני
   /// שהוא מחליף.

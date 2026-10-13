@@ -819,10 +819,6 @@ class LibraryUpdateApplier {
   }
 
   Future<void> _guardOtzariaNotRunning() async {
-    // הבדיקה עצמה תלויית-פלטפורמה (tasklist/pgrep) ומטופלת בתוך ה-guard;
-    // כאן רק מחליטים מה לעשות עם התשובה. שים לב שבלינוקס אין מסלול התקנה
-    // של הלאנצ'ר, אבל ה-guard בכל זאת עונה שם — כדי שבדיקות אוטומטיות
-    // שרצות על לינוקס יעברו באותו מסלול קוד ולא ב-shortcut.
     if (await _processGuard.isAnyRunning(_otzariaProcessNames)) {
       throw const OtzariaIsRunningException();
     }

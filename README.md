@@ -87,7 +87,7 @@ dart pub global activate coverage 1.15.1
 dart tool/coverage.dart --collect
 ```
 
-הפקודה מריצה את הבדיקות בכל תשע החבילות ושומרת בכל אחת
+הפקודה מריצה את הבדיקות בשמונה החבילות ושומרת בכל אחת
 `build/coverage/lcov.info` ולוג ריצה. הדוח המשוקלל נמצא
 ב-`build/coverage/summary.json`; מוצג גם הכיסוי ללא חבילת התרגומים.
 לסיכום חוזר של הדוחות הקיימים: `dart tool/coverage.dart`.
@@ -97,7 +97,7 @@ dart tool/coverage.dart --collect
 או כשל בבדיקות מחזירים קוד יציאה שונה מאפס. `--packages=library_manager,launcher_app`
 מגביל את האיסוף והסיכום לחבילות שנבחרו. ב-CI הכיסוי נאסף ב-Windows בשני
 חלקים במקביל, כל אחד עם `--packages=` משלו, וג'וב נפרד מאחד את הדוחות
-ומריץ `dart tool/coverage.dart` על כל תשע החבילות.
+ומריץ `dart tool/coverage.dart` על כל שמונה החבילות.
 
 המדידה היא כיסוי שורות Dart תחת `lib/`, משוקלל לפי מספר השורות
 המדידות ולא ממוצע של אחוזי החבילות. בזמן המדידה נוצר זמנית קובץ

@@ -133,7 +133,7 @@ class OtzariaModuleController extends ChangeNotifier
   bool hasStaleFullPackage = false;
 
   /// האם אוצריא פתוחה, לפי בדיקת התהליך ש-[checkForUpdate] מבצעת ממילא.
-  /// כך הלאנצ'ר לא מריץ `tasklist` שני משלו בעלייה. [refreshRunningState]
+  /// כך הלאנצ'ר לא בודק פעם שנייה בעלייה. [refreshRunningState]
   /// מרעננת אותה לבדה.
   bool isRunning = false;
 
@@ -255,7 +255,7 @@ class OtzariaModuleController extends ChangeNotifier
 
   /// מרענן **רק** את "אוצריא פתוחה?" — כדי שסגירה שלה תזוהה בזמן שהלאנצ'ר
   /// פתוח, ולא רק בהפעלה מחדש שלו. קורא שמגיע בזמן בדיקה שרצה מצטרף אליה
-  /// במקום להריץ `tasklist` שני.
+  /// במקום להריץ בדיקה שנייה.
   ///
   /// [force] מחייב בדיקה שמתחילה **עכשיו**, וממתין לזו שבאוויר לפני כן.
   /// נחוץ לפני פעולה שאוצריא הפתוחה חוסמת: הצטרפות מחזירה תמונה מלפני עד

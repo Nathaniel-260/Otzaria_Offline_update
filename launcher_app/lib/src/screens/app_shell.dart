@@ -88,8 +88,8 @@ class AppShell extends StatefulWidget {
 
   final SettingsController settings;
 
-  /// בדיקת "אוצריא פתוחה?" — מוזרקת כדי שבדיקות widget לא יריצו `tasklist`
-  /// אמיתי: תהליך חיצוני משאיר טיימר תלוי ומפיל את הבדיקה.
+  /// בדיקת "אוצריא פתוחה?" — מוזרקת כדי שבדיקות widget לא יריצו בדיקה
+  /// אמיתית ב-isolate, שמשאירה טיימר תלוי ומפילה את הבדיקה.
   final RunningOtzariaLocator runningLocator;
 
   /// ראו [AppTitleBar.showWindowButtons] — מוזרק `false` בבדיקות widget.

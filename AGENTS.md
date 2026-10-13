@@ -179,9 +179,9 @@ only repo tooling; the update engine is an external package (below).
 
 | Path | Package | Role |
 | --- | --- | --- |
-| `otzaria_downloads/` | `otzaria_downloads` | Pure Dart. Shared resumable file transfers for app, launcher, store and custom apps, and the one GitHub API transport they use (`githubGet`: headers, timeout, `GithubRateLimitException` with a fail-fast gate). Also the Windows elevation helpers shared by `otzaria_manager` and `custom_apps_manager` (`windows_elevation.dart`: token query, the one argument-quoting function, de-elevated launch, `ShellExecuteExW` `runas`). `library_manager` keeps an equivalent internal copy (`github_fetch.dart`) instead of depending on it. |
+| `otzaria_downloads/` | `otzaria_downloads` | Pure Dart. Shared resumable file transfers for app, launcher, store and custom apps, and the one GitHub API transport they use (`githubGet`: headers, timeout, `GithubRateLimitException` with a fail-fast gate). Also the Windows elevation helpers shared by `otzaria_manager`, `custom_apps_manager` and `launcher_app` (`windows_elevation.dart`: token query, the one argument-quoting function, de-elevated launch, `ShellExecuteExW` `runas`). `library_manager` keeps an equivalent internal copy (`github_fetch.dart`) instead of depending on it. |
 | `otzaria_l10n/` | `otzaria_l10n` | Pure Dart, **no dependencies at all**. Every user-visible string, Hebrew + English. The updater, managers and launcher depend on it, which is why it cannot use Flutter. See §4. |
-| `.` (root, `tool/`, `test/`) | `otzaria_offline_update` | Flutter. Repo tooling only: `tool/coverage.dart` over all nine packages and the logical-hash measuring tools. Nothing depends on it. |
+| `.` (root, `tool/`, `test/`) | `otzaria_offline_update` | Flutter. Repo tooling only: `tool/coverage.dart` over the eight sub-packages and the logical-hash measuring tools. Nothing depends on it. |
 | `otzaria_manager/` | `otzaria_manager` | Pure Dart. The **Otzaria app itself**: check, download, silent install, launch. Windows + macOS. |
 | `library_manager/` | `library_manager` | Flutter. Wires `seforim_library_updater` into the launcher: locate the real `seforim.db`, check versions, apply to the **live** DB, export/consume the mirror. |
 | `plugins_manager/` | `plugins_manager` | Pure Dart. The **offline plugin store**: syncs `otzaria.org/api/plugins` into the mirror, detects what Otzaria has, installs via `otzaria://`. Converted from `Yehuda-Zakesh/Offline-repository-plugin-store` (itself derived from `Otzaria/Otzaria_Website`); details in `plugins_manager/README.md`. |
@@ -196,8 +196,9 @@ and the patches; this repo only *consumes* them.
 `Otzaria/otzaria_library_updater`** — the package Otzaria itself uses for its
 online update — pinned as a git dependency in the root, `library_manager` and
 `launcher_app` pubspecs (move the three refs together). The mirror policy is its
-`Offline*` classes (`OfflineLibraryUpdateDiscovery`, `OfflineLibraryUpdatePlanner`,
-`OfflineLibraryDbRecoveryService`, each given `supportedDbSchemaVersion`); the
+`Offline*` classes (`OfflineLibraryUpdateDiscovery`, which alone takes
+`supportedDbSchemaVersion`, `OfflineLibraryUpdatePlanner`,
+`OfflineLibraryDbRecoveryService`); the
 unprefixed names are Otzaria's online route and still compile here, so never use
 them. Engine changes go upstream. Otzaria's consumer side is
 `Otzaria/otzaria` under `lib/library_update/` — read it before changing how the
@@ -250,7 +251,7 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
   weekly `cron` was removed 2026-08-11. The Windows coverage runs as four shards
   (`--packages=`; the pure-Dart ones on `setup-dart`, not Flutter), with the
   test runner's default concurrency, and `tests + coverage (total)` merges
-  their reports and enforces the thresholds over all nine packages.
+  their reports and enforces the thresholds over the eight sub-packages.
 - **Publishing is a deliberate click, not a push.** A push to `main` only runs
   `ci.yml`. A release comes from Actions → **Release** → *Run workflow* (`main`
   only): `release.yml` runs the whole of `ci.yml` via `workflow_call`, then its
@@ -1669,7 +1670,8 @@ resolves with `--enforce-lockfile`.** CI used to resolve fresh on every run, so
 the same commit could ship different dependencies. Flutter (`flutter-version`),
 the Dart SDK (`setup-dart` `sdk:`) and every action (commit SHA) are pinned in
 `.github/workflows/`; bump the toolchain and regenerate the locks together, and
-never change a lock without its `pubspec.yaml` in an unrelated change.
+never change a lock without its `pubspec.yaml` in an unrelated change. Windows
+jobs run `flutter create --no-pub` and fail on any `pubspec.lock` diff after it.
 
 **The distributed exe carries the whole file pile inside it.** `launcher_app.exe`
 cannot ship alone: `flutter_windows.dll` is a load-time import and `data/` is resolved
@@ -2096,7 +2098,7 @@ verify something new.
 | `WindowsExeVersionReader`, `WindowsInstallRegistry` | **Run against a real install** (`otzaria.exe` 0.9.96+90960, Windows 11, 2026-08-10) |
 | `otzaria_manager` on macOS + launcher build/run there | **Verified** against a real `otzaria-macos.zip` — but that predates the custom title bar and `RunningOtzariaLocator._probeMac` |
 | `ZstdFileDecompressor` | Verified against real libzstd on Windows (`library_manager/test/zstd_file_decompressor_test.dart`) — **not** on a full ~1GB DB. `flutter test` never builds the plugin binary, so `_openLibrary` falls back to `ZSTD_LIBRARY_PATH` and then the system `libzstd`; the zstd tests load it through `nativeZstd()` (`test/support/zstd_fixtures.dart`), which skips without it unless `REQUIRE_NATIVE_ZSTD=1` — set on the Linux `analyze + native zstd (linux)` CI job, so there they run instead of skipping. Locally on macOS: `ZSTD_LIBRARY_PATH=/opt/homebrew/lib/libzstd.dylib` |
-| `LibraryUpdateApplier` on Windows | Not verified on real hardware (full ~1GB download, delta chains, `tasklist`) |
+| `LibraryUpdateApplier` on Windows | Not verified on real hardware (full ~1GB download, delta chains, the running-Otzaria probe) |
 | `RunningOtzariaLocator` FFI half (`QueryFullProcessImageNameW`), Windows `.db` picker filter | Not verified |
 | Plugin store round trip | Unit-tested only — never a real `sync()` against `otzaria.org`, a USB trip, and `install-local` against a real Otzaria |
 | Launcher self-update | Dart side unit-tested end to end (GitHub client against a mock, mirror round trip, location fallbacks, a real swap in a temp dir asserting `OtzariaData/` survives); `stub.c` compiles clean at `/W4`. **Never run for real**: a published tag found by a shipped exe, the `--after-update=<pid>` wait, the re-extract over a live `app-files\`, the macOS bundle swap |
