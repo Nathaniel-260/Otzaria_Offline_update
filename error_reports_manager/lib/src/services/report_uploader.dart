@@ -399,21 +399,22 @@ class ErrorReportUploader {
         ? '${DateTime.now().microsecondsSinceEpoch}-${item.reportId.hashCode.abs()}'
         : AppReport.generateReportId();
     final body = Map<String, dynamic>.of(decoded)..[key] = newId;
+    final outboxId = '${OutboxReport.idPrefixFor(item.endpoint)}$newId';
     return (
       report: OutboxReport(
-        reportId: newId,
+        reportId: outboxId,
         endpoint: item.endpoint,
         bookTitle: item.bookTitle,
         createdAt: item.createdAt,
         filePath: p.join(
           p.dirname(item.filePath),
-          DirectoryReportOutbox.fileNameFor(newId),
+          DirectoryReportOutbox.fileNameFor(outboxId),
         ),
         hasImages: item.hasImages,
         hasMinidump: item.hasMinidump,
       ),
       fileBytes: OutboxReport.encodeFile(OutboxReport.fileJson(
-        reportId: newId,
+        reportId: outboxId,
         bookTitle: item.bookTitle,
         createdAt: item.createdAt?.toUtc().toIso8601String() ?? '',
         endpoint: item.endpoint.toString(),

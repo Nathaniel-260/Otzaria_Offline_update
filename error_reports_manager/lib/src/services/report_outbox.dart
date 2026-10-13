@@ -63,6 +63,7 @@ class DirectoryReportOutbox implements ReportOutbox {
       _listIn(String directory) async {
     final out = <OutboxReport>[];
     final invalid = <(String, String)>[];
+    final byContent = <String, ({OutboxReport report, DateTime modified})>{};
     await for (final entity in Directory(directory).list()) {
       if (entity is! File) continue;
       final lower = entity.path.toLowerCase();
@@ -72,15 +73,29 @@ class DirectoryReportOutbox implements ReportOutbox {
       }
       if (!lower.endsWith('.json')) continue;
       try {
-        out.add(OutboxReport.fromJson(
-          await _readJson(entity.path),
-          filePath: entity.path,
-        ));
+        final json = await _readJson(entity.path);
+        final report = OutboxReport.fromJson(json, filePath: entity.path);
+        final key = OutboxReport.contentKeyOf(json);
+        if (key == null) {
+          out.add(report);
+          continue;
+        }
+        final modified = await entity.lastModified();
+        final other = byContent[key];
+        if (other == null) {
+          byContent[key] = (report: report, modified: modified);
+          continue;
+        }
+        final keepNew = modified.isAfter(other.modified);
+        await File(keepNew ? other.report.filePath : entity.path).delete();
+        if (keepNew) byContent[key] = (report: report, modified: modified);
       } catch (e) {
         invalid.add((entity.path, '$e'));
       }
     }
-    out.sort(compareReports);
+    out
+      ..addAll([for (final entry in byContent.values) entry.report])
+      ..sort(compareReports);
     return (reports: out, invalid: invalid);
   }
 

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
+
 /// דיווח טעות אחד שנאסף מהתור של אוצריא, כפי שהוא יושב בתיבת היציאה עד
 /// שיישלח.
 class OutboxReport {
@@ -87,6 +89,29 @@ class OutboxReport {
       hasImages: images is List && images.isNotEmpty,
       hasMinidump: attachments is Map && attachments['minidump'] != null,
     );
+  }
+
+  /// הקידומת של מזהה הקובץ בתיבה, כמו באיסוף: `app-`/`plugin-`, ובלי קידומת
+  /// לדיווח על ספר.
+  static String idPrefixFor(Uri endpoint) => switch (endpoint.path) {
+        '/api/app-reports' => 'app-',
+        '/api/plugin-reports' => 'plugin-',
+        _ => '',
+      };
+
+  /// טביעה של תוכן הדיווח בלי המזהה שלו — זהה לשני העותקים שנשארים אחרי
+  /// קריסה בין כתיבת המזהה החדש (409) למחיקת הישן.
+  static String? contentKeyOf(Map<String, dynamic> fileJson) {
+    final body = fileJson['body'];
+    if (body is! Map<String, dynamic>) return null;
+    final idKey = body.containsKey('report_id') ? 'report_id' : 'reportId';
+    if (body[idKey] is! String) return null;
+    final content = Map.of(body)
+      ..remove(idKey)
+      ..remove('product');
+    return sha256
+        .convert(utf8.encode('${fileJson['endpoint']}\n${jsonEncode(content)}'))
+        .toString();
   }
 
   static Uint8List encodeFile(Map<String, dynamic> fileJson) =>

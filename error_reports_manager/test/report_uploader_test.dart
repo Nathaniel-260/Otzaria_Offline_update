@@ -179,6 +179,27 @@ void main() {
       expect(outbox.reports, isEmpty);
     });
 
+    test('דיווח תוכנה שהוחלף לו המזהה נשמר בתיבה עם הקידומת app-', () async {
+      final dir = Directory.systemTemp.createTempSync('outbox_409_app_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final outbox = DirectoryReportOutbox(dir.path);
+      await outbox.write(
+        'app-a1',
+        OutboxReport.encodeFile(withBody('app-a1', {'reportId': 'a1'},
+            endpoint: OutboxReport.appReportingEndpoint)),
+      );
+      var requests = 0;
+      await uploader((_) async {
+        requests++;
+        return http.Response('', requests == 1 ? 409 : 500);
+      }).upload(outbox);
+
+      final left = (await outbox.list()).single;
+      expect(left.reportId, startsWith('app-'));
+      final body = jsonDecode(utf8.decode(await outbox.requestBody(left)));
+      expect('app-${body['reportId']}', left.reportId);
+    });
+
     test('כשל זמני אחרי החלפת המזהה — הקובץ נשמר במזהה החדש', () async {
       final dir = Directory.systemTemp.createTempSync('outbox_409_');
       addTearDown(() => dir.deleteSync(recursive: true));
