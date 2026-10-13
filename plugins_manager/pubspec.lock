@@ -247,6 +247,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  otzaria_manager:
+    dependency: "direct main"
+    description:
+      path: "../otzaria_manager"
+      relative: true
+    source: path
+    version: "0.1.0"
   package_config:
     dependency: transitive
     description:

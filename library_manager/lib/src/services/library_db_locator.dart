@@ -1,7 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
+import 'package:otzaria_manager/otzaria_manager.dart'
+    show OtzariaCapabilities, OtzariaDataRoot;
 import 'package:path/path.dart' as p;
 
 import 'library_state_store.dart';
@@ -238,14 +239,8 @@ class LibraryDbLocator {
 
   /// התיקייה שבה יושב ה-executable של אוצריא, לפי נתיב ההפעלה: ב-macOS זהו
   /// `Contents/MacOS` שבתוך חבילת ה-`.app`, ושם גם יושב סימון ההתקנה הניידת.
-  String? exeDirFor(String? launchPath) {
-    if (launchPath == null || launchPath.isEmpty) return null;
-    if (_operatingSystem == 'macos' &&
-        _path.basename(launchPath).toLowerCase().endsWith('.app')) {
-      return _path.join(launchPath, 'Contents', 'MacOS');
-    }
-    return _path.dirname(launchPath);
-  }
+  String? exeDirFor(String? launchPath) =>
+      OtzariaDataRoot.exeDirOf(launchPath, operatingSystem: _operatingSystem);
 
   /// שורשי הנתונים של אוצריא לפי סדר עדיפות: התקנה ניידת קודמת לכול, בדיוק
   /// כמו `AppPaths.getDataRootPath`.
@@ -266,14 +261,11 @@ class LibraryDbLocator {
 
   /// תיקיית הנתונים של התקנה **ניידת** (`portable.marker` ליד ה-exe), או
   /// `null` כשההתקנה אינה כזו.
-  Future<String?> portableDataRoot(String? launchPath) async {
-    final exeDir = exeDirFor(launchPath);
-    if (exeDir == null) return null;
-    if (!await File(_path.join(exeDir, portableMarkerFileName)).exists()) {
-      return null;
-    }
-    return _path.join(exeDir, portableDataFolderName);
-  }
+  Future<String?> portableDataRoot(String? launchPath) async =>
+      OtzariaDataRoot.portableRoot(
+        launchPath,
+        operatingSystem: _operatingSystem,
+      );
 
   /// השורש היחיד שאוצריא **כותבת** אליו את ההגדרות — תרגום של
   /// `AppPaths.getDataRootPath`: תיקיית ההתקנה הניידת אם יש, ואחרת השורש של
@@ -281,16 +273,12 @@ class LibraryDbLocator {
   /// בהתקנת מנהל, וקופסת ההגדרות נשארת אצל המשתמש. `null` = אין מיקום ידוע,
   /// ואז אין לאן לכתוב.
   Future<String?> otzariaSettingsRoot(String? launchPath) async {
-    final portable = await portableDataRoot(launchPath);
-    if (portable != null) return _guarded(portable);
-
-    final roots = _platformDataRoots(
+    final root = OtzariaDataRoot.resolve(
+      launchPath,
       operatingSystem: _operatingSystem,
       environment: _environment,
-      guessUnknownPlatform: true,
-      userOnly: true,
     );
-    return roots.isEmpty ? null : _guarded(roots.first);
+    return root == null ? null : _guarded(root);
   }
 
   /// האם אוצריא הותקנה כמנהל (התקנה מערכתית) — תרגום של

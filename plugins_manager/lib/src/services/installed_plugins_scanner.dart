@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaDataRoot;
 import 'package:path/path.dart' as p;
 
 import 'installed_plugins_registry.dart';
@@ -30,8 +31,10 @@ class InstalledPluginsScanner {
   /// סימון ההתקנה הניידת של אוצריא, ליד ה-executable שלה, ותיקיית הנתונים
   /// שהוא מפעיל. **חייבים להישאר תואמים ל-`LibraryDbLocator`** — אותו זיהוי
   /// בדיוק בשתי החבילות; יש בדיקה ב-`launcher_app` שמאמתת זאת.
-  static const String portableMarkerFileName = 'portable.marker';
-  static const String portableDataFolderName = 'otzaria_data';
+  static const String portableMarkerFileName =
+      OtzariaDataRoot.portableMarkerFileName;
+  static const String portableDataFolderName =
+      OtzariaDataRoot.portableDataFolderName;
 
   Future<Map<String, String>> scan() async => (await scanState()).versions;
 
@@ -126,47 +129,22 @@ class InstalledPluginsScanner {
   /// תיקיית התוספים של התקנה **ניידת** — `<exeDir>/otzaria_data/plugins` —
   /// או null כשההתקנה שזוהתה אינה ניידת.
   ///
-  /// הסימון הוא התנאי, בדיוק כמו ב-`LibraryDbLocator`; תיקיית נתונים קיימת
-  /// לצד קובץ ההרצה מתקבלת גם בלעדיו, כדי שהתקנה שהסימון שלה נמחק לא תיפול
-  /// חזרה ל-`%APPDATA%` של מחשב אחר לגמרי.
+  /// כמו באוצריא, רק קובץ הסימון קובע — תיקיית נתונים בלעדיו אינה ניידת.
   static String? portablePluginsDir(String? launchPath) {
-    final exeDir = exeDirOf(launchPath);
-    if (exeDir == null) return null;
-
-    final plugins = p.join(exeDir, portableDataFolderName, 'plugins');
-    if (File(p.join(exeDir, portableMarkerFileName)).existsSync() ||
-        Directory(p.join(plugins, installedDirName)).existsSync()) {
-      return plugins;
-    }
-    return null;
+    final root = OtzariaDataRoot.portableRoot(
+      launchPath,
+      operatingSystem: Platform.operatingSystem,
+    );
+    return root == null ? null : p.join(root, 'plugins');
   }
 
-  /// התיקייה שבה יושב ה-executable של אוצריא: ב-macOS זהו `Contents/MacOS`
-  /// שבתוך חבילת ה-`.app`, ושם גם יושב סימון ההתקנה הניידת.
-  static String? exeDirOf(String? launchPath) {
-    if (launchPath == null || launchPath.isEmpty) return null;
-    if (launchPath.toLowerCase().endsWith('.app')) {
-      return p.join(launchPath, 'Contents', 'MacOS');
-    }
-    return p.dirname(launchPath);
-  }
-
-  /// `<dataRoot>/plugins` של אוצריא (`AppPaths.getPluginsRootPath`) — היא
-  /// אינה שומרת תוספים מחוץ לשורש הנתונים של המשתמש.
+  /// `<dataRoot>/plugins` של אוצריא (`AppPaths.getPluginsRootPath`).
   static String? defaultPluginsDir() {
-    final env = environment();
-    if (Platform.isWindows) {
-      final appData = env['APPDATA'];
-      if (appData == null || appData.isEmpty) return null;
-      return p.join(appData, 'otzaria', 'plugins');
-    }
-    if (Platform.isMacOS) {
-      final home = env['HOME'];
-      if (home == null || home.isEmpty) return null;
-      return p.join(
-          home, 'Library', 'Application Support', 'otzaria', 'plugins');
-    }
-    return null;
+    final root = OtzariaDataRoot.userRoot(
+      operatingSystem: Platform.operatingSystem,
+      environment: environment(),
+    );
+    return root == null ? null : p.join(root, 'plugins');
   }
 
   /// הגרסה המותקנת של תוסף אחד — מתוך תיקיית ההוצאה הפעילה שלו.

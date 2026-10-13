@@ -1,4 +1,5 @@
 export 'src/models/otzaria_capabilities.dart';
+export 'src/models/otzaria_data_root.dart';
 export 'src/models/otzaria_deep_links.dart';
 export 'src/models/otzaria_install_state.dart';
 export 'src/models/otzaria_release.dart';

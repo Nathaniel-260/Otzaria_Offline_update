@@ -391,12 +391,13 @@ void main() {
       expect(await scanner.scan(), {'nikud': '1.4.0'});
     });
 
-    test('תיקיית נתונים קיימת מתקבלת גם בלי קובץ הסימון', () async {
+    test('תיקיית נתונים בלי קובץ הסימון אינה ניידת — כמו באוצריא', () {
       final scanner = InstalledPluginsScanner(
         otzariaLaunchPath: portableInstall(marker: false),
       );
+      const fallback = InstalledPluginsScanner();
 
-      expect(await scanner.scan(), {'nikud': '1.4.0'});
+      expect(scanner.resolveInstalledDir(), fallback.resolveInstalledDir());
     });
 
     test('התקנה רגילה (בלי סימון ובלי תיקיית נתונים) נופלת לברירת המחדל', () {

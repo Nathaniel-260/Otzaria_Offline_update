@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'otzaria_data_root.dart';
 import 'otzaria_release.dart';
 
 class OtzariaCapabilities {
@@ -22,8 +23,10 @@ class OtzariaCapabilities {
 
   static const String fileName = 'otzaria_capabilities.json';
   static const String libraryDatabasePathFileName = 'library_database_path.txt';
-  static const String portableDataFolderName = 'otzaria_data';
-  static const String portableMarkerFileName = 'portable.marker';
+  static const String portableDataFolderName =
+      OtzariaDataRoot.portableDataFolderName;
+  static const String portableMarkerFileName =
+      OtzariaDataRoot.portableMarkerFileName;
 
   static const int legacyReadableDbSchemaVersion = 5;
 
@@ -112,25 +115,15 @@ class OtzariaCapabilities {
     String launchPath, {
     required OtzariaTargetPlatform platform,
     Map<String, String>? environment,
-  }) {
-    final env = environment ?? Platform.environment;
-    switch (platform) {
-      case OtzariaTargetPlatform.windows:
-        final exeDir = p.dirname(launchPath);
-        if (File(p.join(exeDir, portableMarkerFileName)).existsSync()) {
-          return p.join(exeDir, portableDataFolderName);
-        }
-        final appData = env['APPDATA'];
-        return appData == null || appData.isEmpty
-            ? null
-            : p.join(appData, 'otzaria');
-      case OtzariaTargetPlatform.macos:
-        final home = env['HOME'];
-        return home == null || home.isEmpty
-            ? null
-            : p.join(home, 'Library', 'Application Support', 'otzaria');
-    }
-  }
+  }) =>
+      OtzariaDataRoot.resolve(
+        launchPath,
+        operatingSystem: switch (platform) {
+          OtzariaTargetPlatform.windows => 'windows',
+          OtzariaTargetPlatform.macos => 'macos',
+        },
+        environment: environment ?? Platform.environment,
+      );
 
   static OtzariaCapabilities? readForInstall(
     String launchPath, {
