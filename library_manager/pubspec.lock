@@ -125,10 +125,10 @@ packages:
     dependency: transitive
     description:
       name: equatable
-      sha256: "3bce007a596ff8b3119c45d68aaef631272537c03d30e5d4534dd24bf4c5eaa2"
+      sha256: ea36e500cbf0ec18361deabca755434f73e42fe53c5130021c7e2d6b5ebe1702
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.0"
+    version: "3.0.0"
   fake_async:
     dependency: transitive
     description:
@@ -352,10 +352,24 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.2"
+  otzaria_downloads:
+    dependency: transitive
+    description:
+      path: "../otzaria_downloads"
+      relative: true
+    source: path
+    version: "0.1.0"
   otzaria_l10n:
     dependency: "direct main"
     description:
       path: "../otzaria_l10n"
+      relative: true
+    source: path
+    version: "0.1.0"
+  otzaria_manager:
+    dependency: "direct main"
+    description:
+      path: "../otzaria_manager"
       relative: true
     source: path
     version: "0.1.0"
@@ -442,10 +456,12 @@ packages:
   seforim_library_updater:
     dependency: "direct main"
     description:
-      path: ".."
-      relative: true
-    source: path
-    version: "0.1.0"
+      path: "."
+      ref: "2e16a4cd170cac4b8d1bf86e90cbfe980c0f5c7b"
+      resolved-ref: "2e16a4cd170cac4b8d1bf86e90cbfe980c0f5c7b"
+      url: "https://github.com/palmoni5/otzaria_library_updater.git"
+    source: git
+    version: "0.8.1"
   shelf:
     dependency: transitive
     description:
@@ -516,7 +532,7 @@ packages:
     source: hosted
     version: "3.7.0"
   sqlite3_flutter_libs:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: sqlite3_flutter_libs
       sha256: eeb9e3a45207649076b808f8a5a74d68770d0b7f26ccef6d5f43106eee5375ad
