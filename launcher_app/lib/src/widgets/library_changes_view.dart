@@ -65,10 +65,14 @@ class LibraryChangesView extends StatefulWidget {
     super.key,
     required this.markdowns,
     required this.emptyText,
+    this.note,
   });
 
   final List<String> markdowns;
   final String emptyText;
+
+  /// שורה מעל הרשימה — למשל שהרשימה חלקית.
+  final String? note;
 
   /// מעל הגודל הזה הפירוק רץ ב-isolate.
   static const int parseInIsolateChars = 64 * 1024;
@@ -78,6 +82,9 @@ class LibraryChangesView extends StatefulWidget {
 }
 
 class _LibraryChangesViewState extends State<LibraryChangesView> {
+  // משותף ל-Scrollbar ול-ListView: בלעדיו גלגלת העכבר בדסקטופ זורקת
+  // "ScrollController has no ScrollPosition attached".
+  final ScrollController _scroll = ScrollController();
   List<LibraryChangesLine>? _lines;
 
   @override
@@ -94,25 +101,46 @@ class _LibraryChangesViewState extends State<LibraryChangesView> {
   }
 
   @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final lines = _lines;
+    final theme = Theme.of(context);
     final height = MediaQuery.sizeOf(context).height * 0.6;
+    final note = widget.note;
     return SizedBox(
       width: 600,
       height: height < 480 ? height : 480,
       child: lines == null
           ? const Center(child: CircularProgressIndicator())
           : lines.isEmpty
-              ? Text(
-                  widget.emptyText,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                )
-              : Scrollbar(
-                  child: ListView.builder(
-                    itemCount: lines.length,
-                    itemBuilder: (context, index) =>
-                        _LineView(line: lines[index]),
-                  ),
+              ? Text(widget.emptyText, style: theme.textTheme.bodyMedium)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (note != null)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: AppTokens.spaceSM,
+                        ),
+                        child: Text(note, style: theme.textTheme.bodySmall),
+                      ),
+                    Expanded(
+                      child: Scrollbar(
+                        controller: _scroll,
+                        child: ListView.builder(
+                          controller: _scroll,
+                          itemCount: lines.length,
+                          itemBuilder: (context, index) =>
+                              _LineView(line: lines[index]),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
     );
   }

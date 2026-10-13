@@ -435,9 +435,10 @@ class LibraryManager {
   }) async {
     final name = AppL10n.strings.libraryDomain.libraryChangesNotesName;
     try {
-      if (!await hasMirror) return;
+      final online = _cloudClient.lastFetchedReleases;
+      if (online == null || !await hasMirror) return;
       final covered = LibraryChangesNotes.coveredReleases(
-        online: await _cloudClient.fetchReleases(),
+        online: online,
         mirrored: await LocalMirrorLibraryReleaseClient(
           mirrorDir: mirrorDir,
         ).fetchReleases(),

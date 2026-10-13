@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:library_manager/library_manager.dart' show LibraryChangesNote;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../controllers/library_module_controller.dart';
@@ -95,15 +94,16 @@ Future<void> applyLibraryAndReport(
   if (library.changesNotesApplied &&
       library.changesNotes.isNotEmpty &&
       context.mounted) {
-    await showLibraryChangesDialog(context, library.changesNotes);
+    await showLibraryChangesDialog(context, library);
   }
 }
 
 /// "מה חדש בספרייה" — ההערות של כל הגרסאות שבטווח, החדשה קודם.
 Future<void> showLibraryChangesDialog(
   BuildContext context,
-  List<LibraryChangesNote> notes,
+  LibraryModuleController library,
 ) async {
+  final notes = library.changesNotes;
   final parts = <String>[];
   for (final note in notes) {
     try {
@@ -122,6 +122,9 @@ Future<void> showLibraryChangesDialog(
     customContent: LibraryChangesView(
       markdowns: parts,
       emptyText: t.changesNotFound,
+      note: library.changesNotesPartial
+          ? t.changesPartial(notes.length, library.changesNotesRange)
+          : null,
     ),
   );
 }

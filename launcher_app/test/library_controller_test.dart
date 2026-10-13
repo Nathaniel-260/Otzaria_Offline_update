@@ -899,6 +899,14 @@ void main() {
     expect(controller.changesNotes.map((n) => n.releaseTag), ['v33', 'v32']);
     expect(controller.changesNotesApplied, isTrue);
     expect(controller.changesNotesVersion, 33);
+    expect(controller.changesNotesRange, 2);
+    expect(controller.changesNotesPartial, isFalse);
+
+    // החלה חוזרת שלא העלתה גרסה (נלווים בלבד) אינה מציגה שוב "מה חדש".
+    await controller.update();
+
+    expect(controller.changesNotesApplied, isFalse);
+    expect(controller.changesNotes, isEmpty);
   });
 
   group('החלה שרצה', () {

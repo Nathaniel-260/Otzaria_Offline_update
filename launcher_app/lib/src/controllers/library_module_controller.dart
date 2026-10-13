@@ -210,7 +210,15 @@ class LibraryModuleController extends ChangeNotifier
   List<LibraryChangesNote> changesNotes = const [];
   bool changesNotesApplied = false;
   int? changesNotesVersion;
-  ({int version, List<LibraryChangesNote> notes})? _appliedChangesNotes;
+
+  /// כמה גרסאות בטווח; יותר מ-[changesNotes] = הרשימה חלקית.
+  int changesNotesRange = 0;
+  bool get changesNotesPartial => changesNotes.length < changesNotesRange;
+  ({
+    int version,
+    int range,
+    List<LibraryChangesNote> notes
+  })? _appliedChangesNotes;
   bool get semanticConsentRequired =>
       semanticPending && !semanticConsentGranted;
 
@@ -687,10 +695,13 @@ class LibraryModuleController extends ChangeNotifier
         changesNotes = pending;
         changesNotesApplied = false;
         changesNotesVersion = targetVersion;
+        changesNotesRange =
+            pending.isEmpty ? 0 : (targetVersion ?? 0) - (localVersion ?? 0);
       } else {
         changesNotes = applied.notes;
         changesNotesApplied = true;
         changesNotesVersion = applied.version;
+        changesNotesRange = applied.range;
       }
     } catch (e) {
       changesNotes = const [];
@@ -709,6 +720,7 @@ class LibraryModuleController extends ChangeNotifier
     try {
       _appliedChangesNotes = (
         version: reached,
+        range: reached - before.dbVersion,
         notes: await _manager.changesNotesBetween(before.dbVersion, reached),
       );
     } catch (e) {
@@ -778,6 +790,12 @@ class LibraryModuleController extends ChangeNotifier
       return;
     }
 
+    // רק החלה שהעלתה את הגרסה מציגה "מה חדש" — לא ניסיון חוזר של נלווים.
+    _appliedChangesNotes = null;
+    if (changesNotesApplied) {
+      changesNotes = const [];
+      changesNotesApplied = false;
+    }
     status = LibraryModuleStatus.updating;
     stageText = null;
     applyProgress = null;
@@ -830,7 +848,7 @@ class LibraryModuleController extends ChangeNotifier
             AppLogger.instance.warn('התקנת הקובץ הנלווה "$name" נכשלה: $error');
           },
           onStateWarning: (error) => AppLogger.instance
-              .warn('רישום מצב העדכון נכשל — הבדיקה הבאה תציע שוב: $error'),
+              .warn('רישום שאחרי ההחלה נכשל (מצב או "מה חדש"): $error'),
           onLibraryLocationFailure: (reason) => AppLogger.instance
               .warn('סיבת הכשל בכתיבת מיקום הספרייה: $reason'),
           onLibraryLocationNotSet: (dbPath) {

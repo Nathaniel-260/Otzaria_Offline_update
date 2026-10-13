@@ -533,7 +533,10 @@ class _LibraryScreen extends LibraryScreenStrings {
   @override
   String changesAppliedSubtitle(String version) =>
       'הספרים שנוספו והשתנו עד גרסה $version, שהותקנה. '
-      'אוצריא תציג את הרשימה גם בפתיחה הבאה.';
+      'גרסאות אוצריא שתומכות בכך יציגו את הרשימה גם בפתיחה הבאה.';
+  @override
+  String changesPartial(int shown, int total) =>
+      'הרשימה חלקית: יש בה $shown מתוך $total הגרסאות שבטווח.';
   @override
   String get changesButton => 'הצגה';
   @override

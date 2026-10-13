@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -97,6 +99,45 @@ void main() {
     );
     expect(find.text('• ספר מספר $_bookCount בספרייה'), findsOneWidget);
     expect(first, findsNothing);
+  });
+
+  testWidgets('a mouse wheel on Windows scrolls without a controller error', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await _pumpView(tester, [
+      List.generate(200, (i) => '* ספר $i').join('\n'),
+    ]);
+    await tester.pumpAndSettle();
+
+    final pointer = TestPointer(1, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(
+      pointer.hover(tester.getCenter(find.byType(ListView))),
+    );
+    await tester.sendEventToBinding(pointer.scroll(const Offset(0, 600)));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('• ספר 0'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('a partial list says so above the books', (tester) async {
+    useViewSize(tester, const Size(900, 900));
+    await tester.pumpWidget(
+      wrap(
+        const Scaffold(
+          body: LibraryChangesView(
+            markdowns: ['* ספר'],
+            emptyText: 'empty',
+            note: 'partial',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('partial'), findsOneWidget);
   });
 
   testWidgets('a small file is shown at once, without an isolate', (

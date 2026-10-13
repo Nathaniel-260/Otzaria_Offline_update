@@ -558,12 +558,17 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get changesTitle => "What's new in the library";
   @override
   String changesPendingSubtitle(String version) =>
-      'The books added and changed up to version $version, which this update '
-      'installs.';
+      'Books added and changed up to version $version, which this update '
+      'will install.';
   @override
   String changesAppliedSubtitle(String version) =>
-      'The books added and changed up to version $version, now installed. '
-      'Otzaria shows the list too the next time it opens.';
+      'Books added and changed up to version $version, which is now '
+      'installed. Otzaria versions that support it will also show this list '
+      'the next time they open.';
+  @override
+  String changesPartial(int shown, int total) =>
+      'This list is partial: it covers $shown of the $total versions in the '
+      'range.';
   @override
   String get changesButton => 'Show';
   @override

@@ -352,6 +352,9 @@ abstract class LibraryScreenStrings {
   String get changesTitle;
   String changesPendingSubtitle(String version);
   String changesAppliedSubtitle(String version);
+
+  /// הטווח ארוך ממה שיש על הכונן: חלק מהגרסאות בלי רשימה, או מעבר לעשר.
+  String changesPartial(int shown, int total);
   String get changesButton;
   String get changesNotFound;
 

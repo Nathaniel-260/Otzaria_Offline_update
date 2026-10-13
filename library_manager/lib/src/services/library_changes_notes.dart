@@ -93,9 +93,8 @@ class LibraryChangesNotes {
     return covered.take(maxNotes).toList(growable: false);
   }
 
-  /// מביא למראה את ההערות של [covered] לפי רשימת הנכסים של כל release, ומוחק
-  /// הערות של releases שהמראה כבר אינה מכסה. נכס שעוד לא הועלה (או 404) הוא
-  /// "עדיין לא" — ינוסה שוב בהורדה הבאה. לעולם אינו זורק על release בודד.
+  /// מביא את ההערות של [covered] לפי רשימת הנכסים ומוחק את שאינן מכוסות.
+  /// נכס חסר או 404 = עוד לא הועלה; כשל ב-release בודד הוא אזהרה בלבד.
   static Future<int> syncMirror({
     required String mirrorDir,
     required List<LibraryRelease> covered,
@@ -180,10 +179,8 @@ class LibraryChangesNotes {
     return notes.take(maxNotes).toList(growable: false);
   }
 
-  /// כותב את [notes] ל-`<dataRoot>/pending_library_changes/<tag>.md`, שם
-  /// אוצריא מציגה אותן. תג שכבר ממתין או שכבר הוצג (`library_changes_seen`)
-  /// אינו נכתב שוב. אחר כך נשארות בתיקייה רק [maxNotes] החדשות — אוצריא ישנה
-  /// שאינה צורכת אותה לא תצבור בה קבצים בלי סוף. מחזיר את התגים שנכתבו.
+  /// כותב ל-`pending_library_changes` כל תג שאינו ממתין ולא הוצג, ומשאיר שם
+  /// [maxNotes] — אוצריא ישנה שאינה צורכת את התיקייה לא תצבור בה קבצים.
   static Future<List<String>> handOff({
     required String dataRoot,
     required List<LibraryChangesNote> notes,
@@ -223,7 +220,11 @@ class LibraryChangesNotes {
     String tagOf(File f) => p.basenameWithoutExtension(f.path);
     files.sort((a, b) => newestTagFirst(tagOf(a), tagOf(b)));
     for (final file in files.skip(maxNotes)) {
-      await file.delete();
+      try {
+        await file.delete();
+      } on FileSystemException {
+        // אוצריא מעבירה אותו ל-seen ברגע זה, או שהוא נעול — יימחק בפעם הבאה.
+      }
     }
   }
 }

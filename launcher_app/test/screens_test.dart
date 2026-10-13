@@ -1058,6 +1058,10 @@ void main() {
     await pumpScreen(tester, screen());
     expect(find.text(t.changesAppliedSubtitle('33')), findsOneWidget);
 
+    library.changesNotesRange = 5;
+    await pumpScreen(tester, screen());
+    expect(find.textContaining(t.changesPartial(1, 5)), findsOneWidget);
+
     library.changesNotes = const [];
     await pumpScreen(tester, screen());
     expect(find.text(t.changesTitle), findsNothing);

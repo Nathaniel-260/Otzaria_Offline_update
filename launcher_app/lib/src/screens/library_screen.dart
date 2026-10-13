@@ -184,15 +184,18 @@ class LibraryScreen extends StatelessWidget {
           SettingsActionTile.text(
             icon: FluentIcons.news_24_regular,
             title: t.changesTitle,
-            subtitle: c.changesNotesApplied
-                ? t.changesAppliedSubtitle('${c.changesNotesVersion}')
-                : t.changesPendingSubtitle('${c.changesNotesVersion}'),
+            subtitle: [
+              c.changesNotesApplied
+                  ? t.changesAppliedSubtitle('${c.changesNotesVersion}')
+                  : t.changesPendingSubtitle('${c.changesNotesVersion}'),
+              if (c.changesNotesPartial)
+                t.changesPartial(c.changesNotes.length, c.changesNotesRange),
+            ].join('\n'),
             actions: [
               ActionButton.neutral(
                 text: t.changesButton,
                 icon: FluentIcons.document_text_24_regular,
-                onPressed: () =>
-                    showLibraryChangesDialog(context, c.changesNotes),
+                onPressed: () => showLibraryChangesDialog(context, c),
               ),
             ],
           ),

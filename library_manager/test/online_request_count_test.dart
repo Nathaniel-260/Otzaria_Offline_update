@@ -359,6 +359,39 @@ void main() {
       });
     });
 
+    test(
+      'the notes reuse the export list even after a long download',
+      () async {
+        await online(() async {
+          github
+            ..libraryTo = 3
+            ..notes[3] = '# v3';
+          final start = DateTime.utc(2026, 10, 13, 8);
+          var clockCalls = 0;
+          final manager = LibraryManager(
+            dataDir: dataDir,
+            releaseClient: RecentLibraryReleasesClient(
+              httpClient: github.client,
+              clock: () => clockCalls++ == 0
+                  ? start
+                  : start.add(const Duration(hours: 1)),
+            ),
+          );
+          addTearDown(manager.dispose);
+
+          await manager.downloadToMirror();
+
+          expect(github.count(_libraryReleasesPath), 1);
+          expect(
+            File(
+              p.join(manager.mirrorDir, 'changes', 'v3-20261011.md'),
+            ).existsSync(),
+            isTrue,
+          );
+        });
+      },
+    );
+
     test('a new light check asks GitHub again', () async {
       await online(() async {
         final manager = LibraryManager(dataDir: dataDir);

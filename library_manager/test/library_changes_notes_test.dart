@@ -341,6 +341,30 @@ void main() {
       expect(names, containsAll(['v2.md', 'v10.md', 'v11.md']));
     });
 
+    test(
+      'a pending file that cannot be deleted does not fail the hand-off',
+      () async {
+        final pending = folder(LibraryChangesNotes.pendingFolderName);
+        for (var v = 1; v <= 10; v++) {
+          File(p.join(pending.path, 'v$v.md'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync('old');
+        }
+        final held = File(p.join(pending.path, 'v1.md')).openSync();
+        addTearDown(held.closeSync);
+
+        final written = await LibraryChangesNotes.handOff(
+          dataRoot: dataRoot,
+          notes: [await note('v11', 'new')],
+        );
+
+        expect(written, ['v11']);
+      },
+      skip: !Platform.isWindows
+          ? 'an open file blocks deletion only on Windows'
+          : false,
+    );
+
     test('an empty note and an unsafe tag are skipped', () async {
       final written = await LibraryChangesNotes.handOff(
         dataRoot: dataRoot,
