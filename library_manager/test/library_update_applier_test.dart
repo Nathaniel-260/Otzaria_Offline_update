@@ -1888,7 +1888,7 @@ void main() {
     });
 
     test(
-      'בלי ספריית zstd לזרימה (streamed == false) נופלים למסלול הזיכרון',
+      'בלי ספריית zstd לזרימה (streamed == false) ה-patch אינו מחולץ בזיכרון',
       () async {
         if (bindings == null) {
           markTestSkipped('אין ספריית zstd לטעינה בסביבה הזו');
@@ -1904,8 +1904,6 @@ void main() {
           fromHash: h.h1,
           toHash: h.h2,
         );
-        final zst = edge.patchFileUrls.values.single;
-        final raw = File(zst.substring(0, zst.length - 4)).readAsBytesSync();
         var streamCalls = 0;
         var memoryCalls = 0;
         final fallback = LibraryUpdateApplier(
@@ -1925,35 +1923,140 @@ void main() {
               },
           decompress: (_) async {
             memoryCalls++;
-            return raw;
+            return null;
           },
         );
         addTearDown(fallback.dispose);
-        final log = <LibraryApplyProgress>[];
 
-        await fallback.applyDelta(
+        await expectLater(
+          fallback.applyDelta(
+            plan: LibraryUpdatePlan.delta(
+              localVersion: 1,
+              targetVersion: 2,
+              steps: [edge],
+            ),
+            dbPath: dbPath,
+          ),
+          throwsA(
+            isA<LibraryApplyException>().having(
+              (e) => e.message,
+              'message',
+              AppL10n.strings.libraryDomain.patchNeedsNativeZstd,
+            ),
+          ),
+        );
+
+        expect(streamCalls, 1);
+        expect(memoryCalls, 0);
+        expect(hashOf(dbPath), h.h1);
+        expect(File('$dbPath.applying').existsSync(), isFalse);
+      },
+    );
+
+    test('חוסר מקום ידוע עוצר את צעד הדלתא לפני החילוץ וההחלה', () async {
+      if (bindings == null) {
+        markTestSkipped('אין ספריית zstd לטעינה בסביבה הזו');
+        return;
+      }
+      final h = buildChainHashes();
+      final edge = buildEdge(
+        from: 1,
+        to: 2,
+        upsertRows: [
+          [2, 'bet'],
+        ],
+        fromHash: h.h1,
+        toHash: h.h2,
+      );
+      final probed = <String>[];
+      final tight = LibraryUpdateApplier(
+        processGuard: const _FakeGuard(false),
+        freeBytesFor: (path) {
+          probed.add(path);
+          return 1 << 20;
+        },
+      );
+      addTearDown(tight.dispose);
+      final uncompressed = edge.manifest.patchFiles.first.uncompressedSize;
+
+      await expectLater(
+        tight.applyDelta(
           plan: LibraryUpdatePlan.delta(
             localVersion: 1,
             targetVersion: 2,
             steps: [edge],
           ),
           dbPath: dbPath,
-          onProgress: log.add,
-        );
+        ),
+        throwsA(
+          isA<LibraryApplyException>().having(
+            (e) => e.message,
+            'message',
+            AppL10n.strings.libraryDomain.notEnoughDiskSpace(
+              p.dirname(dbPath),
+              DiskSpaceProbe.formatBytes(2 * uncompressed),
+              DiskSpaceProbe.formatBytes(1 << 20),
+            ),
+          ),
+        ),
+      );
 
-        final size = edge.manifest.patchFiles.first.size;
-        expect(streamCalls, 1);
-        expect(memoryCalls, 1);
-        expect(
-          log
-              .where((e) => e.stage == LibraryApplyStage.downloadingPatch)
-              .map((e) => (e.bytesDone, e.bytesTotal))
-              .toList(),
-          [(size, size)],
-        );
-        expect(hashOf(dbPath), h.h2);
-      },
-    );
+      expect(probed, [p.dirname(dbPath)]);
+      expect(hashOf(dbPath), h.h1);
+      expect(File('$dbPath.applying').existsSync(), isFalse);
+      final tmp = Directory(recovery.patchTmpDirFor(dbPath));
+      expect(
+        tmp.existsSync() ? tmp.listSync().whereType<File>() : const <File>[],
+        isEmpty,
+      );
+    });
+
+    test('מסד שיחצה 4GiB על FAT32 נעצר לפני צעד הדלתא', () async {
+      if (bindings == null) {
+        markTestSkipped('אין ספריית zstd לטעינה בסביבה הזו');
+        return;
+      }
+      final h = buildChainHashes();
+      final edge = buildEdge(
+        from: 1,
+        to: 2,
+        upsertRows: [
+          [2, 'bet'],
+        ],
+        fromHash: h.h1,
+        toHash: h.h2,
+        uncompressedSizeOverride: DiskSpaceProbe.fatMaxFileBytes,
+      );
+      final fat = LibraryUpdateApplier(
+        processGuard: const _FakeGuard(false),
+        freeBytesFor: (_) => null,
+        isFatVolume: (_) => true,
+      );
+      addTearDown(fat.dispose);
+
+      await expectLater(
+        fat.applyDelta(
+          plan: LibraryUpdatePlan.delta(
+            localVersion: 1,
+            targetVersion: 2,
+            steps: [edge],
+          ),
+          dbPath: dbPath,
+        ),
+        throwsA(
+          isA<LibraryApplyException>().having(
+            (e) => e.message,
+            'message',
+            AppL10n.strings.libraryDomain.fileTooLargeForVolume(
+              p.dirname(dbPath),
+            ),
+          ),
+        ),
+      );
+
+      expect(hashOf(dbPath), h.h1);
+      expect(File('$dbPath.applying').existsSync(), isFalse);
+    });
   });
 }
 

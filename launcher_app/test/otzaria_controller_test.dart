@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
@@ -431,6 +432,7 @@ void main() {
     }) controllerWith({
       String? uri = OtzariaDeepLinks.libraryReindex,
       bool launchFails = false,
+      bool libraryApplying = false,
     }) {
       final launcher = _RecordingLauncher(fails: launchFails);
       final delivered = <bool>[];
@@ -440,6 +442,7 @@ void main() {
         launcher: launcher,
         pendingLaunchUri: () async => uri,
         onLaunchUriDelivered: () async => delivered.add(true),
+        isLibraryApplying: () => libraryApplying,
       );
       addTearDown(controller.dispose);
       return (controller: controller, launcher: launcher, delivered: delivered);
@@ -456,6 +459,27 @@ void main() {
         expect(t.launcher.uris, [OtzariaDeepLinks.libraryReindex]);
         expect(t.delivered, [true]);
         expect(t.controller.errorMessage, isNull);
+      },
+      testOn: 'windows',
+    );
+
+    test(
+      'בזמן עדכון ספרייה אין הפעלה, והבקשה הממתינה אינה נמחקת',
+      () async {
+        if (!writeManagedInstall()) return;
+        final t = controllerWith(libraryApplying: true);
+        await t.controller.checkForUpdate();
+
+        expect(t.controller.canLaunch, isFalse);
+        await t.controller.launch();
+        expect(await t.controller.requestLibraryReindex(), isFalse);
+
+        expect(t.launcher.uris, isEmpty);
+        expect(t.delivered, isEmpty);
+        expect(
+          t.controller.noticeMessage,
+          AppL10n.strings.home.libraryApplyActive,
+        );
       },
       testOn: 'windows',
     );

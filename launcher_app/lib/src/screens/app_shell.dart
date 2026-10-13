@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -223,11 +224,18 @@ class _AppShellState extends State<AppShell> {
       pendingLaunchUri: () async =>
           _library.hasPendingReindex ? OtzariaDeepLinks.libraryReindex : null,
       onLaunchUriDelivered: () => _library.markReindexRequestDelivered(),
+      isLibraryApplying: () => _library.isApplying,
     )..addListener(_onChange);
     _library = LibraryModuleController(
       dataDir: widget.dataDir,
       stateDir: widget.stateFilesDir,
       otzariaLaunchPath: () async => _otzaria.launchPath,
+      otzariaAppVersion: () async => _otzaria.currentVersion,
+      mirroredOtzariaUpdate: () async =>
+          _otzaria.status == OtzariaModuleStatus.updateAvailable
+              ? _otzaria.latestVersion
+              : null,
+      instanceLock: const OtzariaInstanceLock(),
     )..addListener(_onChange);
     _plugins = PluginsModuleController(
       mirrorRootDir: p.join(widget.dataDir, 'mirror'),

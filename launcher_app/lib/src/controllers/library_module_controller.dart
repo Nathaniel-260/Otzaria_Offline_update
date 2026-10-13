@@ -63,14 +63,22 @@ class LibraryModuleController extends ChangeNotifier
     String? stateDir,
     bool allowPrerelease = false,
     Future<String?> Function()? otzariaLaunchPath,
+    Future<String?> Function()? otzariaAppVersion,
+    Future<String?> Function()? mirroredOtzariaUpdate,
+    OtzariaInstanceLock? instanceLock,
     LibraryManager? manager,
-  }) : _manager = manager ??
+  })  : _mirroredOtzariaUpdate = mirroredOtzariaUpdate,
+        _manager = manager ??
             LibraryManager(
               dataDir: dataDir,
               stateDir: stateDir,
               allowPrerelease: allowPrerelease,
               otzariaLaunchPath: otzariaLaunchPath,
+              otzariaAppVersion: otzariaAppVersion,
+              instanceLock: instanceLock,
             );
+
+  final Future<String?> Function()? _mirroredOtzariaUpdate;
 
   set personalUpdateMode(bool value) {
     if (_manager.personalUpdateMode == value) return;
@@ -136,7 +144,7 @@ class LibraryModuleController extends ChangeNotifier
   /// מסמן שהבקשה נמסרה לאוצריא בפועל. **רק אחרי מסירה מוצלחת** — מחיקה
   /// מוקדמת הייתה משאירה את אינדקס החיפוש על התוכן הישן בלי שאיש יידע.
   Future<void> markReindexRequestDelivered() async {
-    if (pendingReindex == null) return;
+    if (pendingReindex == null || _applying) return;
     await _manager.clearReindexRequest(dbPath: dbPath);
     pendingReindex = null;
     notifyListeners();
@@ -587,7 +595,8 @@ class LibraryModuleController extends ChangeNotifier
           // [LibraryModuleStatus.personalTargetElsewhere].
           if (personalTargetIsThisMachine) {
             status = LibraryModuleStatus.error;
-            errorMessage = check.plan?.reason ??
+            errorMessage = await _otzariaFirstMessage(check) ??
+                check.plan?.reason ??
                 AppL10n
                     .strings.libraryDomain.blockedNeedsManualActionWithPeriod;
           } else {
@@ -649,8 +658,21 @@ class LibraryModuleController extends ChangeNotifier
     notifyListeners();
   }
 
+  Future<String?> _otzariaFirstMessage(LibraryUpdateCheckResult check) async {
+    if (!check.needsNewerOtzaria) return null;
+    final version = await _mirroredOtzariaUpdate?.call();
+    if (version == null) return null;
+    final readable = OtzariaCapabilities.readableDbSchemaForAppVersion(version);
+    final current = check.readableDbSchemaVersion;
+    if (readable == null || current == null || readable <= current) {
+      return null;
+    }
+    return AppL10n.strings.libraryDomain
+        .libraryNeedsOtzariaUpdateFromDrive(version);
+  }
+
   Future<void> setCustomDbPath(String dbPath) async {
-    await _manager.setCustomDbPath(dbPath);
+    await _manager.setCustomDbPath(dbPath, explicit: true);
     await checkForUpdate();
   }
 

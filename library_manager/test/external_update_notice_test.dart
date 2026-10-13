@@ -47,7 +47,7 @@ void main() {
   });
 
   test(
-    'הורדה מלאה רושמת רשימה ריקה — שם ההשוואה היא לפי טביעות-אצבע',
+    'הורדה מלאה מסמנת fullReconcile בלי booksTouched — אוצריא מריצה ReconcileIndex',
     () async {
       await const ExternalUpdateNotice().write(
         dbPath: dbPath,
@@ -57,7 +57,8 @@ void main() {
 
       final json = readNotice();
       expect(json['route'], ExternalUpdateNotice.routeFull);
-      expect(json['booksTouched'], isEmpty);
+      expect(json['fullReconcile'], isTrue);
+      expect(json.containsKey('booksTouched'), isFalse);
     },
   );
 
@@ -96,7 +97,22 @@ void main() {
       dbVersion: 16,
     );
 
-    expect(readNotice()['route'], ExternalUpdateNotice.routeFull);
+    final json = readNotice();
+    expect(json['route'], ExternalUpdateNotice.routeFull);
+    expect(json['fullReconcile'], isTrue);
+    expect(json.containsKey('booksTouched'), isFalse);
+  });
+
+  test('דלתא בלי ספרים שהשתנו עדיין כותבת booksTouched ריק', () async {
+    await const ExternalUpdateNotice().write(
+      dbPath: dbPath,
+      route: ExternalUpdateNotice.routeDelta,
+      dbVersion: 17,
+    );
+
+    final json = readNotice();
+    expect(json['booksTouched'], isEmpty);
+    expect(json.containsKey('fullReconcile'), isFalse);
   });
 
   test('כשל כתיבה אינו זורק — העדכון עצמו כבר הצליח', () async {

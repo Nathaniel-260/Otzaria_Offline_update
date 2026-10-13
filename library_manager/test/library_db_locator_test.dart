@@ -7,6 +7,24 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
+  test('בבדיקות אין שום גישה לשורשי הנתונים האמיתיים של אוצריא', () async {
+    final tempDir = await Directory.systemTemp.createTemp('db-locator-guard-');
+    addTearDown(() => tempDir.delete(recursive: true));
+    final store = LibraryStateStore(p.join(tempDir.path, 'state.json'));
+
+    final root = await LibraryDbLocator(
+      stateStore: store,
+    ).otzariaSettingsRoot(null);
+    expect(root, isNotNull);
+    expect(p.isWithin(Directory.systemTemp.path, root!), isTrue);
+
+    final leaking = LibraryDbLocator(
+      stateStore: store,
+      environment: Platform.environment,
+    );
+    await expectLater(leaking.resolveDbPath(), throwsStateError);
+  });
+
   group('LibraryDbLocator', () {
     late Directory tempDir;
     late LibraryStateStore stateStore;
@@ -254,6 +272,91 @@ void main() {
 
       expect(await locator(launchPath: launchPath).resolveDbPath(), portableDb);
     });
+
+    test('ההגדרה הנוכחית של אוצריא מנצחת נתיב ישן ששמרנו', () async {
+      final stale = await createDb(p.join(tempDir.path, 'old-place'));
+      await stateStore.saveCustomDbPath(stale);
+      final current = await createDb(p.join(tempDir.path, 'moved'));
+      await writeSettings({
+        OtzariaSettingsReader.keyLibraryPath: p.join(tempDir.path, 'moved'),
+      });
+
+      expect(await locator().resolveDbPath(), current);
+    });
+
+    test('בחירה ידנית מפורשת ב-OU מנצחת את ההגדרה של אוצריא', () async {
+      await createDb(p.join(tempDir.path, 'moved'));
+      await writeSettings({
+        OtzariaSettingsReader.keyLibraryPath: p.join(tempDir.path, 'moved'),
+      });
+      final picked = await createDb(p.join(tempDir.path, 'picked'));
+      await stateStore.saveCustomDbPath(picked, explicit: true);
+
+      expect(await locator().resolveDbPath(), picked);
+      expect(await locator().resolveInstallDbPath(), picked);
+
+      await stateStore.saveCustomDbPath(picked);
+      expect(await locator().resolveDbPath(), picked);
+    });
+
+    test('יעד התקנה: הגדרת אוצריא קודמת לנתיב שמור שאינו מפורש', () async {
+      await stateStore.saveCustomDbPath(
+        p.join(tempDir.path, 'old', 'seforim.db'),
+      );
+      await writeSettings({
+        OtzariaSettingsReader.keyLibraryPath: p.join(tempDir.path, 'target'),
+      });
+
+      expect(
+        await locator().resolveInstallDbPath(),
+        p.join(tempDir.path, 'target', 'seforim.db'),
+      );
+    });
+
+    test('נתיב שמור עדיין קודם לברירת המחדל כשאוצריא אינה מצביעה', () async {
+      await createDb(p.join(dataRoot, 'books'));
+      final custom = await createDb(p.join(tempDir.path, 'custom'));
+      await stateStore.saveCustomDbPath(custom);
+
+      expect(await locator().resolveDbPath(), custom);
+    });
+
+    test('library_database_path.txt (UTF-8 עם BOM) מנצח נתיב שמור', () async {
+      final stale = await createDb(p.join(tempDir.path, 'old-place'));
+      await stateStore.saveCustomDbPath(stale);
+      final recordedDir = p.join(tempDir.path, 'ספרייה', 'אוצריא');
+      final recorded = await createDb(recordedDir);
+      await File(
+        p.join(dataRoot, OtzariaCapabilities.libraryDatabasePathFileName),
+      ).writeAsBytes([0xEF, 0xBB, 0xBF, ...utf8.encode(recordedDir)]);
+
+      expect(await locator().resolveDbPath(), recorded);
+      expect(await locator().isKnownToOtzaria(recorded), isTrue);
+    });
+
+    test('libraryDbPath של otzaria_capabilities.json מנצח נתיב שמור', () async {
+      final stale = await createDb(p.join(tempDir.path, 'old-place'));
+      await stateStore.saveCustomDbPath(stale);
+      final declared = await createDb(p.join(tempDir.path, 'declared'));
+      await File(p.join(dataRoot, OtzariaCapabilities.fileName)).writeAsString(
+        jsonEncode({'formatVersion': 1, 'libraryDbPath': declared}),
+      );
+
+      expect(await locator().resolveDbPath(), declared);
+    });
+
+    test('הקופסה קודמת לקבצי הרישום, שעשויים להיות ישנים', () async {
+      final fromBox = await createDb(p.join(tempDir.path, 'from-box'));
+      await writeSettings({
+        OtzariaSettingsReader.keyLibraryPath: p.join(tempDir.path, 'from-box'),
+      });
+      final declared = await createDb(p.join(tempDir.path, 'declared'));
+      await File(
+        p.join(dataRoot, OtzariaCapabilities.fileName),
+      ).writeAsString(jsonEncode({'libraryDbPath': declared}));
+
+      expect(await locator().resolveDbPath(), fromBox);
+    });
   });
 
   /// סדר החיפוש בווינדוס — ברירות המחדל מוצבעות לתוך ה-tempDir דרך דריסת
@@ -343,7 +446,7 @@ void main() {
       }
       if (File(
         p.windows.join(
-          LibraryDbLocator.legacyFallbackLibraryPath,
+          LibraryDbLocator.legacyFallbackRoot,
           LibraryDbLocator.databaseFileName,
         ),
       ).existsSync()) {
@@ -493,7 +596,12 @@ void main() {
           environment: const {r'APPDATA': r'C:\Users\dov\AppData\Roaming'},
         );
 
-        expect(await windows.isKnownToOtzaria(r'C:\אוצריא\seforim.db'), isTrue);
+        expect(
+          await windows.isKnownToOtzaria(
+            p.windows.join(LibraryDbLocator.legacyFallbackRoot, 'seforim.db'),
+          ),
+          isTrue,
+        );
       },
     );
   });

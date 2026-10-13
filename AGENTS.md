@@ -823,10 +823,14 @@ compare, so the chain stands. A local DB that is not on the mirrored chain lands
 `LibraryUpdatePlanKind.blocked` with a reason (`_fullOrBlocked` → `planNoFullDbEither`).
 
 **DB location is discovered, not assumed — and Otzaria's own setting wins.**
-`LibraryDbLocator` checks, in order: a path we saved ourselves; **Otzaria's
-settings** (`key-library-path` + `key-library-folder-name` from its
-`app_preferences` Hive box, exactly like `DatabaseConstants.getDatabasePath`); a
-a library bundled by a legacy FULL install; `%APPDATA%\otzaria\books\`,
+`LibraryDbLocator` checks, in order: **Otzaria's settings** (`key-library-path` +
+`key-library-folder-name` from its `app_preferences` Hive box, exactly like
+`DatabaseConstants.getDatabasePath`), then its `library_database_path.txt` and
+the `libraryDbPath` of `otzaria_capabilities.json`; only then a path we saved
+ourselves (it used to come first, so a library moved inside Otzaria kept
+updating the stale copy) — unless the user picked it explicitly in OU
+(`saveCustomDbPath(explicit: true)`), which goes first, also for
+`resolveInstallDbPath`; a library bundled by a legacy FULL install; `%APPDATA%\otzaria\books\`,
 `%ProgramData%\otzaria\books\` (Windows) or
 `~/Library/Application Support/otzaria/books/` and the system-wide equivalent
 (macOS); finally `C:\אוצריא\`. Nothing found → `null`, and the UI must ask. Do not
@@ -902,6 +906,27 @@ saying the user must point Otzaria's own library-location setting at it.
 executable puts its whole data root in `otzaria_data` beside it. Detecting that needs
 Otzaria's launch path, which is why `AppShell.checkAll()` runs the app module's check
 **before** the library module's, sequentially.
+
+**Never install a DB schema the installed Otzaria cannot read.** Otzaria reads
+schema 6 only from 0.9.98; the mirror carries both, and OU picked the newest.
+`ReadableSchemaRoute` limits the full DB and the delta edges to
+`OtzariaCapabilities.resolveReadableDbSchema` (C1 `readableDbSchemaVersion`,
+else the app-version table); nothing compatible is `blocked` with "update
+Otzaria first", and `AutoInstallFlow` installs the app before the library.
+
+**An apply holds Otzaria's single-instance mutexes (Windows).** Otzaria checks
+`OtzariaAppSingleInstance` — a portable copy `OtzariaAppSingleInstance-<FNV-1a
+64 of its lower-cased data root>` — before touching the DB and exits, so its
+recovery cannot clear our `.applying` mid-apply. We hold both names
+(`OtzariaInstanceLock.mutexNamesFor`; vectors shared with `main.cpp`), and
+"launch Otzaria" is disabled meanwhile. Not a SQLite lock: `PatchApplier` opens
+its own connection.
+
+**Tests never see the real Otzaria data roots.** A test once installed a
+dictionary into the developer's real `%APPDATA%\otzaria\books`.
+`flutter_test_config.dart` in `library_manager` and `launcher_app` calls
+`LibraryDbLocator.sandboxForTests`: the default environment points into a temp
+dir and any touch of a real root throws. Keep both files when adding packages.
 
 **There is no backup of `seforim.db`, and no setting for one.**
 `LibraryDbRecoveryService` writes a marker (`<db>.applying`) and nothing else. A
@@ -989,8 +1014,9 @@ instead (`dev`, `78f395f3`, [issue #734](https://github.com/Otzaria/otzaria/issu
 `StartIndexing` + `ReconcileIndex` even when their "auto index update" setting is off.
 Three things about our half:
 
-- **`.otzaria-external-update.json` is our own pending marker**, not a message to
-  Otzaria. `applyUpdate` writes it next to the DB, it survives restarts,
+- **`.otzaria-external-update.json` is also our pending marker.** Otzaria reads
+  it too (contract C5): `booksTouched` after a delta, `fullReconcile: true` and
+  no `booksTouched` after a full DB. `applyUpdate` writes it next to the DB, it survives restarts,
   `pendingReindexRequest()` reads it, and `clearReindexRequest()` deletes it **only
   after the request was delivered** — clearing it on the *offer* or on a failed
   launch leaves the index on old content with nobody aware. Hence

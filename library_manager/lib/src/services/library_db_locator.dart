@@ -1,18 +1,20 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import 'library_state_store.dart';
+import 'otzaria_capabilities.dart';
 import 'otzaria_settings_reader.dart';
 
 /// מוצא את נתיב `seforim.db` של המשתמש.
 ///
 /// **סדר החיפוש**:
-/// 1. נתיב מותאם אישית ששמור מ-[LibraryStateStore] (המשתמש כבר הצביע עליו).
-/// 2. **ההגדרות של אוצריא עצמה** — `key-library-path` +
+/// 1. **ההגדרות של אוצריא עצמה** — `key-library-path` +
 ///    `key-library-folder-name` מתוך `app_preferences.hive`, בדיוק כמו
-///    `DatabaseConstants.getDatabasePath` שם. זה המקור האמיתי: משתמש שהעביר
-///    את הספרייה לכונן אחר עשה זאת *שם*, ובלי לקרוא את ההגדרה נעדכן קובץ אחר.
+///    `DatabaseConstants.getDatabasePath` שם; אחריהן `library_database_path.txt`
+///    ו-`libraryDbPath` של `otzaria_capabilities.json` בשורש הנתונים שלה.
+/// 2. נתיב מותאם אישית ששמור מ-[LibraryStateStore] (המשתמש כבר הצביע עליו).
 /// 3. ספרייה מצורפת ליד ההתקנה (חבילת FULL ב-macOS) — ראו [bundledLibraryDir].
 /// 4. ברירות המחדל של אוצריא בפלטפורמה הנוכחית — ראו [defaultDbDirs].
 /// 5. **גיבוי** בווינדוס: `C:\אוצריא\seforim.db`.
@@ -65,7 +67,57 @@ class LibraryDbLocator {
   String get _operatingSystem =>
       _operatingSystemOverride ?? Platform.operatingSystem;
   Map<String, String> get _environment =>
-      _environmentOverride ?? Platform.environment;
+      _environmentOverride ?? defaultEnvironment();
+
+  @visibleForTesting
+  static Map<String, String> Function() defaultEnvironment =
+      _platformEnvironment;
+
+  static Map<String, String> _platformEnvironment() => Platform.environment;
+
+  @visibleForTesting
+  static String legacyFallbackRoot = legacyFallbackLibraryPath;
+
+  @visibleForTesting
+  static void Function(String path)? debugPathGuard;
+
+  static String _guarded(String path) {
+    debugPathGuard?.call(path);
+    return path;
+  }
+
+  @visibleForTesting
+  static void sandboxForTests(String sandboxRoot) {
+    final real = Platform.environment;
+    final forbidden = <String>[
+      for (final key in const ['APPDATA', 'ProgramData', 'LOCALAPPDATA'])
+        if ((real[key] ?? '').isNotEmpty) p.join(real[key]!, 'otzaria'),
+      if ((real['HOME'] ?? '').isNotEmpty) ...[
+        p.join(real['HOME']!, 'Library', 'Application Support', 'otzaria'),
+        p.join(real['HOME']!, '.local', 'share', 'otzaria'),
+      ],
+      if (Platform.isMacOS)
+        p.join('/Library', 'Application Support', 'otzaria'),
+      legacyFallbackLibraryPath,
+    ];
+    final sandbox = <String, String>{
+      'APPDATA': p.join(sandboxRoot, 'Roaming'),
+      'ProgramData': p.join(sandboxRoot, 'ProgramData'),
+      'LOCALAPPDATA': p.join(sandboxRoot, 'Local'),
+      'HOME': p.join(sandboxRoot, 'home'),
+      for (final key in const ['ProgramFiles', 'ProgramFiles(x86)'])
+        if (real[key] != null) key: real[key]!,
+    };
+    defaultEnvironment = () => sandbox;
+    legacyFallbackRoot = p.join(sandboxRoot, 'legacy-otzaria');
+    debugPathGuard = (path) {
+      for (final root in forbidden) {
+        if (p.equals(root, path) || p.isWithin(root, path)) {
+          throw StateError('A test reached a real Otzaria path: $path');
+        }
+      }
+    };
+  }
 
   /// ה-context לבניית נתיבים — לפי [_operatingSystem], לא לפי המכונה המריצה,
   /// כדי שדריסת ה-OS בבדיקות תייצר נתיבים באמת בסגנון אותה פלטפורמה.
@@ -230,7 +282,7 @@ class LibraryDbLocator {
   /// ואז אין לאן לכתוב.
   Future<String?> otzariaSettingsRoot(String? launchPath) async {
     final portable = await portableDataRoot(launchPath);
-    if (portable != null) return portable;
+    if (portable != null) return _guarded(portable);
 
     final roots = _platformDataRoots(
       operatingSystem: _operatingSystem,
@@ -238,7 +290,7 @@ class LibraryDbLocator {
       guessUnknownPlatform: true,
       userOnly: true,
     );
-    return roots.isEmpty ? null : roots.first;
+    return roots.isEmpty ? null : _guarded(roots.first);
   }
 
   /// האם אוצריא הותקנה כמנהל (התקנה מערכתית) — תרגום של
@@ -292,32 +344,45 @@ class LibraryDbLocator {
   ///
   /// [includeReadOnly] מוסיף מקומות שמזהים בהם מסד קיים אבל **לא מתקינים**
   /// אליהם חדש: ספרייה מצורפת (חבילת FULL) והגיבוי הישן בווינדוס.
-  Future<List<String>> _otzariaDbCandidates({
+  Future<({List<String> current, List<String> fallbacks})>
+  _otzariaDbCandidates({
     required String? launchPath,
     required bool includeReadOnly,
   }) async {
-    final paths = <String>[];
-
-    // ההגדרה של אוצריא עצמה — המקור המוסמך כשהיא כבר רצה פעם אחת.
-    for (final root in await otzariaDataRoots(launchPath)) {
+    final current = <String>[];
+    for (final root in (await otzariaDataRoots(launchPath)).map(_guarded)) {
       final settings = await settingsReader.read(root);
       final fromSettings = settings?.resolveDbPath(
         path: _path,
         fileName: databaseFileName,
       );
-      if (fromSettings != null) paths.add(fromSettings);
+      if (fromSettings != null) current.add(fromSettings);
     }
 
+    final settingsRoot = await otzariaSettingsRoot(launchPath);
+    if (settingsRoot != null) {
+      final recordedDir = await OtzariaCapabilities.readLibraryDatabaseDir(
+        settingsRoot,
+      );
+      if (recordedDir != null) {
+        current.add(_path.join(recordedDir, databaseFileName));
+      }
+      final declared = (await OtzariaCapabilities.read(
+        settingsRoot,
+      ))?.libraryDbPath;
+      if (declared != null) current.add(declared);
+    }
+
+    final fallbacks = <String>[];
     if (includeReadOnly) {
       final bundled = await bundledLibraryDir(launchPath);
-      if (bundled != null) paths.add(_path.join(bundled, databaseFileName));
+      if (bundled != null) fallbacks.add(_path.join(bundled, databaseFileName));
     }
 
-    // התקנה ניידת ששורש הנתונים שלה ליד התוכנה, כשאוצריא עוד לא רצה שם.
     final exeDir = exeDirFor(launchPath);
     if (exeDir != null &&
         await File(_path.join(exeDir, portableMarkerFileName)).exists()) {
-      paths.add(
+      fallbacks.add(
         _path.joinAll([
           exeDir,
           portableDataFolderName,
@@ -332,49 +397,46 @@ class LibraryDbLocator {
       environment: _environment,
       systemInstall: await isSystemInstall(launchPath),
     )) {
-      paths.add(_path.join(dir, databaseFileName));
+      fallbacks.add(_path.join(dir, databaseFileName));
     }
 
     if (includeReadOnly && _operatingSystem == 'windows') {
-      paths.add(_path.join(legacyFallbackLibraryPath, databaseFileName));
+      fallbacks.add(_path.join(legacyFallbackRoot, databaseFileName));
     }
 
-    return paths;
+    return (current: current, fallbacks: fallbacks);
   }
 
   Future<String?> resolveDbPath() async {
     for (final candidate in await dbCandidates()) {
-      if (await File(candidate).exists()) return candidate;
+      if (await File(_guarded(candidate)).exists()) return candidate;
     }
     return null;
   }
 
-  Future<List<String>> dbCandidates() async {
-    final custom = await stateStore.loadCustomDbPath();
+  Future<List<String>> dbCandidates() =>
+      _orderedCandidates(includeReadOnly: true);
+
+  Future<List<String>> _orderedCandidates({
+    required bool includeReadOnly,
+  }) async {
+    final custom = await stateStore.loadCustomDbChoice();
+    final otzaria = await _otzariaDbCandidates(
+      launchPath: await otzariaLaunchPath?.call(),
+      includeReadOnly: includeReadOnly,
+    );
+    final explicit = custom != null && custom.explicit;
     return [
-      if (custom != null) custom,
-      ...await _otzariaDbCandidates(
-        launchPath: await otzariaLaunchPath?.call(),
-        includeReadOnly: true,
-      ),
+      if (explicit) custom.path,
+      ...otzaria.current,
+      if (custom != null && !explicit) custom.path,
+      ...otzaria.fallbacks,
     ];
   }
 
-  /// לאן תותקן ספרייה **חדשה** כשאין עדיין מסד בשום מקום: בחירת המשתמש אם
-  /// קיימת (גם כשהקובץ עצמו עוד לא נוצר — זו בדיוק המשמעות שלה כאן), ואחרת
-  /// המיקום שאוצריא עצמה תחפש בו. `null` רק בפלטפורמה שאין לנו בה מיקום כזה.
-  ///
-  /// לא נופל לתיקיית הלאנצ'ר: הוא עשוי לרוץ מכונן נייד, ומסד שמותקן לידו
-  /// נוסע איתו ונעלם מהמחשב ברגע שנשלף.
   Future<String?> resolveInstallDbPath() async {
-    final custom = await stateStore.loadCustomDbPath();
-    if (custom != null) return custom;
-
-    final candidates = await _otzariaDbCandidates(
-      launchPath: await otzariaLaunchPath?.call(),
-      includeReadOnly: false,
-    );
-    return candidates.isEmpty ? null : candidates.first;
+    final candidates = await _orderedCandidates(includeReadOnly: false);
+    return candidates.isEmpty ? null : _guarded(candidates.first);
   }
 
   /// האם אוצריא תמצא את המסד הזה בעצמה — כלומר ההגדרה שלה או אחת מברירות
@@ -385,6 +447,9 @@ class LibraryDbLocator {
       launchPath: await otzariaLaunchPath?.call(),
       includeReadOnly: true,
     );
-    return candidates.any((candidate) => _path.equals(candidate, dbPath));
+    return [
+      ...candidates.current,
+      ...candidates.fallbacks,
+    ].any((candidate) => _path.equals(candidate, dbPath));
   }
 }

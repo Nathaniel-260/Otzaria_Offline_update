@@ -38,12 +38,14 @@ class OtzariaModuleController extends ChangeNotifier
     RunningOtzariaLocator runningLocator = const RunningOtzariaLocator(),
     Future<String?> Function()? pendingLaunchUri,
     Future<void> Function()? onLaunchUriDelivered,
+    bool Function()? isLibraryApplying,
     OtzariaLauncher launcher = const OtzariaLauncher(),
     OtzariaProcessCloser? processCloser,
     OtzariaTargetPlatform? platform,
   })  : _preferPrerelease = preferPrerelease,
         _pendingLaunchUri = pendingLaunchUri,
         _onLaunchUriDelivered = onLaunchUriDelivered,
+        _isLibraryApplying = isLibraryApplying,
         _runningLocator = runningLocator,
         _processCloser =
             processCloser ?? OtzariaProcessCloser(locator: runningLocator),
@@ -63,6 +65,9 @@ class OtzariaModuleController extends ChangeNotifier
   /// הספרייה, והמסירה לקובץ ההרצה — כאן.
   final Future<String?> Function()? _pendingLaunchUri;
   final Future<void> Function()? _onLaunchUriDelivered;
+  final bool Function()? _isLibraryApplying;
+
+  bool get libraryApplyActive => _isLibraryApplying?.call() ?? false;
 
   /// אותו locator שה-manager מקבל — נשמר גם כאן כדי ש-[refreshRunningState]
   /// תוכל לבדוק "אוצריא פתוחה?" לבד, בלי בדיקת גרסאות שלמה.
@@ -156,7 +161,7 @@ class OtzariaModuleController extends ChangeNotifier
   OtzariaRelease? get onlineLatestRelease =>
       onlineChannels?.select(preferPrerelease: preferPrerelease);
 
-  bool get canLaunch => currentVersion != null;
+  bool get canLaunch => currentVersion != null && !libraryApplyActive;
 
   /// התיקייה שלצד התוכנה שממנה מותקנת/מתעדכנת אוצריא — המקור היחיד.
   String get mirrorDir => _manager.mirrorDir;
@@ -473,6 +478,7 @@ class OtzariaModuleController extends ChangeNotifier
   }
 
   Future<void> launch() async {
+    if (_refuseWhileLibraryApplies()) return;
     if (errorMessage != null && status != OtzariaModuleStatus.error) {
       errorMessage = null;
       notifyListeners();
@@ -497,6 +503,7 @@ class OtzariaModuleController extends ChangeNotifier
   ///
   /// `false` = לא היה למי למסור (למשל לא זוהתה התקנה); הסיבה ב-[errorMessage].
   Future<bool> requestLibraryReindex() async {
+    if (_refuseWhileLibraryApplies()) return false;
     try {
       await _manager.requestLibraryReindex();
       if (!isRunning) {
@@ -510,6 +517,13 @@ class OtzariaModuleController extends ChangeNotifier
       notifyListeners();
       return false;
     }
+  }
+
+  bool _refuseWhileLibraryApplies() {
+    if (!libraryApplyActive) return false;
+    noticeMessage = AppL10n.strings.home.libraryApplyActive;
+    notifyListeners();
+    return true;
   }
 
   @override

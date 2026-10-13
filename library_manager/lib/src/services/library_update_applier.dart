@@ -114,8 +114,10 @@ class LibraryUpdateApplier {
     ZstdFileStreamer? streamFile,
     Future<Uint8List?> Function(Uint8List compressed)? decompress,
     int? Function(String path)? freeBytesFor,
+    bool Function(String path)? isFatVolume,
   }) : _processGuard = processGuard,
        _freeBytesFor = freeBytesFor ?? DiskSpaceProbe.freeBytesFor,
+       _isFatVolume = isFatVolume ?? DiskSpaceProbe.isKnownFat,
        _recovery = recovery,
        _verifyExtractedDb = verifyExtractedDb ?? _defaultExtractedDbVerifier,
        _streamFile = streamFile ?? ZstdFileDecompressor.decompressFileToFile,
@@ -128,6 +130,7 @@ class LibraryUpdateApplier {
   final ExtractedDbVerifier _verifyExtractedDb;
   final ZstdFileStreamer _streamFile;
   final int? Function(String path) _freeBytesFor;
+  final bool Function(String path) _isFatVolume;
   final PatchDownloader _downloader;
 
   /// שם קובץ ה-hint לסך-הבתים של אימות ה-hash — ראו [applyDelta].
@@ -193,6 +196,8 @@ class LibraryUpdateApplier {
       }
 
       if (i > 0) await _guardOtzariaNotRunning();
+
+      _ensureDeltaStepFits(dbPath, url, patchFile);
 
       final patchPath = await _fetchPatch(
         patchFile: patchFile,
@@ -301,6 +306,9 @@ class LibraryUpdateApplier {
         isCancelled: isCancelled,
       );
       if (extracted != null) return extracted;
+      throw LibraryApplyException(
+        AppL10n.strings.libraryDomain.patchNeedsNativeZstd,
+      );
     }
     return _downloader.downloadAndExtract(
       patchFile: patchFile,
@@ -842,9 +850,17 @@ class LibraryUpdateApplier {
     );
   }
 
+  void _ensureDeltaStepFits(String dbPath, String url, PatchFileEntry patch) {
+    final dir = p.dirname(dbPath);
+    final download = PatchDownloader.isRemoteUrl(url) ? patch.size : 0;
+    _ensureSpaceFor(dir, download + 2 * patch.uncompressedSize);
+    final dbSize = File(dbPath).existsSync() ? File(dbPath).lengthSync() : 0;
+    _ensureFileFitsVolume(dir, dbSize + patch.uncompressedSize);
+  }
+
   void _ensureFileFitsVolume(String dir, int fileSize) {
     if (fileSize <= DiskSpaceProbe.fatMaxFileBytes) return;
-    if (!DiskSpaceProbe.isKnownFat(dir)) return;
+    if (!_isFatVolume(dir)) return;
     throw LibraryApplyException(
       AppL10n.strings.libraryDomain.fileTooLargeForVolume(dir),
     );
