@@ -190,7 +190,6 @@ final _hebrewLetter = RegExp(r'[֐-׿]');
 ({List<_Literal> offenders, int filesScanned}) _scan(Directory root) {
   // `otzaria_l10n/lib` אינו ברשימה — הוא היעד, לא העבירה.
   const scanned = [
-    'lib',
     'launcher_app/lib',
     'library_manager/lib',
     'otzaria_manager/lib',

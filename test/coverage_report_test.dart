@@ -55,10 +55,10 @@ void main() {
     final temporary =
         await Directory.systemTemp.createTemp('coverage-foreign-');
     addTearDown(() => temporary.delete(recursive: true));
-    await Directory.fromUri(temporary.uri.resolve('lib/'))
+    await Directory.fromUri(temporary.uri.resolve('library_manager/lib/'))
         .create(recursive: true);
-    final report =
-        File.fromUri(temporary.uri.resolve('build/coverage/lcov.info'));
+    final report = File.fromUri(
+        temporary.uri.resolve('library_manager/build/coverage/lcov.info'));
     await report.parent.create(recursive: true);
     await report.writeAsString(
         r'SF:Q:\elsewhere\lib\example.dart' '\nDA:1,1\nend_of_record\n');
@@ -66,7 +66,7 @@ void main() {
         'dart',
         [
           File('tool/coverage.dart').absolute.path,
-          '--packages=.',
+          '--packages=library_manager',
           '--target=0'
         ],
         workingDirectory: temporary.path,
@@ -107,9 +107,7 @@ void main() {
       final temporary = await Directory.systemTemp.createTemp('coverage-gate-');
       addTearDown(() => temporary.delete(recursive: true));
       for (final package in coverage.packages.keys) {
-        final directory = package == '.'
-            ? temporary
-            : Directory.fromUri(temporary.uri.resolve('$package/'));
+        final directory = Directory.fromUri(temporary.uri.resolve('$package/'));
         final lib = Directory.fromUri(directory.uri.resolve('lib/'));
         await lib.create(recursive: true);
         final report =
@@ -133,8 +131,8 @@ void main() {
       final json = jsonDecode(await File.fromUri(
               temporary.uri.resolve('build/coverage/summary.json'))
           .readAsString()) as Map;
-      expect(json['packages'], hasLength(9));
-      expect(json['total']['found'], 90);
+      expect(json['packages'], hasLength(8));
+      expect(json['total']['found'], 80);
       expect(json['total']['percent'], greaterThan(80));
       expect(json['minimumPerPackage'], 60);
       expect(json['targetOverall'], 80);
@@ -144,10 +142,8 @@ void main() {
   test('coverage CLI measures only the packages it was asked for', () async {
     final temporary = await Directory.systemTemp.createTemp('coverage-subset-');
     addTearDown(() => temporary.delete(recursive: true));
-    for (final package in ['.', 'launcher_app']) {
-      final directory = package == '.'
-          ? temporary
-          : Directory.fromUri(temporary.uri.resolve('$package/'));
+    for (final package in ['library_manager', 'launcher_app']) {
+      final directory = Directory.fromUri(temporary.uri.resolve('$package/'));
       await Directory.fromUri(directory.uri.resolve('lib/'))
           .create(recursive: true);
       final report =
@@ -156,15 +152,20 @@ void main() {
       await report.writeAsString(
           'SF:lib/example.dart\nDA:1,1\nDA:2,1\nend_of_record\n');
     }
-    final result = await Process.run('dart',
-        [File('tool/coverage.dart').absolute.path, '--packages=launcher_app,.'],
-        workingDirectory: temporary.path, runInShell: Platform.isWindows);
+    final result = await Process.run(
+        'dart',
+        [
+          File('tool/coverage.dart').absolute.path,
+          '--packages=launcher_app,library_manager'
+        ],
+        workingDirectory: temporary.path,
+        runInShell: Platform.isWindows);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     final json = jsonDecode(
         await File.fromUri(temporary.uri.resolve('build/coverage/summary.json'))
             .readAsString()) as Map;
     expect([for (final row in json['packages'] as List) row['package']],
-        ['.', 'launcher_app']);
+        ['library_manager', 'launcher_app']);
     expect(json['total']['found'], 4);
   });
 

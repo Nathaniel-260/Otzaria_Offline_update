@@ -156,8 +156,8 @@ void main() {
       _setReadOnly(crashed, true);
       try {
         final fromHealthCheck = thrownBy(
-          () =>
-              const LibraryDbRecoveryService().checkDbHealthAfterCrash(crashed),
+          () => const OfflineLibraryDbRecoveryService()
+              .checkDbHealthAfterCrash(crashed),
         );
         expect(
           fromHealthCheck,
@@ -1096,6 +1096,7 @@ void _writeMirror(Directory tempDir, {required List<_MirrorRelease> releases}) {
           'toVersion': patch.to,
           'fromSchemaVersion': patch.fromSchema,
           'toSchemaVersion': patch.toSchema,
+          if (patch.toSchema >= 4) 'patchFormatVersion': 4,
           'fromContentHash': 'from${patch.from}',
           'toContentHash': 'to${patch.to}',
           'patchFiles': [

@@ -3,7 +3,8 @@
 // ignore_for_file: avoid_print — כלי CLI אבחוני; ההדפסה היא הפלט המיועד שלו.
 import 'dart:io';
 
-import 'package:seforim_library_updater/src/services/logical_content_hasher.dart';
+import 'package:seforim_library_updater/seforim_library_updater.dart'
+    show LogicalContentHasher, kHashTableOrder;
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 void main(List<String> args) {
@@ -45,7 +46,8 @@ void main(List<String> args) {
     final db = sqlite3.sqlite3.open(path, mode: sqlite3.OpenMode.readOnly);
     var bytes = 0;
     final sw = Stopwatch()..start();
-    final hash = hasher.compute(db, onProgress: (b) => bytes = b);
+    final hash = hasher.compute(db,
+        tableOrder: kHashTableOrder, onProgress: (b) => bytes = b);
     sw.stop();
     db.close();
     final mb = bytes / (1 << 20);

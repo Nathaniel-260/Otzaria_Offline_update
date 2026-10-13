@@ -16,8 +16,9 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # TODO: path זמני — יוחלף ב-git ref של Otzaria/otzaria_library_updater.
   seforim_library_updater:
-    path: ../
+    path: ../../../otzaria_library_updater
   otzaria_l10n:
     path: ../otzaria_l10n
   otzaria_manager:

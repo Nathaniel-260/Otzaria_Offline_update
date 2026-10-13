@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 const packages = <String, bool>{
-  '.': true,
   'otzaria_downloads': false,
   'otzaria_l10n': false,
   'otzaria_manager': false,
@@ -150,7 +149,7 @@ Future<void> main(List<String> args) async {
       selectedArgs.length > 1 ||
       !packages.keys.toSet().containsAll(selected)) {
     stderr.writeln('dart tool/coverage.dart [--collect] [--min=60] '
-        '[--target=80] [--packages=.,launcher_app]');
+        '[--target=80] [--packages=library_manager,launcher_app]');
     exitCode = 64;
     return;
   }
@@ -170,9 +169,7 @@ Future<void> main(List<String> args) async {
   var failed = false;
   for (final entry
       in packages.entries.where((entry) => selected.contains(entry.key))) {
-    final directory = entry.key == '.'
-        ? root
-        : Directory.fromUri(root.uri.resolve('${entry.key}/'));
+    final directory = Directory.fromUri(root.uri.resolve('${entry.key}/'));
     if (args.contains('--collect')) await collect(directory, entry.value);
     final report =
         File.fromUri(directory.uri.resolve('build/coverage/lcov.info'));

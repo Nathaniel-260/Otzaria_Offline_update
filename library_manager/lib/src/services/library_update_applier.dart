@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
+import 'library_updater_l10n.dart';
 import 'otzaria_process_guard.dart';
 import 'zstd_decompressor.dart';
 import 'zstd_file_decompressor.dart';
@@ -107,7 +108,8 @@ typedef ExtractedDbVerifier =
 class LibraryUpdateApplier {
   LibraryUpdateApplier({
     OtzariaProcessGuard processGuard = const OtzariaProcessGuard(),
-    LibraryDbRecoveryService recovery = const LibraryDbRecoveryService(),
+    OfflineLibraryDbRecoveryService recovery =
+        const OfflineLibraryDbRecoveryService(),
     ExtractedDbVerifier? verifyExtractedDb,
     ZstdFileStreamer? streamFile,
     Future<Uint8List?> Function(Uint8List compressed)? decompress,
@@ -122,7 +124,7 @@ class LibraryUpdateApplier {
        );
 
   final OtzariaProcessGuard _processGuard;
-  final LibraryDbRecoveryService _recovery;
+  final OfflineLibraryDbRecoveryService _recovery;
   final ExtractedDbVerifier _verifyExtractedDb;
   final ZstdFileStreamer _streamFile;
   final int? Function(String path) _freeBytesFor;
@@ -595,7 +597,6 @@ class LibraryUpdateApplier {
     final dbAlreadyExists = File(dbPath).existsSync();
     final markerPreexisted = File(_recovery.markerPathFor(dbPath)).existsSync();
     if (dbAlreadyExists) {
-      // סימון בלבד — אין גיבוי של המסד, ראו [LibraryDbRecoveryService].
       try {
         await _recovery.beginApply(
           dbPath: dbPath,
@@ -909,6 +910,7 @@ PatchApplyResult _applyPatchInIsolate(
   (String, String, DeltaManifest, AppLanguage, int?, SendPort, bool, bool) args,
 ) {
   AppL10n.use(args.$4);
+  useLibraryUpdaterL10n();
   const applier = PatchApplier();
   return applier.apply(
     dbPath: args.$1,
@@ -927,6 +929,7 @@ PatchApplyResult _applyPatchInIsolate(
 /// מחליף את המסד החי. top-level מאותה סיבה כמו [_applyPatchInIsolate].
 void _verifyExtractedDbInIsolate((String, int?, AppLanguage, SendPort) args) {
   AppL10n.use(args.$3);
+  useLibraryUpdaterL10n();
   final stagePort = args.$4;
   // `quick_check` סורק את הקובץ כולו ולוקח דקות על מסד מלא — האמירה מה
   // נבדק היא ההבדל בין "מוודא תקינות..." שנתקע לבין שלב מובן.

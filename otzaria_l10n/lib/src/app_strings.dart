@@ -1277,6 +1277,26 @@ abstract class LibraryDomainStrings {
   String localSourceNotFound(String url);
   String localFileSizeMismatch(int expected, int actual, String url);
   String localFileHashMismatch(String url);
+  String get manifestMissingPatchFormatVersion;
+  String manifestInvalidOptionalField(String key);
+  String manifestInvalidHashMap(String key);
+  String splitManifestDownloadFailed(String name, int statusCode);
+  String get interruptedUpdateWithoutBackup;
+  String get interruptedUpdateRestored;
+  String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema);
+  String planSchemaBarrierNeedsFullDownload(int schemaVersion);
+  String planDeltaNeedsAppUpdate(
+    int latestVersion,
+    int supportedSchema,
+    int supportedPatchFormat,
+  );
+  String planHeavyDelta(String deltaSize, String localDbSize);
+  String tableHashMismatch(String tables);
+  String patchOpenFailed(String path, String detail);
+  String get networkInterrupted;
+  String get deletePreviousArchiveFailed;
+  String joinedArchiveSizeMismatch(int written, int expected);
+  String get joinedArchiveHashMismatch;
 
   // library_manager
   String get mirrorMissing;
