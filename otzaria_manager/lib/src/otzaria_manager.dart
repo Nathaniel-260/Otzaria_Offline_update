@@ -47,6 +47,36 @@ import 'services/windows_install_registry.dart';
 /// }
 /// ```
 class OtzariaManager {
+  static Map<String, String> Function() defaultEnvironment =
+      _platformEnvironment;
+
+  static Map<String, String> _platformEnvironment() => Platform.environment;
+
+  static void sandboxForTests(String sandboxRoot) {
+    final real = Platform.environment;
+    final forbidden = [
+      for (final key in const ['APPDATA', 'LOCALAPPDATA', 'ProgramData'])
+        if ((real[key] ?? '').isNotEmpty) p.join(real[key]!, 'otzaria'),
+      if ((real['HOME'] ?? '').isNotEmpty)
+        p.join(real['HOME']!, 'Library', 'Application Support', 'otzaria'),
+    ];
+    final sandbox = {
+      'APPDATA': p.join(sandboxRoot, 'Roaming'),
+      'LOCALAPPDATA': p.join(sandboxRoot, 'Local'),
+      'HOME': p.join(sandboxRoot, 'home'),
+      for (final key in const ['ProgramFiles', 'ProgramFiles(x86)'])
+        if (real[key] != null) key: real[key]!,
+    };
+    defaultEnvironment = () => sandbox;
+    OtzariaCapabilities.debugPathGuard = (path) {
+      for (final root in forbidden) {
+        if (p.equals(root, path) || p.isWithin(root, path)) {
+          throw AssertionError('A test reached a real Otzaria path: $path');
+        }
+      }
+    };
+  }
+
   OtzariaManager({
     required String dataDir,
 
@@ -65,7 +95,7 @@ class OtzariaManager {
     this.preferPrerelease = false,
   })  : _platform =
             platform ?? OtzariaTargetPlatform.detect(Platform.operatingSystem),
-        _environment = environment ?? Platform.environment,
+        _environment = environment ?? defaultEnvironment(),
         _machineArchOverride = machineArch,
         _exeArchOf = exeArchOf ?? WindowsArch.ofExecutable,
         _runningLocator = runningLocator,

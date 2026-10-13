@@ -6,6 +6,8 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/sandbox.dart';
+
 /// exe של מערכת עם version resource — התחליף ל-otzaria.exe אמיתי בבדיקות
 /// הזיהוי האוטומטי (בלי version resource הזיהוי מחזיר null בכוונה).
 const String _systemExe = r'C:\Windows\System32\notepad.exe';
@@ -30,6 +32,8 @@ OtzariaRelease _release(String tag, {required bool isPrerelease}) =>
     );
 
 void main() {
+  sandboxRealDataRoot();
+
   late Directory dataDir;
 
   setUp(() async {

@@ -4,7 +4,11 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/sandbox.dart';
+
 void main() {
+  sandboxRealDataRoot();
+
   late Directory root;
 
   setUp(() async {

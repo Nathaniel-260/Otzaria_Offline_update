@@ -5,7 +5,11 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/sandbox.dart';
+
 void main() {
+  sandboxRealDataRoot();
+
   group('versionFromDisk', () {
     test('מפענח hotfix מקוד הגרסה שב-build', () {
       expect(

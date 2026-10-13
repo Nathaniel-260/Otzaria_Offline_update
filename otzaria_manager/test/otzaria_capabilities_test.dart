@@ -4,6 +4,8 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/sandbox.dart';
+
 void main() {
   late Directory temp;
 
@@ -57,5 +59,24 @@ void main() {
     expect(caps?.appVersion, isNull);
     expect(caps?.exePath, isNull);
     expect(caps?.readableDbSchemaVersion, isNull);
+  });
+
+  test('בבדיקות, קריאה משורש הנתונים האמיתי של אוצריא נכשלת', () async {
+    sandboxRealDataRoot();
+    final real =
+        Platform.environment['APPDATA'] ?? Platform.environment['HOME'];
+    final root = Platform.environment['APPDATA'] != null
+        ? p.join(real!, 'otzaria')
+        : p.join(real!, 'Library', 'Application Support', 'otzaria');
+
+    await expectLater(
+      OtzariaCapabilities.read(root),
+      throwsA(isA<AssertionError>()),
+    );
+    expect(
+        OtzariaManager.defaultEnvironment()['APPDATA'],
+        isNot(
+          Platform.environment['APPDATA'],
+        ));
   });
 }

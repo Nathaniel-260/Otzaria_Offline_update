@@ -78,7 +78,10 @@ class OtzariaCapabilities {
   static String _withoutBom(String text) =>
       text.startsWith('﻿') ? text.substring(1) : text;
 
+  static void Function(String path)? debugPathGuard;
+
   static Future<OtzariaCapabilities?> read(String dataRoot) async {
+    debugPathGuard?.call(dataRoot);
     try {
       return _parse(await File(p.join(dataRoot, fileName)).readAsBytes());
     } on FileSystemException {
@@ -89,6 +92,7 @@ class OtzariaCapabilities {
   }
 
   static Future<String?> readLibraryDatabaseDir(String dataRoot) async {
+    debugPathGuard?.call(dataRoot);
     try {
       final text = _withoutBom(
         utf8.decode(
@@ -139,6 +143,7 @@ class OtzariaCapabilities {
       environment: environment,
     );
     if (root == null) return null;
+    debugPathGuard?.call(root);
     try {
       return _parse(File(p.join(root, fileName)).readAsBytesSync());
     } on FileSystemException {

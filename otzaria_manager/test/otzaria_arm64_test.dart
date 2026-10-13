@@ -8,6 +8,8 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/sandbox.dart';
+
 const _bytes = 'installer-bytes';
 
 Map<String, dynamic> _releaseJson(
@@ -54,6 +56,8 @@ Uint8List _peHeader(int machine) {
 }
 
 void main() {
+  sandboxRealDataRoot();
+
   late Directory temp;
 
   setUp(() async {
