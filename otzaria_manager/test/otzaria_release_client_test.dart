@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:otzaria_downloads/otzaria_downloads.dart'
+    show NetworkBlockedException;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:test/test.dart';
@@ -252,7 +254,7 @@ void main() {
     test('סטטוס לא תקין הופך ל-GithubApiException עם ההודעה מ-l10n', () async {
       final client = OtzariaReleaseClient(
         platform: OtzariaTargetPlatform.windows,
-        httpClient: MockClient((_) async => http.Response('nope', 403)),
+        httpClient: MockClient((_) async => http.Response('nope', 500)),
       );
 
       expect(
@@ -261,10 +263,26 @@ void main() {
           isA<GithubApiException>().having(
             (e) => e.message,
             'message',
-            allOf(contains('403'), contains('Otzaria/otzaria')),
+            allOf(contains('500'), contains('Otzaria/otzaria')),
           ),
         ),
       );
+    });
+
+    test('403/418 בלי מגבלת קצב — חסימת סינון ולא "סטטוס 403"', () async {
+      for (final status in [403, 418]) {
+        final client = OtzariaReleaseClient(
+          platform: OtzariaTargetPlatform.windows,
+          httpClient: MockClient((_) async => http.Response('', status)),
+        );
+        await expectLater(
+          client.fetchChannelReleases(),
+          throwsA(
+            isA<NetworkBlockedException>()
+                .having((e) => e.statusCode, 'statusCode', status),
+          ),
+        );
+      }
     });
 
     test('רשימת releases ריקה — StateError מנוסח דרך l10n', () async {

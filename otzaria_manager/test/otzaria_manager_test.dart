@@ -1361,9 +1361,7 @@ class _FakeInstallRegistry extends WindowsInstallRegistry {
   int calls = 0;
 
   @override
-  List<String> installDirs({
-    bool Function(String displayName)? matchesDisplayName,
-  }) {
+  Future<List<String>> otzariaInstallDirs() async {
     calls++;
     return dirs;
   }

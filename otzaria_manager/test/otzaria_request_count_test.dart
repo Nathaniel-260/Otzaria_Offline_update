@@ -78,10 +78,7 @@ class _EmptyRegistry extends WindowsInstallRegistry {
   const _EmptyRegistry();
 
   @override
-  List<String> installDirs({
-    bool Function(String displayName)? matchesDisplayName,
-  }) =>
-      const [];
+  Future<List<String>> otzariaInstallDirs() async => const [];
 }
 
 void main() {

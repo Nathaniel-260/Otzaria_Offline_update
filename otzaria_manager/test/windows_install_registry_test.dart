@@ -39,7 +39,7 @@ void main() {
   group('WindowsInstallRegistry — מול הרג׳יסטרי האמיתי', () {
     test(
       'רישום עם DisplayName של אוצריא — התיקייה מוחזרת',
-      () {
+      () async {
         final dir = Directory.systemTemp.createTempSync('otzaria-reg-');
         addTearDown(() => dir.deleteSync(recursive: true));
         if (!writeEntry('found', {
@@ -52,6 +52,10 @@ void main() {
 
         // הלוכסן הסופי מנורמל, בדיוק כמו שהמתקין האמיתי כותב אותו.
         expect(registry.installDirs(), contains(p.normalize(dir.path)));
+        expect(
+          await registry.otzariaInstallDirs(),
+          contains(p.normalize(dir.path)),
+        );
       },
       testOn: 'windows',
     );
@@ -235,6 +239,42 @@ void main() {
       () => expect(registry.entries(), isEmpty),
       testOn: '!windows',
     );
+  });
+
+  group('זיהוי אוצריא ברישומי ההסרה', () {
+    const key = WindowsInstallRegistry.otzariaUninstallKeyName;
+
+    test('מפתח ה-AppId של אוצריא מזהה גם בלי DisplayName מוכר', () {
+      expect(WindowsInstallRegistry.identifiesOtzaria(key, 'Setup'), isTrue);
+      expect(
+        WindowsInstallRegistry.identifiesOtzaria(key.toLowerCase(), 'x'),
+        isTrue,
+      );
+      expect(
+        WindowsInstallRegistry.identifiesOtzaria('{OTHER}_is1', 'Other'),
+        isFalse,
+      );
+      expect(
+        WindowsInstallRegistry.identifiesOtzaria('{OTHER}_is1', 'אוצריא 1.0'),
+        isTrue,
+      );
+    });
+
+    test('התיקייה מהמפתח קודמת לזו שזוהתה לפי שם', () {
+      final dirs = WindowsInstallRegistry.otzariaInstallDirsOf(const [
+        InstallRegistryEntry(
+          keyName: 'other',
+          displayName: 'אוצריא',
+          installDir: 'by-name',
+        ),
+        InstallRegistryEntry(
+          keyName: key,
+          displayName: 'אוצריא',
+          installDir: 'by-key',
+        ),
+      ]);
+      expect(dirs, ['by-key', 'by-name']);
+    });
   });
 
   group('executableOf — פקודת הסרה אינה נתיב', () {

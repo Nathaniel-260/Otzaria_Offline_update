@@ -106,6 +106,12 @@ class OtzariaModuleController extends ChangeNotifier
   String? latestVersion;
   String? errorMessage;
 
+  String? installStage;
+
+  bool _stopSetupWait = false;
+
+  void stopWaitingForSetup() => _stopSetupWait = true;
+
   /// הודעה שאינה שגיאה — "ביטלת באשף", "האשף עוד פתוח". נפרדת מ-
   /// [errorMessage] כדי שהממשק לא יצבע בחירה של המשתמש כתקלה אדומה.
   String? noticeMessage;
@@ -162,6 +168,8 @@ class OtzariaModuleController extends ChangeNotifier
       onlineChannels?.select(preferPrerelease: preferPrerelease);
 
   bool get canLaunch => currentVersion != null && !libraryApplyActive;
+
+  bool get elevatedAsOtherUser => _manager.elevatedAsOtherUser;
 
   /// התיקייה שלצד התוכנה שממנה מותקנת/מתעדכנת אוצריא — המקור היחיד.
   String get mirrorDir => _manager.mirrorDir;
@@ -260,9 +268,22 @@ class OtzariaModuleController extends ChangeNotifier
     return inFlight.then((_) => _runningProbe ??= _probeRunning());
   }
 
+  Object? _loggedProbeFailure;
+
+  void _noteProbeFailure() {
+    final failure = RunningOtzariaLocator.lastProbeFailure;
+    if (failure != null && failure != _loggedProbeFailure) {
+      AppLogger.maybeInstance?.warn(
+        'בדיקת "אוצריא פתוחה?" נכשלה ונחשבת "סגורה": $failure',
+      );
+    }
+    _loggedProbeFailure = failure;
+  }
+
   Future<bool> _probeRunning() async {
     try {
       final probe = await _runningLocator.probe();
+      _noteProbeFailure();
       if (isDisposed) return probe.isRunning;
       final changed = isRunning != probe.isRunning;
       isRunning = probe.isRunning;
@@ -403,8 +424,10 @@ class OtzariaModuleController extends ChangeNotifier
       stableVersion = check.stableRelease?.tagName;
       prereleaseVersion = check.prereleaseRelease?.tagName;
       hasChannelChoice = check.hasChannelChoice;
-      hasStaleFullPackage = check.hasStaleFullPackage;
+      hasStaleFullPackage =
+          check.hasStaleFullPackage || check.mirrorLacksArchitectures;
       isRunning = check.isOtzariaRunning;
+      _noteProbeFailure();
       status = switch (check) {
         _ when check.needsDownload => OtzariaModuleStatus.needsDownload,
         _ when check.installedIsNewer => OtzariaModuleStatus.installedIsNewer,
@@ -433,6 +456,7 @@ class OtzariaModuleController extends ChangeNotifier
     if (check == null) return;
 
     _installing = true;
+    _stopSetupWait = false;
     _recheckAfterInstall = false;
     status = OtzariaModuleStatus.installing;
     needsElevation = false;
@@ -446,7 +470,15 @@ class OtzariaModuleController extends ChangeNotifier
 
     var recheck = false;
     try {
-      final state = await _manager.update(check, useWizard: useWizard);
+      final state = await _manager.update(
+        check,
+        useWizard: useWizard,
+        onSetupContinuesElsewhere: () {
+          installStage = AppL10n.strings.appDomain.setupContinuesElsewhere;
+          if (!isDisposed) notifyListeners();
+        },
+        isWaitCancelled: () => _stopSetupWait || isDisposed,
+      );
       currentVersion = state.installedTagName;
       status = OtzariaModuleStatus.upToDate;
       AppLogger.instance.info('התקנת אוצריא הסתיימה בהצלחה');
@@ -467,6 +499,7 @@ class OtzariaModuleController extends ChangeNotifier
       AppLogger.instance.error('התקנת אוצריא נכשלה', e, st);
     } finally {
       _installing = false;
+      installStage = null;
       _manager.preferPrerelease = _preferPrerelease;
     }
     if (recheck || _recheckAfterInstall) {

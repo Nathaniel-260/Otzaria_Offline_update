@@ -223,7 +223,7 @@ class CustomAppsController extends ChangeNotifier
   Future<String?> _findRunningProcess(String exeName) =>
       _detectionSnapshot.runningProcess(exeName);
 
-  List<String> _lookupUninstallDirs(RegExp displayName) =>
+  Future<List<String>> _lookupUninstallDirs(RegExp displayName) =>
       _detectionSnapshot.uninstallDirs(displayName);
 
   /// **כל** רישומי ההסרה, בלי סינון — זה מה שהופך צילום לפני/אחרי לאפשרי.
@@ -233,9 +233,8 @@ class CustomAppsController extends ChangeNotifier
   static Future<List<UninstallEntry>> _uninstallEntries() async {
     try {
       return [
-        for (final entry in const WindowsInstallRegistry().entries(
-          matchesDisplayName: _any,
-        ))
+        for (final entry in await const WindowsInstallRegistry()
+            .entriesOffUiIsolate(matchesDisplayName: _any))
           UninstallEntry(
             keyName: entry.keyName,
             displayName: entry.displayName,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -14,7 +15,9 @@ typedef AppVersionReader = String? Function(String exePath);
 
 /// מחזיר תיקיות התקנה שרשומות ברג'יסטרי ההסרה של ווינדוס ושה-`DisplayName`
 /// שלהן תואם לתבנית. גם הוא מוזרק — מאותה סיבה.
-typedef UninstallDirLookup = List<String> Function(RegExp displayName);
+typedef UninstallDirLookup = FutureOr<List<String>> Function(
+  RegExp displayName,
+);
 
 /// מחזיר את נתיב ההרצה של תהליך שרץ **כרגע** ושמו [exeName], או `null`.
 ///
@@ -68,7 +71,7 @@ class CustomAppLocator {
       }
     }
 
-    for (final dir in _candidateDirs(descriptor, learnedDirs)) {
+    await for (final dir in _candidateDirs(descriptor, learnedDirs)) {
       final found = await _findExeIn(dir, exeName);
       if (found != null) return _stateAt(found);
     }
@@ -94,21 +97,24 @@ class CustomAppLocator {
   /// המיקומים הנלמדים קודמים לרג'יסטרי: תיקייה שכבר נמצאה בכמה מחשבים
   /// היא תצפית שהתאמתה, בעוד שהרג'יסטרי הוא רישום שהמתקין כתב (ועדיין
   /// טוב בהרבה מהתיקייה שהמשתמש הקליד בטופס).
-  Iterable<String> _candidateDirs(
+  Stream<String> _candidateDirs(
     AppDescriptor descriptor,
     List<String> learnedDirs,
-  ) sync* {
-    yield* learnedDirs;
+  ) async* {
+    yield* Stream.fromIterable(learnedDirs);
 
     // ⚠️ ההידור עובר דרך `compile` ולא דרך `RegExp(...)` ישיר: תבנית פגומה
     // ב-`descriptor.json` הייתה זורקת כאן, ה-throw נבלע במעלה הזרם, והתוצאה
     // היא תוכנה שמדווחת "אינה מותקנת" לנצח בלי שום סימן שמשהו נשבר.
     final pattern = RegistryDisplayNamePattern.compile(
-        descriptor.detect.registryDisplayName);
+      descriptor.detect.registryDisplayName,
+    );
     final lookup = lookupUninstallDirs;
-    if (pattern != null && lookup != null) yield* lookup(pattern);
+    if (pattern != null && lookup != null) {
+      yield* Stream.fromIterable(await lookup(pattern));
+    }
     if (descriptor.installDir case final dir? when dir.isNotEmpty) yield dir;
-    yield* descriptor.detect.dirs;
+    yield* Stream.fromIterable(descriptor.detect.dirs);
   }
 
   /// חיפוש לרוחב אחרי [exeName] תחת [root], עד [_maxDepth].

@@ -530,6 +530,16 @@ The library is never skipped in personal-update mode, where the target comes fro
 the recorded DB version. The skip is announced in a snackbar; a silent one produced
 the "why did it not download the plugins" confusion.
 
+**Filtered networks get their own messages and NetFree's CA.** A filter answers
+418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
+handshake dump. `otzaria_downloads` maps them to `NetworkBlockedException` /
+`NetworkCertificateException` (`githubGet` maps 418 only, since its callers read
+403 themselves; `downloadFile` maps 418 only, since a 403 there is usually an
+expired signed URL; `OtzariaReleaseClient` maps both), and `main.dart`
+loads `assets/ca/*.pem` (copied from Otzaria) into
+`SecurityContext.defaultContext` — the one context every client in the UI
+isolate uses, `library_manager`'s included — before the first frame.
+
 **The library's light check covers the companions, not just the DB version.**
 They download only inside the library download, which `skipLibrary` skipped whenever
 the mirror's DB matched the latest online — so a drive that once missed the Talmud
@@ -1099,7 +1109,8 @@ saved click. `HomeScreen._confirmAppInstall` offers both when
 
 **When the *user* installs, Otzaria's own wizard opens**
 (`update(check, useWizard: true)` → `OtzariaInstaller.installWithWizard`, no flags
-but `/LOG=`). Its two pages carry
+but `/LOG=`, `/NOLAUNCH=1` and, from an elevated launcher, `/CURRENTUSER`). Its two
+pages carry
 decisions only the person at the machine can make: which folder, and whether to
 create a desktop shortcut. `/VERYSILENT` deleted both pages — that is what the report
 "it didn't open the installer's dialog and made no shortcut" was. Do not "fix" it back
@@ -1114,8 +1125,10 @@ The dir we passed also **outranks detection** when deciding what got installed; 
 if no executable is there does detection answer.
 
 **Auto-install stays silent** (`AutoInstallFlow.run` passes `useWizard: false`): a
-wizard waiting for a click is not "install by itself", and that is the only path where
-`/MERGETASKS=desktopicon` still does anything.
+wizard waiting for a click is not "install by itself". `/MERGETASKS=desktopicon` goes
+only with a *fresh* silent install (`installDir == null`): `otzaria.iss` sets
+`UsePreviousTasks=no`, so sending it on every update recreated a shortcut the user
+had deleted.
 
 **A silent update must keep the install's scope.** Under `WizardSilent`,
 `otzaria.iss` returns from `InitializeSetup` before any scope detection, and its
@@ -1136,6 +1149,20 @@ both after relaunching itself (elevated, or silent for a 0.9.88+ upgrade) and af
 user refused UAC. So after exit 1 the exe that was in `installDir` counts as the update
 only once it changed (version, size or timestamp); an untouched exe, including a
 reinstall of the same build, ends as `OtzariaWizardStillOpen`, never as "installed".
+The relaunched setup is the same `{srcexe}`, so after exit 1 the installer waits for
+a process with that image path to exit (`RunningOtzariaLocator.waitForImageToExit`,
+up to `relaunchedSetupTimeout`, stoppable from the app screen; matched by image name,
+so another user's elevated setup still counts) and shows `setupContinuesElsewhere`; it used to give
+up after 20s while the silent upgrade was still running. Older installers do not
+forward `/NOLAUNCH`, so Otzaria may open afterwards — the following recheck sees it.
+
+**An elevated launcher must not run Otzaria elevated or turn a per-user install
+into an all-users one.** Elevated, `otzaria.iss` relaunches an upgrade with
+`/ALLUSERS`, and `Process.start` gave Otzaria the admin token. So per-user scopes
+always pass `/CURRENTUSER`, `OtzariaLauncher` starts Otzaria with the shell's token
+(`WindowsElevation.launchUnelevated`, `CreateProcessWithTokenW`, falling back to a
+plain start), and the install dialog warns when elevated as another user, whose
+profile (`HKCU`, `%LOCALAPPDATA%`) is the one detection and Inno would use.
 
 **A silent install must pass `/NOLAUNCH=1`, and the library goes first.**
 `otzaria.iss` carries a *second* `[Run]` entry firing **only** under `WizardSilent`,
@@ -1184,31 +1211,27 @@ and crashed on the next thing it loaded. `OtzariaManager._refuseIfRunningOnMac` 
 signed; `unzip` / `package:archive` destroy the symlinks and xattrs, and therefore the
 signature, and macOS refuses to run it.
 
-**Process detection uses exact matching.** `OtzariaProcessGuard` looks for
-`otzaria.exe` via `tasklist` and the Hebrew process name `אוצריא` via `pgrep -x`.
-`pgrep -f` or a substring match would also match the launcher itself (its path
-contains "otzaria") and block every DB update.
-
-**Two packages match that process, and their name lists must agree.**
-`OtzariaProcessGuard` (`library_manager`) blocks DB updates while Otzaria is open;
-`RunningOtzariaLocator` (`otzaria_manager`) reads that process's *path* to learn where
-Otzaria is installed — the authoritative answer, tried before the guesses in
-`_autoDetectDirs`. The packages do not depend on each other, so
-`launcher_app/test/process_names_test.dart` asserts the two `processNamesFor` lists are
-identical; drift gives "we can see Otzaria is running, yet we cannot tell where it is
-installed". The locator answers only for the *app* directory — `seforim.db` lives under
-`%APPDATA%` regardless and stays `LibraryDbLocator`'s job.
+**"Otzaria is running" = its mutex *or* an `otzaria.exe` process, probed off the
+UI isolate.** `RunningOtzariaLocator.probe` runs in `Isolate.run`: `OpenMutexW` on
+`OtzariaAppSingleInstance` (contract C7) plus, always, one
+`CreateToolhelp32Snapshot` scan by image *name* — portable builds, Otzaria before
+0.9.96 and other users' or elevated processes hold no mutex we can see or hide
+their path. Paths are only enrichment. `tasklist` cost ~300ms per call. A total
+failure is logged (`lastProbeFailure`) and **blocks** in `OtzariaProcessGuard`
+(which keeps `pgrep -x` on macOS). Resolve `GetLastError` before `OpenMutexW` —
+its lazy lookup clobbers the error. OU's own lock sets
+`OtzariaSelfLock.isHeldByThisProcess` so its mutex is not mistaken for Otzaria.
 
 **The Windows uninstall registry beats every guess.** `WindowsInstallRegistry` reads
 `InstallLocation` from the Inno entries under `…\CurrentVersion\Uninstall` (HKCU, then
 HKLM 64- and 32-bit), so an install in a folder nobody guessed is found *with Otzaria
 closed*. Only the **directory** comes from there; the version is still read from the
 exe, because `DisplayVersion` records what the installer wrote, not what is on disk
-now. The scan costs ~200ms, so `checkForUpdate` builds `_autoDetectDirs` only when
-nothing is known yet.
+now. The scan costs ~200ms, so it runs off the UI isolate and only when nothing is
+known yet.
 
-**Only `DisplayName` identifies an entry in that registry.** Matching on
-`InstallLocation` too let any third-party program in a path merely mentioning
+**Only the uninstall key name or `DisplayName` identifies an entry in that
+registry.** Matching on `InstallLocation` too let any third-party program in a path merely mentioning
 "otzaria" into `_autoDetectDirs`, where `sharedDir: false` means no further identity
 check. Both real Inno entries write a `DisplayName` ("אוצריא גירסה …"), verified on a
 real machine. `UninstallString` is only a fallback for the *directory*, and must be
@@ -1216,22 +1239,18 @@ parsed as a command line, not a path: `MsiExec.exe /X{GUID}` through `p.dirname`
 a **relative** string, because `package:path` treats the `/switch` as a path segment.
 
 **Where a fresh Windows install goes is the installer's call, not ours.**
-`installFromFile` passes `/DIR=` only when updating an install we already know about;
-for a fresh one it passes none and finds the result through detection. This repo once
-recorded `{autopf}\Otzaria` as "the installer's real default, verified with the Otzaria
-developers (2026-08-07) — not a guess", while `installer/otzaria.iss` in
-`Otzaria/otzaria` says `DefaultDirName=C:\אוצריא`. A copied default drifts from the
-thing it copies. `_windowsRealDefaultDirs` (`{autopf}\Otzaria`,
-`%ProgramFiles%\Otzaria`, `{Program Files}\אוצריא`, `C:\אוצריא`) is a **detection**
-list only, and `resolveDefaultInstallDir()` is a Windows *display* value plus the real
-macOS target (`/Applications`, falling back to `~/Applications`) — never an install
-argument on Windows. Verify installer facts against **`Otzaria/otzaria`** (what
-`OtzariaReleaseClient` downloads); `Sivan22/otzaria` has a similar-but-different
-`installer/` folder, and reading the wrong one produces confident wrong answers. This
-is a *different* directory from where the library DB lives (`%APPDATA%\otzaria\`) —
-don't conflate them when debugging "Otzaria not detected". The manual
-"בחירת מיקום ידנית" picker (`adoptInstallDir`) is the fallback for anything the paths
-do not cover.
+`installFromFile` passes `/DIR=` only when updating an install we already know
+about; for a fresh one it passes none and finds the result through detection.
+`otzaria.iss` (in `Otzaria/otzaria`, not `Sivan22/otzaria`) sets
+`DefaultDirName={code:GetDefaultInstallDir}`: the previous install (registry,
+`C:\אוצריא`, `{autopf}\אוצריא`, `{autopf}\Otzaria`), else `{autopf}\Otzaria`. A
+copied default drifts, so `_windowsRealDefaultDirs` is a **detection** list only
+and `resolveDefaultInstallDir()` a Windows *display* value (and the real macOS
+target). Detection first matches the Inno uninstall key
+`{EEC4F712-CD05-4D15-A753-509E840A51A5}_is1`, then `DisplayName`
+(`WindowsInstallRegistry.otzariaInstallDirs`, in `Isolate.run`, memoized per
+`checkForUpdate`). The install dir is not where the DB lives
+(`%APPDATA%\otzaria\`); `adoptInstallDir` covers anything else.
 
 **Never return the first `.exe` in the install folder.** `crashpad_handler.exe` ships
 next to `otzaria.exe`, sorts before it, *and* carries its own version resource
@@ -1281,6 +1300,14 @@ download", which the UI already knows how to say. `OtzariaAppMirror` takes
 the top-level entry (the syncing platform's, for older launchers): `sync` preserves the
 other platforms' entries, and sync's prune plus `MirrorJunkSweeper` keep every file any
 platform references.
+
+**Windows installers travel for both architectures; ARM64 is never downgraded
+to x64.** The drive moves between PCs, so a Windows sync also mirrors each
+channel's `windows_arm64.exe` under `platforms.windows_arm64` (top-level entries
+stay x64 for older launchers), and records releases without one in
+`missingAssetTags`. On an ARM64 machine (`WindowsArch.machine`, IsWow64Process2 —
+the env vars lie under x64 emulation) `OtzariaManager._mirrorFor` prefers ARM64
+and falls back to x64 only when the installed exe is not ARM64 (PE header).
 
 ### 5.6 Plugins
 

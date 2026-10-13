@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
@@ -66,10 +67,40 @@ class WindowsInstallRegistry {
   /// חוצץ לקריאת ערך. נתיב התקנה לא מתקרב לזה, ומפתח חריג שכן — מדולג.
   static const int _maxValueBytes = 8192;
 
+  static const String otzariaUninstallKeyName =
+      '{EEC4F712-CD05-4D15-A753-509E840A51A5}_is1';
+
   List<String> installDirs({
     bool Function(String displayName)? matchesDisplayName,
   }) =>
       uniqueInstallDirs(_allEntries(matchesDisplayName));
+
+  Future<List<String>> otzariaInstallDirs() =>
+      Isolate.run(_scanOtzariaInstallDirs);
+
+  static List<String> _scanOtzariaInstallDirs() =>
+      otzariaInstallDirsOf(_scan(identifiesOtzaria));
+
+  static bool identifiesOtzaria(String keyName, String displayName) =>
+      _isOtzariaKey(keyName) || OtzariaAppLocator.mentionsOtzaria(displayName);
+
+  static List<String> otzariaInstallDirsOf(
+    Iterable<InstallRegistryEntry> scanned,
+  ) {
+    final entries = scanned.toList();
+    return uniqueInstallDirs([
+      ...entries.where((entry) => _isOtzariaKey(entry.keyName)),
+      ...entries.where((entry) => !_isOtzariaKey(entry.keyName)),
+    ]);
+  }
+
+  static bool _isOtzariaKey(String keyName) =>
+      keyName.toLowerCase() == otzariaUninstallKeyName.toLowerCase();
+
+  Future<List<InstallRegistryEntry>> entriesOffUiIsolate({
+    bool Function(String displayName)? matchesDisplayName,
+  }) =>
+      Isolate.run(() => entries(matchesDisplayName: matchesDisplayName));
 
   static List<String> uniqueInstallDirs(
     Iterable<InstallRegistryEntry> entries,
@@ -105,19 +136,24 @@ class WindowsInstallRegistry {
 
   Iterable<InstallRegistryEntry> _allEntries(
     bool Function(String displayName)? matchesDisplayName,
+  ) {
+    final matches = matchesDisplayName ?? OtzariaAppLocator.mentionsOtzaria;
+    return _scan((_, displayName) => matches(displayName));
+  }
+
+  static Iterable<InstallRegistryEntry> _scan(
+    bool Function(String keyName, String displayName) matches,
   ) sync* {
     if (!Platform.isWindows) return;
-
-    final matches = matchesDisplayName ?? OtzariaAppLocator.mentionsOtzaria;
     for (final root in _roots) {
       yield* _entriesUnder(root.hive, root.access, matches);
     }
   }
 
-  List<InstallRegistryEntry> _entriesUnder(
+  static List<InstallRegistryEntry> _entriesUnder(
     int hive,
     int access,
-    bool Function(String displayName) matches,
+    bool Function(String keyName, String displayName) matches,
   ) {
     final pathPtr = _uninstallKeyPath.toNativeUtf16();
     final keyPtr = calloc<IntPtr>();
@@ -136,10 +172,10 @@ class WindowsInstallRegistry {
     }
   }
 
-  List<InstallRegistryEntry> _scanSubKeys(
+  static List<InstallRegistryEntry> _scanSubKeys(
     int uninstallKey,
     int access,
-    bool Function(String displayName) matches,
+    bool Function(String keyName, String displayName) matches,
   ) {
     final found = <InstallRegistryEntry>[];
     final namePtr = calloc<Uint16>(_maxKeyNameChars).cast<Utf16>();
@@ -179,11 +215,11 @@ class WindowsInstallRegistry {
   }
 
   /// רישום הסרה בודד, או null אם ה-`DisplayName` אינו תואם (או חסר).
-  InstallRegistryEntry? _entryOf(
+  static InstallRegistryEntry? _entryOf(
     int uninstallKey,
     String subKeyName,
     int access,
-    bool Function(String displayName) matches,
+    bool Function(String keyName, String displayName) matches,
   ) {
     final namePtr = subKeyName.toNativeUtf16();
     final keyPtr = calloc<IntPtr>();
@@ -199,7 +235,9 @@ class WindowsInstallRegistry {
         // יכול להיות של תוכנה אחרת לגמרי — ומשם היא נכנסת לזיהוי האוטומטי
         // בלי שום אימות נוסף.
         final displayName = _readString(key, 'DisplayName');
-        if (displayName == null || !matches(displayName)) return null;
+        if (displayName == null || !matches(subKeyName, displayName)) {
+          return null;
+        }
 
         return InstallRegistryEntry(
           keyName: subKeyName,

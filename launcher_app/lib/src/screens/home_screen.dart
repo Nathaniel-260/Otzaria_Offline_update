@@ -193,6 +193,7 @@ class HomeScreen extends StatelessWidget {
         needsDownload: c.currentVersion == null
             ? t.appNoInstallFound
             : t.appNothingDownloaded,
+        installStage: c.installStage,
       ),
       primaryActionText: switch (c.status) {
         OtzariaModuleStatus.updateAvailable => common.install,
