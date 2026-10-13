@@ -87,6 +87,12 @@ class LibraryDbLocator {
     return path;
   }
 
+  static const String macSystemDataRoot =
+      '/Library/Application Support/otzaria';
+
+  @visibleForTesting
+  static String macSystemRoot = macSystemDataRoot;
+
   @visibleForTesting
   static void sandboxForTests(String sandboxRoot) {
     final real = Platform.environment;
@@ -97,8 +103,7 @@ class LibraryDbLocator {
         p.join(real['HOME']!, 'Library', 'Application Support', 'otzaria'),
         p.join(real['HOME']!, '.local', 'share', 'otzaria'),
       ],
-      if (Platform.isMacOS)
-        p.join('/Library', 'Application Support', 'otzaria'),
+      if (Platform.isMacOS) macSystemDataRoot,
       legacyFallbackLibraryPath,
     ];
     final sandbox = <String, String>{
@@ -111,6 +116,7 @@ class LibraryDbLocator {
     };
     defaultEnvironment = () => sandbox;
     legacyFallbackRoot = p.join(sandboxRoot, 'legacy-otzaria');
+    macSystemRoot = p.join(sandboxRoot, 'SystemLibrary', 'otzaria');
     debugPathGuard = (path) {
       for (final root in forbidden) {
         if (p.equals(root, path) || p.isWithin(root, path)) {
@@ -221,7 +227,7 @@ class LibraryDbLocator {
           'Application Support',
           'otzaria',
         ]);
-        system.add(path.join('/Library', 'Application Support', 'otzaria'));
+        system.add(macSystemRoot);
       default:
         // הלאנצ'ר לא נבנה ללינוקס, אבל הבדיקות רצות שם ב-CI.
         if (operatingSystem == 'linux' || guessUnknownPlatform) {

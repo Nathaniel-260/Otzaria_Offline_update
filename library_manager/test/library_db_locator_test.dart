@@ -608,9 +608,17 @@ void main() {
   });
 
   group('LibraryDbLocator.defaultDbDirs', () {
+    // רשימת נתיבים בלבד, בלי גישה לדיסק — מותר להשוות לנתיב המערכתי האמיתי.
+    void useRealMacSystemRoot() {
+      final sandboxed = LibraryDbLocator.macSystemRoot;
+      LibraryDbLocator.macSystemRoot = LibraryDbLocator.macSystemDataRoot;
+      addTearDown(() => LibraryDbLocator.macSystemRoot = sandboxed);
+    }
+
     // ברירות המחדל נגזרות מ-`lib/core/app_paths.dart` של אוצריא עצמה. הבדיקה
     // הזאת היא מה שיתפוס אם מישהו ישנה אותן כאן בלי לבדוק מול הקוד שם.
     test('macOS: per-user Application Support first, then system-wide', () {
+      useRealMacSystemRoot();
       final dirs = LibraryDbLocator.defaultDbDirs(
         operatingSystem: 'macos',
         environment: const {'HOME': '/Users/dov'},
@@ -623,6 +631,7 @@ void main() {
     });
 
     test('macOS: system-wide location is still offered without HOME', () {
+      useRealMacSystemRoot();
       final dirs = LibraryDbLocator.defaultDbDirs(
         operatingSystem: 'macos',
         environment: const {},
