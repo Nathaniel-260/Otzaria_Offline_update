@@ -71,6 +71,7 @@ class _WindowsMutexLease implements OtzariaInstanceLease {
     OtzariaInstanceLock._heldByThisProcess++;
   }
 
+  static const int _errorAccessDenied = 5;
   static const int _errorAlreadyExists = 183;
   static const int _synchronize = 0x00100000;
 
@@ -138,7 +139,7 @@ class _WindowsMutexLease implements OtzariaInstanceLease {
       }
       final handle = _createMutex(nullptr, 0, name);
       final error = _getLastError();
-      if (handle == 0) return 0;
+      if (handle == 0) return error == _errorAccessDenied ? null : 0;
       if (error == _errorAlreadyExists) {
         _closeHandle(handle);
         return null;
