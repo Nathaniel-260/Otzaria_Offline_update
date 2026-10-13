@@ -52,11 +52,7 @@ Widget libraryApplyProgressRow(
         stage: c.stageText ?? context.strings.libraryScreen.updatingProgress,
         progress: c.applyProgress,
         detail: formatBytesProgress(c.applyReceivedBytes, c.applyTotalBytes),
-        warning: _withEstimate(
-          context,
-          context.strings.home.doNotRemoveDriveWarning,
-          c.applyEstimateFor(),
-        ),
+        warning: context.strings.home.doNotRemoveDriveWarning,
       ),
     );
 

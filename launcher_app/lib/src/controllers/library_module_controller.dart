@@ -160,18 +160,15 @@ class LibraryModuleController extends ChangeNotifier
   /// זה להפעיל מחדש כמנהל, ולכן זה נדלק בכשל ונכבה בכל ניסיון חדש.
   bool needsElevation = false;
 
-  /// גודל ההורדה של אותה ספרייה מלאה, בבייטים — לתצוגה לפני שמאשרים.
-  /// "צפוי כ-X–Y דקות" for the plan being confirmed, or the one running.
-  ({int low, int high})? applyEstimateFor({bool fullDownload = false}) {
-    final plan = _applyingPlan ??
-        (fullDownload
+  /// "צפוי כ-X עד Y דקות" לתוכנית שמאושרת עכשיו — בדיאלוג האישור בלבד.
+  ({int low, int high})? applyEstimateFor({bool fullDownload = false}) =>
+      libraryApplyMinutes(
+        fullDownload
             ? _lastCheck?.plan?.fullDownloadFallback
-            : _lastCheck?.plan);
-    return libraryApplyMinutes(plan);
-  }
+            : _lastCheck?.plan,
+      );
 
-  LibraryUpdatePlan? _applyingPlan;
-
+  /// גודל ההורדה של אותה ספרייה מלאה, בבייטים — לתצוגה לפני שמאשרים.
   int? get fullDownloadFallbackSize =>
       _lastCheck?.plan?.fullDownloadFallback?.totalDownloadSize;
 
@@ -720,7 +717,6 @@ class LibraryModuleController extends ChangeNotifier
 
     final plan =
         useFullDownloadFallback ? check.plan?.fullDownloadFallback : check.plan;
-    _applyingPlan = plan;
     AppLogger.instance.info(
       'update() מתחיל: kind=${plan?.kind} local=${plan?.localVersion} target=${plan?.targetVersion}',
     );
@@ -772,7 +768,6 @@ class LibraryModuleController extends ChangeNotifier
         );
       } finally {
         _applying = false;
-        _applyingPlan = null;
       }
       AppLogger.instance.info(
         'החלת העדכון הסתיימה, נלווים שנכשלו=${companionFailures.length}',
@@ -891,8 +886,8 @@ class LibraryModuleController extends ChangeNotifier
   }
 }
 
-/// Measured runs spread 3–5x between machines around [ApplyTimeEstimate]'s
-/// figure (129–581s against 262s), so the range is shown, not one number.
+/// הריצות שנמדדו מתפזרות פי 3–5 סביב האומדן של [ApplyTimeEstimate]
+/// (129–581 שניות מול 262), ולכן מוצג טווח ולא מספר אחד.
 ({int low, int high})? libraryApplyMinutes(
   LibraryUpdatePlan? plan, {
   ApplyTimeEstimate estimate = const ApplyTimeEstimate(),
