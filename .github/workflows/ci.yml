@@ -65,9 +65,9 @@ jobs:
           channel: stable
           cache: true
           pub-cache-key: flutter-pub-:os:-:channel:-:version:-:arch:-:hash:-linux_checks
-      - name: seforim_library_updater
+      - name: otzaria_offline_update (root tools)
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
-        run: flutter pub get && flutter analyze --no-fatal-infos
+        run: flutter pub get && flutter analyze --no-fatal-infos && flutter test
       - name: library_manager
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: library_manager
@@ -215,7 +215,7 @@ jobs:
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: library_manager
         run: flutter pub get && flutter test
-      - name: seforim_library_updater
+      - name: otzaria_offline_update (root tools)
         if: ${{ !cancelled() && steps.flutter.outcome == 'success' }}
         working-directory: .
         run: flutter pub get && flutter test

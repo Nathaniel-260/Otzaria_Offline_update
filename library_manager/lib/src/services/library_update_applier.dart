@@ -597,7 +597,6 @@ class LibraryUpdateApplier {
     final dbAlreadyExists = File(dbPath).existsSync();
     final markerPreexisted = File(_recovery.markerPathFor(dbPath)).existsSync();
     if (dbAlreadyExists) {
-      // סימון בלבד — אין גיבוי של המסד, ראו [OfflineLibraryDbRecoveryService].
       try {
         await _recovery.beginApply(
           dbPath: dbPath,

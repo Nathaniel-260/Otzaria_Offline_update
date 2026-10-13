@@ -318,6 +318,7 @@ class LibraryManager {
     var exported = true;
     var exportFailed = false;
     final exporter = LibraryMirrorExporter(
+      supportedDbSchemaVersion: kSupportedDbSchemaVersion,
       client: _cloudClient,
       scheduler: _scheduler,
     );
@@ -367,6 +368,7 @@ class LibraryManager {
         String? tag;
         if (exported) {
           final discovery = await OfflineLibraryUpdateDiscovery(
+            supportedDbSchemaVersion: kSupportedDbSchemaVersion,
             client: await _resolveSource(),
           ).discover(allowPrerelease: allowPrerelease);
           tag = discovery.newestReleaseTag;
@@ -461,6 +463,7 @@ class LibraryManager {
 
   ({String tag, int version})? _latestOnline(List<LibraryRelease> all) =>
       OfflineLibraryUpdateDiscovery.latestOnlineRelease(
+        supportedDbSchemaVersion: kSupportedDbSchemaVersion,
         all,
         allowPrerelease: allowPrerelease,
       );
@@ -520,6 +523,7 @@ class LibraryManager {
     final source = await _resolveSource();
     final releases = await source.fetchReleases();
     final discoverer = OfflineLibraryUpdateDiscovery(
+      supportedDbSchemaVersion: kSupportedDbSchemaVersion,
       client: _FetchedReleasesSource(source, releases),
     );
     final discoveryResult = await discoverer.discover(
@@ -925,9 +929,6 @@ class LibraryManager {
         onLibraryLocationNotSet?.call(dbPath);
       }
     }
-    // רושמים מאיזה release התוכן הנוכחי הגיע, **יחד עם הגרסה** — זה מה
-    // שמאפשר לזהות בהמשך מסד מתוקן שפורסם באותו db_version, ומונע השוואה
-    // מול רישום שנעשה בגרסה אחרת (ראו OfflineLibraryUpdatePlanner).
     if (tag != null && version != null && version > 0) {
       await record(
         () => _stateStore.saveAppliedRelease(tag: tag, dbVersion: version),

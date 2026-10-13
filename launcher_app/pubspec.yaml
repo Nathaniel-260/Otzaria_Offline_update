@@ -16,8 +16,7 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  # TODO: path זמני לעותק מקומי של Otzaria/otzaria_library_updater — יוחלף
-  # ב-git ref אחרי שהענף feat/offline-update-convergence יידחף.
+  # TODO: path זמני — יוחלף ב-git ref של Otzaria/otzaria_library_updater.
   seforim_library_updater:
     path: ../../../otzaria_library_updater
   otzaria_l10n:

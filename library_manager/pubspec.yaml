@@ -12,11 +12,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # TODO: path זמני לעותק מקומי של Otzaria/otzaria_library_updater — יוחלף
-  # ב-git ref אחרי שהענף feat/offline-update-convergence יידחף.
+  # TODO: path זמני — יוחלף ב-git ref של Otzaria/otzaria_library_updater.
   seforim_library_updater:
     path: ../../../otzaria_library_updater
-  # הספריות הנייטיביות של sqlite3 ב-Flutter — הגיעו בעבר דרך חבילת השורש.
   sqlite3_flutter_libs: ^0.5.24
   otzaria_l10n:
     path: ../otzaria_l10n
