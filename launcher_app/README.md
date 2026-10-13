@@ -10,8 +10,8 @@
   `otzaria.org` אל תיקיית המראה, זיהוי התוספים המותקנים באוצריא, והתקנה
   דרך הפרוטוקול `otzaria://`.
 
-כל שלושת המודולים (וה-package הראשי `seforim_library_updater`) יושבים
-כ-packages נפרדים באותו ריפו; `launcher_app` תלוי בהם דרך `path:` יחסי
+כל שלושת המודולים יושבים כ-packages נפרדים באותו ריפו (מנוע המסד,
+`seforim_library_updater`, מגיע כתלות git מ-`Otzaria/otzaria_library_updater`); `launcher_app` תלוי בהם דרך `path:` יחסי
 (`../otzaria_manager`, `../library_manager`, `../plugins_manager`), כך
 שהוא צריך לשבת **באותה רמה** בריפו — לצדם, לא בתוכם.
 

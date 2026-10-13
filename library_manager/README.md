@@ -1,7 +1,7 @@
 # library_manager
 
 חבילת Flutter שמחווטת (wiring) את
-[`seforim_library_updater`](../README.md) אל תוך הלאנצ'ר המאוחד: איתור
+[`seforim_library_updater`](https://github.com/Otzaria/otzaria_library_updater) (מדיניות המראה: המחלקות `Offline*`) אל תוך הלאנצ'ר המאוחד: איתור
 תיקיית ה-DB בפועל של המשתמש, בדיקת גרסה מול הענן, והחלה בפועל (patch
 דלתאי או החלפת DB מלא) על ה-DB **החי** דרך [`LibraryUpdateApplier`](lib/src/services/library_update_applier.dart) —
 נבנה מחדש אחרי שהוסר עקב באג, ראו "היסטוריית התיקון" למטה.
@@ -114,8 +114,8 @@
 
 הצד השני של אותו מנגנון חי ב-`Otzaria/otzaria`, ב-`lib/library_update/`
 (`LibraryUpdateRepository`, `LibraryUpdateBloc`, `CompanionAssetsService`),
-מעל אותה חבילת מנוע בדיוק — `seforim_library_updater`, שהיא השורש של המאגר
-הזה. המנוע זהה; מה שיושר כאן (אוגוסט 2026) הוא שכבת התזמור:
+מעל אותה חבילת מנוע בדיוק — `seforim_library_updater`, שהמאגר הזה תלוי בה
+כתלות git. המנוע זהה; מה שיושר כאן (אוגוסט 2026) הוא שכבת התזמור:
 
 - **דגלי ה-apply** — `checkForeignKeys: false`, כמו
   `LibraryUpdateRepository._runApplyIsolate`. אימות ה-hash שאחרי ההחלה הוא

@@ -18,7 +18,8 @@
 
 | תיקייה | תפקיד |
 | --- | --- |
-| `/` (root), `lib/` | `seforim_library_updater` — עדכון מסד הספרים מהפצות דלתא של [`SeforimLibrary`](https://github.com/Otzaria/SeforimLibrary) |
+| `/` (root), `tool/`, `test/` | `otzaria_offline_update` — כלי המאגר: מדידת כיסוי לכל החבילות וכלי מדידה של ה-hash הלוגי |
+| [`otzaria_downloads/`](otzaria_downloads) | הורדות עם המשך, לקוח GitHub משותף, והרמת הרשאות בווינדוס |
 | [`otzaria_manager/`](otzaria_manager) | התקנה, עדכון והפעלה של אפליקציית אוצריא עצמה |
 | [`library_manager/`](library_manager) | חיווט עדכון המסד (`seforim.db`) לתוך הלאנצ'ר |
 | [`plugins_manager/`](plugins_manager) | חנות התוספים האופליינית: סנכרון הקטלוג מ-`otzaria.org` והתקנה דרך `otzaria://` |
@@ -26,13 +27,15 @@
 | [`error_reports_manager/`](error_reports_manager) | איסוף דיווחי טעויות במחשב הלא־מקוון והעלאתם ממחשב מקוון |
 | [`otzaria_l10n/`](otzaria_l10n) | מחרוזות ממשק (עברית ואנגלית) |
 | [`launcher_app/`](launcher_app) | אפליקציית Flutter לדסקטופ שמחברת את כל המודולים לדשבורד אחד |
-| `tool/`, `test/` | סקריפטי עזר ובדיקות של ה-package הראשי |
 
 `launcher_app` תלוי בשאר ה-packages דרך `path:` יחסי, ולכן הם חייבים לשבת באותה רמה בריפו.
+מנוע עדכון המסד אינו בריפו הזה (למטה).
 
-## ה-package הראשי: `seforim_library_updater`
+## מנוע עדכון המסד: `seforim_library_updater`
 
-חבילת Flutter שהיא **צד הלקוח** של פורמט ההפצה של `SeforimLibrary`. היא:
+החבילה של [`Otzaria/otzaria_library_updater`](https://github.com/Otzaria/otzaria_library_updater) — אותה חבילה שאוצריא עצמה מתעדכנת דרכה ברשת. `library_manager`, `launcher_app` וכלי השורש תלויים בה כתלות git מוצמדת. מדיניות המראה (אופליין) היא המחלקות `Offline*` שבה; שינויים במנוע נעשים שם.
+
+זו חבילת Flutter שהיא **צד הלקוח** של פורמט ההפצה של `SeforimLibrary`. היא:
 
 - מגלה גרסאות ב-GitHub Releases ובוחרת מסלול עדכון — דלתא או הורדה מלאה.
 - מורידה ומאמתת קובצי `patch-vX-vY.db.zst`.
@@ -69,10 +72,11 @@ flutter run -d windows   # או: -d macos
 ## בדיקות
 
 ```bash
-flutter test                                               # ה-package הראשי: fixtures בלבד
-SEFORIM_LIBRARY_RELEASES_DIR=/path/to/releases flutter test # + בדיקות מול הפצות אמיתיות (אופציונלי)
-cd launcher_app && flutter test                            # הלאנצ'ר
+flutter test                     # כלי השורש
+cd launcher_app && flutter test  # הלאנצ'ר
 ```
+
+בדיקות המנוע, כולל אלה שמול הפצות אמיתיות, רצות בריפו של `otzaria_library_updater`.
 
 ### מדידת כיסוי לכל הפרויקט
 
@@ -90,7 +94,7 @@ dart tool/coverage.dart --collect
 
 רף ברירת המחדל הוא לפחות 60% בכל חבילה ולפחות 80% בפרויקט כולו.
 אפשר לשנות אותו באמצעות `--min=80 --target=80`. ריצה מתחת לרף
-או כשל בבדיקות מחזירים קוד יציאה שונה מאפס. `--packages=.,launcher_app`
+או כשל בבדיקות מחזירים קוד יציאה שונה מאפס. `--packages=library_manager,launcher_app`
 מגביל את האיסוף והסיכום לחבילות שנבחרו. ב-CI הכיסוי נאסף ב-Windows בשני
 חלקים במקביל, כל אחד עם `--packages=` משלו, וג'וב נפרד מאחד את הדוחות
 ומריץ `dart tool/coverage.dart` על כל תשע החבילות.

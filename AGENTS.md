@@ -174,29 +174,32 @@ runs **only** after the write probe failed. An empty locked folder is still
 
 ## 2. Repository layout
 
-Nine Dart/Flutter packages, each with its own `pubspec.yaml`. The main package
-sits at the repo root (historical — do not move it).
+Nine Dart/Flutter packages, each with its own `pubspec.yaml`. The root holds
+only repo tooling; the update engine is an external package (below).
 
 | Path | Package | Role |
 | --- | --- | --- |
-| `otzaria_downloads/` | `otzaria_downloads` | Pure Dart. Shared resumable file transfers for app, launcher, store and custom apps, and the one GitHub API transport they use (`githubGet`: headers, timeout, `GithubRateLimitException` with a fail-fast gate). `library_manager` keeps an equivalent internal copy (`github_fetch.dart`) instead of depending on it. |
+| `otzaria_downloads/` | `otzaria_downloads` | Pure Dart. Shared resumable file transfers for app, launcher, store and custom apps, and the one GitHub API transport they use (`githubGet`: headers, timeout, `GithubRateLimitException` with a fail-fast gate). Also the Windows elevation helpers shared by `otzaria_manager` and `custom_apps_manager` (`windows_elevation.dart`: token query, the one argument-quoting function, de-elevated launch, `ShellExecuteExW` `runas`). `library_manager` keeps an equivalent internal copy (`github_fetch.dart`) instead of depending on it. |
 | `otzaria_l10n/` | `otzaria_l10n` | Pure Dart, **no dependencies at all**. Every user-visible string, Hebrew + English. The updater, managers and launcher depend on it, which is why it cannot use Flutter. See §4. |
-| `.` (root, `lib/`) | `seforim_library_updater` | Flutter. Client side of the `Otzaria/SeforimLibrary` delta format: discover releases, plan a route (delta vs. full), download, verify the logical hash, apply patches atomically. |
+| `.` (root, `tool/`, `test/`) | `otzaria_offline_update` | Flutter. Repo tooling only: `tool/coverage.dart` over all nine packages and the logical-hash measuring tools. Nothing depends on it. |
 | `otzaria_manager/` | `otzaria_manager` | Pure Dart. The **Otzaria app itself**: check, download, silent install, launch. Windows + macOS. |
-| `library_manager/` | `library_manager` | Flutter. Wires the root package into the launcher: locate the real `seforim.db`, check versions, apply to the **live** DB, export/consume the mirror. |
+| `library_manager/` | `library_manager` | Flutter. Wires `seforim_library_updater` into the launcher: locate the real `seforim.db`, check versions, apply to the **live** DB, export/consume the mirror. |
 | `plugins_manager/` | `plugins_manager` | Pure Dart. The **offline plugin store**: syncs `otzaria.org/api/plugins` into the mirror, detects what Otzaria has, installs via `otzaria://`. Converted from `Yehuda-Zakesh/Offline-repository-plugin-store` (itself derived from `Otzaria/Otzaria_Website`); details in `plugins_manager/README.md`. |
 | `custom_apps_manager/` | `custom_apps_manager` | Pure Dart. **User-added programs**: a record filled in a form (name, GitHub repo *or* local installer, install location, detection rules) so the drive can carry a program that is not Otzaria. Not a plugin system — no runtime, no WebView, no permissions, and **no importing a record from a file**, so every repo and file was chosen by the user. |
 | `error_reports_manager/` | `error_reports_manager` | Pure Dart. **Otzaria's unsent book, app and plugin reports**, carried offline → online: read Otzaria's queues in `user_state.db` directly (Otzaria unchanged), port of its `toApiPayload`, a drive outbox, upload to `otzaria.org` in rate-limited batches — **and the launcher's own problem reports** (a port of Otzaria's app reports, routed by `product`), with their queue and crash detection. See §5.10. |
-| `launcher_app/` | `launcher_app` | The Flutter desktop app (Windows + macOS) wiring the modules into one dashboard. Depends on the other eight by relative `path:`, so it must stay their sibling. |
+| `launcher_app/` | `launcher_app` | The Flutter desktop app (Windows + macOS) wiring the modules into one dashboard. Depends on the seven sub-packages by relative `path:`, so it must stay their sibling. |
 
 Producer vs. consumer: the Kotlin repo `Otzaria/SeforimLibrary` *produces* the DB
 and the patches; this repo only *consumes* them.
 
-**The root package is a fork of `Otzaria/otzaria_library_updater`** — the package
-Otzaria itself depends on for its online update. Keep the engine (discovery,
-planner, hasher, `PatchApplier`, `PatchDownloader`) in step with upstream; our
-deliberate additions are the l10n calls, the offline mirror source/exporter, and
-`LibraryUpdatePlanner.localReleaseTag`. Otzaria's consumer side is
+**The update engine is `seforim_library_updater` of
+`Otzaria/otzaria_library_updater`** — the package Otzaria itself uses for its
+online update — pinned as a git dependency in the root, `library_manager` and
+`launcher_app` pubspecs (move the three refs together). The mirror policy is its
+`Offline*` classes (`OfflineLibraryUpdateDiscovery`, `OfflineLibraryUpdatePlanner`,
+`OfflineLibraryDbRecoveryService`, each given `supportedDbSchemaVersion`); the
+unprefixed names are Otzaria's online route and still compile here, so never use
+them. Engine changes go upstream. Otzaria's consumer side is
 `Otzaria/otzaria` under `lib/library_update/` — read it before changing how the
 launcher orchestrates an update, and see `library_manager/README.md` §
 "התאמה לעדכון המקוון של אוצריא".
@@ -296,8 +299,7 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
   "shouldn't be needed", a workaround flag, or a fix over ~15 lines means the cause
   has not been found yet.
 - Match the surrounding naming and idiom. Follow `flutter_lints`.
-- **Keep the module boundaries.** `otzaria_manager` must not depend on Flutter;
-  the root package must not depend on Otzaria app code or on the launcher.
+- **Keep the module boundaries.** `otzaria_manager` must not depend on Flutter.
   `otzaria_l10n` is the one package everything may depend on — which is why it has
   no dependencies of its own.
 - Do not silently widen scope. Fix what was asked, then say what you left out.
@@ -715,8 +717,8 @@ GitHub, which the code already knew (`_streamToFile` treats "ignored Range → 2
 a restart). What the CDN *does* throttle is each connection separately: ~0.7MB/s on
 one against ~2.1MB/s aggregate on four.
 
-`DownloadScheduler` (root package, exported) is that pool, and it is a **shared
-semaphore on purpose**: `LibraryManager` hands the same instance to
+`DownloadScheduler` (`seforim_library_updater`, exported) is that pool, and it
+is a **shared semaphore on purpose**: `LibraryManager` hands the same instance to
 `LibraryMirrorExporter` and `CompanionAssetsMirror` and runs them concurrently (the
 ~509MB of companions used to queue behind the ~1.55GB DB), so the two stages
 together never open more than four connections. The smart-search sync
@@ -727,8 +729,8 @@ through `slot(existingBytes:)` before its `announce()`, and reports into a new
 resetting when it starts; an
 export that returned "up to date" without ever reporting gets a zero total first,
 or the outer total would stay unknown. `plugins_manager` cannot depend on
-the root package (pure Dart vs. Flutter) and carries its own 40-line `runPooled`;
-keep them in step conceptually, without a cross-package dependency. Three
+`seforim_library_updater` (pure Dart vs. Flutter) and carries its own 40-line
+`runPooled`; keep them in step conceptually, without a cross-package dependency. Three
 load-bearing consequences:
 
 - **The biggest asset starts first** (`jobs.sort` by size, descending) — with the
@@ -921,9 +923,9 @@ Otzaria's launch path, which is why `AppShell.checkAll()` runs the app module's 
 **Never install a DB schema the installed Otzaria cannot read.** Otzaria reads
 schema 6 only from 0.9.98; the mirror carries both, and OU picked the newest.
 `ReadableSchemaRoute` limits the full DB and the delta edges to
-`OtzariaCapabilities.resolveReadableDbSchema` (C1 `readableDbSchemaVersion`,
-else the app-version table); nothing compatible is `blocked` with "update
-Otzaria first", and `AutoInstallFlow` installs the app before the library.
+`OtzariaCapabilities.resolveReadableDbSchema` (C1 `readableDbSchemaVersion`
+unless its `exePath` is another exe, else the app-version table); nothing
+compatible is `blocked` with "update Otzaria first", and `AutoInstallFlow` installs the app before the library.
 
 **An apply holds Otzaria's single-instance mutexes (Windows).** Otzaria checks
 `OtzariaAppSingleInstance` — a portable copy `OtzariaAppSingleInstance-<FNV-1a
@@ -934,10 +936,12 @@ recovery cannot clear our `.applying` mid-apply. We hold both names
 its own connection.
 
 **Tests never see the real Otzaria data roots.** A test once installed a
-dictionary into the developer's real `%APPDATA%\otzaria\books`.
-`flutter_test_config.dart` in `library_manager` and `launcher_app` calls
-`LibraryDbLocator.sandboxForTests`: the default environment points into a temp
-dir and any touch of a real root throws. Keep both files when adding packages.
+dictionary into the developer's real `%APPDATA%\otzaria\books`, and launcher tests
+read its real `otzaria_capabilities.json`. `LibraryDbLocator`,
+`InstalledPluginsScanner` and `OtzariaManager` each have `sandboxForTests`: the
+default environment points into a temp dir and any touch of a real root throws.
+`flutter_test_config.dart` (`library_manager`, `launcher_app`) calls those the
+package reaches; pure-Dart tests call `sandboxRealDataRoot()` in `main`.
 
 **There is no backup of `seforim.db`, and no setting for one.**
 `OfflineLibraryDbRecoveryService` writes a marker (`<db>.applying`) and nothing else. A
@@ -1220,8 +1224,9 @@ UI isolate.** `RunningOtzariaLocator.probe` runs in `Isolate.run`: `OpenMutexW` 
 their path. Paths are only enrichment. `tasklist` cost ~300ms per call. A total
 failure is logged (`lastProbeFailure`) and **blocks** in `OtzariaProcessGuard`
 (which keeps `pgrep -x` on macOS). Resolve `GetLastError` before `OpenMutexW` —
-its lazy lookup clobbers the error. OU's own lock sets
-`OtzariaSelfLock.isHeldByThisProcess` so its mutex is not mistaken for Otzaria.
+its lazy lookup clobbers the error. `OtzariaInstanceLock.acquire` (§5.4) points
+`OtzariaSelfLock.isHeldByThisProcess` at its own lease count, or every guard
+inside an apply took OU's mutex for Otzaria and threw `OtzariaIsRunningException`.
 
 **The Windows uninstall registry beats every guess.** `WindowsInstallRegistry` reads
 `InstallLocation` from the Inno entries under `…\CurrentVersion\Uninstall` (HKCU, then

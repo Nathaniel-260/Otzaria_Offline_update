@@ -1,7 +1,12 @@
 # הורדות עם המשך אוטומטי
 
 חבילת Dart משותפת למתקין אוצריא, לעדכון הלאנצ׳ר, לחנות התוספים
-ולתוכנות הנוספות. מנגנון הורדת הספרייה נשאר בחבילת השורש.
+ולתוכנות הנוספות. מנגנון הורדת הספרייה הוא של `seforim_library_updater`.
+
+`windows_elevation.dart` מרכז את הרמת ההרשאות בווינדוס עבור `otzaria_manager`
+ו-`custom_apps_manager`: בדיקת ה-token, פונקציית ציטוט ארגומנטים אחת
+(`WindowsElevation.quoteArgument`), הפעלה לא-מורמת ב-`CreateProcessWithTokenW`
+והרצה מורמת ב-`ShellExecuteExW` (`ElevatedProcess`).
 
 ההורדה נכתבת ל־`<destination>.part`, והזהות שלה ל־`<destination>.resume`.
 רק קובץ שהורד בשלמותו מחליף את היעד. בכשל נשמרים בייטים רק כשיש
