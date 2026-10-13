@@ -256,8 +256,8 @@ void main() {
           manifestUrl: 'm',
         );
 
-    LibraryDiscoveryResult discovery(List<PatchEdge> edges) =>
-        LibraryDiscoveryResult(
+    OfflineLibraryDiscoveryResult discovery(List<PatchEdge> edges) =>
+        OfflineLibraryDiscoveryResult(
           latestVersion: 32,
           edges: edges,
           latestFullDbAsset: null,

@@ -10,13 +10,14 @@ class ReadableSchemaRoute {
     this.excludedSchema,
   });
 
-  factory ReadableSchemaRoute.unlimited(LibraryDiscoveryResult discovery) =>
-      ReadableSchemaRoute(
-        edges: discovery.edges,
-        latestFullDbAsset: discovery.latestFullDbAsset,
-        fullDbReleaseTag: discovery.fullDbReleaseTag,
-        latestFullDbVersion: discovery.latestFullDbVersion,
-      );
+  factory ReadableSchemaRoute.unlimited(
+    OfflineLibraryDiscoveryResult discovery,
+  ) => ReadableSchemaRoute(
+    edges: discovery.edges,
+    latestFullDbAsset: discovery.latestFullDbAsset,
+    fullDbReleaseTag: discovery.fullDbReleaseTag,
+    latestFullDbVersion: discovery.latestFullDbVersion,
+  );
 
   final List<PatchEdge> edges;
   final ReleaseAsset? latestFullDbAsset;
@@ -28,7 +29,7 @@ class ReadableSchemaRoute {
   bool get limited => excludedSchema != null;
 
   static ReadableSchemaRoute limit({
-    required LibraryDiscoveryResult discovery,
+    required OfflineLibraryDiscoveryResult discovery,
     required List<LibraryRelease> releases,
     required bool allowPrerelease,
     required int? readableSchema,
@@ -55,7 +56,7 @@ class ReadableSchemaRoute {
     LibraryRelease? fullRelease;
     ReleaseAsset? fullAsset;
     var fullVersion = -1;
-    for (final release in LibraryUpdateDiscovery.eligibleReleases(
+    for (final release in OfflineLibraryUpdateDiscovery.eligibleReleases(
       releases,
       allowPrerelease: allowPrerelease,
     )) {
@@ -67,7 +68,7 @@ class ReadableSchemaRoute {
       }
       final asset = release.fullDbAssetFor(maxSchemaVersion: readableSchema);
       if (asset == null) continue;
-      final version = LibraryUpdateDiscovery.releaseVersionOf(release);
+      final version = OfflineLibraryUpdateDiscovery.releaseVersionOf(release);
       if (version > fullVersion ||
           (version == fullVersion && _publishedAfter(release, fullRelease))) {
         fullVersion = version;

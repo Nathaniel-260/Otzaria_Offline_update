@@ -381,9 +381,9 @@ Change either and every update starts getting rejected. Golden-hash tests guard 
 detected during *planning*.** `kHashTableOrderBySchemaVersion` in
 `patch_table_spec.dart` is the single source of truth (`isSupportedSchemaVersion`);
 adding a schema is one line. Everything downstream reads it:
-`PatchEdge.hasSupportedSchema`, `LibraryUpdateDiscovery.discover` (drops those
+`PatchEdge.hasSupportedSchema`, `OfflineLibraryUpdateDiscovery.discover` (drops those
 edges but still counts them toward `latestVersion`, so a new release never reads
-as "up to date"), `LibraryUpdatePlanner`, `LibraryMirrorExporter` (keeps the tiny
+as "up to date"), `OfflineLibraryUpdatePlanner`, `LibraryMirrorExporter` (keeps the tiny
 `.manifest.json` but not the patch files, and a full DB in an unknown schema as a
 zero-byte name-only marker that `fullDbAsset` never selects). Do not move the
 check back into `PatchApplier`: SeforimLibrary shipped v26 in schema 4, and a
@@ -590,7 +590,7 @@ full DB included.
   size comparison — an 8.5MB patch and a 585MB one start from the same fixed cost,
   which is what a size rule cannot see.
   **The ten minutes are widened by a download credit** (on the exporter side only —
-  once both files are on the drive the download is sunk, so `LibraryUpdatePlanner`
+  once both files are on the drive the download is sunk, so `OfflineLibraryUpdatePlanner`
   passes none): `isOutOfRange(..., savedDownloadBytes:)` adds
   `downloadSecondsPerMb` (0.5, ~2MB/s aggregate from GitHub) for every byte the
   patch route saves against the full DB (full size minus the patch route, floored at
@@ -672,7 +672,7 @@ to be filtered out while the mode reported "up to date"), and the "turn personal
 update off and download again" message now fires only at a real dead end.
 
 **Only the patches are per-release; `seforim.db.zst` is downloaded once**, from the
-highest version carrying one — the only full-DB asset `LibraryUpdateDiscovery` ever
+highest version carrying one — the only full-DB asset `OfflineLibraryUpdateDiscovery` ever
 selects offline, so a copy per release meant ~7.5GB nothing would read. After a
 successful download, anything under `assets/` missing from the new manifest is
 deleted (`_pruneStaleAssets`); the `.resume` sidecars of assets that *are* in it
@@ -824,7 +824,7 @@ which differs from the DB's parent when a library folder name is set.
 `OtzariaSettingsWriter.finishSemanticInstall` install and enable the data.
 
 **The offline machine picks the fastest route it has, and that route can be the full
-database.** `LibraryUpdatePlanner` used to take the delta chain whenever it reached
+database.** `OfflineLibraryUpdatePlanner` used to take the delta chain whenever it reached
 at least as high as the full route — but by then both assets sit on the drive, so
 the only thing left to compare is how long the user waits. On the *same* target
 version the `ApplyTimeEstimate` range decides and a far-slower chain loses
@@ -940,7 +940,7 @@ dictionary into the developer's real `%APPDATA%\otzaria\books`.
 dir and any touch of a real root throws. Keep both files when adding packages.
 
 **There is no backup of `seforim.db`, and no setting for one.**
-`LibraryDbRecoveryService` writes a marker (`<db>.applying`) and nothing else. A
+`OfflineLibraryDbRecoveryService` writes a marker (`<db>.applying`) and nothing else. A
 second ~1GB copy doubles what the drive must hold while adding no real safety: the
 delta route is one SQLite transaction that rolls itself back, and the full route
 extracts to `<db>.new`, verifies it (`quick_check` + version), and only then swaps.
@@ -983,12 +983,12 @@ decompression take many minutes, and on macOS `unlink` on an open file succeeds.
 
 **A DB update can ship without a version bump.** SeforimLibrary sometimes
 re-publishes a corrected `seforim.db.zst` under the same `db_version`, which the
-version comparison reads as "up to date". `LibraryUpdatePlanner` therefore also
+version comparison reads as "up to date". `OfflineLibraryUpdatePlanner` therefore also
 compares the applied release tag (`LibraryStateStore.loadAppliedRelease()`) — but
 only when that tag is *known*: a DB not installed by this launcher has none, and
 guessing would offer a ~1GB download on every launch. Two traps, both once live:
 
-- The tag must be `LibraryDiscoveryResult.latestContentTag`, the newest release —
+- The tag must be `OfflineLibraryDiscoveryResult.latestContentTag`, the newest release —
   **not** `fullDbReleaseTag`, the release that happens to carry `seforim.db.zst`. A
   patches-only release is the newest while the full DB stays on an older tag, so
   recording the carrier told every up-to-date machine "the content changed" and

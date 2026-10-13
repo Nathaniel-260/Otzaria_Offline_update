@@ -8,7 +8,7 @@ import 'package:library_manager/library_manager.dart';
 import 'package:path/path.dart' as p;
 
 /// ה-state הזה הוא מה שמבדיל בין "מסד שהותקן על ידינו" לבין "מסד שמצאנו":
-/// בלי רשומת `appliedReleases` של המחשב הזה, `LibraryUpdatePlanner` **לא**
+/// בלי רשומת `appliedReleases` של המחשב הזה, `OfflineLibraryUpdatePlanner` **לא**
 /// מנחש שמדובר בפרסום מחדש — אחרת כל פתיחה הייתה מציעה הורדה של ~1GB.
 void main() {
   late Directory tempDir;
