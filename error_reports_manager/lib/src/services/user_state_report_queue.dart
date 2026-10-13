@@ -197,8 +197,8 @@ class UserStateReportQueue implements OtzariaReportQueue {
 
   final String dbPath;
 
-  /// `reportsQueueFormat` מ-`otzaria_capabilities.json`; `null` = הקובץ חסר,
-  /// ואז ההכרעה לפי `PRAGMA user_version`.
+  /// `reportsQueueFormat` מ-`otzaria_capabilities.json`; `null` = הקובץ חסר.
+  /// גם כשהוא מוכר, `PRAGMA user_version` חייב להיות מוכר.
   final int? reportsQueueFormat;
   final DateTime Function() _clock;
   final IsolateRunner _run;
@@ -286,8 +286,7 @@ class UserStateReportQueue implements OtzariaReportQueue {
         "SELECT 1 FROM sqlite_master WHERE type='table' "
         "AND name='pending_reports'",
       );
-      final knownLayout = queueFormat != null ||
-          (version is int && version <= knownSchemaVersion);
+      final knownLayout = version is int && version <= knownSchemaVersion;
       if (!knownLayout || table.isEmpty) {
         db.close();
         return null;

@@ -530,9 +530,21 @@ void main() {
   });
 
   group('פורמט התור מ-otzaria_capabilities.json (C3)', () {
-    test('פורמט 1 — נאסף גם כש-user_version עלה מסיבה אחרת', () async {
+    test('פורמט 1 עם user_version לא מוכר — לא נוגעים בכלום', () async {
       final db =
           create(userVersion: UserStateReportQueue.knownSchemaVersion + 1);
+      insert(db, pending, _stored('a'));
+      db.close();
+      final before = File(dbPath).readAsBytesSync();
+
+      final queue = UserStateReportQueue(dbPath, reportsQueueFormat: 1);
+      expect(await queue.countSendable(), 0);
+      expect((await queue.collectTo(MemoryOutbox(const []))).collected, 0);
+      expect(File(dbPath).readAsBytesSync(), before);
+    });
+
+    test('פורמט 1 עם user_version מוכר — נאסף', () async {
+      final db = create();
       insert(db, pending, _stored('a'));
       db.close();
 

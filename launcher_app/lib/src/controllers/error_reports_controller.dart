@@ -104,8 +104,6 @@ class ErrorReportsController extends ChangeNotifier
   List<String> unmigratedLegacy = const [];
   final ErrorReportUploader _uploader;
 
-  OtzariaReportQueue? _queue;
-
   /// ההצעה לאסוף — פעם אחת בהרצה, גם כשנענתה "לא עכשיו".
   bool _offered = false;
 
@@ -151,7 +149,7 @@ class ErrorReportsController extends ChangeNotifier
       );
     }
     try {
-      final queue = _queue = await _resolveQueue();
+      final queue = await _resolveQueue();
       if (queue == null) return 0;
       return await queue.countSendable();
     } catch (e) {
@@ -168,7 +166,7 @@ class ErrorReportsController extends ChangeNotifier
     isCollecting = true;
     notifyListeners();
     try {
-      final queue = _queue ?? await _resolveQueue();
+      final queue = await _resolveQueue();
       if (queue == null) return (collected: 0, error: null);
       final result = await queue.collectTo(outbox);
       final error = result.error;

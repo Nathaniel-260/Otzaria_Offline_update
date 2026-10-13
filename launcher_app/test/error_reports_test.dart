@@ -670,6 +670,22 @@ void main() {
       expect(find.text(t.legacyReportsDialogTitle), findsNothing);
     });
 
+    test('כל איסוף קורא מחדש את התור ואת היכולות של אוצריא', () async {
+      var resolved = 0;
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async {
+          resolved++;
+          return _FakeQueue(resolved == 1 ? 1 : 0);
+        },
+      );
+      addTearDown(c.dispose);
+
+      expect(await c.pendingToOffer(), 1);
+      expect((await c.collect()).collected, 0);
+      expect(resolved, 2);
+    });
+
     test('כשל חלקי באיסוף — מה שהועבר נספר, והשגיאה נמסרת', () async {
       final c = controller(pending: 2, partialError: 'partial');
       await c.pendingToOffer();
