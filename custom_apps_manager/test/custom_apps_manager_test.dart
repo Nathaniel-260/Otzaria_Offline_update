@@ -279,6 +279,7 @@ void main() {
           'sha256': sha256.convert(utf8.encode('MZ Inno Setup')).toString(),
         }),
       );
+      await manager.trustHere('org.example.app');
       await manager.install('org.example.app');
       expect(runner.calls.single.executable, setup);
     });
@@ -320,30 +321,77 @@ void main() {
       expect(runner.calls.single.executable, setup);
     });
 
-    test('רשומה שנוספה במחשב אחר מחכה לאישור במחשב הזה', () async {
-      installerJson(
-          sha: sha256.convert(utf8.encode('MZ Inno Setup')).toString());
-      final elsewhere = CustomAppsManager(
-        resolveMirrorDir: () async => root,
-        readVersion: (_) => '1.4.2',
-        processRunner: runner.call,
-        downloadsDir: p.join(root, 'Downloads'),
-        machineKey: () async => 'another-machine',
-      );
+    CustomAppsManager machine(String trustFile) => CustomAppsManager(
+          resolveMirrorDir: () async => root,
+          readVersion: (_) => '1.4.2',
+          processRunner: runner.call,
+          downloadsDir: p.join(root, 'Downloads'),
+          trustFilePath: trustFile,
+        );
 
-      expect((await elsewhere.installPreflight('org.example.app')).needsTrust,
-          isTrue);
+    String sha(String content) =>
+        sha256.convert(utf8.encode(content)).toString();
+
+    test('רשומה שלא אושרה במחשב הזה מחכה לאישור, ואחריו אינה שואלת שוב',
+        () async {
+      installerJson(sha: sha('MZ Inno Setup'));
+      final trustFile = p.join(tempMirrorRoot(), 'machine', 'trust.json');
+      final here = machine(trustFile);
+
+      expect(
+          (await here.installPreflight('org.example.app')).needsTrust, isTrue);
       await expectLater(
-        elsewhere.install('org.example.app'),
+        here.install('org.example.app'),
         throwsA(isA<AppDescriptorException>()),
       );
       expect(runner.calls, isEmpty);
 
-      await elsewhere.trustHere('org.example.app');
-      await elsewhere.install('org.example.app');
+      await here.trustHere('org.example.app');
+      await here.install('org.example.app');
       expect(runner.calls, hasLength(1));
-      expect((await manager.installPreflight('org.example.app')).needsTrust,
+
+      final restarted = machine(trustFile);
+      expect((await restarted.installPreflight('org.example.app')).needsTrust,
           isFalse);
+    });
+
+    test('האישור נשמר במחשב, לא על הכונן', () async {
+      installerJson(sha: sha('MZ Inno Setup'));
+      final trustFile = p.join(tempMirrorRoot(), 'machine', 'trust.json');
+      await machine(trustFile).trustHere('org.example.app');
+
+      final onDrive = Directory(root)
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.readAsStringSync().contains('org.example.app|'));
+      expect(onDrive, isEmpty);
+      expect(
+        (await machine(p.join(tempMirrorRoot(), 'other', 'trust.json'))
+                .installPreflight('org.example.app'))
+            .needsTrust,
+        isTrue,
+      );
+    });
+
+    test('קובץ התקנה אחר או מקור אחר מבקשים אישור מחדש', () async {
+      installerJson(sha: sha('MZ Inno Setup'));
+      final trustFile = p.join(tempMirrorRoot(), 'machine', 'trust.json');
+      final here = machine(trustFile);
+      await here.trustHere('org.example.app');
+
+      installerJson(sha: sha('MZ something else'));
+      expect(
+          (await here.installPreflight('org.example.app')).needsTrust, isTrue);
+
+      installerJson(sha: sha('MZ Inno Setup'));
+      final descriptorFile =
+          File(p.join(root, 'apps', 'org.example.app', 'descriptor.json'));
+      final json =
+          jsonDecode(descriptorFile.readAsStringSync()) as Map<String, dynamic>;
+      json['install'] = {'dir': r'C:\Windows'};
+      descriptorFile.writeAsStringSync(jsonEncode(json));
+      expect(
+          (await here.installPreflight('org.example.app')).needsTrust, isTrue);
     });
   });
 
@@ -1028,6 +1076,7 @@ void main() {
         downloadsDir: p.join(root, 'Downloads'),
       );
 
+      await m.trustHere('org.example.app');
       await m.install('org.example.app');
 
       final executable = runner.calls.single.executable;

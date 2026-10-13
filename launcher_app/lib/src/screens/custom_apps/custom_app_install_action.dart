@@ -57,8 +57,8 @@ Future<bool> installCustomApp({
   return true;
 }
 
-/// A record from another machine, or an installer with no stored sha256, is
-/// confirmed here first; the manager refuses both otherwise.
+/// תוכן שלא אושר במחשב הזה, או קובץ בלי sha256 שמור, מאושר כאן קודם —
+/// אחרת המנהל מסרב להריץ אותו. אישור של קובץ בלי sha256 מאשר גם את התוכן.
 Future<bool> _confirmTrust(
   BuildContext context,
   CustomAppsController controller,
@@ -70,17 +70,6 @@ Future<bool> _confirmTrust(
   if (preflight == null) {
     UiSnack.showFailure(controller.errorMessage);
     return false;
-  }
-  if (preflight.needsTrust) {
-    if (!context.mounted) return false;
-    final source = app.descriptor.github?.webUrl ?? app.descriptor.name;
-    final approved = await showWarningDialog(
-      context: context,
-      title: t.trustDialogTitle,
-      content: t.trustDialogContent(app.descriptor.name, source),
-      confirmText: t.trustDialogConfirm,
-    );
-    if (!approved || !await controller.trustHere(id)) return false;
   }
   if (preflight.needsHash) {
     if (!context.mounted) return false;
@@ -95,6 +84,16 @@ Future<bool> _confirmTrust(
       UiSnack.showFailure(controller.errorMessage);
       return false;
     }
+  } else if (preflight.needsTrust) {
+    if (!context.mounted) return false;
+    final source = app.descriptor.github?.webUrl ?? app.descriptor.name;
+    final approved = await showWarningDialog(
+      context: context,
+      title: t.trustDialogTitle,
+      content: t.trustDialogContent(app.descriptor.name, source),
+      confirmText: t.trustDialogConfirm,
+    );
+    if (!approved || !await controller.trustHere(id)) return false;
   }
   return context.mounted;
 }

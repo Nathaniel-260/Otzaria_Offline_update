@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:custom_apps_manager/custom_apps_manager.dart';
 import 'package:flutter/foundation.dart';
-import 'package:library_manager/library_manager.dart' show LibraryStateStore;
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
@@ -104,6 +103,7 @@ class CustomAppsController extends ChangeNotifier
   CustomAppsController({
     required String mirrorRootDir,
     String? stateDir,
+    String? trustFilePath,
     CustomAppsManager? manager,
     ExeIconExtraction? extractIcon,
     CustomAppDetectionSnapshot Function()? detectionSnapshot,
@@ -123,7 +123,7 @@ class CustomAppsController extends ChangeNotifier
           lookupInstalledExe: findInstalledExe,
           onLearningStarted: _markLearning,
           onLearnedRulesNotSaved: logLearnedRulesNotSaved,
-          machineKey: LibraryStateStore.currentMachineKey,
+          trustFilePath: trustFilePath,
         );
   }
 

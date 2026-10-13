@@ -62,9 +62,9 @@ class CustomAppsManager {
     GithubAppClient? githubClient,
     InstallLearner? learner,
     void Function(String id, FileSystemException error)? onLearnedRulesNotSaved,
-    Future<String> Function()? machineKey,
+    String? trustFilePath,
   })  : _onLearnedRulesNotSaved = onLearnedRulesNotSaved,
-        _machineKey = machineKey ?? _hostnameKey,
+        _trust = CustomAppTrustStore(trustFilePath),
         _locator = CustomAppLocator(
           readVersion: readVersion,
           lookupUninstallDirs: lookupUninstallDirs,
@@ -95,9 +95,7 @@ class CustomAppsManager {
   final InstallLearner _learner;
   final void Function(String id, FileSystemException error)?
       _onLearnedRulesNotSaved;
-  final Future<String> Function() _machineKey;
-
-  static Future<String> _hostnameKey() async => Platform.localHostname;
+  final CustomAppTrustStore _trust;
 
   /// לאן מגיעה תוכנה מסוג ארכיון.
   String get downloadsDir => _installer.downloadsDir;
@@ -119,32 +117,41 @@ class CustomAppsManager {
 
   /// רושם תוכנה חדשה מהטופס, ומסמן אותה כמאושרת במחשב הזה בלבד. תיקייה
   /// שהועתקה ממחשב אחר מגיעה בלי האישור הזה — ראו [installPreflight].
-  Future<void> add(AppDescriptor descriptor) async {
-    final store = await _store();
-    await store.add(descriptor);
-    await CustomAppTrustStore(store.dirFor(descriptor.id))
-        .trust(await _machineKey());
-  }
+  Future<void> add(AppDescriptor descriptor) async =>
+      (await _store()).add(descriptor);
 
-  /// What [install] would refuse: a record not confirmed on this machine, or
-  /// an installer with no stored sha256. The UI asks, then calls [trustHere]
-  /// or [recordInstallerHash].
+  /// מה ש-[install] יסרב לו: קובץ בלי sha256 שמור ([recordInstallerHash]),
+  /// או תוכן שלא אושר במחשב הזה ([trustHere]). הממשק שואל לפני ההתקנה.
   Future<({bool needsTrust, bool needsHash})> installPreflight(
     String id,
   ) async {
-    final store = await _store();
-    final entry = await store.load(id);
-    final trusted = await CustomAppTrustStore(store.dirFor(id))
-        .isTrusted(await _machineKey());
+    final entry = await (await _store()).load(id);
+    final sha = entry?.installer?.sha256;
+    if (entry == null || entry.installer == null) {
+      return (needsTrust: false, needsHash: false);
+    }
+    if (sha == null) return (needsTrust: true, needsHash: true);
     return (
-      needsTrust: !trusted,
-      needsHash: entry?.installer != null && entry!.installer!.sha256 == null,
+      needsTrust: !await _trust.isTrusted(
+        CustomAppTrustStore.keyFor(entry.descriptor, sha),
+      ),
+      needsHash: false,
     );
   }
 
   Future<void> trustHere(String id) async {
-    final store = await _store();
-    await CustomAppTrustStore(store.dirFor(id)).trust(await _machineKey());
+    final entry = await (await _store()).load(id);
+    final sha = entry?.installer?.sha256;
+    if (entry == null || sha == null) return;
+    await _trust.trust(CustomAppTrustStore.keyFor(entry.descriptor, sha));
+  }
+
+  /// קובץ שהמחשב הזה הביא בעצמו (צירוף או הורדה) מאושר בלי לשאול.
+  Future<void> _trustOwn(String id, String? sha) async {
+    if (sha == null) return;
+    final entry = await (await _store()).load(id);
+    if (entry == null) return;
+    await _trust.trust(CustomAppTrustStore.keyFor(entry.descriptor, sha));
   }
 
   /// Stores the sha256 of the installer as it is now, after the user
@@ -169,6 +176,7 @@ class CustomAppsManager {
         sha256: await sha256OfFile(path),
       ),
     );
+    await trustHere(id);
   }
 
   /// מעדכן רשומה שכבר קיימת — מה שהטופס עושה כשפותחים אותו לעריכה.
@@ -182,7 +190,16 @@ class CustomAppsManager {
         AppL10n.strings.customAppsDomain.appNotRegistered(descriptor.id),
       );
     }
+    final before = await store.load(descriptor.id);
+    final sha = before?.installer?.sha256;
+    final wasTrusted = before != null &&
+        sha != null &&
+        await _trust
+            .isTrusted(CustomAppTrustStore.keyFor(before.descriptor, sha));
     await store.saveDescriptor(descriptor);
+    if (wasTrusted) {
+      await _trust.trust(CustomAppTrustStore.keyFor(descriptor, sha));
+    }
   }
 
   /// מסיר מהמרשם. **אינו מסיר את התוכנה מהמחשב** — ראו
@@ -307,6 +324,7 @@ class CustomAppsManager {
 
     await _commitInstaller(store, id, entry.installer, stored);
     await _sweepPartials(store, id, keep: fileName);
+    await _trustOwn(id, stored.sha256);
     return stored;
   }
 
@@ -442,6 +460,7 @@ class CustomAppsManager {
 
     await _commitInstaller(store, id, entry.installer, stored);
     await _sweepPartials(store, id, keep: stored.fileName);
+    await _trustOwn(id, stored.sha256);
     return stored;
   }
 
@@ -479,12 +498,11 @@ class CustomAppsManager {
     if (installer == null) {
       throw AppDescriptorException(t.noInstallerInMirror);
     }
-    if (!await CustomAppTrustStore(store.dirFor(id))
-        .isTrusted(await _machineKey())) {
+    final sha = installer.sha256;
+    if (sha == null) throw AppDescriptorException(t.installerUnverified);
+    if (!await _trust
+        .isTrusted(CustomAppTrustStore.keyFor(entry.descriptor, sha))) {
       throw AppDescriptorException(t.appNotTrustedHere);
-    }
-    if (installer.sha256 == null) {
-      throw AppDescriptorException(t.installerUnverified);
     }
 
     final installerPath = store.installerPathFor(id, installer);

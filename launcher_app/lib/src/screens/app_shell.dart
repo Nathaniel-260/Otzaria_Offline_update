@@ -251,6 +251,7 @@ class _AppShellState extends State<AppShell> {
     _customApps = CustomAppsController(
       mirrorRootDir: p.join(widget.dataDir, 'mirror'),
       stateDir: widget.stateFilesDir,
+      trustFilePath: _customAppsTrustFile(),
     )..addListener(_onChange);
     _launcherUpdate = LauncherUpdateController(dataDir: widget.dataDir)
       ..addListener(_onChange);
@@ -970,6 +971,16 @@ class _AppShellState extends State<AppShell> {
             appReports: widget.appReports,
           ),
       };
+
+  /// אישורי התוכנות הנוספות נשמרים במחשב, לעולם לא על הכונן.
+  static String? _customAppsTrustFile() {
+    final dir = AppPaths.machineStateDir(
+      Platform.environment,
+      isWindows: Platform.isWindows,
+      isMacOS: Platform.isMacOS,
+    );
+    return dir == null ? null : p.join(dir, 'custom_apps_trust.json');
+  }
 
   /// Ctrl+R: re-reads what is installed and what the drive carries, without
   /// the startup offers. Ignored while a long task runs.
