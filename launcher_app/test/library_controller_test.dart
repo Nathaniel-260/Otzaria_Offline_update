@@ -879,6 +879,36 @@ void main() {
     });
   });
 
+  test('"מה חדש" של העדכון המוצע, ואחרי ההחלה של מה שהותקן', () async {
+    controller.dispose();
+    final manager = _ChangesNotesManager(tempDir.path);
+    controller = LibraryModuleController(
+      dataDir: tempDir.path,
+      manager: manager,
+    );
+
+    await controller.checkForUpdate();
+    expect(controller.changesNotes.map((n) => n.releaseTag), ['v33', 'v32']);
+    expect(controller.changesNotesApplied, isFalse);
+    expect(controller.changesNotesVersion, 33);
+
+    await controller.update();
+
+    expect(controller.status, LibraryModuleStatus.upToDate);
+    expect(manager.between, [(31, 33)]);
+    expect(controller.changesNotes.map((n) => n.releaseTag), ['v33', 'v32']);
+    expect(controller.changesNotesApplied, isTrue);
+    expect(controller.changesNotesVersion, 33);
+    expect(controller.changesNotesRange, 2);
+    expect(controller.changesNotesPartial, isFalse);
+
+    // החלה חוזרת שלא העלתה גרסה (נלווים בלבד) אינה מציגה שוב "מה חדש".
+    await controller.update();
+
+    expect(controller.changesNotesApplied, isFalse);
+    expect(controller.changesNotes, isEmpty);
+  });
+
   group('החלה שרצה', () {
     late _ApplyManager manager;
 
@@ -1271,4 +1301,65 @@ void _setReadOnly(String path, bool readOnly) {
       ? Process.runSync('attrib', [readOnly ? '+R' : '-R', path])
       : Process.runSync('chmod', [readOnly ? '444' : '644', path]);
   expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+}
+
+class _ChangesNotesManager extends LibraryManager {
+  _ChangesNotesManager(String dataDir) : super(dataDir: dataDir);
+
+  int _version = 31;
+  final between = <(int, int)>[];
+
+  static const _notes = [
+    LibraryChangesNote(releaseTag: 'v33', path: 'v33.md'),
+    LibraryChangesNote(releaseTag: 'v32', path: 'v32.md'),
+  ];
+
+  @override
+  Future<LibraryUpdateCheckResult> checkForUpdate() async =>
+      LibraryUpdateCheckResult(
+        dbPath: '/db/seforim.db',
+        localVersion: LocalDbVersion(
+          dbVersion: _version,
+          schemaVersion: 6,
+          hasVersionMeta: true,
+        ),
+        latestVersion: 33,
+        plan: _version < 33
+            ? LibraryUpdatePlan.delta(
+                localVersion: _version,
+                targetVersion: 33,
+                steps: const [],
+              )
+            : LibraryUpdatePlan.none(localVersion: 33),
+      );
+
+  @override
+  Future<List<LibraryChangesNote>> pendingChangesNotes(
+    LibraryUpdateCheckResult check,
+  ) async =>
+      check.dbUpdateAvailable ? _notes : const [];
+
+  @override
+  Future<List<LibraryChangesNote>> changesNotesBetween(
+    int fromVersion,
+    int toVersion,
+  ) async {
+    between.add((fromVersion, toVersion));
+    return _notes;
+  }
+
+  @override
+  Future<Set<int>> applyUpdate(
+    LibraryUpdateCheckResult check, {
+    void Function(LibraryApplyProgress progress)? onProgress,
+    void Function(String assetName, Object error)? onCompanionWarning,
+    void Function(Object error)? onStateWarning,
+    void Function(String dbPath)? onLibraryLocationNotSet,
+    void Function(String reason)? onLibraryLocationFailure,
+    bool Function()? isCancelled,
+    bool useFullDownloadFallback = false,
+  }) async {
+    _version = 33;
+    return const {};
+  }
 }

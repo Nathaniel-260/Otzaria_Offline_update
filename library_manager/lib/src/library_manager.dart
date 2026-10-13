@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:http/http.dart' as http;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
@@ -10,6 +11,7 @@ import 'services/companion_assets.dart';
 import 'services/companion_assets_installer.dart';
 import 'services/companion_assets_mirror.dart';
 import 'services/external_update_notice.dart';
+import 'services/library_changes_notes.dart';
 import 'services/library_db_locator.dart';
 import 'services/library_state_store.dart';
 import 'services/library_update_applier.dart';
@@ -370,6 +372,12 @@ class LibraryManager {
     );
 
     await Future.wait<void>([exportFuture, companionsFuture]);
+    if (!(isCancelled?.call() ?? false)) {
+      await _syncChangesNotes(
+        onWarning: onCompanionWarning,
+        isCancelled: isCancelled,
+      );
+    }
 
     if (includeSemanticSearch) {
       final semantic = SemanticSearchAssets(scheduler: _scheduler);
@@ -417,6 +425,82 @@ class LibraryManager {
       personalFromVersion: fromVersion,
       upToDate: !exported,
     );
+  }
+
+  /// "מה חדש" של כל release שהמראה מכסה. קובץ שעוד לא הועלה יובא בהורדה
+  /// הבאה, וכשל כאן לעולם אינו מכשיל את ההורדה — רק מדווח.
+  Future<void> _syncChangesNotes({
+    void Function(String assetName, Object error)? onWarning,
+    bool Function()? isCancelled,
+  }) async {
+    final name = AppL10n.strings.libraryDomain.libraryChangesNotesName;
+    try {
+      final online = _cloudClient.lastFetchedReleases;
+      if (online == null || !await hasMirror) return;
+      final covered = LibraryChangesNotes.coveredReleases(
+        online: online,
+        mirrored: await LocalMirrorLibraryReleaseClient(
+          mirrorDir: mirrorDir,
+        ).fetchReleases(),
+        allowPrerelease: allowPrerelease,
+      );
+      final client = http.Client();
+      try {
+        await LibraryChangesNotes.syncMirror(
+          mirrorDir: mirrorDir,
+          covered: covered,
+          client: client,
+          isCancelled: isCancelled,
+          onWarning: (tag, error) => onWarning?.call('$name ($tag)', error),
+        );
+      } finally {
+        client.close();
+      }
+    } catch (error) {
+      onWarning?.call(name, error);
+    }
+  }
+
+  /// "מה חדש" שבמראה לגרסאות ([fromVersion], [toVersion]], החדשה קודם.
+  Future<List<LibraryChangesNote>> changesNotesBetween(
+    int fromVersion,
+    int toVersion,
+  ) => LibraryChangesNotes.inMirror(
+    mirrorDir,
+    fromVersion: fromVersion,
+    toVersion: toVersion,
+  );
+
+  /// "מה חדש" בעדכון ש-[check] מציע — ריק כשאין עדכון מסד, או כשאין גרסה
+  /// מקומית להשוות אליה (התקנה טרייה).
+  Future<List<LibraryChangesNote>> pendingChangesNotes(
+    LibraryUpdateCheckResult check,
+  ) async {
+    final local = check.localVersion;
+    final plan = check.plan;
+    final target = plan?.finalTargetVersion;
+    if (plan == null ||
+        plan.kind == LibraryUpdatePlanKind.none ||
+        plan.kind == LibraryUpdatePlanKind.blocked ||
+        local == null ||
+        !local.hasVersionMeta ||
+        target == null) {
+      return const [];
+    }
+    return changesNotesBetween(local.dbVersion, target);
+  }
+
+  /// מוסר לאוצריא את "מה חדש" של הגרסאות שהוחלו — ראו
+  /// [LibraryChangesNotes.handOff]. שורש הנתונים כמו בהגדרות (גם נייד).
+  Future<void> _handOffChangesNotes(int fromVersion, int toVersion) async {
+    final notes = await changesNotesBetween(fromVersion, toVersion);
+    if (notes.isEmpty) return;
+    final launch = await _locator.otzariaLaunchPath?.call();
+    final root = await _locator.otzariaSettingsRoot(launch);
+    if (root == null) return;
+    // בלי אוצריא מותקנת אין ליצור את תיקיית הנתונים שלה.
+    if (launch == null && !await Directory(root).exists()) return;
+    await LibraryChangesNotes.handOff(dataRoot: root, notes: notes);
   }
 
   /// הגרסה שממנה תצא הורדה במצב אישי: **הנמוכה** מבין הגרסאות שנרשמו
@@ -1034,6 +1118,10 @@ class LibraryManager {
     }
     if (version != null && version > 0) {
       await record(() => _stateStore.recordOwnDbVersion(version));
+    }
+    final local = check.localVersion;
+    if (local != null && local.hasVersionMeta && version != null) {
+      await record(() => _handOffChangesNotes(local.dbVersion, version));
     }
     // מה השתנה, לטובת אינדקס החיפוש של אוצריא — ראו [ExternalUpdateNotice].
     await const ExternalUpdateNotice().write(

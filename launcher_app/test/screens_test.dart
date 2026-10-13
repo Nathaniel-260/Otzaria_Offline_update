@@ -1016,6 +1016,57 @@ void main() {
     expect(find.text('חזרה לעדכון מהרשת'), findsNothing);
   });
 
+  testWidgets('"מה חדש בספרייה" לפני ההתקנה ואחריה, והדיאלוג מציג את הרשימה', (
+    tester,
+  ) async {
+    final t = stringsOf().libraryScreen;
+    final file = File('${tempDir.path}/v33-1.md')
+      ..writeAsStringSync('# גרסה 33\n\n* ספר חדש מאוד');
+    library
+      ..status = LibraryModuleStatus.updateAvailable
+      ..changesNotes = [
+        LibraryChangesNote(releaseTag: 'v33-1', path: file.path),
+      ]
+      ..changesNotesVersion = 33;
+    Widget screen() => LibraryScreen(
+          library: library,
+          otzariaIsRunning: false,
+          onCloseOtzaria: () async => true,
+          isDownloading: false,
+          onProcessStateChanged: () async => false,
+          onRequestReindex: () async {},
+          onGoToSettings: () {},
+        );
+
+    await pumpScreen(tester, screen());
+    expect(find.text(t.changesTitle), findsOneWidget);
+    expect(find.text(t.changesPendingSubtitle('33')), findsOneWidget);
+
+    await tester.runAsync(() async {
+      await tester.tap(find.widgetWithText(ActionButton, t.changesButton));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('ספר חדש מאוד', findRichText: true),
+      findsOneWidget,
+    );
+    await tester.tap(find.text(stringsOf().common.close));
+    await tester.pumpAndSettle();
+
+    library.changesNotesApplied = true;
+    await pumpScreen(tester, screen());
+    expect(find.text(t.changesAppliedSubtitle('33')), findsOneWidget);
+
+    library.changesNotesRange = 5;
+    await pumpScreen(tester, screen());
+    expect(find.textContaining(t.changesPartial(1, 5)), findsOneWidget);
+
+    library.changesNotes = const [];
+    await pumpScreen(tester, screen());
+    expect(find.text(t.changesTitle), findsNothing);
+  });
+
   // המחשב המקוון בעדכון אישי: הסבר במקום ההודעה האדומה, ושתי הדרכים החוצה.
   testWidgets('מראה שנבנתה למחשב אחר מוסברת, בלי שורת שגיאה', (tester) async {
     final t = stringsOf().libraryScreen;

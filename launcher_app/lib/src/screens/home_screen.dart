@@ -265,6 +265,7 @@ class HomeScreen extends StatelessWidget {
     if (library.status != LibraryModuleStatus.updateAvailable) return;
 
     await applyLibraryAndReport(
+      context,
       library,
       library.update,
       onRequestReindex: onRequestReindex,
