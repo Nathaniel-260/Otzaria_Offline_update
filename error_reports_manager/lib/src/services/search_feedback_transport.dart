@@ -215,6 +215,7 @@ class SearchFeedbackTransport {
           final claimed = await queue.claim(name);
           if (claimed == null) continue;
           var carried = true;
+          var droppedByFallback = 0;
           var batch = await queue.read(claimed,
               notBefore: DateTime.now().subtract(carriedWindow));
           if (batch == null) continue;
@@ -279,10 +280,13 @@ class SearchFeedbackTransport {
           }
           if (outcome.kind == SearchFeedbackOutcomeKind.drop && !_stopped) {
             carried = false;
+            final carriedCount = batch.eventLines.length;
             batch = await queue.read(claimed,
                 notBefore: DateTime.now().subtract(plainWindow));
             if (batch == null) continue;
+            droppedByFallback = carriedCount - batch.eventLines.length;
             if (batch.eventLines.isEmpty) {
+              rejected += droppedByFallback;
               await queue.remove(claimed);
               continue;
             }
@@ -291,13 +295,13 @@ class SearchFeedbackTransport {
           switch (outcome.kind) {
             case SearchFeedbackOutcomeKind.accepted:
               sent += batch.eventLines.length - outcome.rejected;
-              rejected += outcome.rejected;
+              rejected += outcome.rejected + droppedByFallback;
               await queue.remove(claimed);
               _backoffStep = 0;
               if (await retryFile.exists()) await retryFile.delete();
               if (await filteredFile.exists()) await filteredFile.delete();
             case SearchFeedbackOutcomeKind.drop:
-              rejected += batch.eventLines.length;
+              rejected += batch.eventLines.length + droppedByFallback;
               await queue.remove(claimed);
             case SearchFeedbackOutcomeKind.tooLarge:
               await queue.split(claimed);

@@ -404,7 +404,7 @@ void main() {
       addTearDown(transport.close);
       await transport.collect(source, mayCollect: () async => true);
 
-      expect(await transport.upload(), (sent: 1, rejected: 0, remaining: 0));
+      expect(await transport.upload(), (sent: 1, rejected: 1, remaining: 0));
       expect(bodies, hasLength(2));
       expect(bodies.last.containsKey('carriedOffline'), isFalse);
       expect(
