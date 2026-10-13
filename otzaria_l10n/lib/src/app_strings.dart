@@ -1850,14 +1850,11 @@ abstract class ErrorReportsStrings {
   String get collectLater;
   String collectedSnack(int count);
 
-  /// אוצריא דיווחה על כשל חלקי — מה שנאסף תקין ויישלח.
   String collectPartialSnack(int count, String error);
   String collectFailedSnack(String error);
 
-  /// אוצריא נפתחה בין האישור לאיסוף — הדיווחים נשארים בה עד ההפעלה הבאה.
   String get collectOtzariaOpenSnack;
 
-  // ── הסבר חד-פעמי, בהרצה הראשונה במחשב ──
   String get introDialogTitle;
   String get introDialogContent;
   String get introDialogContentReadOnly;
@@ -1872,8 +1869,12 @@ abstract class ErrorReportsStrings {
   String uploadingStage(int done, int total);
   String uploadWaitingStage(int seconds);
   String get uploadStopButton;
+  String get uploadingFeedbackStage;
+  String uploadPendingOffline(int count);
+  String uploadPendingUnchecked(int count);
+  String get uploadCollectingBusy;
+  String get uploadUnexpectedFailure;
 
-  /// הסיכום בסוף ריצה — גם כשנעצרה באמצע.
   String uploadSummary(int sent, int rejected, int remaining);
   String uploadFailedSnack(String error);
 }
