@@ -40,8 +40,8 @@ class MirrorDownloadUndo {
     return undo;
   }
 
-  /// Synchronous I/O over the whole mirror; runs inside an isolate, so log
-  /// lines are returned instead of written.
+  /// I/O סינכרוני על כל המראה — רץ ב-isolate, ולכן שורות הלוג מוחזרות
+  /// ונכתבות בצד הראשי.
   static (MirrorDownloadUndo, List<String>) _capture(List<String> rootDirs) {
     final notes = <String>[];
     final roots = <({String path, bool existed})>[];

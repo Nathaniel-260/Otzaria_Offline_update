@@ -130,8 +130,7 @@ class AppLogger {
     _drain ??= _drainPending().whenComplete(() => _drain = null);
   }
 
-  /// One open sink, one size check per batch: the old code opened the file
-  /// and stat-ed it for every single line.
+  /// sink פתוח אחד ובדיקת גודל אחת לכל אצווה, ולא פתיחה ובדיקה לכל שורה.
   Future<void> _drainPending() async {
     while (_pending.isNotEmpty) {
       final batch = StringBuffer();
@@ -183,8 +182,8 @@ class AppLogger {
     for (var drain = _drain; drain != null; drain = _drain) {
       await drain;
     }
-    // Releases the handle (exit, tests deleting the folder); the next line
-    // reopens it.
+    // משחרר את הקובץ (יציאה, או בדיקה שמוחקת את התיקייה); השורה הבאה
+    // פותחת אותו מחדש.
     if (_drain == null) await _closeSink();
   }
 

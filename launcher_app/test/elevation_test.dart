@@ -168,8 +168,7 @@ void main() {
         quit: () => quit = true,
       );
 
-      expect(failure, isNotNull);
-      expect('$failure', contains('${ElevatedProcess.cancelledCode}'));
+      expect(failure, same(Elevation.cancelled));
       expect(quit, isFalse);
     }, skip: !Platform.isWindows);
 

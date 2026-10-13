@@ -85,8 +85,8 @@ class LauncherSelfInstaller {
     }
   }
 
-  /// The same rule as `RecoverInterruptedUpdate` in `stub.c`: a replace cut
-  /// between its two renames leaves only [previousName], the one copy to keep.
+  /// אותו כלל כמו `RecoverInterruptedUpdate` ב-`stub.c`: החלפה שנקטעה בין
+  /// שני ה-rename משאירה רק את [previousName] — העותק היחיד שיש לשמור.
   Future<void> _restoreInterruptedReplace(LauncherInstallLayout layout) async {
     final previous = File(p.join(layout.executableDir, previousName));
     try {

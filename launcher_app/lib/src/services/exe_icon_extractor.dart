@@ -54,7 +54,7 @@ abstract final class ExeIconExtractor {
       Isolate.run(() => writeExeIconPng(exePath, outPath));
 }
 
-/// Synchronous GDI work; run it inside an isolate.
+/// עבודת GDI סינכרונית — לקרוא רק מתוך isolate.
 bool writeExeIconPng(String exePath, String outPath) {
   final icon = _loadIcon(exePath);
   if (icon == 0) return false;
@@ -108,8 +108,8 @@ _Pixels? _iconPixels(int icon) {
     final color = info.ref.hbmColor;
     final mask = info.ref.hbmMask;
     try {
-      if (color == 0 ||
-          GetObject(color, sizeOf<BITMAP>(), bitmap) == 0 ||
+      if (color == 0) return _monochromePixels(screen, mask, bitmap, header);
+      if (GetObject(color, sizeOf<BITMAP>(), bitmap) == 0 ||
           bitmap.ref.bmWidth <= 0 ||
           bitmap.ref.bmHeight <= 0) {
         return null;
@@ -135,6 +135,49 @@ _Pixels? _iconPixels(int icon) {
     free(bitmap);
     free(header);
   }
+}
+
+/// אייקון מונוכרום: אין `hbmColor`, ומסכה אחת בגובה כפול — חציה העליון
+/// AND (שקיפות) והתחתון XOR (שחור/לבן).
+_Pixels? _monochromePixels(
+  int screen,
+  int mask,
+  Pointer<BITMAP> bitmap,
+  Pointer<BITMAPINFO> header,
+) {
+  if (mask == 0 ||
+      GetObject(mask, sizeOf<BITMAP>(), bitmap) == 0 ||
+      bitmap.ref.bmWidth <= 0 ||
+      bitmap.ref.bmHeight < 2) {
+    return null;
+  }
+  final width = bitmap.ref.bmWidth;
+  final height = bitmap.ref.bmHeight ~/ 2;
+  final bits = _readBits(screen, mask, header, width, height * 2);
+  if (bits == null) return null;
+  return (
+    width: width,
+    height: height,
+    rgba: monochromeToRgba(bits, width, height)
+  );
+}
+
+/// [bits] הוא 32bpp של המסכה בגובה כפול. AND=1 ו-XOR=0 שקוף; אחרת XOR קובע
+/// לבן או שחור (פיקסל "הפוך" מוצג שחור).
+Uint8List monochromeToRgba(Uint8List bits, int width, int height) {
+  final rgba = Uint8List(width * height * 4);
+  final half = width * height * 4;
+  for (var i = 0; i < half; i += 4) {
+    final and = bits[i] != 0;
+    final xor = bits[half + i] != 0;
+    final value = xor && !and ? 255 : 0;
+    rgba
+      ..[i] = value
+      ..[i + 1] = value
+      ..[i + 2] = value
+      ..[i + 3] = and && !xor ? 0 : 255;
+  }
+  return rgba;
 }
 
 Uint8List? _readBits(
@@ -163,8 +206,8 @@ Uint8List? _readBits(
   }
 }
 
-/// 32bpp BGRA from GDI to RGBA. An icon without alpha takes its
-/// transparency from the AND mask, as `Icon.ToBitmap` does.
+/// BGRA של GDI ל-RGBA. אייקון בלי אלפא מקבל שקיפות ממסכת ה-AND, כמו
+/// ב-`Icon.ToBitmap`.
 Uint8List bgraToRgba(Uint8List bgra, Uint8List? andMask) {
   var hasAlpha = false;
   for (var i = 3; i < bgra.length; i += 4) {
@@ -187,7 +230,7 @@ Uint8List bgraToRgba(Uint8List bgra, Uint8List? andMask) {
   return rgba;
 }
 
-/// A minimal truecolour+alpha PNG (filter 0, zlib).
+/// PNG מינימלי, צבע מלא עם אלפא (filter 0, zlib).
 Uint8List encodeRgbaPng(int width, int height, Uint8List rgba) {
   final raw = BytesBuilder(copy: false);
   final stride = width * 4;

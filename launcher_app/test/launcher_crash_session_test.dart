@@ -32,9 +32,9 @@ void main() {
   });
 
   group('exitCleanly', () {
-    test('מוחק את הנעילה ויוצא עם 0', () {
+    test('מוחק את הנעילה ויוצא עם 0', () async {
       final codes = <int>[];
-      LauncherCrashSession.exitCleanly(codes.add);
+      await LauncherCrashSession.exitCleanly(codes.add);
       expect(File(lockPath).existsSync(), isFalse);
       expect(codes, [0]);
     });

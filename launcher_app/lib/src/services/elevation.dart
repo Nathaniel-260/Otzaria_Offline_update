@@ -64,6 +64,10 @@ class Elevation {
     return '$error\n\n${macOS ? t.macHint : t.hint}';
   }
 
+  /// מה ש-[restartElevated] מחזיר כשחלון ה-UAC נסגר בלי אישור (או שהגישה
+  /// נחסמה): בחירה של המשתמש ולא תקלה, ולכן בלי הודעת שגיאה.
+  static const Object cancelled = _ElevationCancelled();
+
   static Future<Object?> restartElevated({
     Future<int> Function(String executable, List<String> arguments)? run,
     void Function()? quit,
@@ -76,6 +80,7 @@ class Elevation {
     } catch (e) {
       return e;
     }
+    if (exitCode == ElevatedProcess.cancelledCode) return cancelled;
     if (exitCode != 0) return 'exit code $exitCode';
     (quit ?? _defaultQuit)();
     return null;
@@ -94,4 +99,11 @@ class Elevation {
   }
 
   static void _defaultQuit() => LauncherCrashSession.exitCleanly();
+}
+
+class _ElevationCancelled {
+  const _ElevationCancelled();
+
+  @override
+  String toString() => 'cancelled';
 }

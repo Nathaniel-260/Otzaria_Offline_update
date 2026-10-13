@@ -15,7 +15,7 @@ String? safeFileName(Object? value) {
 
 final RegExp _forbiddenChars = RegExp(r'[\x00-\x1F<>:"/\\|?*]');
 
-/// `CON.txt` opens the console device on Windows, whatever the extension.
+/// `CON.txt` פותח בווינדוס את התקן הקונסולה, בכל סיומת.
 final RegExp _reservedDeviceName = RegExp(
   r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)',
   caseSensitive: false,

@@ -1659,10 +1659,11 @@ class _SetupError extends SetupErrorStrings {
       'Extract the file to a drive before running it';
   @override
   String get macVolumeAccessDenied =>
-      'macOS did not allow this program to access the removable drive. Open '
-      'System Settings → Privacy & Security → Files and Folders (or Full Disk '
-      'Access), allow Otzaria Updates to access "Removable Volumes", and open '
-      'the program again.';
+      'macOS did not allow this program to write to the folder next to it. '
+      'Open System Settings → Privacy & Security → Files and Folders (or Full '
+      'Disk Access), allow Otzaria Updates to access that location — a '
+      'removable drive, Documents, Desktop or Downloads — and open the program '
+      'again.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {
@@ -2869,12 +2870,13 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String installerElevatedRetryDeclined(int firstExitCode) =>
       'The installation failed (exit code $firstExitCode). It was not '
-      'retried with administrator rights, because the Windows permission '
-      'prompt was declined.';
+      'retried with administrator rights: the Windows permission prompt was '
+      'declined, or access was denied.';
   @override
   String get installerElevationDeclined =>
       'The installer requires administrator rights, and the request was '
-      'declined. To install, approve the Windows permission prompt.';
+      'declined or access was denied. To install, approve the Windows '
+      'permission prompt.';
   @override
   String get installerDigestMismatch =>
       'The installer on the drive is damaged — it does not match the file '
@@ -2899,7 +2901,7 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String get launchElevationDeclined =>
       'The program requires administrator rights, and the request was '
-      'declined.';
+      'declined or access was denied.';
 
   @override
   String mediaFileMissing(String path) => 'Image file not found: $path';

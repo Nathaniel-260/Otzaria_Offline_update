@@ -435,8 +435,8 @@ class LibraryStateStore {
   }
 }
 
-/// `MachineGuid` straight from the registry (64-bit view), in place of a
-/// `reg.exe` spawn that costs ~1s on filtered machines.
+/// `MachineGuid` ישר מהרג'יסטרי (תצוגת 64 סיביות), במקום `reg.exe` שעולה
+/// כשנייה במחשבים מסוננים.
 String? readWindowsMachineGuid() {
   final subKey = r'SOFTWARE\Microsoft\Cryptography'.toNativeUtf16();
   final value = 'MachineGuid'.toNativeUtf16();

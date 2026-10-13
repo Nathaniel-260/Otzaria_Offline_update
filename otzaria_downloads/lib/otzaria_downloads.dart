@@ -16,8 +16,8 @@ class FileDownloadResult {
   final String? sha256;
 }
 
-/// Starts the streaming SHA-256 of [downloadFile]. A Flutter host installs a
-/// native hasher here; `close` must also release whatever it holds.
+/// מתחיל את ה-SHA-256 המוזרם של [downloadFile]. אפליקציית Flutter מציבה
+/// כאן מימוש נייטיבי; `close` חייב גם לשחרר את מה שהוא מחזיק.
 ByteConversionSink Function(Sink<Digest> output) startSha256 =
     sha256.startChunkedConversion;
 

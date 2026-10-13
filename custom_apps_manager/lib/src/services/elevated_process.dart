@@ -56,8 +56,8 @@ class ElevatedProcess {
     }
   }
 
-  /// Runs [executable] through `ShellExecuteExW` and waits for it. A failure
-  /// to start (UAC declined = [cancelledCode]) is reported as the exit code.
+  /// מריץ דרך `ShellExecuteExW` (ב-isolate) וממתין לסיום. כשל בהפעלה
+  /// מוחזר כקוד היציאה; סירוב או חסימה ב-UAC = [cancelledCode].
   static Future<ProcessResult> run(
     String executable,
     List<String> arguments, {
@@ -74,7 +74,7 @@ class ElevatedProcess {
         ));
   }
 
-  /// Like [run], elevated, without waiting for the program to exit.
+  /// כמו [run], מורם, בלי להמתין לסיום התוכנה.
   static Future<ProcessResult> start(
     String executable,
     List<String> arguments, {
@@ -134,8 +134,8 @@ const _seeMaskFlagNoUi = 0x00000400;
 
 const _seErrAccessDenied = 5;
 
-/// Dart FFI clobbers `GetLastError` after a non-leaf call, so the cause comes
-/// from `hInstApp`; a declined UAC prompt is reported there as access denied.
+/// Dart FFI דורס את `GetLastError` אחרי קריאה רגילה, ולכן הסיבה נלקחת מ-
+/// `hInstApp`; שם סירוב UAC וחסימת גישה נראים אותו דבר (access denied).
 int shellExecuteFailureCode(int hInstApp, {String? verb}) {
   if (verb == 'runas' && hInstApp == _seErrAccessDenied) {
     return ElevatedProcess.cancelledCode;
@@ -143,7 +143,7 @@ int shellExecuteFailureCode(int hInstApp, {String? verb}) {
   return hInstApp > 0 && hInstApp <= 32 ? hInstApp : 1;
 }
 
-/// Blocks until the program exits when [wait] — call it inside an isolate.
+/// עם [wait] חוסם עד סיום התוכנה — לקרוא רק מתוך isolate.
 ProcessResult shellExecute(
   String executable,
   String parameters, {

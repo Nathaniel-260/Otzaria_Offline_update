@@ -459,7 +459,7 @@ class _AppShellState extends State<AppShell> {
     } finally {
       if (mounted) setState(() => _elevationPending = false);
     }
-    if (failure != null) {
+    if (failure != null && failure != Elevation.cancelled) {
       UiSnack.showError(t.restartFailedSnack('$failure'));
     }
   }
@@ -982,8 +982,8 @@ class _AppShellState extends State<AppShell> {
     return dir == null ? null : p.join(dir, 'custom_apps_trust.json');
   }
 
-  /// Ctrl+R: re-reads what is installed and what the drive carries, without
-  /// the startup offers. Ignored while a long task runs.
+  /// Ctrl+R/F5: קורא מחדש מה מותקן ומה יש על הכונן, בלי ההצעות של העלייה.
+  /// לא פועל בזמן משימה ארוכה.
   Future<void> _refreshFromKeyboard() async {
     if (_longTaskRunning) return;
     await _launcherFlow.checkMirror();

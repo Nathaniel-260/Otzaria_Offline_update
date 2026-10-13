@@ -154,8 +154,8 @@ class CustomAppsManager {
     await _trust.trust(CustomAppTrustStore.keyFor(entry.descriptor, sha));
   }
 
-  /// Stores the sha256 of the installer as it is now, after the user
-  /// confirmed it; from then on [install] verifies against it.
+  /// שומר את ה-sha256 של קובץ ההתקנה כפי שהוא עכשיו, אחרי שהמשתמש אישר
+  /// אותו (וגם את התוכן — [trustHere]); מכאן [install] מאמת מולו.
   Future<void> recordInstallerHash(String id) async {
     final t = AppL10n.strings.customAppsDomain;
     final store = await _store();

@@ -98,8 +98,8 @@ class StartupDiagnostics {
     return buffer.toString();
   }
 
-  /// `EnumDisplayDevices` is a synchronous driver call: it runs in an isolate
-  /// after the first frame is built, never on the platform thread at startup.
+  /// `EnumDisplayDevices` היא קריאת דרייבר סינכרונית — רצה ב-isolate אחרי
+  /// שהפריים הראשון נבנה, ולעולם לא על thread הפלטפורמה בעלייה.
   static Future<void> _logDisplayAdapter() async {
     try {
       final adapter = await Isolate.run(primaryDisplayAdapter);

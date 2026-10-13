@@ -1562,9 +1562,10 @@ class _SetupError extends SetupErrorStrings {
   String get runningFromTempTitle => 'חלץ את הקובץ לכונן לפני ההפעלה';
   @override
   String get macVolumeAccessDenied =>
-      'macOS לא אישר לתוכנה גישה לכונן הנשלף. יש לפתוח את הגדרות המערכת ← '
-      'פרטיות ואבטחה ← קבצים ותיקיות (או גישה מלאה לדיסק), לאפשר לעדכוני '
-      'אוצריא גישה ל"כוננים נשלפים", ולפתוח את התוכנה מחדש.';
+      'macOS לא אישר לתוכנה לכתוב לתיקייה שלצידה. יש לפתוח את הגדרות '
+      'המערכת ← פרטיות ואבטחה ← קבצים ותיקיות (או גישה מלאה לדיסק), לאפשר '
+      'לעדכוני אוצריא גישה למיקום הזה — כונן נשלף, מסמכים, שולחן העבודה או '
+      'הורדות — ולפתוח את התוכנה מחדש.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {
@@ -2669,11 +2670,11 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String installerElevatedRetryDeclined(int firstExitCode) =>
       'ההתקנה הסתיימה בשגיאה (קוד $firstExitCode). ניסיון חוזר בהרשאות '
-      'מנהל לא בוצע, כי הבקשה נדחתה בחלון ההרשאות של ווינדוס.';
+      'מנהל לא בוצע: הבקשה נדחתה בחלון ההרשאות של ווינדוס, או שהגישה נחסמה.';
   @override
   String get installerElevationDeclined =>
-      'המתקין דורש הרשאות מנהל, והבקשה נדחתה. כדי להתקין, יש לאשר את '
-      'חלון ההרשאות של ווינדוס.';
+      'המתקין דורש הרשאות מנהל, והבקשה נדחתה או שהגישה נחסמה. כדי להתקין, '
+      'יש לאשר את חלון ההרשאות של ווינדוס.';
   @override
   String get installerDigestMismatch =>
       'קובץ ההתקנה שעל הכונן פגום — הוא אינו זהה לקובץ שנשמר. יש להוריד '
@@ -2696,7 +2697,7 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'קובץ ההרצה אינו נמצא: $launchPath';
   @override
   String get launchElevationDeclined =>
-      'התוכנה דורשת הרשאות מנהל, והבקשה נדחתה.';
+      'התוכנה דורשת הרשאות מנהל, והבקשה נדחתה או שהגישה נחסמה.';
 
   @override
   String mediaFileMissing(String path) => 'קובץ התמונה אינו נמצא: $path';

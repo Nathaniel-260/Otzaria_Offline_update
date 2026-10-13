@@ -929,7 +929,7 @@ abstract class SetupErrorStrings {
   String get runningFromTemp;
   String get runningFromTempTitle;
 
-  /// macOS (TCC) חסם גישה לכונן נשלף — EPERM, לא הרשאות קובץ.
+  /// macOS (TCC) חסם כתיבה לתיקייה שליד התוכנה — EPERM, לא הרשאות קובץ.
   String get macVolumeAccessDenied;
 }
 

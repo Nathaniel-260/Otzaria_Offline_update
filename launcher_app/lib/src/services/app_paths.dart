@@ -128,20 +128,17 @@ class AppPaths {
     );
   }
 
-  static final RegExp _zipSegment =
-      RegExp(r'\.zip([\\/]|$)', caseSensitive: false);
-
-  /// Explorer runs an exe opened inside a zip from a copy under `%TEMP%`
-  /// (`Temp1_<name>.zip`); data written there is discarded. = `stub.c`.
+  /// Explorer מריץ exe שנפתח מתוך zip מעותק תחת `%TEMP%` (`Temp1_<שם>.zip`),
+  /// ומה שנכתב שם נמחק. תיקיית temp שהיא שורש כונן אינה נחשבת. = `stub.c`.
   static bool isTemporaryLocation(
     String dir, {
     required List<String> tempDirs,
   }) {
-    if (_zipSegment.hasMatch(dir)) return true;
     final normalized = p.windows.normalize(dir).toLowerCase();
     for (final temp in tempDirs) {
       if (temp.isEmpty) continue;
       final root = p.windows.normalize(temp).toLowerCase();
+      if (p.windows.rootPrefix(root) == root) continue;
       if (normalized == root || p.windows.isWithin(root, normalized)) {
         return true;
       }
@@ -174,8 +171,8 @@ class AppPaths {
     return dirs.toList();
   }
 
-  /// On macOS a removable volume the user never allowed (TCC) fails with
-  /// EPERM; the OS text says nothing about where to allow it.
+  /// ב-macOS מיקום שהמשתמש לא אישר (TCC) נכשל ב-EPERM, והודעת המערכת אינה
+  /// אומרת איפה מאשרים.
   static String writeFailureMessage(
     FileSystemException failure, {
     required bool isMacOS,

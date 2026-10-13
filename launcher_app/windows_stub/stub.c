@@ -791,25 +791,12 @@ static BOOL IsInsideFolder(const wchar_t *path, const wchar_t *folder) {
   return path[length] == L'\0' || path[length] == L'\\';
 }
 
-static BOOL HasZipSegment(const wchar_t *path) {
-  for (const wchar_t *dot = wcschr(path, L'.'); dot != NULL;
-       dot = wcschr(dot + 1, L'.')) {
-    if (_wcsnicmp(dot, L".zip", 4) == 0 &&
-        (dot[4] == L'\\' || dot[4] == L'\0')) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
 // = `AppPaths.isTemporaryLocation`.
+// Explorer מריץ exe מתוך zip מעותק תחת %TEMP%; temp שהוא שורש כונן אינו נחשב.
 static BOOL IsTemporaryLocation(const wchar_t *dir) {
-  if (HasZipSegment(dir)) {
-    return TRUE;
-  }
   wchar_t temp[MAX_PATH + 1];
   const DWORD length = GetTempPathW(ARRAYSIZE(temp), temp);
-  if (length == 0 || length >= ARRAYSIZE(temp)) {
+  if (length == 0 || length >= ARRAYSIZE(temp) || length <= 3) {
     return FALSE;
   }
   wchar_t *long_temp = LongPathOf(temp);

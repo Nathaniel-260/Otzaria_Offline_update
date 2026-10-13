@@ -4,8 +4,8 @@ import 'package:crypto/crypto.dart';
 import 'package:seforim_library_updater/seforim_library_updater.dart'
     show Sha256Stream;
 
-/// `otzaria_downloads.startSha256` backed by the OS crypto (`Sha256Stream`),
-/// so verifying a download no longer runs pure-Dart SHA on the UI isolate.
+/// `otzaria_downloads.startSha256` דרך ספריית ההצפנה של המערכת
+/// (`Sha256Stream`), במקום SHA של Dart טהור על ה-UI isolate.
 class NativeSha256Sink extends ByteConversionSink {
   NativeSha256Sink(this._output);
 

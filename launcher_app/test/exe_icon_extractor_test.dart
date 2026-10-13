@@ -31,6 +31,15 @@ void main() {
     expect(bgraToRgba(bgra, mask), [3, 2, 1, 255, 6, 5, 4, 0]);
   });
 
+  test('אייקון מונוכרום: AND=1/XOR=0 שקוף, XOR=1 לבן, השאר שחור', () {
+    // שני פיקסלים, גובה 1: חצי עליון AND, חצי תחתון XOR.
+    final bits = Uint8List.fromList([
+      255, 255, 255, 0, 0, 0, 0, 0, // AND
+      0, 0, 0, 0, 255, 255, 255, 0, // XOR
+    ]);
+    expect(monochromeToRgba(bits, 2, 1), [0, 0, 0, 0, 255, 255, 255, 255]);
+  });
+
   test('BGRA עם אלפא שומר אותו ומתעלם מהמסכה', () {
     final bgra = Uint8List.fromList([1, 2, 3, 77]);
     expect(bgraToRgba(bgra, Uint8List(4)..[0] = 255), [3, 2, 1, 77]);

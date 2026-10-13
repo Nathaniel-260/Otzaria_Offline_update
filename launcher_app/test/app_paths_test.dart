@@ -271,13 +271,24 @@ void main() {
       );
     });
 
-    test('עותק ש-Explorer פתח מתוך zip, גם מחוץ ל-%TEMP%', () {
+    test('תיקייה בשם .zip מחוץ ל-%TEMP% אינה זמנית', () {
       expect(
         AppPaths.isTemporaryLocation(
-          r'D:\x\Temp1_Otzaria-Updates.ZIP\app-files',
-          tempDirs: const [],
+          r'E:\archive.zip\app-files',
+          tempDirs: temp,
         ),
-        isTrue,
+        isFalse,
+      );
+    });
+
+    test('TMP שמצביע על שורש כונן אינו הופך את כל הכונן לזמני', () {
+      expect(
+        AppPaths.isTemporaryLocation(r'E:\app-files', tempDirs: [r'E:\']),
+        isFalse,
+      );
+      expect(
+        AppPaths.isTemporaryLocation(r'E:\app-files', tempDirs: ['E:']),
+        isFalse,
       );
     });
 

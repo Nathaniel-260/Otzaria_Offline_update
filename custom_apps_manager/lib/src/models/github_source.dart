@@ -26,8 +26,8 @@ class GithubSource {
   /// הכתובת שהמשתמש רואה — גם מה שהוא הדביק מלכתחילה.
   String get webUrl => 'https://github.com/$owner/$repo';
 
-  /// The record travels on the drive, so it gets the same check as [parseUrl]:
-  /// `owner`/`repo` end up in an API URL.
+  /// הרשומה נוסעת על הכונן, ולכן אותה בדיקה כמו ב-[parseUrl] —
+  /// `owner`/`repo` נכנסים לכתובת API.
   factory GithubSource.fromJson(Map<String, dynamic> json) {
     final owner = json['owner'];
     final repo = json['repo'];
