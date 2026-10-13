@@ -1618,7 +1618,8 @@ just launch. Five load-bearing details:
 - Its two message boxes (the failure, and "extract me first") are the **only**
   user-visible strings in this repo outside `otzaria_l10n` — C cannot depend on
   a Dart package.
-- **It refuses to run from `%TEMP%` or from inside a `.zip`**
+- **It refuses to run from under `%TEMP%`** (a temp that is a drive root
+  does not count; a folder merely named `*.zip` elsewhere is fine)
   (`IsTemporaryLocation`; Dart twin `AppPaths.isTemporaryLocation` →
   `AppPathsFailure.runningFromTemp`). Explorer runs an exe opened in a zip from
   `%TEMP%\Temp1_<name>.zip\`, and everything downloaded there was discarded.
