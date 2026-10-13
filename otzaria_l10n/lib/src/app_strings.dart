@@ -1077,6 +1077,11 @@ abstract class LauncherUpdateStrings {
   String downloadFailed(int statusCode);
   String sizeMismatch(int received, int expected);
   String replaceFailed(String error);
+  String replaceFailedNotRestored(
+    String error,
+    String previousPath,
+    String executableName,
+  );
   String restartFailed(String error);
   String restartFailedRolledBack(String error);
   String get digestMismatch;

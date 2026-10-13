@@ -5,6 +5,7 @@
 // **כן** רצה על קבצים אמיתיים בתיקייה זמנית: זה כל העניין בה, ודמה שלא נוגע
 // בדיסק לא היה מגלה שהיא מוחקת משהו שאסור לגעת בו.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -898,6 +899,44 @@ void main() {
       expect(quits, 0);
     });
 
+    test('החזרה שנכשלה אינה מוצגת כהחזרה, וה-target נשאר ל-stub', () async {
+      final names = {
+        LauncherSelfInstaller.stagedName,
+        LauncherSelfInstaller.previousName,
+      };
+      await expectLater(
+        IOOverrides.runZoned(
+          () => installer().apply(
+            layout: layout,
+            downloadedFilePath: downloaded.path,
+          ),
+          createFile: (path) {
+            final real = Zone.root.run(() => File(path));
+            return names.contains(p.basename(path))
+                ? _NoRenameFile(real)
+                : real;
+          },
+        ),
+        throwsA(
+          isA<LauncherUpdateException>().having(
+            (e) => e.message,
+            'message',
+            contains(LauncherSelfInstaller.previousName),
+          ),
+        ),
+      );
+
+      expect(
+        File(p.join(temp.path, LauncherSelfInstaller.targetName)).existsSync(),
+        isTrue,
+      );
+      expect(
+        await File(p.join(temp.path, LauncherSelfInstaller.previousName))
+            .readAsString(),
+        'גרסה ישנה',
+      );
+    });
+
     test('מפעיל את הקובץ החדש עם ה-pid שלנו, ואז מסיים', () async {
       await installer().apply(
         layout: layout,
@@ -1419,6 +1458,29 @@ class _DeniedUpdater implements LauncherSelfUpdater {
 
   @override
   String get currentVersion => '1.0.0';
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _NoRenameFile implements File {
+  _NoRenameFile(this._real);
+
+  final File _real;
+
+  @override
+  String get path => _real.path;
+
+  @override
+  Future<bool> exists() => _real.exists();
+
+  @override
+  Future<FileSystemEntity> delete({bool recursive = false}) =>
+      _real.delete(recursive: recursive);
+
+  @override
+  Future<File> rename(String newPath) =>
+      Future.error(FileSystemException('locked', path));
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

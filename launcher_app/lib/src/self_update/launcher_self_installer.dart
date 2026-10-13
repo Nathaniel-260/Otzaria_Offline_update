@@ -126,6 +126,7 @@ class LauncherSelfInstaller {
       );
     }
 
+    var stubMustRecover = false;
     try {
       try {
         await File(layout.executablePath).rename(previous.path);
@@ -139,14 +140,23 @@ class LauncherSelfInstaller {
       } catch (e) {
         try {
           await previous.rename(layout.executablePath);
-        } catch (_) {}
+        } catch (_) {
+          stubMustRecover = true;
+          throw LauncherUpdateException(
+            AppL10n.strings.launcherUpdate.replaceFailedNotRestored(
+              '$e',
+              previous.path,
+              p.basename(layout.executablePath),
+            ),
+          );
+        }
         throw LauncherUpdateException(
           AppL10n.strings.launcherUpdate.replaceFailed('$e'),
         );
       }
     } finally {
       try {
-        await target.delete();
+        if (!stubMustRecover) await target.delete();
       } on FileSystemException catch (_) {}
     }
   }
@@ -234,7 +244,15 @@ class LauncherSelfInstaller {
       } catch (e) {
         try {
           await previous.rename(layout.executablePath);
-        } catch (_) {}
+        } catch (_) {
+          throw LauncherUpdateException(
+            AppL10n.strings.launcherUpdate.replaceFailedNotRestored(
+              '$e',
+              previous.path,
+              p.basename(layout.executablePath),
+            ),
+          );
+        }
         throw LauncherUpdateException(
           AppL10n.strings.launcherUpdate.replaceFailed('$e'),
         );

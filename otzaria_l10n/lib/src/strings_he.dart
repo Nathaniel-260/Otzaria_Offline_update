@@ -1802,6 +1802,14 @@ class _LauncherUpdate extends LauncherUpdateStrings {
   String replaceFailed(String error) =>
       'החלפת קובץ ההרצה נכשלה: $error. הקובץ הקודם הוחזר למקומו.';
   @override
+  String replaceFailedNotRestored(
+    String error,
+    String previousPath,
+    String executableName,
+  ) =>
+      'החלפת קובץ ההרצה נכשלה: $error, וגם החזרת הקובץ הקודם נכשלה. הוא '
+      'שמור ב-$previousPath — יש לשנות את שמו בחזרה ל-$executableName.';
+  @override
   String restartFailed(String error) =>
       'הפעלת הגרסה החדשה נכשלה: $error. יש לסגור את התוכנה ולהפעיל אותה '
       'מחדש ידנית — ההחלפה עצמה כבר הושלמה.';

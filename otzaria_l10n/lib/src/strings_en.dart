@@ -1919,6 +1919,15 @@ class _LauncherUpdate extends LauncherUpdateStrings {
       'Replacing the executable failed: $error. The previous file was put '
       'back in place.';
   @override
+  String replaceFailedNotRestored(
+    String error,
+    String previousPath,
+    String executableName,
+  ) =>
+      'Replacing the executable failed: $error, and putting the previous '
+      'file back failed too. It is kept as $previousPath — rename it back to '
+      '$executableName.';
+  @override
   String restartFailed(String error) =>
       'Launching the new version failed: $error. Please close the program and '
       'start it again manually — the replacement itself already finished.';
