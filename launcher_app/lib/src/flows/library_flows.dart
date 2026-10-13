@@ -119,10 +119,9 @@ Future<void> showLibraryChangesDialog(
     context: context,
     title: t.changesTitle,
     confirmText: context.strings.common.close,
-    customContent: WhatsNewView(
-      markdown: parts.join('\n\n---\n\n'),
+    customContent: LibraryChangesView(
+      markdowns: parts,
       emptyText: t.changesNotFound,
-      maxHeight: 480,
     ),
   );
 }
