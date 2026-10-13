@@ -18,6 +18,7 @@ class PluginVersionEntry extends Equatable {
     this.releasedAt = '',
     this.supportsDirectInstall = true,
     this.isLatest = false,
+    this.sha256,
   });
 
   final String version;
@@ -42,6 +43,8 @@ class PluginVersionEntry extends Equatable {
   /// זו הגרסה החיה של התוסף באתר.
   final bool isLatest;
 
+  final String? sha256;
+
   /// בונה רשומה מתוך `versions[]` של `/api/plugins`. [baseUrl] הופך את
   /// `downloadUrl` היחסי למוחלט, בדיוק כמו ב-`StorePlugin.fromApi`.
   static PluginVersionEntry? fromApi(Object? json, String baseUrl) {
@@ -63,8 +66,31 @@ class PluginVersionEntry extends Equatable {
       releasedAt: _string(json['releasedAt']),
       supportsDirectInstall: json['supportsDirectInstall'] != false,
       isLatest: json['isLatest'] == true,
+      sha256: normalizeSha256(json['sha256']),
     );
   }
+
+  static final RegExp _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
+
+  static String? normalizeSha256(Object? value) {
+    if (value is! String) return null;
+    final hex = value.trim().toLowerCase();
+    return _sha256Pattern.hasMatch(hex) ? hex : null;
+  }
+
+  PluginVersionEntry withDownloadUrl(String url) => PluginVersionEntry(
+        version: version,
+        status: status,
+        compatibleWith: compatibleWith,
+        maxAppVersion: maxAppVersion,
+        downloadUrl: url,
+        requiresNetwork: requiresNetwork,
+        fileSize: fileSize,
+        releasedAt: releasedAt,
+        supportsDirectInstall: supportsDirectInstall,
+        isLatest: isLatest,
+        sha256: sha256,
+      );
 
   /// קריאה מהקטלוג השמור. הכתובת כבר מוחלטת שם, ולכן אין [baseUrl].
   static PluginVersionEntry? fromJson(Object? json) => fromApi(json, '');
@@ -80,6 +106,7 @@ class PluginVersionEntry extends Equatable {
         'releasedAt': releasedAt,
         'supportsDirectInstall': supportsDirectInstall,
         'isLatest': isLatest,
+        if (sha256 != null) 'sha256': sha256,
       };
 
   static String _string(Object? value) => value is String ? value : '';
@@ -102,5 +129,6 @@ class PluginVersionEntry extends Equatable {
         releasedAt,
         supportsDirectInstall,
         isLatest,
+        sha256,
       ];
 }

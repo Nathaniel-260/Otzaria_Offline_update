@@ -113,6 +113,7 @@ class _AppShellState extends State<AppShell> {
 
   /// "התוסף הותקן בהצלחה" — נשלח מהקונטרולר כשהסריקה זיהתה שאוצריא סיימה.
   late final StreamSubscription<String> _installDone;
+  late final StreamSubscription<Object?> _installRejected;
 
   /// תוכנות שהמשתמש הוסיף בעצמו. אינו מודול כמו השלושה: הוא לא נבדק
   /// ב-[checkAll], אין לו הורדה מהרשת, והוא נעלם לגמרי כשאין בו כלום.
@@ -254,6 +255,17 @@ class _AppShellState extends State<AppShell> {
         UiSnack.showSuccess(AppL10n.strings.plugins.installDoneSnack(name));
       }
     });
+    _installRejected = _plugins.installRejections.listen((entry) {
+      if (!mounted) return;
+      final t = AppL10n.strings.plugins;
+      if (entry.report.cancelled) {
+        UiSnack.show(t.installCancelledSnack(entry.name));
+      } else {
+        UiSnack.showError(
+          t.installRejectedSnack(entry.name, entry.report.message),
+        );
+      }
+    });
     _customApps = CustomAppsController(
       mirrorRootDir: p.join(widget.dataDir, 'mirror'),
       stateDir: widget.stateFilesDir,
@@ -311,6 +323,7 @@ class _AppShellState extends State<AppShell> {
     _dialogs.dispose();
     _runningPoll?.cancel();
     unawaited(_installDone.cancel());
+    unawaited(_installRejected.cancel());
     widget.settings.removeListener(_onChange);
     _otzaria.removeListener(_onChange);
     _library.removeListener(_onChange);
@@ -557,6 +570,7 @@ class _AppShellState extends State<AppShell> {
         _errorReports,
         readOnly: widget.readOnly,
         isOtzariaRunning: refreshProcessState,
+        notices: _notices,
       );
       if (!mounted) return;
       await offerSearchFeedbackCollection(

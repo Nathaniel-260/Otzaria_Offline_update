@@ -603,6 +603,8 @@ abstract class PluginsStrings {
 
   /// אחרי שהסריקה הוכיחה שאוצריא סיימה — ולא כשהמסירה אליה הצליחה.
   String installDoneSnack(String pluginName);
+  String installCancelledSnack(String pluginName);
+  String installRejectedSnack(String pluginName, String? reason);
   String get installFailedSnack;
 
   String get loadingCatalog;
@@ -696,6 +698,9 @@ abstract class PluginsStrings {
   /// היה נראה כתקלה. בכל שאר המצבים הבחירה שקופה — מוצג פשוט מספר הגרסה
   /// שתותקן.
   String get installChipIncompatible;
+  String get installChipDisabled;
+  String get installChipDisabledUpdate;
+  String get installChipDevelopment;
 
   String get infoPanelTitle;
   String get tagsPanelTitle;
@@ -1496,6 +1501,7 @@ abstract class PluginsDomainStrings {
   /// אין לתוסף אף בילד שירוץ על גרסת אוצריא שבמחשב הזה.
   String get noCompatibleBuild;
   String get localPluginFileMissing;
+  String get localPluginFileCorrupt;
   String get badPluginExtension;
   String get otzariaOpenFailedHint;
   String otzariaOpenFailed(String error);
@@ -1523,6 +1529,10 @@ abstract class PluginsDomainStrings {
   String syncScreenshotFailed(String name, String error);
   String syncPluginFileFailed(String name, String error);
   String get downloadedFileNotPlugin;
+  String get downloadedFileNotImage;
+  String get downloadedFileHashMismatch;
+  String get downloadedFileWrongBuild;
+  String get siteClosedForShabbat;
 
   String get whatPluginList;
   String get whatStoreStructure;
@@ -1892,6 +1902,10 @@ abstract class ErrorReportsStrings {
   /// אוצריא נפתחה בין האישור לאיסוף — הדיווחים נשארים בה עד ההפעלה הבאה.
   String get collectOtzariaOpenSnack;
 
+  /// קובץ Hive ישן של תור דיווחים שאוצריא הנוכחית אינה מעבירה עוד.
+  String get legacyReportsDialogTitle;
+  String get legacyReportsDialogContent;
+
   // ── הסבר חד-פעמי, בהרצה הראשונה במחשב ──
   String get introDialogTitle;
   String get introDialogContent;
@@ -1924,6 +1938,7 @@ abstract class ErrorReportsDomainStrings {
   String get someNotCollected;
 
   String uploadHttpStatus(int statusCode);
+  String get uploadShabbat;
   String get uploadTimedOut;
   String uploadNetworkError(String error);
   String outboxUnreadable(String error);

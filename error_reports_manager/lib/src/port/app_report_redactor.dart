@@ -21,29 +21,8 @@ class AppReportRedactor {
   static const String emailPlaceholder = '<email>';
   static const int minUserNameLength = 3;
 
-  /// הדומיין של כתובת דואר, מוגבל (RFC 5321: תווית עד 63). הביטוי המקורי
-  /// (`...*@...`) היה מחפש `@` מכל נקודת התחלה בטקסט — ריבועי: `'a' * 200000`
-  /// תקע את ה-isolate דקות. לכן מחפשים קודם `@`, וממנו סורקים קדימה ואחורה.
-  static final RegExp _emailDomain = RegExp(
-    r'[A-Za-z0-9\-]{1,63}(?:\.[A-Za-z0-9\-]{1,63}){0,10}\.[A-Za-z]{2,24}',
-  );
-
-  static bool _isAlnum(int c) =>
-      (c >= 0x30 && c <= 0x39) ||
-      (c >= 0x41 && c <= 0x5A) ||
-      (c >= 0x61 && c <= 0x7A);
-
-  /// תווי החלק המקומי: אות/ספרה ו-`._%+-`.
-  static bool _isLocal(int c) =>
-      _isAlnum(c) ||
-      c == 0x2E ||
-      c == 0x5F ||
-      c == 0x25 ||
-      c == 0x2B ||
-      c == 0x2D;
-
-  /// מחליף כל כתובת דואר ב-[emailPlaceholder]. החלק המקומי עד 64 תווים
-  /// ומתחיל באות או ספרה (`-a@b.com` מוסתר כ-`-<email>`, לא נשאר גלוי).
+  /// סורק ליניארי, פורט של `_redactEmails` באוצריא (c65848023): ביטוי רגולרי
+  /// עם backtracking איטי ריבועית בטוקן ארוך. אותה משמעות בדיוק, בלי גבולות אורך.
   static String _redactEmails(String text) {
     var at = text.indexOf('@');
     if (at < 0) return text;
@@ -51,29 +30,57 @@ class AppReportRedactor {
     var copied = 0;
     while (at >= 0) {
       var start = at;
-      while (start > copied &&
-          at - start < 64 &&
-          _isLocal(text.codeUnitAt(start - 1))) {
+      while (start > copied && _isLocal(text.codeUnitAt(start - 1))) {
         start--;
       }
       while (start < at && !_isAlnum(text.codeUnitAt(start))) {
         start++;
       }
-      final domain =
-          start < at ? _emailDomain.matchAsPrefix(text, at + 1) : null;
-      if (domain == null) {
+      final end = start < at ? _domainEnd(text, at + 1) : -1;
+      if (end < 0) {
         at = text.indexOf('@', at + 1);
         continue;
       }
       out
         ..write(text.substring(copied, start))
         ..write(emailPlaceholder);
-      copied = domain.end;
-      at = text.indexOf('@', copied);
+      copied = end;
+      at = text.indexOf('@', end);
     }
-    out.write(text.substring(copied));
-    return out.toString();
+    return (out..write(text.substring(copied))).toString();
   }
+
+  /// סוף הדומיין שמתחיל ב-[from]: תוויות לא ריקות מופרדות בנקודה ואחריהן
+  /// סיומת של 2 אותיות לפחות; הסיומת המאוחרת ביותר מנצחת. -1 אם אין.
+  static int _domainEnd(String text, int from) {
+    var end = -1;
+    var pos = from;
+    while (true) {
+      final labelStart = pos;
+      while (pos < text.length && _isLabel(text.codeUnitAt(pos))) {
+        pos++;
+      }
+      if (pos == labelStart || pos >= text.length) break;
+      if (text.codeUnitAt(pos) != 0x2E) break;
+      var tld = pos + 1;
+      while (tld < text.length && _isLetter(text.codeUnitAt(tld))) {
+        tld++;
+      }
+      if (tld - pos - 1 >= 2) end = tld;
+      pos++;
+    }
+    return end;
+  }
+
+  static bool _isLetter(int c) =>
+      (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A);
+
+  static bool _isAlnum(int c) => _isLetter(c) || (c >= 0x30 && c <= 0x39);
+
+  static bool _isLabel(int c) => _isAlnum(c) || c == 0x2D;
+
+  static bool _isLocal(int c) =>
+      _isLabel(c) || c == 0x2E || c == 0x5F || c == 0x25 || c == 0x2B;
 
   /// מקטע נתיב: מותרים בו רווחים פנימיים (`John Smith`, `Program Files`),
   /// אבל לא בתחילתו ובסופו — כך שמשפט שבא אחרי נתיב אינו נבלע בו.

@@ -963,6 +963,12 @@ class _Plugins extends PluginsStrings {
   String installDoneSnack(String pluginName) =>
       'התוסף $pluginName הותקן בהצלחה';
   @override
+  String installCancelledSnack(String pluginName) =>
+      'התקנת $pluginName בוטלה באוצריא';
+  @override
+  String installRejectedSnack(String pluginName, String? reason) =>
+      'אוצריא לא התקינה את $pluginName${reason == null ? '' : ': $reason'}';
+  @override
   String get installFailedSnack => 'ההתקנה נכשלה';
 
   @override
@@ -1134,6 +1140,12 @@ class _Plugins extends PluginsStrings {
       'עדכון זמין (מותקן $installedVersion)';
   @override
   String get installChipIncompatible => 'דורש אוצריא חדשה יותר';
+  @override
+  String get installChipDisabled => 'מותקן, מושבת באוצריא';
+  @override
+  String get installChipDisabledUpdate => 'עדכון זמין, מושבת באוצריא';
+  @override
+  String get installChipDevelopment => 'גרסת פיתוח מקומית';
 
   @override
   String get infoPanelTitle => 'מידע כללי';
@@ -2325,7 +2337,8 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get semanticFeedbackCollectTitle => 'איסוף נתוני אימון לחיפוש החכם';
   @override
   String semanticFeedbackCollectBody(int count) =>
-      'באוצריא ממתינות $count רשומות נתוני שימוש בחיפוש החכם, שנאספו בהסכמתכם. להעביר אותן לכונן כדי לשלוח לאוצריא מהמחשב המקוון? הנתונים יוסרו מהתור של אוצריא רק לאחר שמירתם בכונן.';
+      'באוצריא ממתינות $count רשומות נתוני שימוש בחיפוש החכם, שנאספו בהסכמתכם. להעביר אותן לכונן כדי לשלוח לאוצריא מהמחשב המקוון? הנתונים יוסרו מהתור של אוצריא רק לאחר שמירתם בכונן.\n\n'
+      'שימו לב: הרשומות, כולל מילות החיפוש, נשמרות בכונן בלי הצפנה עד שיישלחו, יחד עם המפתח האנונימי שחותם עליהן. המפתח נמחק מהכונן כשכל הרשומות נשלחו.';
   @override
   String get semanticFeedbackUploadTitle => 'שליחת נתוני אימון לאוצריא';
   @override
@@ -2616,6 +2629,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   String get localPluginFileMissing =>
       'קובץ התוסף המקומי חסר. יש לבצע סנכרון מחדש.';
   @override
+  String get localPluginFileCorrupt =>
+      'קובץ התוסף שבכונן פגום או אינו הגרסה שנבחרה. יש להוריד את החנות מחדש במחשב המחובר לרשת.';
+  @override
   String get badPluginExtension => 'קובץ התוסף אינו בסיומת otzplugin תקינה.';
   @override
   String get otzariaOpenFailedHint =>
@@ -2659,6 +2675,18 @@ class _PluginsDomain extends PluginsDomainStrings {
       'לא ניתן להוריד את קובץ התוסף $name: $error';
   @override
   String get downloadedFileNotPlugin => 'הקובץ שירד אינו קובץ תוסף תקין';
+  @override
+  String get downloadedFileNotImage =>
+      'הקובץ שירד אינו תמונה (ייתכן שזה דף חסימה של סינון)';
+  @override
+  String get downloadedFileHashMismatch =>
+      'הקובץ שירד אינו תואם לחתימה שהאתר פרסם';
+  @override
+  String get downloadedFileWrongBuild =>
+      'הקובץ שירד אינו הגרסה שנבחרה של התוסף';
+  @override
+  String get siteClosedForShabbat =>
+      'אתר אוצריא סגור בשבת ובימים טובים. החנות שכבר בכונן ממשיכה לעבוד, ואפשר להוריד עדכונים אחרי צאת השבת.';
 
   @override
   String get whatPluginList => 'רשימת התוספים';
@@ -3205,7 +3233,10 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String collectDialogContent(int count) =>
       'נמצאו באוצריא $count דיווחים על ספרים, התוכנה ותוספים שעדיין לא נשלחו.\n\n'
-      'לאסוף אותם לכונן, כדי לשלוח אותם לאוצריא מהמחשב המחובר לרשת?';
+      'לאסוף אותם לכונן, כדי לשלוח אותם לאוצריא מהמחשב המחובר לרשת?\n\n'
+      'שימו לב: הדיווחים נשמרים בכונן כמו שהם, בלי הצפנה, עד שיישלחו — '
+      'כתובת המייל, הטקסט שכתבתם, קטעי יומן, צילומי מסך, ובדיווח על קריסה '
+      'שאישרתם גם תמונת זיכרון (dump). מי שמחזיק בכונן יכול לקרוא אותם.';
   @override
   String get collectConfirm => 'איסוף';
   @override
@@ -3221,6 +3252,14 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String get collectOtzariaOpenSnack =>
       'אוצריא פתוחה, ולכן הדיווחים לא נאספו. השאלה תחזור בהפעלה הבאה';
+  @override
+  String get legacyReportsDialogTitle => 'דיווחים ישנים שלא הועברו';
+  @override
+  String get legacyReportsDialogContent =>
+      'במחשב הזה נשארו דיווחים שנשמרו בגרסה ישנה של אוצריא, במבנה שגרסת '
+      'אוצריא הנוכחית כבר אינה מעבירה. לכן גם עדכוני אוצריא אינם יכולים '
+      'לאסוף אותם.\n\n'
+      'שאר הדיווחים נאספים ונשלחים כרגיל.';
 
   @override
   String get introDialogTitle => 'דיווחים לאוצריא ולמפתחי התוספים';
@@ -3282,6 +3321,9 @@ class _ErrorReportsDomain extends ErrorReportsDomainStrings {
 
   @override
   String uploadHttpStatus(int statusCode) => 'השרת השיב בקוד $statusCode';
+  @override
+  String get uploadShabbat =>
+      'אתר אוצריא סגור בשבת ובימים טובים. הדיווחים נשמרו בכונן ויישלחו בפעם הבאה, אחרי צאת השבת.';
   @override
   String get uploadTimedOut => 'השרת לא השיב בזמן';
   @override

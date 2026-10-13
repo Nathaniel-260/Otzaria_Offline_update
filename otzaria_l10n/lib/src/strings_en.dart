@@ -1022,6 +1022,12 @@ class _Plugins extends PluginsStrings {
   String installDoneSnack(String pluginName) =>
       '$pluginName was installed successfully';
   @override
+  String installCancelledSnack(String pluginName) =>
+      'Installing $pluginName was cancelled in Otzaria';
+  @override
+  String installRejectedSnack(String pluginName, String? reason) =>
+      'Otzaria did not install $pluginName${reason == null ? '' : ': $reason'}';
+  @override
   String get installFailedSnack => 'The installation failed';
 
   @override
@@ -1195,6 +1201,13 @@ class _Plugins extends PluginsStrings {
       'Update available (you have $installedVersion)';
   @override
   String get installChipIncompatible => 'Needs a newer Otzaria';
+  @override
+  String get installChipDisabled => 'Installed, disabled in Otzaria';
+  @override
+  String get installChipDisabledUpdate =>
+      'Update available, disabled in Otzaria';
+  @override
+  String get installChipDevelopment => 'Local development copy';
 
   @override
   String get infoPanelTitle => 'General Information';
@@ -2501,7 +2514,8 @@ class _LibraryDomain extends LibraryDomainStrings {
       'Collect smart search training data';
   @override
   String semanticFeedbackCollectBody(int count) =>
-      'Otzaria has $count records of smart search usage data collected with your consent. Transfer them to the drive for sending from the online computer? They will be removed from Otzaria’s queue only after being saved to the drive.';
+      'Otzaria has $count records of smart search usage data collected with your consent. Transfer them to the drive for sending from the online computer? They will be removed from Otzaria’s queue only after being saved to the drive.\n\n'
+      'Note: the records, including the search queries, are stored on the drive unencrypted until they are sent, together with the anonymous key that signs them. The key is deleted from the drive once all records have been sent.';
   @override
   String get semanticFeedbackUploadTitle => 'Send training data to Otzaria';
   @override
@@ -2809,6 +2823,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   String get localPluginFileMissing =>
       'The local plugin file is missing. Please sync again.';
   @override
+  String get localPluginFileCorrupt =>
+      'The plugin file on the drive is damaged or is not the selected version. Download the store again on the online computer.';
+  @override
   String get badPluginExtension =>
       'The plugin file does not have a valid otzplugin extension.';
   @override
@@ -2856,6 +2873,18 @@ class _PluginsDomain extends PluginsDomainStrings {
   @override
   String get downloadedFileNotPlugin =>
       'the downloaded file is not a valid plugin';
+  @override
+  String get downloadedFileNotImage =>
+      'the downloaded file is not an image (it may be a filter block page)';
+  @override
+  String get downloadedFileHashMismatch =>
+      'the downloaded file does not match the checksum the site published';
+  @override
+  String get downloadedFileWrongBuild =>
+      'the downloaded file is not the selected version of the plugin';
+  @override
+  String get siteClosedForShabbat =>
+      'The Otzaria site is closed on Shabbat and Yom Tov. The store already on the drive keeps working; updates can be downloaded after Shabbat ends.';
 
   @override
   String get whatPluginList => 'the plugin list';
@@ -3444,7 +3473,11 @@ class _ErrorReports extends ErrorReportsStrings {
       'Otzaria has $count ${_reports(count)} about books, the app and plugins '
       'that have not been '
       'sent yet.\n\nCollect them to the drive, so they can be sent to Otzaria '
-      'from the computer that is online?';
+      'from the computer that is online?\n\n'
+      'Note: the reports are stored on the drive as they are, unencrypted, '
+      'until they are sent — your email address, the text you wrote, log '
+      'excerpts, screenshots and, for a crash report you approved, a memory '
+      'dump. Anyone holding the drive can read them.';
   @override
   String get collectConfirm => 'Collect';
   @override
@@ -3463,6 +3496,14 @@ class _ErrorReports extends ErrorReportsStrings {
   String get collectOtzariaOpenSnack =>
       'Otzaria is open, so the reports were not collected. You will be asked '
       'again next launch';
+  @override
+  String get legacyReportsDialogTitle => 'Old reports that were not migrated';
+  @override
+  String get legacyReportsDialogContent =>
+      'This computer still has reports saved by an old version of Otzaria, in '
+      'a format the current Otzaria no longer migrates. Otzaria Offline Update '
+      'therefore cannot collect them either.\n\n'
+      'All other reports are collected and sent as usual.';
 
   @override
   String get introDialogTitle => 'Reports to Otzaria and plugin developers';
@@ -3527,6 +3568,9 @@ class _ErrorReportsDomain extends ErrorReportsDomainStrings {
   @override
   String uploadHttpStatus(int statusCode) =>
       'The server answered with code $statusCode';
+  @override
+  String get uploadShabbat =>
+      'The Otzaria site is closed on Shabbat and Yom Tov. The reports stay on the drive and will be sent next time, after Shabbat ends.';
   @override
   String get uploadTimedOut => 'The server did not respond in time';
   @override

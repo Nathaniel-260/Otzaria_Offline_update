@@ -196,7 +196,10 @@ class _PluginsScreenState extends State<PluginsScreen> {
     await widget.controller.sync();
     if (!mounted) return;
     final warnings = widget.controller.syncWarnings;
-    if (widget.controller.status == PluginsModuleStatus.error) {
+    final shabbat = widget.controller.shabbatNotice;
+    if (shabbat != null) {
+      UiSnack.show(shabbat);
+    } else if (widget.controller.status == PluginsModuleStatus.error) {
       UiSnack.showError(widget.controller.errorMessage ?? t.syncFailedSnack);
     } else if (warnings.isNotEmpty) {
       // שכבת הסנכרון (ובה האזהרות) נעלמת ברגע הסיום. בלי ההודעה הזו סנכרון

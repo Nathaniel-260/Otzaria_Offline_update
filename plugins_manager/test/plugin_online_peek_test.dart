@@ -19,14 +19,19 @@ class _Site {
         requests.add(request.url.path);
         if (request.url.path == '/api/plugins') return jsonResponse(plugins);
         if (request.url.path.endsWith('/download')) {
+          final ref = request.url.path.split('/')[3];
+          final at = ref.indexOf('@');
+          final version = at >= 0
+              ? ref.substring(at + 1)
+              : plugins.firstWhere((plugin) => plugin['id'] == ref)['version'];
           return http.Response.bytes(
-            pluginBytes('{"id":"manifest"}'),
+            pluginBytes('{"id":"manifest","version":"$version"}'),
             200,
             headers: {'content-type': 'application/zip'},
           );
         }
         return http.Response.bytes(
-          const [137, 80, 78, 71],
+          const [137, 80, 78, 71, 13, 10, 26, 10],
           200,
           headers: {'content-type': 'image/png'},
         );
@@ -42,6 +47,7 @@ Map<String, dynamic> _plugin(String id, String version) => {
     };
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
 
   setUp(() => temp = createTempDir());

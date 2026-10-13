@@ -30,6 +30,9 @@ class SearchFeedbackTransport {
 
   static String dirIn(String dataDir) => p.join(dataDir, 'search-feedback');
 
+  static const Duration carriedWindow = Duration(days: 89);
+  static const Duration plainWindow = Duration(days: 29);
+
   SearchFeedbackQueue _queue(String path) => SearchFeedbackQueue(
         () async => Directory(path),
         clock: DateTime.now,
@@ -111,7 +114,7 @@ class SearchFeedbackTransport {
       );
       final carriedIdentity = await destinationIdentity.load();
       if (carriedIdentity?.blocked == true) return 0;
-      if (carriedIdentity == null) await destinationIdentity.save(identity);
+      var keyCarried = carriedIdentity != null;
       var collected = 0;
       for (final name in await source.sealAndList()) {
         if (!await mayCollect()) break;
@@ -119,6 +122,10 @@ class SearchFeedbackTransport {
         if (claimed == null) continue;
         final batch = await source.read(claimed);
         if (batch == null) continue;
+        if (!keyCarried) {
+          await destinationIdentity.save(identity);
+          keyCarried = true;
+        }
         final lock = await SearchFeedbackQueueLock.acquire('$destination.lock');
         try {
           // נשמר לפני המחיקה במקור, ושם המקטע מאפשר חזרה אחרי קריסה.
@@ -207,8 +214,10 @@ class SearchFeedbackTransport {
           if (_stopped) break;
           final claimed = await queue.claim(name);
           if (claimed == null) continue;
-          final batch = await queue.read(claimed,
-              notBefore: DateTime.now().subtract(const Duration(days: 29)));
+          var carried = true;
+          var droppedByFallback = 0;
+          var batch = await queue.read(claimed,
+              notBefore: DateTime.now().subtract(carriedWindow));
           if (batch == null) continue;
           final context = jsonDecode(batch.contextJson) as Map;
           if (batch.eventLines.isEmpty || context['localOnly'] == true) {
@@ -247,16 +256,21 @@ class SearchFeedbackTransport {
           }
 
           if (!identity.isRegistered && !await register()) break;
-          Future<SearchFeedbackOutcome> post() => sender.sendEvents(
-                identity: identity,
-                body: '{"schema":1,"batchId":"${newSearchFeedbackId()}",'
-                    '"sentAt":"${searchFeedbackIsoTime(DateTime.now())}",'
-                    '"context":${batch.contextJson},'
-                    '"events":[${batch.eventLines.join(',')}]}',
-                appVersion: version,
-                canSend: () => !_stopped,
-                abortTrigger: _abort.future,
-              );
+          Future<SearchFeedbackOutcome> post() {
+            final events = batch!;
+            return sender.sendEvents(
+              identity: identity,
+              body: '{"schema":1,"batchId":"${newSearchFeedbackId()}",'
+                  '"sentAt":"${searchFeedbackIsoTime(DateTime.now())}",'
+                  '${carried ? '"carriedOffline":true,' : ''}'
+                  '"context":${events.contextJson},'
+                  '"events":[${events.eventLines.join(',')}]}',
+              appVersion: version,
+              canSend: () => !_stopped,
+              abortTrigger: _abort.future,
+            );
+          }
+
           var outcome = await post();
           if (outcome.kind == SearchFeedbackOutcomeKind.unknownKey) {
             identity.registeredKeyId = null;
@@ -264,16 +278,30 @@ class SearchFeedbackTransport {
             if (!await register()) break;
             outcome = await post();
           }
+          if (outcome.kind == SearchFeedbackOutcomeKind.drop && !_stopped) {
+            carried = false;
+            final carriedCount = batch.eventLines.length;
+            batch = await queue.read(claimed,
+                notBefore: DateTime.now().subtract(plainWindow));
+            if (batch == null) continue;
+            droppedByFallback = carriedCount - batch.eventLines.length;
+            if (batch.eventLines.isEmpty) {
+              rejected += droppedByFallback;
+              await queue.remove(claimed);
+              continue;
+            }
+            outcome = await post();
+          }
           switch (outcome.kind) {
             case SearchFeedbackOutcomeKind.accepted:
               sent += batch.eventLines.length - outcome.rejected;
-              rejected += outcome.rejected;
+              rejected += outcome.rejected + droppedByFallback;
               await queue.remove(claimed);
               _backoffStep = 0;
               if (await retryFile.exists()) await retryFile.delete();
               if (await filteredFile.exists()) await filteredFile.delete();
             case SearchFeedbackOutcomeKind.drop:
-              rejected += batch.eventLines.length;
+              rejected += batch.eventLines.length + droppedByFallback;
               await queue.remove(claimed);
             case SearchFeedbackOutcomeKind.tooLarge:
               await queue.split(claimed);
@@ -298,6 +326,9 @@ class SearchFeedbackTransport {
               await defer(outcome);
           }
           if (_stopped) break;
+        }
+        if (!identity.blocked && await pending(entity.path) == 0) {
+          await store.delete();
         }
       }
       return (sent: sent, rejected: rejected, remaining: await count());

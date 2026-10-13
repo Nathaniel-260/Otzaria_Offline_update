@@ -6,13 +6,17 @@ import 'package:path/path.dart' as p;
 /// תוצאת ניסיון פעולה מול מערכת ההפעלה — מוחזרת כערך ולא כחריג, בדיוק
 /// כמו ב-`FileReveal` בלאנצ'ר: ה-UI מציג הודעה, לא stack trace.
 class PluginInstallResult {
-  const PluginInstallResult.ok()
+  const PluginInstallResult.ok([this.deliveredPath])
       : success = true,
         error = null;
-  const PluginInstallResult.failure(this.error) : success = false;
+  const PluginInstallResult.failure(this.error)
+      : success = false,
+        deliveredPath = null;
 
   final bool success;
   final String? error;
+
+  final String? deliveredPath;
 }
 
 /// מתקין תוסף באוצריא דרך הפרוטוקול `otzaria://`.
@@ -45,10 +49,11 @@ abstract final class PluginDirectInstaller {
       return PluginInstallResult.failure(strings.saveFailed('$e'));
     }
 
-    return openProtocolUrl(
+    final opened = await openProtocolUrl(
       installLocalUrl(deliverable),
       otzariaLaunchPath: otzariaLaunchPath,
     );
+    return opened.success ? PluginInstallResult.ok(deliverable) : opened;
   }
 
   static bool acceptedByOtzaria(String path, [p.Context? context]) {

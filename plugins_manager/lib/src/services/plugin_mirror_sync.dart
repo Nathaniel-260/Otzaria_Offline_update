@@ -11,6 +11,8 @@ import '../models/plugin_sync_progress.dart';
 import '../models/plugin_version_entry.dart';
 import '../models/store_plugin.dart';
 import 'download_pool.dart';
+import 'media_sniffer.dart';
+import 'plugin_build_check.dart';
 import 'plugin_manifest_reader.dart';
 import 'plugin_mirror_store.dart';
 import 'plugin_store_client.dart';
@@ -107,6 +109,7 @@ class PluginMirrorSync {
 
     final fetched = <String, StorePlugin>{};
     final failed = <String>[];
+    final versionMismatches = <String>[];
     final total = todo.where((plan) => plan.needsNetwork).length;
     var done = 0;
 
@@ -141,6 +144,7 @@ class PluginMirrorSync {
 
           fetched[plugin.id] = plugin;
           if (!files.ok) failed.add(plugin.name);
+          versionMismatches.addAll(files.versionMismatches);
         },
     ], maxConcurrent: maxConcurrentPlugins);
 
@@ -207,6 +211,7 @@ class PluginMirrorSync {
       fetched: done,
       skipped: skipped,
       failed: failed,
+      versionMismatches: versionMismatches,
       incompatible: [
         for (final plan in plans)
           if (plan.isIncompatible)
@@ -270,7 +275,7 @@ class PluginMirrorSync {
           ? const []
           : previous?.screenshotPaths ?? const [],
       localFiles: previous?.localFiles,
-      manifestId: previous?.manifestId,
+      manifestId: remote.manifestId ?? previous?.manifestId,
     );
 
     final keep = <String, PluginLocalFile>{};
@@ -278,10 +283,10 @@ class PluginMirrorSync {
     final targets = plugin.targetsFor(appVersions);
     for (final target in targets) {
       if (target.downloadUrl.isEmpty) continue;
-      if (await _buildUnchanged(target, plugin, previous)) {
-        keep[target.version] = plugin
-            .localFileFor(target.version)!
-            .copyWith(sourceUrl: target.downloadUrl, targetedAt: now);
+      final unchanged = await _unchangedBuild(target, plugin, previous);
+      if (unchanged != null) {
+        keep[target.version] =
+            unchanged.copyWith(sourceUrl: target.downloadUrl, targetedAt: now);
       } else {
         missing.add(target);
       }
@@ -448,6 +453,7 @@ class PluginMirrorSync {
           plugin.remoteImageUrl,
           p.join(dir, 'image'),
           checkCancelled: () => _throwIfCancelled(cancelled),
+          rejection: _imageRejection,
         );
         result = result.copyWith(imagePath: store.relativePath(asset.path));
       } catch (e) {
@@ -483,6 +489,7 @@ class PluginMirrorSync {
                 shotUrls[i],
                 p.join(dir, 'screenshot-$i'),
                 checkCancelled: () => _throwIfCancelled(cancelled),
+                rejection: _imageRejection,
               );
               downloaded[i] = store.relativePath(asset.path);
             } catch (e) {
@@ -517,6 +524,11 @@ class PluginMirrorSync {
 
     return result;
   }
+
+  static Future<String?> _imageRejection(String path) async =>
+      await MediaSniffer.isImageFile(path)
+          ? null
+          : AppL10n.strings.pluginsDomain.downloadedFileNotImage;
 
   static bool _recentlyTargeted(PluginLocalFile file, DateTime now) {
     final targetedAt = file.targetedAt;
@@ -579,47 +591,91 @@ class PluginMirrorSync {
     return true;
   }
 
-  Future<bool> _buildUnchanged(
+  Future<PluginLocalFile?> _unchangedBuild(
     PluginVersionEntry target,
     StorePlugin plugin,
     StorePlugin? previous,
   ) async {
     final local = plugin.localFileFor(target.version);
-    if (!await store.hasFileFor(plugin, target.version) ||
+    if (local == null ||
+        !await store.hasFileFor(plugin, target.version) ||
         !await store.hasBuild(local)) {
-      return false;
+      return null;
+    }
+    final expected = target.sha256;
+    if (expected != null && local.sha256 == null) {
+      final actual = await PluginBuildCheck.sha256Of(
+        store.absolutePath(local.relativePath),
+      );
+      return actual == expected ? local.copyWith(sha256: actual) : null;
     }
     final known = previous?.versionEntries
         .where((entry) => entry.version == target.version)
         .firstOrNull;
     return buildMatches(
       target,
-      local!.sourceUrl ?? known?.downloadUrl ?? '',
+      local.sourceUrl ?? known?.downloadUrl ?? '',
       local.size,
-    );
+      recordedSha256: local.sha256,
+    )
+        ? local
+        : null;
   }
 
   static bool buildMatches(
     PluginVersionEntry target,
     String recordedSource,
-    int recordedSize,
-  ) =>
-      (target.fileSize <= 0 ||
-          recordedSize <= 0 ||
-          recordedSize == target.fileSize) &&
-      _sameBuildSource(recordedSource, target.downloadUrl, target.version);
+    int recordedSize, {
+    String? recordedSha256,
+  }) {
+    final expected = target.sha256;
+    if (expected != null && recordedSha256 != null) {
+      return expected == recordedSha256;
+    }
+    return (target.fileSize <= 0 ||
+            recordedSize <= 0 ||
+            recordedSize == target.fileSize) &&
+        _sameBuildSource(recordedSource, target.downloadUrl, target.version);
+  }
 
   static bool _sameBuildSource(
     String recorded,
     String current,
     String version,
-  ) {
-    if (_sameSource(recorded, current)) return true;
+  ) =>
+      _sameSource(recorded, current) ||
+      _canonicalBuildSource(recorded, version) ==
+          _canonicalBuildSource(current, version);
+
+  static String _canonicalBuildSource(String url, String version) {
+    var path = url;
+    final queryStart = url.indexOf('?');
+    if (queryStart >= 0) {
+      final query = Uri.splitQueryString(url.substring(queryStart + 1));
+      if (query.length != 1 || query['version'] != version) return url;
+      path = url.substring(0, queryStart);
+    }
     const suffix = '/download';
-    if (!recorded.endsWith(suffix) || !current.endsWith(suffix)) return false;
-    final before = recorded.substring(0, recorded.length - suffix.length);
-    final after = current.substring(0, current.length - suffix.length);
-    return after == '$before@$version' || before == '$after@$version';
+    if (!path.endsWith(suffix)) return url;
+    final base = path.substring(0, path.length - suffix.length);
+    return base.endsWith('@$version') ? path : '$base@$version$suffix';
+  }
+
+  static String? buildRejection(
+    Map<String, dynamic>? manifest,
+    PluginVersionEntry target,
+    String? expectedId,
+  ) {
+    final strings = AppL10n.strings.pluginsDomain;
+    return switch (PluginBuildCheck.match(
+      manifest,
+      version: target.version,
+      expectedId: expectedId,
+    )) {
+      PluginBuildMatch.notPlugin => strings.downloadedFileNotPlugin,
+      PluginBuildMatch.wrongId => strings.downloadedFileWrongBuild,
+      PluginBuildMatch.matches || PluginBuildMatch.versionDiffers => null,
+    };
   }
 
   static void _throwIfCancelled(bool Function() cancelled) {
@@ -628,7 +684,8 @@ class PluginMirrorSync {
     }
   }
 
-  Future<({StorePlugin plugin, bool ok})> _syncPluginFiles(
+  Future<({StorePlugin plugin, bool ok, List<String> versionMismatches})>
+      _syncPluginFiles(
     _PluginPlan plan,
     StorePlugin plugin,
     void Function(PluginSyncProgress) report,
@@ -642,16 +699,21 @@ class PluginMirrorSync {
           store.absolutePath(known.relativePath),
         );
         if (id != null) {
-          return (plugin: plugin.copyWith(manifestId: id), ok: true);
+          return (
+            plugin: plugin.copyWith(manifestId: id),
+            ok: true,
+            versionMismatches: const <String>[],
+          );
         }
       }
-      return (plugin: plugin, ok: true);
+      return (plugin: plugin, ok: true, versionMismatches: const <String>[]);
     }
 
     final files = Map.of(plugin.localFiles);
     var manifestId = plugin.manifestId;
     var ok = true;
     var interrupted = false;
+    final versionMismatches = <String>[];
 
     for (final target in plan.missingBuilds) {
       Map<String, dynamic>? manifest;
@@ -662,10 +724,11 @@ class PluginMirrorSync {
           preferredExt: PluginMirrorStore.pluginFileExt,
           requiredExt: PluginMirrorStore.pluginFileExt,
           expectedSize: target.fileSize,
+          expectedSha256: target.sha256,
           checkCancelled: () => _throwIfCancelled(cancelled),
-          isValid: (path) {
+          rejection: (path) {
             manifest = PluginManifestReader.read(path);
-            return manifest != null;
+            return buildRejection(manifest, target, manifestId);
           },
         );
         files[target.version] = PluginLocalFile(
@@ -675,8 +738,15 @@ class PluginMirrorSync {
           size: asset.size,
           sourceUrl: target.downloadUrl,
           targetedAt: now,
+          sha256: target.sha256,
         );
         manifestId ??= PluginManifestReader.idOf(manifest);
+        final manifestVersion = manifest?['version'];
+        if (PluginBuildCheck.match(manifest, version: target.version) ==
+            PluginBuildMatch.versionDiffers) {
+          versionMismatches
+              .add('${plugin.name}: ${target.version} ≠ $manifestVersion');
+        }
       } catch (e) {
         if (cancelled()) {
           interrupted = true;
@@ -714,6 +784,7 @@ class PluginMirrorSync {
     return (
       plugin: plugin.copyWith(localFiles: files, manifestId: manifestId),
       ok: ok,
+      versionMismatches: versionMismatches,
     );
   }
 }

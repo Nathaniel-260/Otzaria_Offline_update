@@ -1313,11 +1313,19 @@ and falls back to x64 only when the installed exe is not ARM64 (PE header).
 
 **Install-state matching uses `manifestId`, not the catalog `id`.** The `id` from
 `/api/plugins` is the website's database id; Otzaria installs under
-`plugins/installed/<manifest.id>/`. `manifestId` comes from the `manifest.json` inside
-the downloaded `.otzplugin` (`PluginManifestReader`, BOM-stripped like
-`LogicalContentHasher`). Compare by catalog id and *nothing* is ever detected as
-installed. A plugin whose file is not downloaded yet correctly reports
+`plugins/installed/<manifest.id>/`. `manifestId` is the site's `pluginUid`, or — on a
+site without it — the `manifest.json` inside the downloaded `.otzplugin`
+(`PluginManifestReader`, BOM-stripped like `LogicalContentHasher`). Compare by catalog
+id and *nothing* is ever detected as installed. A plugin with neither correctly reports
 `PluginInstallStatus.unknown` — not an error.
+
+**Every downloaded build is checked against the build it was fetched for**
+(`PluginBuildCheck`): a wrong manifest id or a `sha256` mismatch rejects the file. A
+different manifest *version* is only logged (`PluginSyncOutcome.versionMismatches`):
+site admins can change the listed version without a new file. A site that publishes
+`sha256` also gets version-pinned URLs (`?version=`), and a mirrored file recorded
+without a hash is hashed during sync and re-downloaded on mismatch — otherwise the
+install-time check (the same one, from the drive) would refuse it forever.
 
 **Otzaria has two on-disk layouts, and `InstalledPluginsScanner` must read both.**
 Older installs use `installed/<manifest.id>/current/`; newer ones
@@ -1338,9 +1346,9 @@ as `0.9.97.2+800` is not above a `maxAppVersion` of `0.9.97`.
 **The mirror carries the plugin build that will *run*, not the newest one published.**
 Every build declares `compatibleWith` (minimum Otzaria version) and `maxAppVersion`,
 and `/api/plugins` returns the whole `versions[]` history.
-`plugins_manager/lib/src/services/plugin_compatibility.dart` is a 1:1 port of the
-site's `src/lib/pluginCompatibility.js`: pick the **highest build whose range contains
-the app version**. Before this the sync always fetched the live build, so an offline
+`plugins_manager/lib/src/services/plugin_compatibility.dart` follows the site's
+`src/lib/pluginCompatibility.js` rule — pick the **highest build whose range contains
+the app version** — but compares app versions like Otzaria (core only, see above). Before this the sync always fetched the live build, so an offline
 machine got plugins that would not load — 8 of the 37 plugins on the site required a
 newer Otzaria than the latest stable when this was written.
 
@@ -1409,6 +1417,13 @@ internal registry beyond the `installed/` directory, and a manual unpack bypasse
 `install-local` reads from disk and needs no network; the older `install?url=` does and
 is deliberately unused.
 
+**Install completion comes from Otzaria's result file when it writes one, else from
+polling.** When `otzaria_capabilities.json` says `pluginInstallResults >= 1`,
+`plugin_install_results.jsonl` in Otzaria's data root is matched by the exact handed-off
+path and `at` ≥ the handoff, so a cancel or a rejection is reported at once. Without
+it (older Otzaria) the 5-minute rescan is the only signal, and a cancel looks like a
+timeout.
+
 **Everything about plugins hangs off the launch path the launcher already detected**
 (`OtzariaModuleController.launchPath`). Two consequences, both load-bearing for a
 **portable** Otzaria:
@@ -1416,8 +1431,9 @@ is deliberately unused.
 - `InstalledPluginsScanner` derives the plugins folder from it —
   `<exeDir>/otzaria_data/plugins` when `portable.marker` sits next to the executable
   **or that data folder already exists** (deliberately wider than `LibraryDbLocator`,
-  which demands the marker), otherwise `%APPDATA%\otzaria\plugins`, then the
-  system-wide install. The marker and data-folder names are duplicated in
+  which demands the marker), otherwise `%APPDATA%\otzaria\plugins`. There is no
+  system-wide candidate: Otzaria keeps plugins under its user data root only
+  (`AppPaths.getPluginsRootPath`). The marker and data-folder names are duplicated in
   `plugins_manager` and `library_manager`;
   `launcher_app/test/portable_paths_test.dart` verifies they never drift.
 - `PluginDirectInstaller` hands the `otzaria://…` URL straight to that executable as
@@ -1957,10 +1973,14 @@ and `lib/utils/canonical_json.dart`, plus `AppReport` and `PluginReportRecord`.
 by Otzaria's own code (commit named in the fixture); a change there must be re-ported
 and the vectors regenerated, or the server receives a body Otzaria would never send.
 
-**Never write to a DB we do not understand.** `PRAGMA user_version` above
-`UserStateReportQueue.knownSchemaVersion`, a missing `pending_reports` table, a
-book report's `schemaVersion` above 2, or a still-present report queue `.hive` file
-(queue not yet migrated out of Hive) all mean "no offer" and no write. The DB and its
+**Never write to a DB we do not understand.** A `reportsQueueFormat` other than 1 in
+`otzaria_capabilities.json` (or, without that file, `PRAGMA user_version` above
+`UserStateReportQueue.knownSchemaVersion`), a missing `pending_reports` table, or a
+book report's `schemaVersion` above 2 all mean "no offer" and no write. A leftover
+queue `.hive` does **not** block: current Otzaria no longer migrates Hive, so a file
+left behind blocked collection forever. Only a box whose last `pending_reports` frame
+is a non-empty list (`hivePendingReportCount`, read from hive_ce's frame format), with
+no rows of its box in the DB, is reported — once per computer (`NoticesSeenStore`). The DB and its
 folder are never created. Unsendable reports (`isSendable`, Otzaria's own export filter
 plus the 256KB book limit), invalid app/plugin records and oversized app requests
 stay in the queue. App attachments travel in the outbox, not the sent history.
@@ -1999,8 +2019,11 @@ mid-request: the in-flight POST is aborted (`AbortableRequest`, also on timeout)
 file stays, and a re-send of what the server already got answers `duplicate`.
 
 **Only a 2xx whose body is a JSON object with `success:true` deletes a file as sent
-(a filter's 200 HTML page must not); 400/409/413/422 and a non-`https://otzaria.org`
-endpoint delete it as rejected; anything else keeps it and stops the run.** A drive
+(a filter's 200 HTML page must not); 400/409/413/422 and an endpoint other than the
+three `https://otzaria.org` report paths (no query) delete it as rejected; anything else keeps it and stops the run.** A first 409
+means "this content was not ingested under that id": as in Otzaria, the report gets a
+new id (`report_id` / `reportId`), is rewritten in the outbox under it, and is re-sent
+once. A 503 `{"error":"shabbat"}` stops the run with its own message. A drive
 file can come from anywhere, so the endpoint is checked before any POST — and before
 the rate-limit wait, since it is not a request. Rejection reasons go to the log only.
 One exception, as in Otzaria: an app report carrying the consented crash `minidump`

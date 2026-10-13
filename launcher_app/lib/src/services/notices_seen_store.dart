@@ -20,6 +20,9 @@ class NoticesSeenStore {
   /// מפתח ההסבר על דיווחי הטעויות (גרסה 0.24 ואילך).
   static const String errorReportsIntro = 'error_reports_intro';
 
+  /// דיווחים ממתינים בקובץ Hive ישן שאוצריא כבר אינה מעבירה.
+  static const String legacyReportsNotice = 'legacy_reports_notice';
+
   final File _file;
   final String _host;
 
