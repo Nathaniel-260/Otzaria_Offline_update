@@ -88,7 +88,7 @@ class AppPaths {
     }
     if (windows &&
         isTemporaryLocation(
-          p.dirname(executable),
+          p.windows.dirname(executable),
           tempDirs: tempDirs ?? _windowsTempDirs(environment),
         )) {
       throw AppPathsException(
