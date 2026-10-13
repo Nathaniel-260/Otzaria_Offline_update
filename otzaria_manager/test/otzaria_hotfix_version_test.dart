@@ -112,6 +112,18 @@ void main() {
       );
     }
 
+    /// הנתיב נגזר מ-dataRootFor, כמו בקוד: ב-macOS הנתיב של ווינדוס בנוי עם `\`.
+    void writeCapabilities(String appData, Map<String, Object> json) {
+      final dataRoot = OtzariaCapabilities.dataRootFor(
+        exe,
+        platform: OtzariaTargetPlatform.windows,
+        environment: {'APPDATA': appData},
+      )!;
+      Directory(dataRoot).createSync(recursive: true);
+      File(p.join(dataRoot, OtzariaCapabilities.fileName))
+          .writeAsStringSync(jsonEncode(json));
+    }
+
     OtzariaManager manager({Map<String, String> environment = const {}}) {
       final manager = OtzariaManager(
         dataDir: p.join(root.path, 'data'),
@@ -164,14 +176,12 @@ void main() {
       File(exe).writeAsStringSync('1.2.3+5');
       await writeMirror('1.2.3.4');
       final appData = p.join(root.path, 'appdata');
-      Directory(p.join(appData, 'otzaria')).createSync(recursive: true);
-      File(p.join(appData, 'otzaria', OtzariaCapabilities.fileName))
-          .writeAsStringSync(jsonEncode({
+      writeCapabilities(appData, {
         'formatVersion': 1,
         'appVersion': '1.2.3.4',
         'buildNumber': 5,
         'exePath': exe,
-      }));
+      });
 
       final check = await manager(
         environment: {'APPDATA': appData},
@@ -184,13 +194,11 @@ void main() {
     test('capabilities של build אחר אינו נאמן', () async {
       File(exe).writeAsStringSync('1.2.3+6');
       final appData = p.join(root.path, 'appdata');
-      Directory(p.join(appData, 'otzaria')).createSync(recursive: true);
-      File(p.join(appData, 'otzaria', OtzariaCapabilities.fileName))
-          .writeAsStringSync(jsonEncode({
+      writeCapabilities(appData, {
         'appVersion': '1.2.3.4',
         'buildNumber': 5,
         'exePath': exe,
-      }));
+      });
 
       final check = await manager(
         environment: {'APPDATA': appData},

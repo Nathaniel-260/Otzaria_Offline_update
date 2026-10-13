@@ -579,7 +579,7 @@ class OtzariaManager {
       );
     }
     if (stored.appVersion == null &&
-        _sameMajorMinorPatch(onDisk, version, stored.installedTagName)) {
+        _sameMajorMinorPatch(version, stored.installedTagName)) {
       return stored;
     }
 
@@ -590,16 +590,11 @@ class OtzariaManager {
     );
   }
 
-  static bool _sameMajorMinorPatch(
-    String rawDiskVersion,
-    String diskVersion,
-    String tagName,
-  ) =>
+  static bool _sameMajorMinorPatch(String diskVersion, String tagName) =>
       OtzariaUpdateCheckResult.compareBases(
         diskVersion,
         tagName,
-        leftCarriesHotfix:
-            OtzariaUpdateCheckResult.carriesVersionCode(rawDiskVersion),
+        leftCarriesHotfix: false,
       ) ==
       0;
 

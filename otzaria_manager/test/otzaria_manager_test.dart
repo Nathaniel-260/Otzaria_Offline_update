@@ -81,10 +81,12 @@ void main() {
     String? runningOtzariaPath,
     List<String> registeredInstallDirs = const [],
     OtzariaTargetPlatform platform = OtzariaTargetPlatform.windows,
+    InstalledVersionReader? versionReader,
   }) {
     final manager = OtzariaManager(
       dataDir: dataDir.path,
       platform: platform,
+      versionReader: versionReader,
       environment: environment,
       runningLocator: _FakeRunningLocator(runningOtzariaPath),
       installRegistry: _FakeInstallRegistry(registeredInstallDirs),
@@ -394,7 +396,7 @@ void main() {
   });
 
   group('hotfix tags whose exe reports only major.minor.patch', () {
-    void writeApp(String appPath, String version) {
+    void writeApp(String appPath, String version, {String? build}) {
       final contents = Directory(p.join(appPath, 'Contents'))
         ..createSync(recursive: true);
       File(p.join(contents.path, 'Info.plist')).writeAsStringSync('''
@@ -406,6 +408,7 @@ void main() {
   <string>com.example.otzaria</string>
   <key>CFBundleShortVersionString</key>
   <string>$version</string>
+${build == null ? '' : '<key>CFBundleVersion</key><string>$build</string>'}
 </dict>
 </plist>
 ''');
@@ -521,7 +524,7 @@ void main() {
         await writeMirror(stable: _release(tag, isPrerelease: false));
         final installDir = p.join(dataDir.path, 'Applications');
         final launchPath = p.join(installDir, 'Otzaria.app');
-        writeApp(launchPath, '0.9.97+99700');
+        writeApp(launchPath, '0.9.97', build: '99700');
         final statePath = p.join(dataDir.path, 'otzaria_install_state.json');
         File(statePath).writeAsStringSync(jsonEncode(OtzariaInstallState(
           installedTagName: tag,
@@ -532,12 +535,13 @@ void main() {
         final manager = managerFor(
           platform: OtzariaTargetPlatform.macos,
           environment: {'HOME': p.join(dataDir.path, 'home')},
+          versionReader: const _PlistVersionReader(),
         );
         final during = await manager.checkForUpdate();
         expect(during.updateAvailable, isFalse);
         expect(during.currentState!.appVersion, isNull);
 
-        writeApp(launchPath, '0.9.97+99702');
+        writeApp(launchPath, '0.9.97', build: '99702');
 
         for (var i = 0; i < 2; i++) {
           final check = await manager.checkForUpdate();
@@ -548,9 +552,8 @@ void main() {
         final saved = jsonDecode(File(statePath).readAsStringSync())
             as Map<String, dynamic>;
         expect(saved['installedTagName'], tag);
-        expect(saved['appVersion'], isNull);
+        expect(saved['appVersion'], '0.9.97+99702');
       },
-      testOn: 'mac-os',
     );
   });
 
@@ -1332,6 +1335,25 @@ void main() {
 }
 
 /// "אוצריא רצה מהנתיב הזה" קבוע — במקום לשאול את המערכת מה פתוח כרגע.
+/// כמו `MacAppVersionReader.readVersion`, בלי `plutil` — כדי שהבדיקה תרוץ בכל
+/// מחשב.
+class _PlistVersionReader implements InstalledVersionReader {
+  const _PlistVersionReader();
+
+  @override
+  String? readVersion(String launchPath) {
+    final plist =
+        File(p.join(launchPath, 'Contents', 'Info.plist')).readAsStringSync();
+    String? key(String name) =>
+        RegExp('<key>$name</key>\\s*<string>([^<]*)</string>')
+            .firstMatch(plist)
+            ?.group(1);
+    final version = key('CFBundleShortVersionString');
+    final build = key('CFBundleVersion');
+    return version == null || build == null ? version : '$version+$build';
+  }
+}
+
 class _FakeRunningLocator extends RunningOtzariaLocator {
   const _FakeRunningLocator(this.launchPath);
 
