@@ -125,7 +125,7 @@ void main(List<String> args) async {
     });
     tearDown(() async {
       await InstanceLock.release();
-      if (await sandbox.exists()) await sandbox.delete(recursive: true);
+      await _deleteWhenReleased(sandbox);
     });
 
     Future<Process> holdInOtherProcess() async {
@@ -248,4 +248,18 @@ String _dartExecutable() {
     Platform.isWindows ? 'dart.exe' : 'dart',
   );
   return File(bundled).existsSync() ? bundled : 'dart';
+}
+
+/// התהליך-הבן של dart.exe משחרר את קובץ הנעילה רגע אחרי היציאה, ועד אז
+/// המחיקה נכשלת ב-Windows (errno 32).
+Future<void> _deleteWhenReleased(Directory dir) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (await dir.exists()) {
+    try {
+      await dir.delete(recursive: true);
+    } on FileSystemException {
+      if (DateTime.now().isAfter(deadline)) rethrow;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
 }
