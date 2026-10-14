@@ -31,6 +31,7 @@ class _FakeApp implements AppMirrorModule, AutoInstallApp {
   bool hasUpdateAvailable = true;
 
   Future<void> Function()? onDownload;
+  Future<void> Function()? onInstall;
   bool? installedWithWizard;
 
   @override
@@ -43,6 +44,7 @@ class _FakeApp implements AppMirrorModule, AutoInstallApp {
   Future<void> install({required bool useWizard}) async {
     installedWithWizard = useWizard;
     log.add('install app');
+    await onInstall?.call();
   }
 }
 
@@ -68,6 +70,7 @@ class _FakeLibrary implements LibraryMirrorModule, AutoInstallLibrary {
 
   bool? includedSemanticSearch;
   Future<void> Function()? onUpdate;
+  Future<void> Function()? onRecheck;
 
   @override
   Future<void> download({
@@ -82,6 +85,12 @@ class _FakeLibrary implements LibraryMirrorModule, AutoInstallLibrary {
   Future<void> update() async {
     log.add('update library');
     await onUpdate?.call();
+  }
+
+  @override
+  Future<void> recheck() async {
+    log.add('recheck library');
+    await onRecheck?.call();
   }
 }
 
@@ -653,15 +662,17 @@ void main() {
       active = true;
     });
 
-    test('the library update comes before the silent app install', () async {
+    test('the app is installed first and the library rechecked against it',
+        () async {
       final skipped = await autoInstall().run(enabled: true);
 
       expect(skipped, isFalse);
       expect(log, [
         'process check',
-        'update library',
-        'process check',
         'install app',
+        'recheck library',
+        'process check',
+        'update library',
       ]);
       expect(app.installedWithWizard, isFalse);
     });
@@ -680,7 +691,12 @@ void main() {
     test('each path asks for a fresh process state', () async {
       otzariaOpen = [false, true];
       expect(await autoInstall().run(enabled: true), isTrue);
-      expect(log, ['process check', 'update library', 'process check']);
+      expect(log, [
+        'process check',
+        'install app',
+        'recheck library',
+        'process check',
+      ]);
       expect(processChecks, 2);
     });
 
@@ -718,11 +734,24 @@ void main() {
       expect(log, ['process check', 'process check']);
     });
 
-    test('an unmounted shell after the library update stops there', () async {
-      library.onUpdate = () async => active = false;
-      otzariaOpen = [false, true];
+    test('an unmounted shell after the app install stops there', () async {
+      app.onInstall = () async => active = false;
       expect(await autoInstall().run(enabled: true), isFalse);
-      expect(log, ['process check', 'update library']);
+      expect(log, ['process check', 'install app']);
+    });
+
+    test('a library that needed the newer app is updated after the recheck',
+        () async {
+      library.hasUpdateAvailable = false;
+      library.onRecheck = () async => library.hasUpdateAvailable = true;
+      await autoInstall().run(enabled: true);
+      expect(log, [
+        'process check',
+        'install app',
+        'recheck library',
+        'process check',
+        'update library',
+      ]);
     });
   });
 

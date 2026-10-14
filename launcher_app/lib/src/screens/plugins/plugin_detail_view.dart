@@ -136,6 +136,8 @@ class PluginDetailView extends StatelessWidget {
             PluginInstallChip(
               status: controller.statusOf(plugin),
               installedVersion: controller.installedVersionOf(plugin),
+              disabled: controller.isDisabledInOtzaria(plugin),
+              development: controller.isDevelopmentInOtzaria(plugin),
             ),
           ],
         ),

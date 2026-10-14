@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <compressapi.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strsafe.h>
@@ -61,6 +62,12 @@ static const wchar_t kStubPathEnvVar[] = L"OTZARIA_LAUNCHER_STUB";
 // ל-`LauncherInstallLayout.payloadVersionEnvVar`.
 static const wchar_t kPayloadVersionEnvVar[] = L"OTZARIA_PAYLOAD_VERSION";
 
+// = `LauncherSelfInstaller.stagedName` / `.previousName` / `.targetName`.
+// קובץ ה-target מחזיק את שם ה-exe שהוחלף בפועל — המשתמש יכול לשנות אותו.
+static const wchar_t kStagedExeName[] = L".launcher-update.exe";
+static const wchar_t kPreviousExeName[] = L".launcher-previous.exe";
+static const wchar_t kTargetFileName[] = L".launcher-update.target";
+
 // הלוג של ה-stub, לצד `launcher.log` של הלאנצ'ר. בלעדיו כל מה שקורה כאן —
 // חילוץ שנכשל, קובץ שלא נכתב, מרקר שאינו תואם — קורה בשקט מוחלט, ודיווח על
 // עדכון שנתקע אינו ניתן לאבחון בכלל.
@@ -75,31 +82,60 @@ static const wchar_t kLogFileName[] = L"stub.log";
 // מריץ אותנו; הגבול קיים רק כדי שתקלה לא תשאיר את ה-stub תלוי לנצח.
 #define AFTER_UPDATE_WAIT_MS 60000
 
-// ריק כל עוד לא נמצאה תיקייה לכתוב אליה — אז הלוג פשוט לא נכתב.
-static wchar_t g_log_path[MAX_PATH];
+// NULL כל עוד לא נמצאה תיקייה לכתוב אליה — אז הלוג פשוט לא נכתב.
+static wchar_t *g_log_path;
+
+static void FreeString(wchar_t *value) {
+  if (value != NULL) {
+    HeapFree(GetProcessHeap(), 0, value);
+  }
+}
+
+// מחרוזת מעוצבת על הערימה, בכל אורך — נתיבים כאן אינם מוגבלים ל-MAX_PATH.
+static wchar_t *FormatString(const wchar_t *format, ...) {
+  va_list args;
+  va_start(args, format);
+  const int length = _vscwprintf(format, args);
+  va_end(args);
+  if (length < 0) {
+    return NULL;
+  }
+  const size_t count = (size_t)length + 1;
+  wchar_t *buffer =
+      (wchar_t *)HeapAlloc(GetProcessHeap(), 0, count * sizeof(wchar_t));
+  if (buffer == NULL) {
+    return NULL;
+  }
+  va_start(args, format);
+  const HRESULT result = StringCchVPrintfW(buffer, count, format, args);
+  va_end(args);
+  if (FAILED(result)) {
+    FreeString(buffer);
+    return NULL;
+  }
+  return buffer;
+}
 
 // יוצר את `app-files\OtzariaData\logs` וקובע לאן כותבים. נקרא לפני החילוץ:
 // הוא דורס מעל התיקיות האלה ואינו מוחק אותן.
 static void PrepareLog(const wchar_t *payload_dir) {
-  wchar_t dir[MAX_PATH];
-  if (FAILED(StringCchPrintfW(dir, MAX_PATH, L"%s\\%s", payload_dir,
-                              kDataDirName))) {
-    return;
+  wchar_t *data_dir = FormatString(L"%s\\%s", payload_dir, kDataDirName);
+  wchar_t *log_dir =
+      FormatString(L"%s\\%s\\%s", payload_dir, kDataDirName, kLogDirName);
+  if (data_dir != NULL && log_dir != NULL) {
+    CreateDirectoryW(payload_dir, NULL);
+    CreateDirectoryW(data_dir, NULL);
+    CreateDirectoryW(log_dir, NULL);
+    g_log_path = FormatString(L"%s\\%s", log_dir, kLogFileName);
   }
-  CreateDirectoryW(payload_dir, NULL);
-  CreateDirectoryW(dir, NULL);
-  if (FAILED(StringCchPrintfW(dir, MAX_PATH, L"%s\\%s\\%s", payload_dir,
-                              kDataDirName, kLogDirName))) {
-    return;
-  }
-  CreateDirectoryW(dir, NULL);
-  StringCchPrintfW(g_log_path, MAX_PATH, L"%s\\%s", dir, kLogFileName);
+  FreeString(data_dir);
+  FreeString(log_dir);
 }
 
 // שורת לוג עם חותמת זמן. כשל בכתיבה נבלע: הלוג הוא כלי עזר, ולא סיבה
 // להיכשל בהרצה שאחרת הייתה מצליחה.
 static void LogLine(const wchar_t *format, ...) {
-  if (g_log_path[0] == L'\0') {
+  if (g_log_path == NULL) {
     return;
   }
 
@@ -161,6 +197,19 @@ static int ReportFailure(void) {
               L"ולהריץ אותו משם שוב.",
               L"עדכוני אוצריא",
               MB_OK | MB_ICONERROR | MB_RTLREADING | MB_RIGHT);
+  return EXIT_FAILURE;
+}
+
+// הטקסט השני שאינו ב-otzaria_l10n. Explorer מריץ exe מתוך zip מעותק ב-%TEMP%,
+// וכל מה שהלאנצ'ר היה מוריד לשם נמחק עם התיקייה הזמנית.
+static int ReportTemporaryLocation(void) {
+  MessageBoxW(NULL,
+              L"התוכנה הופעלה מתוך קובץ ZIP או מתיקייה זמנית.\n\n"
+              L"כל מה שהיא מורידה משם נמחק יחד עם התיקייה הזמנית. "
+              L"יש לחלץ את הקובץ לכונן הנייד (או לתיקייה קבועה בדיסק) "
+              L"ולהפעיל אותו משם.",
+              L"עדכוני אוצריא",
+              MB_OK | MB_ICONWARNING | MB_RTLREADING | MB_RIGHT);
   return EXIT_FAILURE;
 }
 
@@ -692,23 +741,187 @@ static BOOL ExtractWithProgress(HINSTANCE instance, const wchar_t *dest_dir,
   return job.ok;
 }
 
+// הנתיב של ה-exe הזה בכל אורך: מאגר קבוע של MAX_PATH נכשל בתיקייה עמוקה.
+static wchar_t *GetOwnPath(void) {
+  for (DWORD capacity = MAX_PATH; capacity <= 32768; capacity *= 2) {
+    wchar_t *buffer = (wchar_t *)HeapAlloc(GetProcessHeap(), 0,
+                                           capacity * sizeof(wchar_t));
+    if (buffer == NULL) {
+      return NULL;
+    }
+    const DWORD length = GetModuleFileNameW(NULL, buffer, capacity);
+    if (length > 0 && length < capacity) {
+      return buffer;
+    }
+    FreeString(buffer);
+    if (length == 0) {
+      return NULL;
+    }
+  }
+  return NULL;
+}
+
+// GetTempPathW מחזיר לעתים שם 8.3 (ADMINI~1), ולכן משווים גם בצורה הארוכה.
+static wchar_t *LongPathOf(const wchar_t *path) {
+  const DWORD needed = GetLongPathNameW(path, NULL, 0);
+  if (needed > 0) {
+    wchar_t *buffer =
+        (wchar_t *)HeapAlloc(GetProcessHeap(), 0, needed * sizeof(wchar_t));
+    if (buffer != NULL) {
+      const DWORD written = GetLongPathNameW(path, buffer, needed);
+      if (written > 0 && written < needed) {
+        return buffer;
+      }
+      FreeString(buffer);
+    }
+  }
+  return FormatString(L"%s", path);
+}
+
+static BOOL IsInsideFolder(const wchar_t *path, const wchar_t *folder) {
+  size_t length = wcslen(folder);
+  while (length > 0 && folder[length - 1] == L'\\') {
+    --length;
+  }
+  if (length == 0 || wcslen(path) < length ||
+      CompareStringOrdinal(path, (int)length, folder, (int)length, TRUE) !=
+          CSTR_EQUAL) {
+    return FALSE;
+  }
+  return path[length] == L'\0' || path[length] == L'\\';
+}
+
+// = `AppPaths.isTemporaryLocation`.
+// Explorer מריץ exe מתוך zip מעותק תחת %TEMP%; temp שהוא שורש כונן אינו נחשב.
+static BOOL IsTemporaryLocation(const wchar_t *dir) {
+  wchar_t temp[MAX_PATH + 1];
+  const DWORD length = GetTempPathW(ARRAYSIZE(temp), temp);
+  if (length == 0 || length >= ARRAYSIZE(temp) || length <= 3) {
+    return FALSE;
+  }
+  wchar_t *long_temp = LongPathOf(temp);
+  wchar_t *long_dir = LongPathOf(dir);
+  const BOOL inside = IsInsideFolder(dir, temp) ||
+                      (long_temp != NULL && long_dir != NULL &&
+                       IsInsideFolder(long_dir, long_temp));
+  FreeString(long_temp);
+  FreeString(long_dir);
+  return inside;
+}
+
+static BOOL FileExists(const wchar_t *path) {
+  return path != NULL && GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES;
+}
+
+// שם ה-exe שההחלפה כיוונה אליו, מתוך קובץ ה-target (UTF-8), או NULL.
+static wchar_t *ReadReplaceTarget(const wchar_t *stub_dir) {
+  wchar_t *path = FormatString(L"%s%s%s", stub_dir, SeparatorFor(stub_dir),
+                               kTargetFileName);
+  if (path == NULL) {
+    return NULL;
+  }
+  HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  FreeString(path);
+  if (file == INVALID_HANDLE_VALUE) {
+    return NULL;
+  }
+  char utf8[1024];
+  DWORD read = 0;
+  const BOOL ok = ReadFile(file, utf8, sizeof(utf8) - 1, &read, NULL);
+  CloseHandle(file);
+  if (!ok || read == 0) {
+    return NULL;
+  }
+  wchar_t name[MAX_PATH];
+  const int length =
+      MultiByteToWideChar(CP_UTF8, 0, utf8, (int)read, name, MAX_PATH - 1);
+  if (length <= 0) {
+    return NULL;
+  }
+  name[length] = L'\0';
+  if (wcschr(name, L'\\') != NULL || wcschr(name, L'/') != NULL ||
+      wcschr(name, L':') != NULL || _wcsicmp(name, kStagedExeName) == 0 ||
+      _wcsicmp(name, kPreviousExeName) == 0) {
+    return NULL;
+  }
+  return FormatString(L"%s%s%s", stub_dir, SeparatorFor(stub_dir), name);
+}
+
+// עדכון עצמי שנקטע בין שני ה-rename של `LauncherSelfInstaller` משאיר רק את
+// הקבצים הזמניים; מי מהם שיופעל מחזיר את הגרסה הקודמת לשם שנרשם ב-target.
+// מחזיר נתיב להריץ במקומנו, או NULL כשממשיכים כרגיל.
+static wchar_t *RecoverInterruptedUpdate(const wchar_t *stub_dir,
+                                         wchar_t **stub_path) {
+  const wchar_t *name = wcsrchr(*stub_path, L'\\');
+  name = name == NULL ? *stub_path : name + 1;
+  const BOOL is_staged = _wcsicmp(name, kStagedExeName) == 0;
+  const BOOL is_previous = _wcsicmp(name, kPreviousExeName) == 0;
+  if (!is_staged && !is_previous) {
+    return NULL;
+  }
+  wchar_t *target = ReadReplaceTarget(stub_dir);
+  if (target == NULL || FileExists(target)) {
+    FreeString(target);
+    return NULL;
+  }
+  wchar_t *previous = FormatString(L"%s%s%s", stub_dir, SeparatorFor(stub_dir),
+                                   kPreviousExeName);
+  wchar_t *relaunch = NULL;
+  const BOOL from_previous = FileExists(previous);
+  const wchar_t *source = from_previous ? previous : *stub_path;
+  if (MoveFileExW(source, target, 0)) {
+    LogLine(L"עדכון עצמי שנקטע: %s שוחזר אל %s", source, target);
+    if (is_previous || !from_previous) {
+      FreeString(*stub_path);
+      *stub_path = target;
+    } else {
+      relaunch = target;
+    }
+    target = NULL;
+  } else {
+    LogLine(L"שחזור %s נכשל בשגיאה %lu", source, GetLastError());
+  }
+  FreeString(target);
+  FreeString(previous);
+  return relaunch;
+}
+
+// CreateProcessW כותב לתוך שורת הפקודה, ולכן היא מועתקת למאגר משלה.
+static BOOL StartProcess(const wchar_t *exe, const wchar_t *forwarded,
+                         const wchar_t *work_dir) {
+  wchar_t *arguments = FormatString(L"\"%s\" %s", exe, forwarded);
+  if (arguments == NULL) {
+    return FALSE;
+  }
+  STARTUPINFOW startup;
+  ZeroMemory(&startup, sizeof(startup));
+  startup.cb = sizeof(startup);
+  PROCESS_INFORMATION process;
+  ZeroMemory(&process, sizeof(process));
+  const BOOL started = CreateProcessW(exe, arguments, NULL, NULL, FALSE, 0,
+                                      NULL, work_dir, &startup, &process);
+  if (started) {
+    // לא ממתינים: ה-stub מסיים מיד ומשאיר את הלאנצ'ר לבד בשורת המשימות.
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+  } else {
+    LogLine(L"הרצת %s נכשלה בשגיאה %lu", exe, GetLastError());
+  }
+  FreeString(arguments);
+  return started;
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
   UNREFERENCED_PARAMETER(prev);
   UNREFERENCED_PARAMETER(show_command);
 
-  wchar_t stub_path[MAX_PATH];
-  wchar_t stub_dir[MAX_PATH];
-  const DWORD length = GetModuleFileNameW(NULL, stub_path, MAX_PATH);
-  if (length == 0 || length >= MAX_PATH ||
-      FAILED(StringCchCopyW(stub_dir, MAX_PATH, stub_path))) {
+  wchar_t *stub_path = GetOwnPath();
+  wchar_t *stub_dir = stub_path == NULL ? NULL : FormatString(L"%s", stub_path);
+  if (stub_dir == NULL) {
     return ReportFailure();
   }
-  // הלאנצ'ר צריך את הנתיב שלנו כדי לדעת איזה קובץ להחליף בעדכון הבא, ואת
-  // גרסת ה-payload כדי לדעת אם מה שהוא מריץ הוא בכלל מה שאנחנו נושאים;
-  // התהליך הבן יורש את הסביבה שלנו, ולכן די בהצבה כאן.
-  SetEnvironmentVariableW(kStubPathEnvVar, stub_path);
-  SetEnvironmentVariableW(kPayloadVersionEnvVar, PAYLOAD_VERSION_W);
 
   wchar_t *separator = wcsrchr(stub_dir, L'\\');
   if (separator == NULL) {
@@ -719,15 +932,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   const BOOL at_drive_root = (separator == stub_dir + 2 && stub_dir[1] == L':');
   separator[at_drive_root ? 1 : 0] = L'\0';
 
-  wchar_t work_dir[MAX_PATH];
-  wchar_t target[MAX_PATH];
-  wchar_t marker[MAX_PATH];
-  if (FAILED(StringCchPrintfW(work_dir, MAX_PATH, L"%s%s%s", stub_dir,
-                              SeparatorFor(stub_dir), kPayloadDir)) ||
-      FAILED(StringCchPrintfW(target, MAX_PATH, L"%s\\%s", work_dir,
-                              kTargetExe)) ||
-      FAILED(StringCchPrintfW(marker, MAX_PATH, L"%s\\%s", work_dir,
-                              kReadyMarker))) {
+  if (IsTemporaryLocation(stub_dir)) {
+    return ReportTemporaryLocation();
+  }
+
+  wchar_t *work_dir =
+      FormatString(L"%s%s%s", stub_dir, SeparatorFor(stub_dir), kPayloadDir);
+  wchar_t *target =
+      work_dir == NULL ? NULL : FormatString(L"%s\\%s", work_dir, kTargetExe);
+  wchar_t *marker =
+      work_dir == NULL ? NULL : FormatString(L"%s\\%s", work_dir, kReadyMarker);
+  if (target == NULL || marker == NULL) {
     return ReportFailure();
   }
 
@@ -740,6 +955,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     return ReportFailure();
   }
   const DWORD after_update_pid = TakeAfterUpdatePid(forwarded);
+
+  wchar_t *recovered = RecoverInterruptedUpdate(stub_dir, &stub_path);
+  if (recovered != NULL) {
+    return StartProcess(recovered, command_line, stub_dir) ? EXIT_SUCCESS
+                                                           : ReportFailure();
+  }
+  // הלאנצ'ר צריך את הנתיב שלנו כדי לדעת איזה קובץ להחליף בעדכון הבא, ואת
+  // גרסת ה-payload כדי לדעת אם מה שהוא מריץ הוא בכלל מה שאנחנו נושאים;
+  // התהליך הבן יורש את הסביבה שלנו, ולכן די בהצבה כאן.
+  SetEnvironmentVariableW(kStubPathEnvVar, stub_path);
+  SetEnvironmentVariableW(kPayloadVersionEnvVar, PAYLOAD_VERSION_W);
 
   LogLine(L"--- stub %hs --- %s", PAYLOAD_VERSION_A, stub_path);
   if (after_update_pid != 0) {
@@ -766,28 +992,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     }
   }
 
-  // CreateProcessW כותב לתוך המאגר הזה, ולכן הוא לא const.
-  static wchar_t arguments[32768];
-  if (FAILED(StringCchPrintfW(arguments, ARRAYSIZE(arguments), L"\"%s\" %s",
-                              target, forwarded))) {
-    return ReportFailure();
-  }
-
-  STARTUPINFOW startup;
-  ZeroMemory(&startup, sizeof(startup));
-  startup.cb = sizeof(startup);
-  PROCESS_INFORMATION process;
-  ZeroMemory(&process, sizeof(process));
-
   // ה-cwd של הבן הוא app-files, שם הוא מצפה למצוא את ה-DLL וה-data.
-  if (!CreateProcessW(target, arguments, NULL, NULL, FALSE, 0, NULL, work_dir,
-                      &startup, &process)) {
-    LogLine(L"הרצת %s נכשלה בשגיאה %lu", target, GetLastError());
+  if (!StartProcess(target, forwarded, work_dir)) {
     return ReportFailure();
   }
-
-  // לא ממתינים: ה-stub מסיים מיד ומשאיר את הלאנצ'ר לבד בשורת המשימות.
-  CloseHandle(process.hThread);
-  CloseHandle(process.hProcess);
   return EXIT_SUCCESS;
 }

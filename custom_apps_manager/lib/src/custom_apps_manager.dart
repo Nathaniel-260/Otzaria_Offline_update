@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:otzaria_downloads/otzaria_downloads.dart' show ElevatedProcess;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
@@ -20,7 +21,7 @@ import 'services/custom_app_locator.dart';
 import 'services/custom_app_media.dart';
 import 'services/custom_app_order_store.dart';
 import 'services/custom_app_store.dart';
-import 'services/elevated_process.dart';
+import 'services/custom_app_trust_store.dart';
 import 'services/file_digest.dart';
 import 'services/github_app_client.dart';
 import 'services/install_learner.dart';
@@ -61,7 +62,9 @@ class CustomAppsManager {
     GithubAppClient? githubClient,
     InstallLearner? learner,
     void Function(String id, FileSystemException error)? onLearnedRulesNotSaved,
+    String? trustFilePath,
   })  : _onLearnedRulesNotSaved = onLearnedRulesNotSaved,
+        _trust = CustomAppTrustStore(trustFilePath),
         _locator = CustomAppLocator(
           readVersion: readVersion,
           lookupUninstallDirs: lookupUninstallDirs,
@@ -92,6 +95,7 @@ class CustomAppsManager {
   final InstallLearner _learner;
   final void Function(String id, FileSystemException error)?
       _onLearnedRulesNotSaved;
+  final CustomAppTrustStore _trust;
 
   /// לאן מגיעה תוכנה מסוג ארכיון.
   String get downloadsDir => _installer.downloadsDir;
@@ -111,11 +115,83 @@ class CustomAppsManager {
 
   Future<Set<String>> takenIds() async => (await _store()).takenIds();
 
-  /// רושם תוכנה חדשה. **התיאור נוצר תמיד כאן, מתוך הטופס** — אין ייבוא
-  /// של תיאור מקובץ חיצוני, ולכן אין תיאור שהגיע מגורם שהמשתמש אינו
-  /// מכיר. זה מה שמייתר דיאלוג אמון: הוא בחר בעצמו את הריפו ואת הקובץ.
-  Future<void> add(AppDescriptor descriptor) async =>
-      (await _store()).add(descriptor);
+  /// רושם תוכנה חדשה מהטופס, ומסמן אותה כמאושרת במחשב הזה בלבד. תיקייה
+  /// שהועתקה ממחשב אחר מגיעה בלי האישור הזה — ראו [installPreflight].
+  Future<void> add(AppDescriptor descriptor) async {
+    await (await _store()).add(descriptor);
+    await _trust.trust(CustomAppTrustStore.keyFor(descriptor, null));
+  }
+
+  /// מה ש-[install] יסרב לו: קובץ בלי sha256 שמור ([recordInstallerHash]),
+  /// או תוכן שלא אושר במחשב הזה ([trustHere]). הממשק שואל לפני ההתקנה.
+  Future<({bool needsTrust, bool needsHash})> installPreflight(
+    String id,
+  ) async {
+    final entry = await (await _store()).load(id);
+    final sha = entry?.installer?.sha256;
+    if (entry == null || entry.installer == null) {
+      return (needsTrust: false, needsHash: false);
+    }
+    if (sha == null) return (needsTrust: true, needsHash: true);
+    return (
+      needsTrust: !await _trust.isTrusted(
+        CustomAppTrustStore.keyFor(entry.descriptor, sha),
+      ),
+      needsHash: false,
+    );
+  }
+
+  Future<void> trustHere(String id) async {
+    final entry = await (await _store()).load(id);
+    if (entry == null) return;
+    final installer = entry.installer;
+    if (installer != null && installer.sha256 == null) return;
+    await _trust.trust(
+      CustomAppTrustStore.keyFor(entry.descriptor, installer?.sha256),
+    );
+  }
+
+  /// הפעלה מריצה קובץ שנגזר מהרשומה, ולכן גם היא דורשת אישור במחשב הזה.
+  Future<bool> launchNeedsTrust(String id) async {
+    final entry = await (await _store()).load(id);
+    if (entry == null) return false;
+    return !await _trust.isTrusted(
+      CustomAppTrustStore.keyFor(entry.descriptor, entry.installer?.sha256),
+    );
+  }
+
+  /// קובץ שהמחשב הזה הביא בעצמו (צירוף או הורדה) מאושר בלי לשאול.
+  Future<void> _trustOwn(String id, String? sha) async {
+    if (sha == null) return;
+    final entry = await (await _store()).load(id);
+    if (entry == null) return;
+    await _trust.trust(CustomAppTrustStore.keyFor(entry.descriptor, sha));
+  }
+
+  /// שומר את ה-sha256 של קובץ ההתקנה כפי שהוא עכשיו, אחרי שהמשתמש אישר
+  /// אותו (וגם את התוכן — [trustHere]); מכאן [install] מאמת מולו.
+  Future<void> recordInstallerHash(String id) async {
+    final t = AppL10n.strings.customAppsDomain;
+    final store = await _store();
+    final entry = await store.load(id);
+    final installer = entry?.installer;
+    if (installer == null) throw AppDescriptorException(t.noInstallerInMirror);
+    final path = store.installerPathFor(id, installer);
+    if (!await File(path).exists()) {
+      throw AppDescriptorException(t.installerFileMissing(path));
+    }
+    await store.saveInstaller(
+      id,
+      StoredInstaller(
+        fileName: installer.fileName,
+        version: installer.version,
+        sizeBytes: installer.sizeBytes,
+        addedAt: installer.addedAt,
+        sha256: await sha256OfFile(path),
+      ),
+    );
+    await trustHere(id);
+  }
 
   /// מעדכן רשומה שכבר קיימת — מה שהטופס עושה כשפותחים אותו לעריכה.
   ///
@@ -128,7 +204,16 @@ class CustomAppsManager {
         AppL10n.strings.customAppsDomain.appNotRegistered(descriptor.id),
       );
     }
+    final before = await store.load(descriptor.id);
+    final sha = before?.installer?.sha256;
+    final wasTrusted = before != null &&
+        (sha != null || before.installer == null) &&
+        await _trust
+            .isTrusted(CustomAppTrustStore.keyFor(before.descriptor, sha));
     await store.saveDescriptor(descriptor);
+    if (wasTrusted) {
+      await _trust.trust(CustomAppTrustStore.keyFor(descriptor, sha));
+    }
   }
 
   /// מסיר מהמרשם. **אינו מסיר את התוכנה מהמחשב** — ראו
@@ -253,6 +338,7 @@ class CustomAppsManager {
 
     await _commitInstaller(store, id, entry.installer, stored);
     await _sweepPartials(store, id, keep: fileName);
+    await _trustOwn(id, stored.sha256);
     return stored;
   }
 
@@ -388,6 +474,7 @@ class CustomAppsManager {
 
     await _commitInstaller(store, id, entry.installer, stored);
     await _sweepPartials(store, id, keep: stored.fileName);
+    await _trustOwn(id, stored.sha256);
     return stored;
   }
 
@@ -424,6 +511,12 @@ class CustomAppsManager {
     final installer = entry.installer;
     if (installer == null) {
       throw AppDescriptorException(t.noInstallerInMirror);
+    }
+    final sha = installer.sha256;
+    if (sha == null) throw AppDescriptorException(t.installerUnverified);
+    if (!await _trust
+        .isTrusted(CustomAppTrustStore.keyFor(entry.descriptor, sha))) {
+      throw AppDescriptorException(t.appNotTrustedHere);
     }
 
     final installerPath = store.installerPathFor(id, installer);
@@ -501,6 +594,11 @@ class CustomAppsManager {
       await store.saveDescriptor(descriptor);
     } on FileSystemException catch (e) {
       _onLearnedRulesNotSaved?.call(descriptor.id, e);
+      return;
+    }
+    final sha = (await store.load(descriptor.id))?.installer?.sha256;
+    if (sha != null) {
+      await _trust.trust(CustomAppTrustStore.keyFor(descriptor, sha));
     }
   }
 
@@ -535,8 +633,8 @@ class CustomAppsManager {
     final t = AppL10n.strings.customAppsDomain;
     final dir = await Directory.systemTemp.createTemp('custom-app-');
     try {
-      final copy = await pending.copy(p.join(dir.path, fileName));
-      if (await sha256OfFile(copy.path) != expected) {
+      final copy = File(p.join(dir.path, fileName));
+      if (await copyFileWithSha256(pending.path, copy.path) != expected) {
         throw AppDescriptorException(t.installerDigestMismatch);
       }
       return copy;
@@ -605,7 +703,12 @@ class CustomAppsManager {
 
   /// מפעיל את התוכנה המותקנת. מנותק מהתהליך שלנו — סגירת הלאנצ'ר לא
   /// אמורה לסגור אותה.
-  Future<void> launch(CustomAppInstallState state) async {
+  Future<void> launch(String id, CustomAppInstallState state) async {
+    if (await launchNeedsTrust(id)) {
+      throw AppDescriptorException(
+        AppL10n.strings.customAppsDomain.appNotTrustedForLaunch,
+      );
+    }
     if (!await File(state.launchPath).exists()) {
       throw AppDescriptorException(
         AppL10n.strings.customAppsDomain.launchFileMissing(state.launchPath),

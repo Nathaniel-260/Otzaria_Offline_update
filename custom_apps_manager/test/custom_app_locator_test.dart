@@ -22,6 +22,19 @@ void main() {
         },
       );
 
+  test('תיקייה יחסית לכונן הנוכחי אינה מקום חיפוש', () {
+    bool windows(String dir) =>
+        CustomAppLocator.isFullyQualified(dir, windows: true);
+    expect(windows(r'C:\Apps\X'), isTrue);
+    expect(windows('D:/Apps'), isTrue);
+    expect(windows(r'\\server\share\X'), isTrue);
+    expect(windows(r'\Apps\X'), isFalse);
+    expect(windows(r'C:Apps'), isFalse);
+    expect(windows(r'Apps\X'), isFalse);
+    expect(CustomAppLocator.isFullyQualified('/opt/x', windows: false), isTrue);
+    expect(CustomAppLocator.isFullyQualified('opt/x', windows: false), isFalse);
+  });
+
   test('בלי שם קובץ הרצה אין זיהוי בכלל', () async {
     final state = await locatorWith().detect(descriptor());
     expect(state, isNull);

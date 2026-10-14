@@ -135,6 +135,18 @@ class _Site {
   List<String> requestsMatching(String suffix) =>
       requests.where((r) => r.endsWith(suffix)).toList();
 
+  ({String id, String version}) buildOf(String path, String? pinned) {
+    final ref = path.split('/')[3];
+    final at = ref.indexOf('@');
+    final id = at < 0 ? ref : ref.substring(0, at);
+    final live = plugins.where((plugin) => plugin['id'] == id).firstOrNull;
+    return (
+      id: id,
+      version: pinned ??
+          (at < 0 ? '${live?['version'] ?? ''}' : ref.substring(at + 1)),
+    );
+  }
+
   http.Client build() => MockClient((request) async {
         final path = request.url.path;
         requests.add(path);
@@ -155,8 +167,11 @@ class _Site {
           return jsonResponse(category);
         }
         if (path.endsWith('/download')) {
+          final build = buildOf(path, request.url.queryParameters['version']);
           return http.Response.bytes(
-            pluginBytes('{"id":"manifest-${path.split('/')[3]}"}'),
+            pluginBytes(
+              '{"id":"manifest-${build.id}","version":"${build.version}"}',
+            ),
             200,
             headers: {
               'content-disposition':
@@ -165,7 +180,7 @@ class _Site {
           );
         }
         return http.Response.bytes(
-          const [137, 80, 78, 71],
+          const [137, 80, 78, 71, 13, 10, 26, 10],
           200,
           headers: {'content-type': 'image/png'},
         );
@@ -173,6 +188,7 @@ class _Site {
 }
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
   final strings = AppL10n.strings.pluginsDomain;
 
@@ -455,6 +471,30 @@ void main() {
           strings.httpStatusFor(404, '/api/plugins/a/image'),
         ),
       );
+    });
+
+    test('דף חסימה במקום תמונה אינו נשמר כתמונה, והקודמת נשארת', () async {
+      await sync(_Site());
+      final image =
+          File(p.join(temp.path, 'plugins', 'files', 'a', 'image.png'));
+      final before = image.readAsBytesSync();
+
+      final blocked = _Site()
+        ..plugins.first['image'] = '/api/plugins/a/image-v2'
+        ..bodies['/api/plugins/a/image-v2'] =
+            utf8.encode('<!doctype html><html>חסום</html>');
+      final events = <PluginSyncProgress>[];
+      final catalog = await sync(blocked, events: events);
+
+      expect(catalog.plugins.first.imagePath, 'files/a/image.png');
+      expect(image.readAsBytesSync(), before);
+      expect(
+        warningsOf(events).single,
+        strings.syncImageFailed('אלף', strings.downloadedFileNotImage),
+      );
+      final again = _Site()..plugins.first['image'] = '/api/plugins/a/image-v2';
+      await sync(again);
+      expect(again.requestsMatching('image-v2'), hasLength(1));
     });
 
     test('צילום מסך אחד שנכשל אינו מוחק את השאר', () async {
@@ -1520,7 +1560,7 @@ void main() {
         baseUrl: 'https://otzaria.test',
         httpClient: MockClient(
           (_) async => http.Response.bytes(
-            pluginBytes('{"id":"manifest-a"}'),
+            pluginBytes('{"id":"manifest-a","version":"1.5.0"}'),
             200,
             headers: {
               'content-disposition': 'attachment; filename="plugin.zip"',

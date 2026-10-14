@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 
 import '../services/app_logger.dart';
@@ -63,14 +64,22 @@ class LibraryModuleController extends ChangeNotifier
     String? stateDir,
     bool allowPrerelease = false,
     Future<String?> Function()? otzariaLaunchPath,
+    Future<String?> Function()? otzariaAppVersion,
+    Future<String?> Function()? mirroredOtzariaUpdate,
+    OtzariaInstanceLock? instanceLock,
     LibraryManager? manager,
-  }) : _manager = manager ??
+  })  : _mirroredOtzariaUpdate = mirroredOtzariaUpdate,
+        _manager = manager ??
             LibraryManager(
               dataDir: dataDir,
               stateDir: stateDir,
               allowPrerelease: allowPrerelease,
               otzariaLaunchPath: otzariaLaunchPath,
+              otzariaAppVersion: otzariaAppVersion,
+              instanceLock: instanceLock,
             );
+
+  final Future<String?> Function()? _mirroredOtzariaUpdate;
 
   set personalUpdateMode(bool value) {
     if (_manager.personalUpdateMode == value) return;
@@ -136,7 +145,7 @@ class LibraryModuleController extends ChangeNotifier
   /// מסמן שהבקשה נמסרה לאוצריא בפועל. **רק אחרי מסירה מוצלחת** — מחיקה
   /// מוקדמת הייתה משאירה את אינדקס החיפוש על התוכן הישן בלי שאיש יידע.
   Future<void> markReindexRequestDelivered() async {
-    if (pendingReindex == null) return;
+    if (pendingReindex == null || _applying) return;
     await _manager.clearReindexRequest(dbPath: dbPath);
     pendingReindex = null;
     notifyListeners();
@@ -159,6 +168,14 @@ class LibraryModuleController extends ChangeNotifier
   /// הכשל האחרון היה "אין הרשאה" — ראו [Elevation]. `AppShell` מציע על סמך
   /// זה להפעיל מחדש כמנהל, ולכן זה נדלק בכשל ונכבה בכל ניסיון חדש.
   bool needsElevation = false;
+
+  /// "צפוי כ-X עד Y דקות" לתוכנית שמאושרת עכשיו — בדיאלוג האישור בלבד.
+  ({int low, int high})? applyEstimateFor({bool fullDownload = false}) =>
+      libraryApplyMinutes(
+        fullDownload
+            ? _lastCheck?.plan?.fullDownloadFallback
+            : _lastCheck?.plan,
+      );
 
   /// גודל ההורדה של אותה ספרייה מלאה, בבייטים — לתצוגה לפני שמאשרים.
   int? get fullDownloadFallbackSize =>
@@ -187,6 +204,21 @@ class LibraryModuleController extends ChangeNotifier
 
   bool semanticPending = false;
   bool semanticConsentGranted = false;
+
+  /// "מה חדש בספרייה": לפני ההחלה — של העדכון המוצע; אחריה — של מה שהותקן
+  /// בהרצה הזו ([changesNotesApplied]). [changesNotesVersion] היא גרסת היעד.
+  List<LibraryChangesNote> changesNotes = const [];
+  bool changesNotesApplied = false;
+  int? changesNotesVersion;
+
+  /// כמה גרסאות בטווח; יותר מ-[changesNotes] = הרשימה חלקית.
+  int changesNotesRange = 0;
+  bool get changesNotesPartial => changesNotes.length < changesNotesRange;
+  ({
+    int version,
+    int range,
+    List<LibraryChangesNote> notes
+  })? _appliedChangesNotes;
   bool get semanticConsentRequired =>
       semanticPending && !semanticConsentGranted;
 
@@ -587,7 +619,8 @@ class LibraryModuleController extends ChangeNotifier
           // [LibraryModuleStatus.personalTargetElsewhere].
           if (personalTargetIsThisMachine) {
             status = LibraryModuleStatus.error;
-            errorMessage = check.plan?.reason ??
+            errorMessage = await _otzariaFirstMessage(check) ??
+                check.plan?.reason ??
                 AppL10n
                     .strings.libraryDomain.blockedNeedsManualActionWithPeriod;
           } else {
@@ -625,6 +658,7 @@ class LibraryModuleController extends ChangeNotifier
       mirroredCompanions = const {};
       AppLogger.instance.error('checkForUpdate נכשל${_sqliteDetail(e)}', e, st);
     }
+    await _refreshChangesNotes(check);
     // הבדיקה עצמה כבר איתרה את הנתיב — גם כשהיא נכשלה אחר כך (למשל אין
     // מראה). קריאה נפרדת ל-`currentDbPath()` הייתה חוזרת על כל האיתור.
     dbPath = _manager.lastResolvedDbPath;
@@ -649,8 +683,67 @@ class LibraryModuleController extends ChangeNotifier
     notifyListeners();
   }
 
+  /// קוסמטי: כשל בקריאת ההערות מהכונן נרשם ללוג ואינו מכשיל את הבדיקה.
+  Future<void> _refreshChangesNotes(LibraryUpdateCheckResult? check) async {
+    try {
+      final pending =
+          check != null && status == LibraryModuleStatus.updateAvailable
+              ? await _manager.pendingChangesNotes(check)
+              : const <LibraryChangesNote>[];
+      final applied = _appliedChangesNotes;
+      if (pending.isNotEmpty || applied == null) {
+        changesNotes = pending;
+        changesNotesApplied = false;
+        changesNotesVersion = targetVersion;
+        changesNotesRange =
+            pending.isEmpty ? 0 : (targetVersion ?? 0) - (localVersion ?? 0);
+      } else {
+        changesNotes = applied.notes;
+        changesNotesApplied = true;
+        changesNotesVersion = applied.version;
+        changesNotesRange = applied.range;
+      }
+    } catch (e) {
+      changesNotes = const [];
+      AppLogger.instance.info('קריאת "מה חדש בספרייה" מהכונן נכשלה: $e');
+    }
+  }
+
+  Future<void> _rememberAppliedChangesNotes(LocalDbVersion? before) async {
+    final reached = localVersion;
+    if (before == null ||
+        !before.hasVersionMeta ||
+        reached == null ||
+        reached <= before.dbVersion) {
+      return;
+    }
+    try {
+      _appliedChangesNotes = (
+        version: reached,
+        range: reached - before.dbVersion,
+        notes: await _manager.changesNotesBetween(before.dbVersion, reached),
+      );
+    } catch (e) {
+      AppLogger.instance.info('קריאת "מה חדש בספרייה" מהכונן נכשלה: $e');
+    }
+    await _refreshChangesNotes(_lastCheck);
+  }
+
+  Future<String?> _otzariaFirstMessage(LibraryUpdateCheckResult check) async {
+    if (!check.needsNewerOtzaria) return null;
+    final version = await _mirroredOtzariaUpdate?.call();
+    if (version == null) return null;
+    final readable = OtzariaCapabilities.readableDbSchemaForAppVersion(version);
+    final current = check.readableDbSchemaVersion;
+    if (readable == null || current == null || readable <= current) {
+      return null;
+    }
+    return AppL10n.strings.libraryDomain
+        .libraryNeedsOtzariaUpdateFromDrive(version);
+  }
+
   Future<void> setCustomDbPath(String dbPath) async {
-    await _manager.setCustomDbPath(dbPath);
+    await _manager.setCustomDbPath(dbPath, explicit: true);
     await checkForUpdate();
   }
 
@@ -697,6 +790,12 @@ class LibraryModuleController extends ChangeNotifier
       return;
     }
 
+    // רק החלה שהעלתה את הגרסה מציגה "מה חדש" — לא ניסיון חוזר של נלווים.
+    _appliedChangesNotes = null;
+    if (changesNotesApplied) {
+      changesNotes = const [];
+      changesNotesApplied = false;
+    }
     status = LibraryModuleStatus.updating;
     stageText = null;
     applyProgress = null;
@@ -749,7 +848,7 @@ class LibraryModuleController extends ChangeNotifier
             AppLogger.instance.warn('התקנת הקובץ הנלווה "$name" נכשלה: $error');
           },
           onStateWarning: (error) => AppLogger.instance
-              .warn('רישום מצב העדכון נכשל — הבדיקה הבאה תציע שוב: $error'),
+              .warn('רישום שאחרי ההחלה נכשל (מצב או "מה חדש"): $error'),
           onLibraryLocationFailure: (reason) => AppLogger.instance
               .warn('סיבת הכשל בכתיבת מיקום הספרייה: $reason'),
           onLibraryLocationNotSet: (dbPath) {
@@ -768,6 +867,7 @@ class LibraryModuleController extends ChangeNotifier
       // עדיף על קביעה ידנית של upToDate, כי זה קורא בפועל את הגרסה
       // שנכתבה ל-DB במקום להניח שהיא תואמת ליעד.
       await checkForUpdate();
+      await _rememberAppliedChangesNotes(check.localVersion);
       // המסד עודכן, אבל קובץ נלווה שלא נרשם כמותקן משאיר את הבדיקה על
       // "יש עדכון" — והמשתמש קיבל את אותה הצעה בכל פתיחה בלי הודעה ובלי
       // שגיאה. עכשיו נאמר לו מה נכשל, ונדלקת הצעת ההרשאות כשזו הסיבה.
@@ -876,4 +976,32 @@ class LibraryModuleController extends ChangeNotifier
     _manager.dispose();
     super.dispose();
   }
+}
+
+/// הריצות שנמדדו מתפזרות פי 3–5 סביב האומדן של [ApplyTimeEstimate]
+/// (129–581 שניות מול 262), ולכן מוצג טווח ולא מספר אחד.
+({int low, int high})? libraryApplyMinutes(
+  LibraryUpdatePlan? plan, {
+  ApplyTimeEstimate estimate = const ApplyTimeEstimate(),
+}) {
+  if (plan == null) return null;
+  final double seconds;
+  switch (plan.kind) {
+    case LibraryUpdatePlanKind.delta:
+      seconds = estimate
+          .deltaRouteSeconds(plan.deltaSteps.map((s) => s.compressedSize));
+    case LibraryUpdatePlanKind.fullDownload:
+      final size = plan.fullDbAsset?.size ?? 0;
+      if (size <= 0) return null;
+      final followUp = plan.followUpDelta?.deltaSteps ?? const [];
+      seconds = estimate.fullRouteSeconds(size) +
+          estimate.deltaRouteSeconds(followUp.map((s) => s.compressedSize));
+    default:
+      return null;
+  }
+  if (seconds <= 0) return null;
+  return (
+    low: ApplyTimeEstimate.minutesOf(seconds * 0.5),
+    high: ApplyTimeEstimate.minutesOf(seconds * 2.5),
+  );
 }

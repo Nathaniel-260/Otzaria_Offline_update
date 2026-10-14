@@ -64,6 +64,15 @@ class NavRailItem extends StatelessWidget {
       );
     }
 
+    return MergeSemantics(
+      child: Semantics(
+        selected: isSelected,
+        child: _item(cs, iconWidget),
+      ),
+    );
+  }
+
+  Widget _item(ColorScheme cs, Widget iconWidget) {
     return SizedBox(
       width: compact ? compactWidth : width,
       child: Padding(

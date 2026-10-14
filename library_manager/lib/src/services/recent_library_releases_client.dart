@@ -30,4 +30,7 @@ class RecentLibraryReleasesClient extends GithubLibraryReleaseClient {
   }
 
   void forgetReleases() => _recent = null;
+
+  /// הרשימה האחרונה שנשלפה, בלי קשר לגילה — מה שההורדה הנוכחית ראתה.
+  List<LibraryRelease>? get lastFetchedReleases => _recent?.releases;
 }

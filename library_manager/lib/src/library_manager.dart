@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:http/http.dart' as http;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 
@@ -9,12 +11,16 @@ import 'services/companion_assets.dart';
 import 'services/companion_assets_installer.dart';
 import 'services/companion_assets_mirror.dart';
 import 'services/external_update_notice.dart';
+import 'services/library_changes_notes.dart';
 import 'services/library_db_locator.dart';
 import 'services/library_state_store.dart';
 import 'services/library_update_applier.dart';
+import 'services/library_updater_l10n.dart';
+import 'services/otzaria_instance_lock.dart';
 import 'services/otzaria_process_guard.dart';
 import 'services/otzaria_settings_reader.dart';
 import 'services/otzaria_settings_writer.dart';
+import 'services/readable_schema_limit.dart';
 import 'services/recent_library_releases_client.dart';
 import 'services/semantic_search_assets.dart';
 
@@ -84,6 +90,8 @@ class LibraryManager {
     this.allowPrerelease = false,
     this.personalUpdateMode = false,
     Future<String?> Function()? otzariaLaunchPath,
+    Future<String?> Function()? otzariaAppVersion,
+    OtzariaInstanceLock? instanceLock,
     String? operatingSystem,
     Map<String, String>? environment,
     LocalDbVersionReader versionReader = const LocalDbVersionReader(),
@@ -95,12 +103,15 @@ class LibraryManager {
          p.join(stateDir ?? dataDir, LibraryStateStore.fileName),
          dataDir: dataDir,
        ),
-       _planner = const LibraryUpdatePlanner(),
+       _planner = const OfflineLibraryUpdatePlanner(),
        _versionReader = versionReader,
-       _recovery = const LibraryDbRecoveryService(),
+       _recovery = const OfflineLibraryDbRecoveryService(),
        _processGuard = processGuard,
+       _otzariaAppVersion = otzariaAppVersion,
+       _instanceLock = instanceLock,
        _cloudClient = releaseClient ?? RecentLibraryReleasesClient(),
        _applier = applier ?? LibraryUpdateApplier(processGuard: processGuard) {
+    useLibraryUpdaterL10n();
     _locator = LibraryDbLocator(
       stateStore: _stateStore,
       settingsReader: settingsReader,
@@ -136,15 +147,19 @@ class LibraryManager {
 
   final LibraryStateStore _stateStore;
   late final LibraryDbLocator _locator;
-  final LibraryUpdatePlanner _planner;
+  final OfflineLibraryUpdatePlanner _planner;
   final LocalDbVersionReader _versionReader;
 
   /// נשאר לצורך [checkForUpdate] בלבד — מזהה ומנקה שרידי-קריסה מהתקנות
   /// ישנות של הלאנצ'ר (מגרסאות קודמות שכן ביצעו patch/apply בפועל). לא
   /// כותב/מחיל דבר בעצמו.
-  final LibraryDbRecoveryService _recovery;
+  final OfflineLibraryDbRecoveryService _recovery;
 
   final OtzariaProcessGuard _processGuard;
+
+  final Future<String?> Function()? _otzariaAppVersion;
+
+  final OtzariaInstanceLock? _instanceLock;
 
   final RecentLibraryReleasesClient _cloudClient;
 
@@ -205,8 +220,8 @@ class LibraryManager {
   Future<bool> semanticConsentGranted() async =>
       (await _semanticSettings())?.searchFeedbackGranted ?? false;
 
-  Future<void> setCustomDbPath(String dbPath) =>
-      _stateStore.saveCustomDbPath(dbPath);
+  Future<void> setCustomDbPath(String dbPath, {bool explicit = false}) =>
+      _stateStore.saveCustomDbPath(dbPath, explicit: explicit);
 
   /// נתיב המסד בתוך תיקייה שהמשתמש בחר — לבחירת מיקום להתקנה טרייה, לפני
   /// שיש שם קובץ להצביע עליו.
@@ -316,6 +331,7 @@ class LibraryManager {
     var exported = true;
     var exportFailed = false;
     final exporter = LibraryMirrorExporter(
+      supportedDbSchemaVersion: kSupportedDbSchemaVersion,
       client: _cloudClient,
       scheduler: _scheduler,
     );
@@ -356,6 +372,12 @@ class LibraryManager {
     );
 
     await Future.wait<void>([exportFuture, companionsFuture]);
+    if (!(isCancelled?.call() ?? false)) {
+      await _syncChangesNotes(
+        onWarning: onCompanionWarning,
+        isCancelled: isCancelled,
+      );
+    }
 
     if (includeSemanticSearch) {
       final semantic = SemanticSearchAssets(scheduler: _scheduler);
@@ -364,7 +386,8 @@ class LibraryManager {
       try {
         String? tag;
         if (exported) {
-          final discovery = await LibraryUpdateDiscovery(
+          final discovery = await OfflineLibraryUpdateDiscovery(
+            supportedDbSchemaVersion: kSupportedDbSchemaVersion,
             client: await _resolveSource(),
           ).discover(allowPrerelease: allowPrerelease);
           tag = discovery.newestReleaseTag;
@@ -402,6 +425,82 @@ class LibraryManager {
       personalFromVersion: fromVersion,
       upToDate: !exported,
     );
+  }
+
+  /// "מה חדש" של כל release שהמראה מכסה. קובץ שעוד לא הועלה יובא בהורדה
+  /// הבאה, וכשל כאן לעולם אינו מכשיל את ההורדה — רק מדווח.
+  Future<void> _syncChangesNotes({
+    void Function(String assetName, Object error)? onWarning,
+    bool Function()? isCancelled,
+  }) async {
+    final name = AppL10n.strings.libraryDomain.libraryChangesNotesName;
+    try {
+      final online = _cloudClient.lastFetchedReleases;
+      if (online == null || !await hasMirror) return;
+      final covered = LibraryChangesNotes.coveredReleases(
+        online: online,
+        mirrored: await LocalMirrorLibraryReleaseClient(
+          mirrorDir: mirrorDir,
+        ).fetchReleases(),
+        allowPrerelease: allowPrerelease,
+      );
+      final client = http.Client();
+      try {
+        await LibraryChangesNotes.syncMirror(
+          mirrorDir: mirrorDir,
+          covered: covered,
+          client: client,
+          isCancelled: isCancelled,
+          onWarning: (tag, error) => onWarning?.call('$name ($tag)', error),
+        );
+      } finally {
+        client.close();
+      }
+    } catch (error) {
+      onWarning?.call(name, error);
+    }
+  }
+
+  /// "מה חדש" שבמראה לגרסאות ([fromVersion], [toVersion]], החדשה קודם.
+  Future<List<LibraryChangesNote>> changesNotesBetween(
+    int fromVersion,
+    int toVersion,
+  ) => LibraryChangesNotes.inMirror(
+    mirrorDir,
+    fromVersion: fromVersion,
+    toVersion: toVersion,
+  );
+
+  /// "מה חדש" בעדכון ש-[check] מציע — ריק כשאין עדכון מסד, או כשאין גרסה
+  /// מקומית להשוות אליה (התקנה טרייה).
+  Future<List<LibraryChangesNote>> pendingChangesNotes(
+    LibraryUpdateCheckResult check,
+  ) async {
+    final local = check.localVersion;
+    final plan = check.plan;
+    final target = plan?.finalTargetVersion;
+    if (plan == null ||
+        plan.kind == LibraryUpdatePlanKind.none ||
+        plan.kind == LibraryUpdatePlanKind.blocked ||
+        local == null ||
+        !local.hasVersionMeta ||
+        target == null) {
+      return const [];
+    }
+    return changesNotesBetween(local.dbVersion, target);
+  }
+
+  /// מוסר לאוצריא את "מה חדש" של הגרסאות שהוחלו — ראו
+  /// [LibraryChangesNotes.handOff]. שורש הנתונים כמו בהגדרות (גם נייד).
+  Future<void> _handOffChangesNotes(int fromVersion, int toVersion) async {
+    final notes = await changesNotesBetween(fromVersion, toVersion);
+    if (notes.isEmpty) return;
+    final launch = await _locator.otzariaLaunchPath?.call();
+    final root = await _locator.otzariaSettingsRoot(launch);
+    if (root == null) return;
+    // בלי אוצריא מותקנת אין ליצור את תיקיית הנתונים שלה.
+    if (launch == null && !await Directory(root).exists()) return;
+    await LibraryChangesNotes.handOff(dataRoot: root, notes: notes);
   }
 
   /// הגרסה שממנה תצא הורדה במצב אישי: **הנמוכה** מבין הגרסאות שנרשמו
@@ -458,7 +557,8 @@ class LibraryManager {
   }
 
   ({String tag, int version})? _latestOnline(List<LibraryRelease> all) =>
-      LibraryUpdateDiscovery.latestOnlineRelease(
+      OfflineLibraryUpdateDiscovery.latestOnlineRelease(
+        supportedDbSchemaVersion: kSupportedDbSchemaVersion,
         all,
         allowPrerelease: allowPrerelease,
       );
@@ -517,13 +617,21 @@ class LibraryManager {
 
     final source = await _resolveSource();
     final releases = await source.fetchReleases();
-    final discoverer = LibraryUpdateDiscovery(
+    final discoverer = OfflineLibraryUpdateDiscovery(
+      supportedDbSchemaVersion: kSupportedDbSchemaVersion,
       client: _FetchedReleasesSource(source, releases),
     );
     final discoveryResult = await discoverer.discover(
       allowPrerelease: allowPrerelease,
     );
     final mirrorDownloadIncomplete = await _mirrorDownloadIncomplete(releases);
+    final readableSchema = await _readableDbSchema(locator);
+    final route = ReadableSchemaRoute.limit(
+      discovery: discoveryResult,
+      releases: releases,
+      allowPrerelease: allowPrerelease,
+      readableSchema: readableSchema,
+    );
 
     final applied = await _stateStore.loadAppliedRelease();
 
@@ -535,14 +643,14 @@ class LibraryManager {
       ),
     );
 
-    final plan = _planner.plan(
+    LibraryUpdatePlan planFor(ReadableSchemaRoute route) => _planner.plan(
       localVersion: local.dbVersion,
       hasLocalVersionMeta: local.hasVersionMeta,
       latestVersion: discoveryResult.latestVersion,
-      edges: discoveryResult.edges,
-      latestFullDbAsset: discoveryResult.latestFullDbAsset,
-      fullDbReleaseTag: discoveryResult.fullDbReleaseTag,
-      latestFullDbVersion: discoveryResult.latestFullDbVersion,
+      edges: route.edges,
+      latestFullDbAsset: route.latestFullDbAsset,
+      fullDbReleaseTag: route.fullDbReleaseTag,
+      latestFullDbVersion: route.latestFullDbVersion,
       latestContentTag: discoveryResult.latestContentTag,
       localReleaseTag: applied?.tag,
       localReleaseTagVersion: applied?.dbVersion,
@@ -550,6 +658,17 @@ class LibraryManager {
       blockingPatchFormatVersion: discoveryResult.blockingPatchFormatVersion,
       localVersionUnknownReason: corruptAfterCrashReason,
     );
+
+    final limitedPlan = planFor(route);
+    final plan = route.limited
+        ? _limitToReadableSchema(
+            limitedPlan,
+            unlimited: planFor(ReadableSchemaRoute.unlimited(discoveryResult)),
+            route: route,
+            localVersion: local.dbVersion,
+            latestVersion: discoveryResult.latestVersion,
+          )
+        : limitedPlan;
 
     final settings = await _semanticSettings(locator);
     final semantic = SemanticSearchAssets();
@@ -580,7 +699,66 @@ class LibraryManager {
       semanticPending: semanticPending,
       semanticConsentGranted: settings?.searchFeedbackGranted ?? false,
       mirrorDownloadIncomplete: mirrorDownloadIncomplete,
+      readableDbSchemaVersion: readableSchema,
+      needsNewerOtzaria: !identical(plan, limitedPlan),
     );
+  }
+
+  Future<int?> _readableDbSchema(LibraryDbLocator locator) async {
+    final launch = await locator.otzariaLaunchPath?.call();
+    final root = await locator.otzariaSettingsRoot(launch);
+    return OtzariaCapabilities.resolveReadableDbSchema(
+      capabilities: root == null ? null : await OtzariaCapabilities.read(root),
+      installedVersion: await _otzariaAppVersion?.call(),
+      launchPath: launch,
+    );
+  }
+
+  LibraryUpdatePlan _limitToReadableSchema(
+    LibraryUpdatePlan plan, {
+    required LibraryUpdatePlan unlimited,
+    required ReadableSchemaRoute route,
+    required int localVersion,
+    required int latestVersion,
+  }) {
+    final readable = route.readableSchema;
+    if (!route.limited || readable == null) return plan;
+    final strings = AppL10n.strings.libraryDomain;
+    int reachedBy(LibraryUpdatePlan p) =>
+        p.kind == LibraryUpdatePlanKind.blocked
+        ? localVersion
+        : p.finalTargetVersion ?? localVersion;
+    final reached = reachedBy(plan);
+    if (reached >= latestVersion || reachedBy(unlimited) <= reached) {
+      return plan;
+    }
+    switch (plan.kind) {
+      case LibraryUpdatePlanKind.none:
+        return plan;
+      case LibraryUpdatePlanKind.blocked:
+        return LibraryUpdatePlan.blocked(
+          localVersion: plan.localVersion,
+          targetVersion: latestVersion,
+          reason: strings.planOtzariaTooOldForLibrary(readable, latestVersion),
+        );
+      case LibraryUpdatePlanKind.delta:
+        return LibraryUpdatePlan.delta(
+          localVersion: plan.localVersion,
+          targetVersion: plan.targetVersion ?? reached,
+          steps: plan.deltaSteps,
+          reason: strings.planStopsBeforeOtzariaSchema(reached, latestVersion),
+          fullDownloadFallback: plan.fullDownloadFallback,
+        );
+      case LibraryUpdatePlanKind.fullDownload:
+        return LibraryUpdatePlan.fullDownload(
+          localVersion: plan.localVersion,
+          targetVersion: plan.targetVersion,
+          asset: plan.fullDbAsset!,
+          releaseTag: plan.fullDbReleaseTag!,
+          reason: strings.planStopsBeforeOtzariaSchema(reached, latestVersion),
+          followUpDelta: plan.followUpDelta,
+        );
+    }
   }
 
   Future<bool> _mirrorDownloadIncomplete(List<LibraryRelease> releases) async {
@@ -618,8 +796,8 @@ class LibraryManager {
   /// מחיל בפועל את [check.plan] על ה-DB **החי** — זה הצעד שחסר עד עכשיו:
   /// [checkForUpdate] רק בודק ותכנן, הפונקציה הזו בפועל מורידה ומתקינה.
   ///
-  /// זורק [OtzariaIsRunningException] אם אוצריא פתוחה — `tasklist` בווינדוס,
-  /// `pgrep -x` ב-macOS/לינוקס. זורק [LibraryApplyException] על
+  /// זורק [OtzariaIsRunningException] אם אוצריא פתוחה — [OtzariaProcessGuard].
+  /// זורק [LibraryApplyException] על
   /// כשלים אחרים (חיבור/אימות/גרסה לא תואמת) — בכל אחד מהם ה-DB הקיים נשאר
   /// כמו שהיה: מסלול delta אטומי, ומסלול המסד המלא מאמת את הקובץ החדש לפני
   /// שהוא מחליף.
@@ -657,7 +835,15 @@ class LibraryManager {
     bool useFullDownloadFallback = false,
   }) async {
     _appliesInFlight++;
+    OtzariaInstanceLease? lease;
     try {
+      final lock = _instanceLock;
+      if (lock != null) {
+        final launch = await _locator.otzariaLaunchPath?.call();
+        lease = await lock.acquire(
+          portableDataRoot: await _locator.portableDataRoot(launch),
+        );
+      }
       return await _applyUpdate(
         check,
         onProgress: onProgress,
@@ -669,6 +855,7 @@ class LibraryManager {
         useFullDownloadFallback: useFullDownloadFallback,
       );
     } finally {
+      lease?.release();
       _appliesInFlight--;
     }
   }
@@ -719,6 +906,7 @@ class LibraryManager {
                 dbPath: dbPath,
                 route: ExternalUpdateNotice.routeDelta,
                 booksTouched: partial,
+                onError: onStateWarning,
               );
             }
             rethrow;
@@ -923,9 +1111,6 @@ class LibraryManager {
         onLibraryLocationNotSet?.call(dbPath);
       }
     }
-    // רושמים מאיזה release התוכן הנוכחי הגיע, **יחד עם הגרסה** — זה מה
-    // שמאפשר לזהות בהמשך מסד מתוקן שפורסם באותו db_version, ומונע השוואה
-    // מול רישום שנעשה בגרסה אחרת (ראו LibraryUpdatePlanner).
     if (tag != null && version != null && version > 0) {
       await record(
         () => _stateStore.saveAppliedRelease(tag: tag, dbVersion: version),
@@ -934,6 +1119,10 @@ class LibraryManager {
     if (version != null && version > 0) {
       await record(() => _stateStore.recordOwnDbVersion(version));
     }
+    final local = check.localVersion;
+    if (local != null && local.hasVersionMeta && version != null) {
+      await record(() => _handOffChangesNotes(local.dbVersion, version));
+    }
     // מה השתנה, לטובת אינדקס החיפוש של אוצריא — ראו [ExternalUpdateNotice].
     await const ExternalUpdateNotice().write(
       dbPath: dbPath,
@@ -941,6 +1130,7 @@ class LibraryManager {
       booksTouched: booksTouched,
       dbVersion: version,
       releaseTag: tag,
+      onError: onStateWarning,
     );
   }
 

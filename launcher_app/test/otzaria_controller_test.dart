@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
@@ -34,6 +35,7 @@ void main() {
     String? stableTag,
     String? prereleaseTag,
     bool staleFullOnDrive = false,
+    bool arm64Checked = true,
     OtzariaInstallerKind installerKind = OtzariaInstallerKind.windowsSetupExe,
   }) {
     final mirrorDir = p.join(tempDir.path, 'mirror', 'app');
@@ -73,6 +75,15 @@ void main() {
       'syncedAt': '2026-08-01T00:00:00.000Z',
       if (stableTag != null) 'stable': entry(stableTag, false),
       if (prereleaseTag != null) 'prerelease': entry(prereleaseTag, true),
+      if (arm64Checked)
+        'platforms': {
+          'windows_arm64': {
+            'missingAssetTags': [
+              if (stableTag != null) stableTag,
+              if (prereleaseTag != null) prereleaseTag,
+            ],
+          },
+        },
     }));
   }
 
@@ -431,6 +442,7 @@ void main() {
     }) controllerWith({
       String? uri = OtzariaDeepLinks.libraryReindex,
       bool launchFails = false,
+      bool libraryApplying = false,
     }) {
       final launcher = _RecordingLauncher(fails: launchFails);
       final delivered = <bool>[];
@@ -440,6 +452,7 @@ void main() {
         launcher: launcher,
         pendingLaunchUri: () async => uri,
         onLaunchUriDelivered: () async => delivered.add(true),
+        isLibraryApplying: () => libraryApplying,
       );
       addTearDown(controller.dispose);
       return (controller: controller, launcher: launcher, delivered: delivered);
@@ -456,6 +469,45 @@ void main() {
         expect(t.launcher.uris, [OtzariaDeepLinks.libraryReindex]);
         expect(t.delivered, [true]);
         expect(t.controller.errorMessage, isNull);
+      },
+      testOn: 'windows',
+    );
+
+    test(
+      'בזמן עדכון ספרייה אין הפעלה, והבקשה הממתינה אינה נמחקת',
+      () async {
+        if (!writeManagedInstall()) return;
+        final t = controllerWith(libraryApplying: true);
+        await t.controller.checkForUpdate();
+
+        expect(t.controller.canLaunch, isFalse);
+        await t.controller.launch();
+        expect(await t.controller.requestLibraryReindex(), isFalse);
+
+        expect(t.launcher.uris, isEmpty);
+        expect(t.delivered, isEmpty);
+        expect(
+          t.controller.noticeMessage,
+          AppL10n.strings.home.libraryApplyActive,
+        );
+      },
+      testOn: 'windows',
+    );
+
+    test(
+      'בזמן עדכון ספרייה אין גם התקנה של אוצריא',
+      () async {
+        if (!writeManagedInstall()) return;
+        final t = controllerWith(libraryApplying: true);
+        await t.controller.checkForUpdate();
+
+        await t.controller.install();
+
+        expect(t.controller.status, isNot(OtzariaModuleStatus.installing));
+        expect(
+          t.controller.noticeMessage,
+          AppL10n.strings.home.libraryApplyActive,
+        );
       },
       testOn: 'windows',
     );
@@ -692,6 +744,14 @@ void main() {
       expect(c.downloadStatus, OtzariaDownloadStatus.error);
     });
   });
+
+  test('מראה שלא נבדקה בה ARM64 מחייבת את מודול התוכנה לרוץ', () async {
+    writeAppMirror(stableTag: '0.9.96', arm64Checked: false);
+    final c = controllerFor();
+    await c.checkForUpdate();
+
+    expect(c.hasStaleFullPackage, isTrue);
+  }, testOn: 'windows');
 
   group('חבילת FULL שנשארה מגרסה ישנה', () {
     test('מראה רגילה — אין מה לנקות', () async {

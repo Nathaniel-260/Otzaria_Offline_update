@@ -2,6 +2,7 @@ abstract interface class AutoInstallLibrary {
   bool get isFreshInstall;
   bool get hasUpdateAvailable;
   Future<void> update();
+  Future<void> recheck();
 }
 
 abstract interface class AutoInstallApp {
@@ -30,6 +31,17 @@ class AutoInstallFlow {
   Future<bool> run({required bool enabled}) async {
     var skippedWhileRunning = false;
 
+    if (enabled && app.isInstalled && app.hasUpdateAvailable) {
+      if (await isOtzariaRunning()) {
+        skippedWhileRunning = true;
+      } else if (!exitPending()) {
+        await app.install(useWizard: false);
+        if (!isActive()) return false;
+        if (!isDownloading()) await library.recheck();
+        if (!isActive()) return false;
+      }
+    }
+
     if (enabled &&
         !isDownloading() &&
         !library.isFreshInstall &&
@@ -38,15 +50,6 @@ class AutoInstallFlow {
         skippedWhileRunning = true;
       } else if (!exitPending()) {
         await library.update();
-        if (!isActive()) return false;
-      }
-    }
-
-    if (enabled && app.isInstalled && app.hasUpdateAvailable) {
-      if (await isOtzariaRunning()) {
-        skippedWhileRunning = true;
-      } else if (!exitPending()) {
-        await app.install(useWizard: false);
       }
     }
 

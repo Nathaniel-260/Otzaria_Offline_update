@@ -208,7 +208,7 @@ void main() {
           isA<StateError>().having(
             (e) => e.message,
             'message',
-            AppL10n.strings.launcherUpdate.digestMismatch,
+            AppL10n.strings.appDomain.installerDigestMismatch,
           ),
         ),
       );
@@ -265,7 +265,7 @@ void main() {
           isA<StateError>().having(
             (e) => e.message,
             'message',
-            AppL10n.strings.launcherUpdate.digestMismatch,
+            AppL10n.strings.appDomain.installerDigestMismatch,
           ),
         ),
       );

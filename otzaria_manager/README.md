@@ -1,7 +1,7 @@
 # otzaria_manager
 
 חבילת Dart טהורה (ללא תלות ב-Flutter) לניהול **אפליקציית אוצריא עצמה**
-(לא ה-DB — לזה יש את [`seforim_library_updater`](https://github.com/Yehuda-Zakesh/Otzariya_update))
+(לא ה-DB — לזה יש את [`seforim_library_updater`](https://github.com/Otzaria/otzaria_library_updater))
 בתוך לאנצ'ר חיצוני: בדיקת גרסה עדכנית, הורדה, התקנה שקטה, והפעלה.
 תומכת ב-**Windows וב-macOS**.
 

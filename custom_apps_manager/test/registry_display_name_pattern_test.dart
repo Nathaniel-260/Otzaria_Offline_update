@@ -118,4 +118,10 @@ void main() {
       );
     });
   });
+
+  test('ההמשך העברי חוסם: "קול" אינו מתאים ל"קולמוס"', () {
+    final pattern = RegistryDisplayNamePattern.fromDisplayName('קול 2.1');
+    expect(RegistryDisplayNamePattern.matches(pattern, 'קולמוס 3'), isFalse);
+    expect(RegistryDisplayNamePattern.matches(pattern, 'קול 2.4'), isTrue);
+  });
 }

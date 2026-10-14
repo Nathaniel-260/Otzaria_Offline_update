@@ -28,6 +28,20 @@ class _FakeOtzaria extends OtzariaModuleController {
     installs++;
     onInstall?.call(this);
   }
+
+  bool running = false;
+  bool closeSucceeds = true;
+  int closes = 0;
+
+  @override
+  Future<bool> refreshRunningState({bool force = false}) async => running;
+
+  @override
+  Future<bool> closeRunning() async {
+    closes++;
+    if (closeSucceeds) running = false;
+    return closeSucceeds;
+  }
 }
 
 class _FakeLibrary extends LibraryModuleController {
@@ -355,6 +369,49 @@ void main() {
 
       expect(otzaria.installs, 1);
       expect(find.text(t.appInstalledSnack('0.9.96')), findsOneWidget);
+      await _drainSnack(tester);
+    });
+
+    testWidgets('אוצריא פתוחה: נסגרת באישור המשתמש לפני ההתקנה', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      appUpdateAvailable();
+      otzaria.running = true;
+      otzaria.onInstall = (c) {
+        c.status = OtzariaModuleStatus.upToDate;
+        c.currentVersion = '0.9.96';
+      };
+      await _pump(tester, home());
+
+      await tester.tap(find.text(stringsOf().common.install));
+      await tester.pumpAndSettle();
+      await _confirm(tester, t.appInstallConfirm);
+      expect(_inDialog(t.closeOtzariaForAppInstallDialogTitle), findsOneWidget);
+      await _confirm(tester, t.closeOtzariaAndInstallConfirm);
+
+      expect(otzaria.closes, 1);
+      expect(otzaria.installs, 1);
+      await _drainSnack(tester);
+    });
+
+    testWidgets('אוצריא שלא נסגרה חוסמת את ההתקנה', (tester) async {
+      final t = stringsOf().home;
+      appUpdateAvailable();
+      otzaria.running = true;
+      otzaria.closeSucceeds = false;
+      await _pump(tester, home());
+
+      await tester.tap(find.text(stringsOf().common.install));
+      await tester.pumpAndSettle();
+      await _confirm(tester, t.appInstallConfirm);
+      await _confirm(tester, t.closeOtzariaAndInstallConfirm);
+
+      expect(otzaria.installs, 0);
+      expect(
+        find.text(stringsOf().common.closeOtzariaFailedSnack),
+        findsOneWidget,
+      );
       await _drainSnack(tester);
     });
 

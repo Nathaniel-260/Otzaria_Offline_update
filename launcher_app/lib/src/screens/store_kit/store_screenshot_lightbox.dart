@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
+import 'store_visuals.dart';
 
 /// גלריית צילומי המסך במסך מלא. ניווט בחצים, בלחיצה על הצדדים, וסגירה
 /// ב-Esc או בלחיצה על הרקע — כמו ה-lightbox בחנות המקורית.
@@ -86,8 +87,8 @@ class _LightboxState extends State<_Lightbox> {
             Center(
               child: Padding(
                 padding: const EdgeInsets.all(AppTokens.spaceXL),
-                child: Image.file(
-                  File(widget.paths[_index]),
+                child: Image(
+                  image: screenBoundImage(context, widget.paths[_index]),
                   fit: BoxFit.contain,
                   errorBuilder: (context, _, __) => const Icon(
                     FluentIcons.image_off_24_regular,
@@ -176,4 +177,18 @@ class _NavButton extends StatelessWidget {
       ),
     );
   }
+}
+
+ImageProvider screenBoundImage(BuildContext context, String path) {
+  final file = FileImage(File(path));
+  final screen = MediaQuery.sizeOf(context);
+  final width = decodeWidthFor(context, screen.width);
+  final height = decodeWidthFor(context, screen.height);
+  if (width == null || height == null) return file;
+  return ResizeImage(
+    file,
+    width: width,
+    height: height,
+    policy: ResizeImagePolicy.fit,
+  );
 }

@@ -12,10 +12,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # TODO: לעבור לתג של Otzaria/otzaria_library_updater אחרי מיזוג #27.
   seforim_library_updater:
-    path: ../
+    git:
+      url: https://github.com/palmoni5/otzaria_library_updater.git
+      ref: 2e16a4cd170cac4b8d1bf86e90cbfe980c0f5c7b
+  sqlite3_flutter_libs: ^0.5.24
   otzaria_l10n:
     path: ../otzaria_l10n
+  otzaria_manager:
+    path: ../otzaria_manager
   otzaria_search_engine: 3.1.0
   zstandard: ^1.3.26
   # ה-bindings של libzstd שחבילת zstandard מביאה איתה בכל מקרה. נדרשים
@@ -24,6 +30,7 @@ dependencies:
   # (~1.1GB) ב-RAM, וזה מה שמאפשר לחלץ קובץ-לקובץ בלי זה.
   zstandard_native: ^1.5.0
   ffi: ^2.1.3
+  win32: ^5.5.4
   path: ^1.9.1
   http: ^1.2.2
   # `PRAGMA quick_check` על המסד המחולץ לפני שהוא מחליף את החי — בדיוק

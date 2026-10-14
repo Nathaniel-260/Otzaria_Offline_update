@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaDataRoot;
 import 'package:path/path.dart' as p;
 
 import 'installed_plugins_registry.dart';
@@ -30,18 +31,52 @@ class InstalledPluginsScanner {
   /// סימון ההתקנה הניידת של אוצריא, ליד ה-executable שלה, ותיקיית הנתונים
   /// שהוא מפעיל. **חייבים להישאר תואמים ל-`LibraryDbLocator`** — אותו זיהוי
   /// בדיוק בשתי החבילות; יש בדיקה ב-`launcher_app` שמאמתת זאת.
-  static const String portableMarkerFileName = 'portable.marker';
-  static const String portableDataFolderName = 'otzaria_data';
+  static const String portableMarkerFileName =
+      OtzariaDataRoot.portableMarkerFileName;
+  static const String portableDataFolderName =
+      OtzariaDataRoot.portableDataFolderName;
 
-  Future<Map<String, String>> scan() async {
+  Future<Map<String, String>> scan() async => (await scanState()).versions;
+
+  static Map<String, String> Function() environment =
+      () => Platform.environment;
+
+  static void Function(String path)? debugPathGuard;
+
+  /// מפנה את ברירת המחדל לתיקייה זמנית, ונכשל אם בדיקה מגיעה בכל זאת לנתוני
+  /// אוצריא האמיתיים של המחשב.
+  static void sandboxForTests(String sandboxRoot) {
+    final real = Platform.environment;
+    final forbidden = [
+      for (final key in const ['APPDATA', 'LOCALAPPDATA', 'ProgramData'])
+        if ((real[key] ?? '').isNotEmpty) p.join(real[key]!, 'otzaria'),
+      if ((real['HOME'] ?? '').isNotEmpty)
+        p.join(real['HOME']!, 'Library', 'Application Support', 'otzaria'),
+    ];
+    final sandbox = {
+      'APPDATA': p.join(sandboxRoot, 'Roaming'),
+      'HOME': p.join(sandboxRoot, 'home'),
+    };
+    environment = () => sandbox;
+    debugPathGuard = (path) {
+      for (final root in forbidden) {
+        if (p.equals(root, path) || p.isWithin(root, path)) {
+          throw StateError('A test reached a real Otzaria path: $path');
+        }
+      }
+    };
+  }
+
+  Future<InstalledPluginsState> scanState() async {
     final root = resolveInstalledDir();
-    if (root == null) return const {};
+    if (root == null) return InstalledPluginsState.empty;
+    debugPathGuard?.call(root);
 
     final registered = await _readRegistry(root);
     if (registered != null) return registered;
 
     final dir = Directory(root);
-    if (!await dir.exists()) return const {};
+    if (!await dir.exists()) return InstalledPluginsState.empty;
 
     final result = <String, String>{};
     try {
@@ -51,17 +86,18 @@ class InstalledPluginsScanner {
         if (version != null) result[p.basename(entry.path)] = version;
       }
     } on FileSystemException {
-      return result;
+      return InstalledPluginsState(versions: result);
     }
-    return result;
+    return InstalledPluginsState(versions: result);
   }
 
-  Future<Map<String, String>?> _readRegistry(String installedDir) async {
+  Future<InstalledPluginsState?> _readRegistry(String installedDir) async {
     final locate = locatePluginsDb;
     if (locate == null) return null;
     try {
       final dbPath = await locate(p.dirname(p.dirname(installedDir)));
       if (dbPath == null) return null;
+      debugPathGuard?.call(dbPath);
       return await Isolate.run(() => readInstalledPluginsRegistry(dbPath));
     } catch (_) {
       return null;
@@ -87,77 +123,28 @@ class InstalledPluginsScanner {
     final portable = portablePluginsDir(otzariaLaunchPath);
     if (portable != null) return portable;
 
-    final candidates = defaultPluginsDirs();
-    for (final dir in candidates) {
-      if (Directory(p.join(dir, installedDirName)).existsSync()) return dir;
-    }
-    return candidates.isEmpty ? null : candidates.first;
+    return defaultPluginsDir();
   }
 
   /// תיקיית התוספים של התקנה **ניידת** — `<exeDir>/otzaria_data/plugins` —
   /// או null כשההתקנה שזוהתה אינה ניידת.
   ///
-  /// הסימון הוא התנאי, בדיוק כמו ב-`LibraryDbLocator`; תיקיית נתונים קיימת
-  /// לצד קובץ ההרצה מתקבלת גם בלעדיו, כדי שהתקנה שהסימון שלה נמחק לא תיפול
-  /// חזרה ל-`%APPDATA%` של מחשב אחר לגמרי.
+  /// כמו באוצריא, רק קובץ הסימון קובע — תיקיית נתונים בלעדיו אינה ניידת.
   static String? portablePluginsDir(String? launchPath) {
-    final exeDir = exeDirOf(launchPath);
-    if (exeDir == null) return null;
-
-    final plugins = p.join(exeDir, portableDataFolderName, 'plugins');
-    if (File(p.join(exeDir, portableMarkerFileName)).existsSync() ||
-        Directory(p.join(plugins, installedDirName)).existsSync()) {
-      return plugins;
-    }
-    return null;
+    final root = OtzariaDataRoot.portableRoot(
+      launchPath,
+      operatingSystem: Platform.operatingSystem,
+    );
+    return root == null ? null : p.join(root, 'plugins');
   }
 
-  /// התיקייה שבה יושב ה-executable של אוצריא: ב-macOS זהו `Contents/MacOS`
-  /// שבתוך חבילת ה-`.app`, ושם גם יושב סימון ההתקנה הניידת.
-  static String? exeDirOf(String? launchPath) {
-    if (launchPath == null || launchPath.isEmpty) return null;
-    if (launchPath.toLowerCase().endsWith('.app')) {
-      return p.join(launchPath, 'Contents', 'MacOS');
-    }
-    return p.dirname(launchPath);
-  }
-
-  /// `%APPDATA%\otzaria\plugins` בווינדוס,
-  /// `~/Library/Application Support/otzaria/plugins` ב-macOS.
+  /// `<dataRoot>/plugins` של אוצריא (`AppPaths.getPluginsRootPath`).
   static String? defaultPluginsDir() {
-    final dirs = defaultPluginsDirs();
-    return dirs.isEmpty ? null : dirs.first;
-  }
-
-  /// כל שורשי הנתונים של אוצריא בפלטפורמה הזו, לפי סדר עדיפות — התקנה
-  /// למשתמש הנוכחי לפני התקנה מערכתית, כמו ב-`LibraryDbLocator`.
-  static List<String> defaultPluginsDirs() {
-    final env = Platform.environment;
-    final dirs = <String>[];
-
-    if (Platform.isWindows) {
-      final appData = env['APPDATA'];
-      if (appData != null && appData.isNotEmpty) {
-        dirs.add(p.join(appData, 'otzaria', 'plugins'));
-      }
-      final programData = env['ProgramData'];
-      if (programData != null && programData.isNotEmpty) {
-        dirs.add(p.join(programData, 'otzaria', 'plugins'));
-      }
-      return dirs;
-    }
-
-    if (Platform.isMacOS) {
-      final home = env['HOME'];
-      if (home != null && home.isNotEmpty) {
-        dirs.add(p.join(
-            home, 'Library', 'Application Support', 'otzaria', 'plugins'));
-      }
-      dirs.add(p.join('/Library', 'Application Support', 'otzaria', 'plugins'));
-      return dirs;
-    }
-
-    return dirs;
+    final root = OtzariaDataRoot.userRoot(
+      operatingSystem: Platform.operatingSystem,
+      environment: environment(),
+    );
+    return root == null ? null : p.join(root, 'plugins');
   }
 
   /// הגרסה המותקנת של תוסף אחד — מתוך תיקיית ההוצאה הפעילה שלו.
@@ -210,7 +197,8 @@ class InstalledPluginsScanner {
     try {
       final file = File(p.join(releaseDir, 'manifest.json'));
       if (!file.existsSync()) return null;
-      final decoded = jsonDecode(file.readAsStringSync().replaceFirst('﻿', ''));
+      final decoded =
+          jsonDecode(file.readAsStringSync().replaceFirst('\uFEFF', ''));
       if (decoded is! Map) return null;
       final version = decoded['version'];
       return version is String && version.isNotEmpty ? version : null;

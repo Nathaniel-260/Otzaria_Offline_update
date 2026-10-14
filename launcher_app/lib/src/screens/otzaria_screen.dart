@@ -82,7 +82,9 @@ class OtzariaScreen extends StatelessWidget {
       actions: [
         RecheckButton(onPressed: _isBusy ? null : c.checkForUpdate),
         ActionButton.recommended(
-          text: t.launchButton,
+          text: c.libraryApplyActive
+              ? context.strings.home.libraryApplyActive
+              : t.launchButton,
           icon: FluentIcons.play_24_regular,
           onPressed: c.canLaunch ? c.launch : null,
         ),
@@ -108,8 +110,18 @@ class OtzariaScreen extends StatelessWidget {
             c.status,
             updateAvailable: t.readyToInstall,
             needsDownload: t.nothingDownloadedYet,
+            installStage: c.installStage,
           ),
         ),
+        if (c.installStage != null)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ActionButton.neutral(
+              text: context.strings.appDomain.stopWaitingForSetup,
+              icon: FluentIcons.dismiss_circle_24_regular,
+              onPressed: c.stopWaitingForSetup,
+            ),
+          ),
         SettingsActionTile.text(
           icon: FluentIcons.tag_24_regular,
           title: t.installedVersion,

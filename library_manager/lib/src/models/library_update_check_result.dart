@@ -25,6 +25,8 @@ class LibraryUpdateCheckResult {
     this.semanticPending = false,
     this.semanticConsentGranted = false,
     this.mirrorDownloadIncomplete = false,
+    this.readableDbSchemaVersion,
+    this.needsNewerOtzaria = false,
   });
 
   final String? dbPath;
@@ -52,6 +54,8 @@ class LibraryUpdateCheckResult {
   final bool semanticPending;
   final bool semanticConsentGranted;
   final bool mirrorDownloadIncomplete;
+  final int? readableDbSchemaVersion;
+  final bool needsNewerOtzaria;
 
   bool get companionsPending =>
       pendingCompanions.isNotEmpty ||

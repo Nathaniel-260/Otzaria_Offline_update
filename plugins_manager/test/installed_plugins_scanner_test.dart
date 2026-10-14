@@ -8,6 +8,7 @@ import 'package:test/test.dart';
 import 'support.dart';
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
 
   setUp(() => temp = createTempDir());
@@ -39,7 +40,7 @@ void main() {
     });
 
     test('BOM במניפסט המותקן אינו מפיל את הקריאה', () async {
-      install(temp.path, 'bom', '﻿{"id":"bom","version":"2.0.0"}');
+      install(temp.path, 'bom', '\uFEFF{"id":"bom","version":"2.0.0"}');
 
       final scanner = InstalledPluginsScanner(customPluginsDir: temp.path);
       expect(await scanner.scan(), {'bom': '2.0.0'});
@@ -207,6 +208,47 @@ void main() {
       expect(askedRoot, temp.path);
     });
 
+    test('enabled ו-source_type נקראים מהרישום', () async {
+      final db = sqlite3.open(dbPath)
+        ..execute(
+          'CREATE TABLE plugin_installation (plugin_id TEXT PRIMARY KEY, '
+          'version TEXT NOT NULL, enabled INTEGER NOT NULL, '
+          "source_type TEXT NOT NULL DEFAULT 'packaged')",
+        );
+      for (final row in [
+        ['on', '1.0.0', 1, 'packaged'],
+        ['off', '1.0.0', 0, 'packaged'],
+        ['dev', '0.1.0', 1, 'development'],
+        ['local', '0.1.0', 1, 'localhost_dev'],
+      ]) {
+        db.execute('INSERT INTO plugin_installation VALUES (?, ?, ?, ?)', row);
+      }
+      db.close();
+
+      final state = await InstalledPluginsScanner(
+        customPluginsDir: pluginsDir,
+        locatePluginsDb: (_) async => dbPath,
+      ).scanState();
+
+      expect(
+          state.versions.keys, unorderedEquals(['on', 'off', 'dev', 'local']));
+      expect(state.disabled, {'off'});
+      expect(state.development, {'dev', 'local'});
+    });
+
+    test('רישום ישן בלי העמודות — הכול פעיל ואין גרסאות פיתוח', () async {
+      openRegistry({'a': '1.0.0'}).close();
+
+      final state = await InstalledPluginsScanner(
+        customPluginsDir: pluginsDir,
+        locatePluginsDb: (_) async => dbPath,
+      ).scanState();
+
+      expect(state.versions, {'a': '1.0.0'});
+      expect(state.disabled, isEmpty);
+      expect(state.development, isEmpty);
+    });
+
     test('רישום ריק פירושו שאין תוספים, גם כשתיקיות נשארו', () async {
       install(pluginsDir, 'leftover', '{"version":"1.0.0"}');
       openRegistry(const {}).close();
@@ -285,6 +327,31 @@ void main() {
       }
     });
 
+    test('ברירת המחדל היא שורש הנתונים של המשתמש בלבד, כמו AppPaths באוצריא',
+        () {
+      final env = InstalledPluginsScanner.environment();
+      final dir = InstalledPluginsScanner.defaultPluginsDir();
+      if (Platform.isWindows) {
+        expect(dir, p.join(env['APPDATA']!, 'otzaria', 'plugins'));
+      } else if (Platform.isMacOS) {
+        expect(
+          dir,
+          p.join(env['HOME']!, 'Library', 'Application Support', 'otzaria',
+              'plugins'),
+        );
+      }
+      expect(dir ?? '', isNot(contains('ProgramData')));
+    });
+
+    test('בדיקה שמגיעה לנתוני אוצריא האמיתיים נכשלת', () async {
+      final appData = Platform.environment['APPDATA'];
+      if (appData == null) return;
+      final real = InstalledPluginsScanner(
+        customPluginsDir: p.join(appData, 'otzaria', 'plugins'),
+      );
+      await expectLater(real.scan(), throwsStateError);
+    });
+
     test('דריסה במחרוזת ריקה נופלת לברירת המחדל', () {
       const scanner = InstalledPluginsScanner(customPluginsDir: '');
       const fallback = InstalledPluginsScanner();
@@ -324,12 +391,13 @@ void main() {
       expect(await scanner.scan(), {'nikud': '1.4.0'});
     });
 
-    test('תיקיית נתונים קיימת מתקבלת גם בלי קובץ הסימון', () async {
+    test('תיקיית נתונים בלי קובץ הסימון אינה ניידת — כמו באוצריא', () {
       final scanner = InstalledPluginsScanner(
         otzariaLaunchPath: portableInstall(marker: false),
       );
+      const fallback = InstalledPluginsScanner();
 
-      expect(await scanner.scan(), {'nikud': '1.4.0'});
+      expect(scanner.resolveInstalledDir(), fallback.resolveInstalledDir());
     });
 
     test('התקנה רגילה (בלי סימון ובלי תיקיית נתונים) נופלת לברירת המחדל', () {

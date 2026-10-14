@@ -72,9 +72,8 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
     _fillMissingIcons();
   }
 
-  /// מילוי האייקונים החסרים הוא **ברירת המחדל**, ורץ בכניסה למסך ולא
-  /// בעלייה: כל ניסיון הוא תהליך PowerShell, ומי שאינו נכנס ללשונית אינו
-  /// משלם עליו. הקונטרולר זוכר את מי כבר ניסה, ולכן הקריאה החוזרת זולה.
+  /// מילוי האייקונים החסרים רץ בכניסה למסך ולא בעלייה, כדי שמי שאינו נכנס
+  /// ללשונית לא ישלם עליו. הקונטרולר זוכר את מי כבר ניסה.
   void _fillMissingIcons() => unawaited(
         widget.controller.fillMissingIcons(readOnly: widget.readOnly),
       );
@@ -146,7 +145,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
       readOnly: widget.readOnly,
       onBack: () => setState(() => _selectedId = null),
       onInstall: () => _install(selected),
-      onLaunch: () => widget.controller.launch(selected.installed!),
+      onLaunch: () => _launch(selected),
       onDownload: () => _download(selected),
       onPickLocation: () => _pickLocation(selected),
       onCategorySelected: (slug) {
@@ -518,7 +517,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
           readOnly: widget.readOnly,
           onOpenDetail: () => setState(() => _selectedId = app.descriptor.id),
           onInstall: () => _install(app),
-          onLaunch: () => widget.controller.launch(app.installed!),
+          onLaunch: () => _launch(app),
           onDownload: () => _download(app),
         );
       },
@@ -679,6 +678,12 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
   // ── פעולות ────────────────────────────────────────────────────────────
 
   Future<void> _install(CustomAppView app) => installCustomApp(
+        context: context,
+        controller: widget.controller,
+        app: app,
+      );
+
+  Future<void> _launch(CustomAppView app) => launchCustomApp(
         context: context,
         controller: widget.controller,
         app: app,

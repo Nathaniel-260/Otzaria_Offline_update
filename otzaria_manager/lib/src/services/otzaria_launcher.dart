@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:otzaria_downloads/otzaria_downloads.dart' show WindowsElevation;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
@@ -51,9 +52,19 @@ class OtzariaLauncher {
       return;
     }
 
+    final arguments = [if (withUri != null) withUri];
+    if (Platform.isWindows &&
+        WindowsElevation.isElevated &&
+        WindowsElevation.launchUnelevated(
+          launchPath,
+          arguments,
+          workingDirectory: p.dirname(launchPath),
+        )) {
+      return;
+    }
     await Process.start(
       launchPath,
-      [if (withUri != null) withUri],
+      arguments,
       workingDirectory: p.dirname(launchPath),
       mode: ProcessStartMode.detached,
     );

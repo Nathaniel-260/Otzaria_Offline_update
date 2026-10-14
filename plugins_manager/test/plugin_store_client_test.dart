@@ -111,6 +111,40 @@ void main() {
       expect(catalog.first['name'], 'אלף');
     });
 
+    test('503 של שבת מהאתר — חריג ייעודי עם הודעה ייעודית', () async {
+      final client = clientFor(
+        (_) async => jsonResponse(
+          {'error': 'shabbat', 'message': 'סגור'},
+          status: 503,
+        ),
+      );
+
+      await expectLater(
+        client.fetchCatalog(),
+        throwsA(
+          isA<PluginStoreShabbatException>().having(
+            (e) => e.message,
+            'message',
+            strings.siteClosedForShabbat,
+          ),
+        ),
+      );
+    });
+
+    test('503 אחר אינו נחשב שבת', () async {
+      final client = clientFor((_) async => http.Response('<html>', 503));
+
+      await expectLater(
+        client.fetchCatalog(),
+        throwsA(
+          predicate(
+            (e) =>
+                e is PluginStoreException && e is! PluginStoreShabbatException,
+          ),
+        ),
+      );
+    });
+
     test('תשובה שאינה רשימה זורקת', () async {
       final client = clientFor((_) async => jsonResponse({'plugins': []}));
 
@@ -300,6 +334,31 @@ void main() {
   });
 
   group('downloadAsset', () {
+    test('503 של שבת בהורדה — חריג ייעודי', () async {
+      final client = clientFor(
+        (_) async => jsonResponse({'error': 'shabbat'}, status: 503),
+      );
+
+      await expectLater(
+        client.downloadAsset('/api/plugins/a/download', p.join(temp.path, 'x')),
+        throwsA(isA<PluginStoreShabbatException>()),
+      );
+    });
+
+    test('503 אחר בהורדה אינו שבת', () async {
+      final client = clientFor((_) async => http.Response('busy', 503));
+
+      await expectLater(
+        client.downloadAsset('/api/plugins/a/download', p.join(temp.path, 'x')),
+        throwsA(
+          predicate(
+            (e) =>
+                e is PluginStoreException && e is! PluginStoreShabbatException,
+          ),
+        ),
+      );
+    });
+
     http.Response asset(List<int> bytes, Map<String, String> headers) =>
         http.Response.bytes(bytes, 200, headers: headers);
 

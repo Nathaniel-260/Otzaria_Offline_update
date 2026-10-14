@@ -27,6 +27,7 @@ String otzariaStatusLabel(
   OtzariaModuleStatus status, {
   required String updateAvailable,
   required String needsDownload,
+  String? installStage,
 }) {
   final common = context.strings.common;
 
@@ -35,7 +36,7 @@ String otzariaStatusLabel(
     OtzariaModuleStatus.checking => common.checking,
     OtzariaModuleStatus.upToDate => common.upToDate,
     OtzariaModuleStatus.updateAvailable => updateAvailable,
-    OtzariaModuleStatus.installing => common.installing,
+    OtzariaModuleStatus.installing => installStage ?? common.installing,
     OtzariaModuleStatus.needsDownload => needsDownload,
     OtzariaModuleStatus.installedIsNewer => common.installedIsNewer,
     OtzariaModuleStatus.error => common.error,
@@ -53,9 +54,13 @@ Future<bool> confirmOtzariaInstall(
     context: context,
     title: title,
     content: content,
+    subtitle: otzaria.elevatedAsOtherUser
+        ? context.strings.home.elevatedAsOtherUserWarning
+        : null,
     confirmText: confirmText,
   );
-  if (!approved) return false;
+  if (!approved || !context.mounted) return false;
+  if (!await _closedForInstall(context, otzaria)) return false;
   await otzaria.install();
   final notice = otzaria.noticeMessage;
   if (notice != null) {
@@ -67,4 +72,23 @@ Future<bool> confirmOtzariaInstall(
     AppL10n.strings.home.appInstalledSnack('${otzaria.currentVersion}'),
   );
   return true;
+}
+
+Future<bool> _closedForInstall(
+  BuildContext context,
+  OtzariaModuleController otzaria,
+) async {
+  if (!await otzaria.refreshRunningState(force: true)) return true;
+  if (!context.mounted) return false;
+  final home = context.strings.home;
+  final close = await showTwoActionsDialog(
+    context: context,
+    title: home.closeOtzariaForAppInstallDialogTitle,
+    content: home.closeOtzariaForAppInstallPrompt,
+    confirmText: home.closeOtzariaAndInstallConfirm,
+  );
+  if (!close) return false;
+  if (await otzaria.closeRunning()) return true;
+  UiSnack.showError(AppL10n.strings.common.closeOtzariaFailedSnack);
+  return false;
 }

@@ -21,6 +21,19 @@ void main() {
       expect(allowed('https://otzaria.org:8443/api'), isFalse);
     });
 
+    test('רק שלוש נקודות הקצה של הדיווחים, בלי query', () {
+      bool allowed(String url) =>
+          OutboxReport.fromJson(reportJson('a', endpoint: url), filePath: 'a')
+              .isAllowedEndpoint;
+      expect(allowed(OutboxReport.appReportingEndpoint), isTrue);
+      expect(allowed(OutboxReport.pluginReportingEndpoint), isTrue);
+      expect(allowed('https://otzaria.org/api/auth/signin'), isFalse);
+      expect(allowed('https://otzaria.org/api/reportingerrors/x'), isFalse);
+      expect(allowed('https://otzaria.org/api/reportingerrors?to=x'), isFalse);
+      expect(allowed('https://otzaria.org/api/reportingerrors#x'), isFalse);
+      expect(allowed('https://otzaria.org/'), isFalse);
+    });
+
     test('שדה חובה חסר זורק', () {
       final json = reportJson('a')..remove('body');
       expect(
@@ -79,6 +92,39 @@ void main() {
 
       await outbox.remove(list.first);
       expect((await outbox.list()).map((r) => r.reportId), ['a']);
+    });
+
+    test('שני עותקים של אותו תוכן במזהים שונים (קריסה אחרי 409) — נשאר החדש',
+        () async {
+      Map<String, dynamic> copy(String id) => OutboxReport.fileJson(
+            reportId: id,
+            bookTitle: 'ספר',
+            createdAt: '2026-09-01T10:00:00Z',
+            body: {'report_id': id, 'text': 'טעות'},
+          );
+      writeReport(dir, copy('old'));
+      File(p.join(dir, 'old.json')).setLastModifiedSync(
+          DateTime.now().subtract(const Duration(hours: 1)));
+      writeReport(dir, copy('new'));
+      writeReport(dir, {
+        ...copy('other'),
+        'body': {'report_id': 'other', 'text': 'אחר'},
+      });
+
+      final list = await DirectoryReportOutbox(dir).list();
+
+      expect(list.map((r) => r.reportId), unorderedEquals(['new', 'other']));
+      expect(File(p.join(dir, 'old.json')).existsSync(), isFalse);
+    });
+
+    test('count סופר קובצי json בלי לפתוח אותם', () async {
+      expect(await DirectoryReportOutbox(dir).count(), 0);
+      writeReport(dir, reportJson('a'));
+      writeReport(dir, reportJson('b'));
+      File(p.join(dir, 'a.json.123.tmp')).writeAsStringSync('{');
+      File(p.join(dir, 'notes.txt')).writeAsStringSync('x');
+
+      expect(await DirectoryReportOutbox(dir).count(), 2);
     });
 
     test('discard מוחק גם את הקובץ הזמני של כתיבה שנכשלה', () async {

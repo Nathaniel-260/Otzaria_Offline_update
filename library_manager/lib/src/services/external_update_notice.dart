@@ -13,13 +13,8 @@ import 'atomic_file.dart';
 /// בודק נוכחות מפתח ולא תוכן, ולכן ספר שתוכנו השתנה נשאר מאונדקס בגרסתו
 /// הישנה, והחיפוש בו מחזיר תוכן ישן.
 ///
-/// **מה אוצריא עושה עם זה:** את הקובץ עצמו היא לא קוראת. הפתרון שהיא מימשה
-/// הוא קישור העומק `otzaria://library/reindex` (`OtzariaDeepLinks`), שמרענן
-/// את הקטלוג ומריץ `StartIndexing` + `ReconcileIndex` — ההשוואה שם היא של
-/// טביעות-אצבע, ולכן היא מזהה לבד אילו ספרים השתנו ואינה צריכה
-/// [booksTouched]. לכן הקובץ נשאר אצלנו בתפקיד אחד: **הסימון המתמשך שבקשת
-/// אינדוקס ממתינה**. הוא נכתב אחרי apply מוצלח, שורד הפעלות מחדש של
-/// הלאנצ'ר, ונמחק ([clear]) רק אחרי שהבקשה נמסרה לאוצריא בפועל.
+/// אוצריא קוראת אותו (חוזה C5): `booksTouched` = אינדוקס ממוקד, ו-`fullReconcile`
+/// בלי `booksTouched` = `ReconcileIndex` מלא. אצלנו הוא גם סימון שבקשה ממתינה.
 class ExternalUpdateNotice {
   const ExternalUpdateNotice();
 
@@ -37,6 +32,7 @@ class ExternalUpdateNotice {
     int? dbVersion,
     String? releaseTag,
     DateTime? updatedAt,
+    void Function(Object error)? onError,
   }) async {
     try {
       final pending = await read(dbPath: dbPath);
@@ -52,13 +48,18 @@ class ExternalUpdateNotice {
           'route': mergedRoute,
           if (dbVersion != null) 'dbVersion': dbVersion,
           if (releaseTag != null) 'releaseTag': releaseTag,
-          'booksTouched': <int>{
-            ...?pending?.booksTouched,
-            ...booksTouched,
-          }.toList()..sort(),
+          if (mergedRoute == routeFull)
+            'fullReconcile': true
+          else
+            'booksTouched': <int>{
+              ...?pending?.booksTouched,
+              ...booksTouched,
+            }.toList()..sort(),
         }),
       );
-    } catch (_) {}
+    } catch (e) {
+      onError?.call(e);
+    }
   }
 
   Future<ExternalUpdateNoticeData?> read({required String dbPath}) async {

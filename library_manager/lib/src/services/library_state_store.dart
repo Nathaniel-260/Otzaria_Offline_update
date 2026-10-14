@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
+import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
+import 'package:win32/win32.dart';
 
 import 'atomic_file.dart';
 
@@ -110,15 +114,7 @@ class LibraryStateStore {
   static Future<String?> _readMachineId() async {
     try {
       if (Platform.isWindows) {
-        final result = await Process.run('reg', [
-          'query',
-          r'HKLM\SOFTWARE\Microsoft\Cryptography',
-          '/v',
-          'MachineGuid',
-          '/reg:64',
-        ]);
-        if (result.exitCode != 0) return null;
-        return parseMachineId(result.stdout.toString());
+        return await Isolate.run(readWindowsMachineGuid);
       }
       if (Platform.isMacOS) {
         final result = await Process.run('/usr/sbin/ioreg', [
@@ -182,9 +178,18 @@ class LibraryStateStore {
     records[key] = value;
   }
 
-  Future<String?> loadCustomDbPath() async {
-    final json = await _readAll();
+  Future<String?> loadCustomDbPath() async =>
+      (await loadCustomDbChoice())?.path;
 
+  Future<({String path, bool explicit})?> loadCustomDbChoice() async {
+    final json = await _readAll();
+    final path = await _loadCustomDbPath(json);
+    if (path == null) return null;
+    final explicit = await _ownRecord(json['customDbPathsExplicit']);
+    return (path: path, explicit: explicit == path);
+  }
+
+  Future<String?> _loadCustomDbPath(Map<String, dynamic> json) async {
     final own = await _ownRecord(json['customDbPaths']);
     if (own is String && own.isNotEmpty) return own;
 
@@ -207,21 +212,38 @@ class LibraryStateStore {
     }
   }
 
-  Future<void> saveCustomDbPath(String dbPath) =>
-      _exclusively(() => _saveCustomDbPath(dbPath));
+  Future<void> saveCustomDbPath(String dbPath, {bool? explicit}) =>
+      _exclusively(() => _saveCustomDbPath(dbPath, explicit));
 
-  Future<void> _saveCustomDbPath(String dbPath) async {
+  Future<void> _saveCustomDbPath(String dbPath, bool? explicit) async {
     final json = await _readAll(forWrite: true);
-    final paths = <String, dynamic>{};
-    final existing = json['customDbPaths'];
+    final paths = _stringRecords(json['customDbPaths']);
+    final explicitPaths = _stringRecords(json['customDbPathsExplicit']);
+    final keep =
+        explicit == null &&
+        await _ownRecord(json['customDbPaths']) == dbPath &&
+        await _ownRecord(json['customDbPathsExplicit']) == dbPath;
+    await _putOwnRecord(paths, dbPath);
+    if (explicit == true || keep) {
+      await _putOwnRecord(explicitPaths, dbPath);
+    } else {
+      explicitPaths
+        ..remove(await currentMachineKey())
+        ..remove(legacyMachineKey());
+    }
+    json['customDbPaths'] = paths;
+    json['customDbPathsExplicit'] = explicitPaths;
+    await _writeAll(json);
+  }
+
+  static Map<String, dynamic> _stringRecords(Object? existing) {
+    final records = <String, dynamic>{};
     if (existing is Map) {
       existing.forEach((key, value) {
-        if (key is String && value is String) paths[key] = value;
+        if (key is String && value is String) records[key] = value;
       });
     }
-    await _putOwnRecord(paths, dbPath);
-    json['customDbPaths'] = paths;
-    await _writeAll(json);
+    return records;
   }
 
   Future<AppliedRelease?> loadAppliedRelease() async {
@@ -436,5 +458,34 @@ class LibraryStateStore {
     return rest.contains('/') ||
         rest.contains(r'\') ||
         rest.toLowerCase().endsWith('.db');
+  }
+}
+
+/// `MachineGuid` ישר מהרג'יסטרי (תצוגת 64 סיביות), במקום `reg.exe` שעולה
+/// כשנייה במחשבים מסוננים.
+String? readWindowsMachineGuid() {
+  final subKey = r'SOFTWARE\Microsoft\Cryptography'.toNativeUtf16();
+  final value = 'MachineGuid'.toNativeUtf16();
+  const capacity = 128;
+  final data = calloc<Uint16>(capacity);
+  final size = calloc<Uint32>()..value = capacity * 2;
+  try {
+    final status = RegGetValue(
+      HKEY_LOCAL_MACHINE,
+      subKey,
+      value,
+      RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY,
+      nullptr,
+      data,
+      size,
+    );
+    if (status != ERROR_SUCCESS) return null;
+    final id = data.cast<Utf16>().toDartString().trim();
+    return id.isEmpty ? null : id;
+  } finally {
+    free(subKey);
+    free(value);
+    free(data);
+    free(size);
   }
 }

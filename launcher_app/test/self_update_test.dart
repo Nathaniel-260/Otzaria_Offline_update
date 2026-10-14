@@ -5,6 +5,7 @@
 // **כן** רצה על קבצים אמיתיים בתיקייה זמנית: זה כל העניין בה, ודמה שלא נוגע
 // בדיסק לא היה מגלה שהיא מוחקת משהו שאסור לגעת בו.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -898,6 +899,44 @@ void main() {
       expect(quits, 0);
     });
 
+    test('החזרה שנכשלה אינה מוצגת כהחזרה, וה-target נשאר ל-stub', () async {
+      final names = {
+        LauncherSelfInstaller.stagedName,
+        LauncherSelfInstaller.previousName,
+      };
+      await expectLater(
+        IOOverrides.runZoned(
+          () => installer().apply(
+            layout: layout,
+            downloadedFilePath: downloaded.path,
+          ),
+          createFile: (path) {
+            final real = Zone.root.run(() => File(path));
+            return names.contains(p.basename(path))
+                ? _NoRenameFile(real)
+                : real;
+          },
+        ),
+        throwsA(
+          isA<LauncherUpdateException>().having(
+            (e) => e.message,
+            'message',
+            contains(LauncherSelfInstaller.previousName),
+          ),
+        ),
+      );
+
+      expect(
+        File(p.join(temp.path, LauncherSelfInstaller.targetName)).existsSync(),
+        isTrue,
+      );
+      expect(
+        await File(p.join(temp.path, LauncherSelfInstaller.previousName))
+            .readAsString(),
+        'גרסה ישנה',
+      );
+    });
+
     test('מפעיל את הקובץ החדש עם ה-pid שלנו, ואז מסיים', () async {
       await installer().apply(
         layout: layout,
@@ -919,6 +958,52 @@ void main() {
       await installer().cleanupLeftovers(layout);
 
       expect(leftover.existsSync(), isFalse);
+    });
+
+    test('החלפה שנקטעה בין שני ה-rename — הגרסה הקודמת חוזרת, לא נמחקת',
+        () async {
+      await stub.rename(p.join(temp.path, LauncherSelfInstaller.previousName));
+      final staged = File(p.join(temp.path, LauncherSelfInstaller.stagedName));
+      await staged.writeAsString('גרסה חדשה');
+
+      await installer().cleanupLeftovers(layout);
+
+      expect(await stub.readAsString(), 'גרסה ישנה');
+      expect(
+        File(p.join(temp.path, LauncherSelfInstaller.previousName))
+            .existsSync(),
+        isFalse,
+      );
+      expect(staged.existsSync(), isFalse);
+    });
+
+    test('ההחלפה רושמת את שם היעד לפני ה-rename, ומוחקת אותו בסוף', () async {
+      final target = File(p.join(temp.path, LauncherSelfInstaller.targetName));
+      String? seenDuringRestart;
+      await LauncherSelfInstaller(
+        currentPid: 1,
+        operatingSystem: 'windows',
+        startDetached: (_, __) async {
+          seenDuringRestart =
+              target.existsSync() ? target.readAsStringSync() : null;
+        },
+        quit: () {},
+      ).apply(layout: layout, downloadedFilePath: downloaded.path);
+
+      expect(seenDuringRestart, isNull);
+      expect(target.existsSync(), isFalse);
+    });
+
+    test('הלאנצ\'ר שרץ מקובץ השארית אינו מוחק את עצמו', () async {
+      final previous =
+          File(p.join(temp.path, LauncherSelfInstaller.previousName));
+      await previous.writeAsString('אני');
+
+      await installer().cleanupLeftovers(
+        LauncherInstallLayout(executablePath: previous.path),
+      );
+
+      expect(previous.existsSync(), isTrue);
     });
 
     // ב-macOS השאריות הן **תיקיות** — תיקיית ה-staging וחבילת ה-.app
@@ -1137,6 +1222,17 @@ void main() {
     group('LauncherUpdateController', () {
       setUp(() => AppLogger.init(temp.path));
 
+      test('החלפה שנכשלה על הרשאות מבקשת הפעלה כמנהל', () async {
+        final controller = LauncherUpdateController(
+          dataDir: temp.path,
+          updater: _DeniedUpdater(),
+        );
+        addTearDown(controller.dispose);
+
+        expect(await controller.install(), isFalse);
+        expect(controller.needsElevation, isTrue);
+      });
+
       test('גרסה ותיקה במראה אינה מסתירה שהגרסה שברשת כבר רצה', () {
         final controller = LauncherUpdateController(
           dataDir: temp.path,
@@ -1347,4 +1443,45 @@ class _NoRestartInstaller extends LauncherSelfInstaller {
 
   @override
   Future<void> cleanupLeftovers(LauncherInstallLayout layout) async {}
+}
+
+class _DeniedUpdater implements LauncherSelfUpdater {
+  @override
+  Future<bool> applyUpdate() async => throw FileSystemException(
+        'rename',
+        'launcher.exe',
+        OSError('denied', Platform.isWindows ? 5 : 13),
+      );
+
+  @override
+  void dispose() {}
+
+  @override
+  String get currentVersion => '1.0.0';
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _NoRenameFile implements File {
+  _NoRenameFile(this._real);
+
+  final File _real;
+
+  @override
+  String get path => _real.path;
+
+  @override
+  Future<bool> exists() => _real.exists();
+
+  @override
+  Future<FileSystemEntity> delete({bool recursive = false}) =>
+      _real.delete(recursive: recursive);
+
+  @override
+  Future<File> rename(String newPath) =>
+      Future.error(FileSystemException('locked', path));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

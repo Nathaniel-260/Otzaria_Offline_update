@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
@@ -56,6 +58,18 @@ Widget libraryApplyProgressRow(
       ),
     );
 
+String _withEstimate(
+  BuildContext context,
+  String text,
+  ({int low, int high})? estimate,
+) =>
+    estimate == null
+        ? text
+        : '${context.strings.home.libraryApplyEstimate(
+            estimate.low,
+            estimate.high,
+          )}\n$text';
+
 Future<bool> _blockedByRunningOtzaria(
   Future<bool> Function() isOtzariaRunning,
 ) async {
@@ -65,6 +79,7 @@ Future<bool> _blockedByRunningOtzaria(
 }
 
 Future<void> applyLibraryAndReport(
+  BuildContext context,
   LibraryModuleController library,
   Future<void> Function() apply, {
   required Future<void> Function() onRequestReindex,
@@ -76,6 +91,42 @@ Future<void> applyLibraryAndReport(
     );
   }
   await onRequestReindex();
+  if (library.changesNotesApplied &&
+      library.changesNotes.isNotEmpty &&
+      context.mounted) {
+    await showLibraryChangesDialog(context, library);
+  }
+}
+
+/// "מה חדש בספרייה" — ההערות של כל הגרסאות שבטווח, החדשה קודם.
+Future<void> showLibraryChangesDialog(
+  BuildContext context,
+  LibraryModuleController library,
+) async {
+  final notes = library.changesNotes;
+  final parts = <String>[];
+  for (final note in notes) {
+    try {
+      final markdown = (await note.readMarkdown()).trim();
+      if (markdown.isNotEmpty) parts.add(markdown);
+    } on FileSystemException {
+      // כונן שנשלף — מה שנקרא מוצג, והשאר נאמר כ"לא נמצא".
+    }
+  }
+  if (!context.mounted) return;
+  final t = context.strings.libraryScreen;
+  await showSingleActionDialog(
+    context: context,
+    title: t.changesTitle,
+    confirmText: context.strings.common.close,
+    customContent: LibraryChangesView(
+      markdowns: parts,
+      emptyText: t.changesNotFound,
+      note: library.changesNotesPartial
+          ? t.changesPartial(notes.length, library.changesNotesRange)
+          : null,
+    ),
+  );
 }
 
 Future<void> confirmLibraryUpdate(
@@ -100,12 +151,18 @@ Future<void> confirmLibraryUpdate(
           .companionsOnlyPrompt(c.pendingCompanionNames),
       _ => home.libraryUpdatePrompt('${c.localVersion}', '${c.targetVersion}'),
     },
-    subtitle: home.doNotRemoveDriveWarning,
+    subtitle: _withEstimate(
+      context,
+      home.doNotRemoveDriveWarning,
+      c.companionsOnly ? null : c.applyEstimateFor(),
+    ),
     confirmText: home.libraryUpdateConfirm,
   );
   if (!approved) return;
 
+  if (!context.mounted) return;
   await applyLibraryAndReport(
+    context,
     c,
     c.update,
     onRequestReindex: onRequestReindex,
@@ -132,12 +189,18 @@ Future<void> confirmLibraryFullDownload(
           ? formatBytes(size)
           : context.strings.common.unknownValue,
     ),
-    subtitle: context.strings.home.doNotRemoveDriveWarning,
+    subtitle: _withEstimate(
+      context,
+      context.strings.home.doNotRemoveDriveWarning,
+      c.applyEstimateFor(fullDownload: true),
+    ),
     confirmText: context.strings.common.install,
   );
   if (!approved) return;
 
+  if (!context.mounted) return;
   await applyLibraryAndReport(
+    context,
     c,
     c.updateWithFullDownload,
     onRequestReindex: onRequestReindex,

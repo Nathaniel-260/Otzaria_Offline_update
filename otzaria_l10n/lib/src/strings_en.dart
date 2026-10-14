@@ -210,6 +210,19 @@ class _Home extends HomeStrings {
       'Otzaria opened when the installation finished, and it locks the '
       'library file. Close it and press "Try again" to continue installing '
       'the library.';
+  @override
+  String get closeOtzariaForAppInstallDialogTitle => 'Otzaria is open';
+  @override
+  String get closeOtzariaForAppInstallPrompt =>
+      'Otzaria must be closed to install the new version. Close it now and '
+      'continue with the installation?';
+  @override
+  String get closeOtzariaAndInstallConfirm => 'Close and install';
+  @override
+  String get elevatedAsOtherUserWarning =>
+      'This program runs as administrator under a different user name — a '
+      '"current user" installation will go into the administrator\'s account, '
+      'not yours. It is better to start it without "Run as administrator".';
 
   @override
   String get autoInstallSkippedTitle => 'The automatic update was not applied';
@@ -235,6 +248,10 @@ class _Home extends HomeStrings {
       'new version has been verified.';
   @override
   String get libraryUpdateConfirm => 'Update Now';
+  @override
+  String libraryApplyEstimate(int lowMinutes, int highMinutes) =>
+      'Expected to take about $lowMinutes to $highMinutes minutes, depending '
+      'on the computer.';
   @override
   String libraryUpdatedSnack(String version) =>
       'The database was updated to version $version';
@@ -341,6 +358,8 @@ class _Home extends HomeStrings {
   String get libraryNotInstalledYet => 'Library not installed yet';
   @override
   String get libraryUpdating => 'Updating…';
+  @override
+  String get libraryApplyActive => 'Library update in progress';
   @override
   String get libraryNothingDownloaded => 'Nothing downloaded yet';
   @override
@@ -535,6 +554,26 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get installUpdateButton => 'Install the update';
   @override
   String get updateDialogTitle => 'Update the book library';
+  @override
+  String get changesTitle => "What's new in the library";
+  @override
+  String changesPendingSubtitle(String version) =>
+      'Books added and changed up to version $version, which this update '
+      'will install.';
+  @override
+  String changesAppliedSubtitle(String version) =>
+      'Books added and changed up to version $version, which is now '
+      'installed. Otzaria versions that support it will also show this list '
+      'the next time they open.';
+  @override
+  String changesPartial(int shown, int total) =>
+      'This list is partial: it covers $shown of the $total versions in the '
+      'range.';
+  @override
+  String get changesButton => 'Show';
+  @override
+  String get changesNotFound =>
+      'The list of changes was not found on the drive.';
 
   @override
   String get reindexTitle => 'Otzaria\'s search index';
@@ -1007,6 +1046,12 @@ class _Plugins extends PluginsStrings {
   String installDoneSnack(String pluginName) =>
       '$pluginName was installed successfully';
   @override
+  String installCancelledSnack(String pluginName) =>
+      'Installing $pluginName was cancelled in Otzaria';
+  @override
+  String installRejectedSnack(String pluginName, String? reason) =>
+      'Otzaria did not install $pluginName${reason == null ? '' : ': $reason'}';
+  @override
   String get installFailedSnack => 'The installation failed';
 
   @override
@@ -1180,6 +1225,13 @@ class _Plugins extends PluginsStrings {
       'Update available (you have $installedVersion)';
   @override
   String get installChipIncompatible => 'Needs a newer Otzaria';
+  @override
+  String get installChipDisabled => 'Installed, disabled in Otzaria';
+  @override
+  String get installChipDisabledUpdate =>
+      'Update available, disabled in Otzaria';
+  @override
+  String get installChipDevelopment => 'Local development copy';
 
   @override
   String get infoPanelTitle => 'General Information';
@@ -1518,7 +1570,10 @@ class _Faq extends FaqStrings {
   String get aLauncherSelfUpdate =>
       'Yes. When a new version exists it offers to download it on a computer '
       'with internet, then replaces itself and reopens. Your settings, books '
-      'and plugins already on the drive stay untouched.';
+      'and plugins already on the drive stay untouched. If the replacement '
+      'was interrupted (say, by a power cut) and the program file is gone, '
+      'run .launcher-previous.exe next to it — it restores the previous '
+      'version under its usual name.';
   @override
   String get qFree => 'Wow, is all of this really free?';
   @override
@@ -1641,6 +1696,22 @@ class _SetupError extends SetupErrorStrings {
   @override
   String get appTranslocatedTitle =>
       'macOS is running this program from a temporary copy';
+  @override
+  String get runningFromTemp =>
+      'This program was started from inside a ZIP file or a temporary folder, '
+      'and everything it downloads there would be deleted along with that '
+      'folder. Extract the file to the USB drive (or a permanent folder on '
+      'disk) and run it from there.';
+  @override
+  String get runningFromTempTitle =>
+      'Extract the file to a drive before running it';
+  @override
+  String get macVolumeAccessDenied =>
+      'macOS did not allow this program to write to the folder next to it. '
+      'Open System Settings → Privacy & Security → Files and Folders (or Full '
+      'Disk Access), allow Otzaria Updates to access that location — a '
+      'removable drive, Documents, Desktop or Downloads — and open the program '
+      'again.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {
@@ -1868,6 +1939,15 @@ class _LauncherUpdate extends LauncherUpdateStrings {
       'Replacing the executable failed: $error. The previous file was put '
       'back in place.';
   @override
+  String replaceFailedNotRestored(
+    String error,
+    String previousPath,
+    String executableName,
+  ) =>
+      'Replacing the executable failed: $error, and putting the previous '
+      'file back failed too. It is kept as $previousPath — rename it back to '
+      '$executableName.';
+  @override
   String restartFailed(String error) =>
       'Launching the new version failed: $error. Please close the program and '
       'start it again manually — the replacement itself already finished.';
@@ -2088,6 +2168,19 @@ class _LibraryDomain extends LibraryDomainStrings {
       'schema $schemaVersion, which this version of the software does not '
       'know how to apply through update files';
   @override
+  String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion) =>
+      'Library release $latestVersion needs a newer Otzaria: the installed '
+      'version reads databases up to schema $readableSchema only. Update '
+      'Otzaria first, then the library.';
+  @override
+  String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion) =>
+      'The library will be updated to release $reachedVersion. Release '
+      '$latestVersion needs a newer Otzaria — update Otzaria to continue.';
+  @override
+  String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion) =>
+      'The drive carries Otzaria $otzariaVersion, which reads the new library: '
+      'update Otzaria first, then the library.';
+  @override
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion) =>
       'The update files of the newest release ($latestVersion) are built in '
       'format $patchFormatVersion, which this version of the software does '
@@ -2296,6 +2389,68 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String localFileHashMismatch(String url) =>
       'The sha256 of the local file does not match: $url';
+  @override
+  String get manifestMissingPatchFormatVersion =>
+      'Required manifest field is missing for schema 4+: patchFormatVersion';
+  @override
+  String manifestInvalidOptionalField(String key) =>
+      'Invalid optional manifest field: $key';
+  @override
+  String manifestInvalidHashMap(String key) =>
+      'Invalid value in the manifest hash map: $key';
+  @override
+  String splitManifestDownloadFailed(String name, int statusCode) =>
+      'Failed to download the split manifest ($name): $statusCode';
+  @override
+  String get interruptedUpdateWithoutBackup =>
+      'An unfinished update marker was found without a backup — the DB must '
+      'be checked';
+  @override
+  String get interruptedUpdateRestored =>
+      'An interrupted update was detected — the DB was restored from the '
+      'backup';
+  @override
+  String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema) =>
+      'The library moved to DB schema $schemaVersion, newer than supported '
+      '(DB $supportedSchema) — an app update is required';
+  @override
+  String planSchemaBarrierNeedsFullDownload(int schemaVersion) =>
+      'The library moved to DB schema $schemaVersion; the change requires a '
+      'full download';
+  @override
+  String planDeltaNeedsAppUpdate(
+    int latestVersion,
+    int supportedSchema,
+    int supportedPatchFormat,
+  ) =>
+      'The delta route to version $latestVersion needs a DB schema or patch '
+      'format newer than supported (DB $supportedSchema, patch '
+      '$supportedPatchFormat) — an app update is required';
+  @override
+  String planHeavyDelta(String deltaSize, String localDbSize) =>
+      'The delta route unpacks $deltaSize against a local DB of '
+      '$localDbSize, and applying it may take a long time';
+  @override
+  String tableHashMismatch(String tables) =>
+      'The hash after applying does not match toTableContentHashes in tables: '
+      '$tables';
+  @override
+  String patchOpenFailed(String path, String detail) =>
+      'Cannot open the patch file ($path): $detail';
+  @override
+  String get networkInterrupted =>
+      'The network connection was interrupted during the download';
+  @override
+  String get deletePreviousArchiveFailed =>
+      'Deleting the previous archive failed — the downloaded parts cannot be '
+      'joined';
+  @override
+  String joinedArchiveSizeMismatch(int written, int expected) =>
+      'The joined archive size ($written) does not match the expected '
+      '($expected)';
+  @override
+  String get joinedArchiveHashMismatch =>
+      'The sha256 of the joined archive does not match';
 
   @override
   String get mirrorMissing =>
@@ -2324,6 +2479,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get fullDbNeedsNativeZstd =>
       'Extracting the full database requires the zstd library, which is not available on this computer';
+  @override
+  String get patchNeedsNativeZstd =>
+      'Extracting the update file requires the zstd library, which is not available on this computer';
   @override
   String versionMismatchAfterWrite(int? actual, int? expected) =>
       'After writing the full database, the version read back ($actual) does '
@@ -2393,6 +2551,8 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get companionSemanticName => 'Smart search';
   @override
+  String get libraryChangesNotesName => "The library's what's-new list";
+  @override
   String get semanticDownloading => 'Downloading smart search files';
   @override
   String get semanticInstalling => 'Installing smart search';
@@ -2408,7 +2568,8 @@ class _LibraryDomain extends LibraryDomainStrings {
       'Collect smart search training data';
   @override
   String semanticFeedbackCollectBody(int count) =>
-      'Otzaria has $count records of smart search usage data collected with your consent. Transfer them to the drive for sending from the online computer? They will be removed from Otzaria’s queue only after being saved to the drive.';
+      'Otzaria has $count records of smart search usage data collected with your consent. Transfer them to the drive for sending from the online computer? They will be removed from Otzaria’s queue only after being saved to the drive.\n\n'
+      'Note: the records, including the search queries, are stored on the drive unencrypted until they are sent, together with the anonymous key that signs them. The key is deleted from the drive once all records have been sent.';
   @override
   String get semanticFeedbackUploadTitle => 'Send training data to Otzaria';
   @override
@@ -2562,6 +2723,17 @@ class _AppDomain extends AppDomainStrings {
   String get wizardStillOpen =>
       'The Otzaria installer was opened. When you finish it, press "Check '
       'again" so the program detects the installation.';
+  @override
+  String get wizardEndedWithoutInstall =>
+      'The installer closed, but the new version was not found on this '
+      'computer. If you installed it into another folder, choose it with '
+      '"Choose location manually"; otherwise install again.';
+  @override
+  String get setupContinuesElsewhere =>
+      'The installer is updating Otzaria in its own window — waiting for it '
+      'to finish…';
+  @override
+  String get stopWaitingForSetup => 'Stop waiting';
 
   @override
   String get noInstallableReleaseForPlatform =>
@@ -2594,6 +2766,11 @@ class _AppDomain extends AppDomainStrings {
   @override
   String installerDownloadFailed(int statusCode) =>
       'Downloading the installer failed: HTTP $statusCode';
+  @override
+  String get installerDigestMismatch =>
+      'The Otzaria installer in the folder is damaged — it does not match '
+      'the checksum GitHub publishes for it. Download it again on a computer '
+      'with internet.';
   @override
   String installerSizeMismatch(int received, int expected) =>
       'The downloaded installer is not the expected size ($received bytes '
@@ -2661,6 +2838,18 @@ class _AppDomain extends AppDomainStrings {
   }
 
   @override
+  String networkBlockedByFilter(int statusCode, String host) =>
+      'Access to $host was blocked (status $statusCode). An internet filter '
+      '(such as NetFree) is probably blocking the address — ask for it to be '
+      'opened, or download from another computer.';
+  @override
+  String networkCertificateRejected(String host) =>
+      'The secure connection to $host failed: the security certificate it '
+      'presented is not trusted. If this computer goes through a filter such '
+      'as NetFree, install the filter\'s certificate, or download from '
+      'another computer.';
+
+  @override
   String noReleasesAtAll(String repo) => 'No releases at all were found in '
       '$repo.';
   @override
@@ -2687,6 +2876,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   @override
   String get localPluginFileMissing =>
       'The local plugin file is missing. Please sync again.';
+  @override
+  String get localPluginFileCorrupt =>
+      'The plugin file on the drive is damaged or is not the selected version. Download the store again on the online computer.';
   @override
   String get badPluginExtension =>
       'The plugin file does not have a valid otzplugin extension.';
@@ -2735,6 +2927,18 @@ class _PluginsDomain extends PluginsDomainStrings {
   @override
   String get downloadedFileNotPlugin =>
       'the downloaded file is not a valid plugin';
+  @override
+  String get downloadedFileNotImage =>
+      'the downloaded file is not an image (it may be a filter block page)';
+  @override
+  String get downloadedFileHashMismatch =>
+      'the downloaded file does not match the checksum the site published';
+  @override
+  String get downloadedFileWrongBuild =>
+      'the downloaded file is not the selected version of the plugin';
+  @override
+  String get siteClosedForShabbat =>
+      'The Otzaria site is closed on Shabbat and Yom Tov. The store already on the drive keeps working; updates can be downloaded after Shabbat ends.';
 
   @override
   String get whatPluginList => 'the plugin list';
@@ -2847,16 +3051,29 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String installerElevatedRetryDeclined(int firstExitCode) =>
       'The installation failed (exit code $firstExitCode). It was not '
-      'retried with administrator rights, because the Windows permission '
-      'prompt was declined.';
+      'retried with administrator rights: the Windows permission prompt was '
+      'declined, or access was denied.';
   @override
   String get installerElevationDeclined =>
       'The installer requires administrator rights, and the request was '
-      'declined. To install, approve the Windows permission prompt.';
+      'declined or access was denied. To install, approve the Windows '
+      'permission prompt.';
   @override
   String get installerDigestMismatch =>
       'The installer on the drive is damaged — it does not match the file '
       'that was stored. Download or add it again on a computer with internet';
+  @override
+  String get installerUnverified =>
+      'The installer has no stored fingerprint, so there is no way to tell '
+      'whether it was changed. Approve it before installing';
+  @override
+  String get appNotTrustedHere =>
+      'This program was added on another computer. Approve it on this '
+      'computer before installing';
+  @override
+  String get appNotTrustedForLaunch =>
+      'This program\'s record was added or changed on another computer. '
+      'Approve it on this computer before running it';
   @override
   String fileCopyFailed(String error) => 'Copying the file failed: $error';
   @override
@@ -2869,7 +3086,7 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String get launchElevationDeclined =>
       'The program requires administrator rights, and the request was '
-      'declined.';
+      'declined or access was denied.';
 
   @override
   String mediaFileMissing(String path) => 'Image file not found: $path';
@@ -3283,6 +3500,25 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String installedSnack(String name) => '$name was installed';
   @override
+  String get trustDialogTitle => 'A program added on another computer';
+  @override
+  String trustDialogContent(String name, String source) =>
+      '"$name" was not added on this computer — it came on the drive from '
+      'elsewhere ($source). Installing runs its installer on this computer. '
+      'Continue only if you know who added it and what it is.';
+  @override
+  String get trustDialogConfirm => 'I trust this program, install';
+  @override
+  String get unverifiedDialogTitle => 'An installer without a fingerprint';
+  @override
+  String unverifiedDialogContent(String fileName) =>
+      '$fileName has no stored fingerprint (sha256), so there is no way to '
+      'tell whether it is the file that was originally added. Approving '
+      'computes and stores it now; from then on any change to the file is '
+      'blocked.';
+  @override
+  String get unverifiedDialogConfirm => 'Verify and save';
+  @override
   String get learningLabel => 'Identifying the installation...';
   @override
   String learnedDetectionSnack(String exeName) =>
@@ -3323,7 +3559,11 @@ class _ErrorReports extends ErrorReportsStrings {
       'Otzaria has $count ${_reports(count)} about books, the app and plugins '
       'that have not been '
       'sent yet.\n\nCollect them to the drive, so they can be sent to Otzaria '
-      'from the computer that is online?';
+      'from the computer that is online?\n\n'
+      'Note: the reports are stored on the drive as they are, unencrypted, '
+      'until they are sent — your email address, the text you wrote, log '
+      'excerpts, screenshots and, for a crash report you approved, a memory '
+      'dump. Anyone holding the drive can read them.';
   @override
   String get collectConfirm => 'Collect';
   @override
@@ -3342,6 +3582,14 @@ class _ErrorReports extends ErrorReportsStrings {
   String get collectOtzariaOpenSnack =>
       'Otzaria is open, so the reports were not collected. You will be asked '
       'again next launch';
+  @override
+  String get legacyReportsDialogTitle => 'Old reports that were not migrated';
+  @override
+  String get legacyReportsDialogContent =>
+      'This computer still has reports saved by an old version of Otzaria, in '
+      'a format the current Otzaria no longer migrates. Otzaria Offline Update '
+      'therefore cannot collect them either.\n\n'
+      'All other reports are collected and sent as usual.';
 
   @override
   String get introDialogTitle => 'Reports to Otzaria and plugin developers';
@@ -3406,6 +3654,9 @@ class _ErrorReportsDomain extends ErrorReportsDomainStrings {
   @override
   String uploadHttpStatus(int statusCode) =>
       'The server answered with code $statusCode';
+  @override
+  String get uploadShabbat =>
+      'The Otzaria site is closed on Shabbat and Yom Tov. The reports stay on the drive and will be sent next time, after Shabbat ends.';
   @override
   String get uploadTimedOut => 'The server did not respond in time';
   @override

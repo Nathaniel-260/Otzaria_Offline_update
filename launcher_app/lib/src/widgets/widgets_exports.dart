@@ -12,6 +12,7 @@ export 'color_picker_tile.dart';
 export 'copy_path_button.dart';
 export 'custom_switch.dart';
 export 'info_rows.dart';
+export 'library_changes_view.dart';
 export 'nav_rail_item.dart';
 export 'recheck_button.dart';
 export 'rtl_icon.dart';

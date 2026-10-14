@@ -204,4 +204,17 @@ void main() {
       expect(GithubAssetPattern.matches('([', 'a.exe'), isFalse);
     });
   });
+
+  test('fromJson דוחה owner/repo שהכתובת שבטופס הייתה דוחה', () {
+    for (final bad in [
+      {'owner': '../x', 'repo': 'r'},
+      {'owner': 'o', 'repo': '..'},
+      {'owner': 'o', 'repo': 'r/../../user'},
+      {'owner': 'o', 'repo': 7},
+    ]) {
+      expect(() => GithubSource.fromJson(bad), throwsFormatException,
+          reason: '$bad');
+    }
+    expect(GithubSource.fromJson({'owner': 'o', 'repo': 'r.js'}).repo, 'r.js');
+  });
 }

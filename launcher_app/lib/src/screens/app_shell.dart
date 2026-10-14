@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -86,8 +88,8 @@ class AppShell extends StatefulWidget {
 
   final SettingsController settings;
 
-  /// בדיקת "אוצריא פתוחה?" — מוזרקת כדי שבדיקות widget לא יריצו `tasklist`
-  /// אמיתי: תהליך חיצוני משאיר טיימר תלוי ומפיל את הבדיקה.
+  /// בדיקת "אוצריא פתוחה?" — מוזרקת כדי שבדיקות widget לא יריצו בדיקה
+  /// אמיתית ב-isolate, שמשאירה טיימר תלוי ומפילה את הבדיקה.
   final RunningOtzariaLocator runningLocator;
 
   /// ראו [AppTitleBar.showWindowButtons] — מוזרק `false` בבדיקות widget.
@@ -112,6 +114,7 @@ class _AppShellState extends State<AppShell> {
 
   /// "התוסף הותקן בהצלחה" — נשלח מהקונטרולר כשהסריקה זיהתה שאוצריא סיימה.
   late final StreamSubscription<String> _installDone;
+  late final StreamSubscription<Object?> _installRejected;
 
   /// תוכנות שהמשתמש הוסיף בעצמו. אינו מודול כמו השלושה: הוא לא נבדק
   /// ב-[checkAll], אין לו הורדה מהרשת, והוא נעלם לגמרי כשאין בו כלום.
@@ -163,11 +166,10 @@ class _AppShellState extends State<AppShell> {
   /// להפעלה מחדש של הלאנצ'ר, גם אחרי שאוצריא נסגרה ובדיקה חדשה כבר ידעה זאת.
   bool get _otzariaIsRunning => _otzaria.isRunning;
 
-  /// כל עוד אוצריא פתוחה בודקים שוב מדי [_runningPollInterval], כדי שסגירה
-  /// שלה תזוהה מעצמה. כשהיא סגורה אין טיימר בכלל — פתיחה מחדש נתפסת
-  /// בבדיקה שרצה לפני כל פעולה חוסמת (ראו [refreshProcessState]).
   static const Duration _runningPollInterval = Duration(seconds: 3);
+  static const Duration _runningWatchSlice = Duration(minutes: 1);
   Timer? _runningPoll;
+  Future<void>? _runningWatch;
 
   /// המסכים שנבנו בפועל. ה-[IndexedStack] בונה את *כל* ילדיו, ולכן בעבר גם
   /// חנות התוספים (רשת כרטיסים עם תמונה לכל תוסף) נבנתה ופענחה את כל
@@ -223,11 +225,18 @@ class _AppShellState extends State<AppShell> {
       pendingLaunchUri: () async =>
           _library.hasPendingReindex ? OtzariaDeepLinks.libraryReindex : null,
       onLaunchUriDelivered: () => _library.markReindexRequestDelivered(),
+      isLibraryApplying: () => _library.isApplying,
     )..addListener(_onChange);
     _library = LibraryModuleController(
       dataDir: widget.dataDir,
       stateDir: widget.stateFilesDir,
       otzariaLaunchPath: () async => _otzaria.launchPath,
+      otzariaAppVersion: () async => _otzaria.currentVersion,
+      mirroredOtzariaUpdate: () async =>
+          _otzaria.status == OtzariaModuleStatus.updateAvailable
+              ? _otzaria.latestVersion
+              : null,
+      instanceLock: const OtzariaInstanceLock(),
     )..addListener(_onChange);
     _plugins = PluginsModuleController(
       mirrorRootDir: p.join(widget.dataDir, 'mirror'),
@@ -247,9 +256,21 @@ class _AppShellState extends State<AppShell> {
         UiSnack.showSuccess(AppL10n.strings.plugins.installDoneSnack(name));
       }
     });
+    _installRejected = _plugins.installRejections.listen((entry) {
+      if (!mounted) return;
+      final t = AppL10n.strings.plugins;
+      if (entry.report.cancelled) {
+        UiSnack.show(t.installCancelledSnack(entry.name));
+      } else {
+        UiSnack.showError(
+          t.installRejectedSnack(entry.name, entry.report.message),
+        );
+      }
+    });
     _customApps = CustomAppsController(
       mirrorRootDir: p.join(widget.dataDir, 'mirror'),
       stateDir: widget.stateFilesDir,
+      trustFilePath: _customAppsTrustFile(),
     )..addListener(_onChange);
     _launcherUpdate = LauncherUpdateController(dataDir: widget.dataDir)
       ..addListener(_onChange);
@@ -304,6 +325,7 @@ class _AppShellState extends State<AppShell> {
     _dialogs.dispose();
     _runningPoll?.cancel();
     unawaited(_installDone.cancel());
+    unawaited(_installRejected.cancel());
     widget.settings.removeListener(_onChange);
     _otzaria.removeListener(_onChange);
     _library.removeListener(_onChange);
@@ -426,7 +448,11 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _maybeOfferElevation() async {
     if (_offeredElevation || !Platform.isWindows) return;
-    if (!_library.needsElevation && !_otzaria.needsElevation) return;
+    if (!_library.needsElevation &&
+        !_otzaria.needsElevation &&
+        !_launcherUpdate.needsElevation) {
+      return;
+    }
     if (_exitWouldInterrupt) return;
     _offeredElevation = true;
     await Future<void>.delayed(Duration.zero);
@@ -457,21 +483,31 @@ class _AppShellState extends State<AppShell> {
     } finally {
       if (mounted) setState(() => _elevationPending = false);
     }
-    if (failure != null) {
+    if (failure != null && failure != Elevation.cancelled) {
       UiSnack.showError(t.restartFailedSnack('$failure'));
     }
   }
 
-  /// מדליק/מכבה את הרענון המחזורי לפי מצב התהליך שהתקבל כרגע.
   void _syncRunningPoll() {
-    if (_otzariaIsRunning) {
-      _runningPoll ??= Timer.periodic(
-        _runningPollInterval,
-        (_) => unawaited(_otzaria.refreshRunningState()),
-      );
-    } else {
-      _runningPoll?.cancel();
-      _runningPoll = null;
+    if (_otzariaIsRunning) _runningWatch ??= _watchUntilClosed();
+  }
+
+  Future<void> _watchUntilClosed() async {
+    try {
+      while (mounted && _otzariaIsRunning) {
+        final exited =
+            await widget.runningLocator.waitForExit(_runningWatchSlice);
+        if (!mounted) return;
+        if (exited == null) {
+          final elapsed = Completer<void>();
+          _runningPoll = Timer(_runningPollInterval, elapsed.complete);
+          await elapsed.future;
+          if (!mounted) return;
+        }
+        await _otzaria.refreshRunningState();
+      }
+    } finally {
+      _runningWatch = null;
     }
   }
 
@@ -540,6 +576,7 @@ class _AppShellState extends State<AppShell> {
         _errorReports,
         readOnly: widget.readOnly,
         isOtzariaRunning: refreshProcessState,
+        notices: _notices,
       );
       if (!mounted) return;
       await offerSearchFeedbackCollection(
@@ -970,8 +1007,42 @@ class _AppShellState extends State<AppShell> {
           ),
       };
 
+  /// אישורי התוכנות הנוספות נשמרים במחשב, לעולם לא על הכונן.
+  static String? _customAppsTrustFile() {
+    final dir = AppPaths.machineStateDir(
+      Platform.environment,
+      isWindows: Platform.isWindows,
+      isMacOS: Platform.isMacOS,
+    );
+    return dir == null ? null : p.join(dir, 'custom_apps_trust.json');
+  }
+
+  /// Ctrl+R/F5: קורא מחדש מה מותקן ומה יש על הכונן, בלי ההצעות של העלייה.
+  /// לא פועל בזמן משימה ארוכה.
+  Future<void> _refreshFromKeyboard() async {
+    if (_longTaskRunning) return;
+    await _launcherFlow.checkMirror();
+    if (!mounted) return;
+    await _otzaria.checkForUpdate();
+    if (!mounted) return;
+    unawaited(_plugins.refreshInstalled());
+    await _library.checkForUpdate();
+  }
+
   @override
   Widget build(BuildContext context) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyR, control: true): () =>
+            unawaited(_refreshFromKeyboard()),
+        const SingleActivator(LogicalKeyboardKey.f5): () =>
+            unawaited(_refreshFromKeyboard()),
+      },
+      child: Focus(autofocus: true, child: _scaffold(context)),
+    );
+  }
+
+  Widget _scaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: AppSurfaces.panelBackground(context),
       // שורת הכותרת נפרסת על כל הרוחב — מעל סרגל הניווט ולא לצידו — כך שגרירת

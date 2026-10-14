@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
+import 'library_updater_l10n.dart';
 import 'otzaria_process_guard.dart';
 import 'zstd_decompressor.dart';
 import 'zstd_file_decompressor.dart';
@@ -107,13 +108,16 @@ typedef ExtractedDbVerifier =
 class LibraryUpdateApplier {
   LibraryUpdateApplier({
     OtzariaProcessGuard processGuard = const OtzariaProcessGuard(),
-    LibraryDbRecoveryService recovery = const LibraryDbRecoveryService(),
+    OfflineLibraryDbRecoveryService recovery =
+        const OfflineLibraryDbRecoveryService(),
     ExtractedDbVerifier? verifyExtractedDb,
     ZstdFileStreamer? streamFile,
     Future<Uint8List?> Function(Uint8List compressed)? decompress,
     int? Function(String path)? freeBytesFor,
+    bool Function(String path)? isFatVolume,
   }) : _processGuard = processGuard,
        _freeBytesFor = freeBytesFor ?? DiskSpaceProbe.freeBytesFor,
+       _isFatVolume = isFatVolume ?? DiskSpaceProbe.isKnownFat,
        _recovery = recovery,
        _verifyExtractedDb = verifyExtractedDb ?? _defaultExtractedDbVerifier,
        _streamFile = streamFile ?? ZstdFileDecompressor.decompressFileToFile,
@@ -122,10 +126,11 @@ class LibraryUpdateApplier {
        );
 
   final OtzariaProcessGuard _processGuard;
-  final LibraryDbRecoveryService _recovery;
+  final OfflineLibraryDbRecoveryService _recovery;
   final ExtractedDbVerifier _verifyExtractedDb;
   final ZstdFileStreamer _streamFile;
   final int? Function(String path) _freeBytesFor;
+  final bool Function(String path) _isFatVolume;
   final PatchDownloader _downloader;
 
   /// שם קובץ ה-hint לסך-הבתים של אימות ה-hash — ראו [applyDelta].
@@ -191,6 +196,8 @@ class LibraryUpdateApplier {
       }
 
       if (i > 0) await _guardOtzariaNotRunning();
+
+      _ensureDeltaStepFits(dbPath, url, patchFile);
 
       final patchPath = await _fetchPatch(
         patchFile: patchFile,
@@ -299,6 +306,9 @@ class LibraryUpdateApplier {
         isCancelled: isCancelled,
       );
       if (extracted != null) return extracted;
+      throw LibraryApplyException(
+        AppL10n.strings.libraryDomain.patchNeedsNativeZstd,
+      );
     }
     return _downloader.downloadAndExtract(
       patchFile: patchFile,
@@ -595,7 +605,6 @@ class LibraryUpdateApplier {
     final dbAlreadyExists = File(dbPath).existsSync();
     final markerPreexisted = File(_recovery.markerPathFor(dbPath)).existsSync();
     if (dbAlreadyExists) {
-      // סימון בלבד — אין גיבוי של המסד, ראו [LibraryDbRecoveryService].
       try {
         await _recovery.beginApply(
           dbPath: dbPath,
@@ -810,10 +819,6 @@ class LibraryUpdateApplier {
   }
 
   Future<void> _guardOtzariaNotRunning() async {
-    // הבדיקה עצמה תלויית-פלטפורמה (tasklist/pgrep) ומטופלת בתוך ה-guard;
-    // כאן רק מחליטים מה לעשות עם התשובה. שים לב שבלינוקס אין מסלול התקנה
-    // של הלאנצ'ר, אבל ה-guard בכל זאת עונה שם — כדי שבדיקות אוטומטיות
-    // שרצות על לינוקס יעברו באותו מסלול קוד ולא ב-shortcut.
     if (await _processGuard.isAnyRunning(_otzariaProcessNames)) {
       throw const OtzariaIsRunningException();
     }
@@ -841,9 +846,17 @@ class LibraryUpdateApplier {
     );
   }
 
+  void _ensureDeltaStepFits(String dbPath, String url, PatchFileEntry patch) {
+    final dir = p.dirname(dbPath);
+    final download = PatchDownloader.isRemoteUrl(url) ? patch.size : 0;
+    _ensureSpaceFor(dir, download + 2 * patch.uncompressedSize);
+    final dbSize = File(dbPath).existsSync() ? File(dbPath).lengthSync() : 0;
+    _ensureFileFitsVolume(dir, dbSize + patch.uncompressedSize);
+  }
+
   void _ensureFileFitsVolume(String dir, int fileSize) {
     if (fileSize <= DiskSpaceProbe.fatMaxFileBytes) return;
-    if (!DiskSpaceProbe.isKnownFat(dir)) return;
+    if (!_isFatVolume(dir)) return;
     throw LibraryApplyException(
       AppL10n.strings.libraryDomain.fileTooLargeForVolume(dir),
     );
@@ -909,6 +922,7 @@ PatchApplyResult _applyPatchInIsolate(
   (String, String, DeltaManifest, AppLanguage, int?, SendPort, bool, bool) args,
 ) {
   AppL10n.use(args.$4);
+  useLibraryUpdaterL10n();
   const applier = PatchApplier();
   return applier.apply(
     dbPath: args.$1,
@@ -927,6 +941,7 @@ PatchApplyResult _applyPatchInIsolate(
 /// מחליף את המסד החי. top-level מאותה סיבה כמו [_applyPatchInIsolate].
 void _verifyExtractedDbInIsolate((String, int?, AppLanguage, SendPort) args) {
   AppL10n.use(args.$3);
+  useLibraryUpdaterL10n();
   final stagePort = args.$4;
   // `quick_check` סורק את הקובץ כולו ולוקח דקות על מסד מלא — האמירה מה
   // נבדק היא ההבדל בין "מוודא תקינות..." שנתקע לבין שלב מובן.

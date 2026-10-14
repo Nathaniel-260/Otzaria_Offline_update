@@ -1,68 +1,47 @@
+import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
+import 'package:win32/win32.dart';
 
 import 'app_logger.dart';
 
-/// מריץ את סקריפט החילוץ ומחזיר את קוד היציאה. תפר לבדיקות — הסקריפט
-/// עצמו מדבר עם ווינדוס ואי אפשר להריץ אותו בסוויטה.
-typedef IconScriptRunner = Future<int> Function(
-  String executable,
-  List<String> arguments,
-);
-
 /// חילוץ אייקון מקובץ הרצה: מחזיר נתיב ל-PNG זמני, או `null`. הקונטרולר
-/// מחזיק אחד כזה כדי שבדיקות לא יריצו PowerShell אמיתי.
+/// מחזיק אחד כזה כדי שבדיקות לא יחלצו אייקון אמיתי.
 typedef ExeIconExtraction = Future<String?> Function(String exePath);
+
+/// כותב את האייקון של קובץ הרצה ל-PNG ומחזיר אם הצליח. תפר לבדיקות.
+typedef IconPngWriter = Future<bool> Function(String exePath, String outPath);
 
 /// חילוץ האייקון של קובץ הרצה לקובץ PNG.
 ///
 /// **למה בכלל:** הרשומה של תוכנה נוספת נוצרת במחשב המקוון, שבו התוכנה
 /// בדרך כלל אינה מותקנת — אבל קובץ ההתקנה כן שם, ומתקין של Inno או NSIS
-/// נושא כמעט תמיד את האייקון של התוכנה עצמה. זה חוסך מהמשתמש לחפש
-/// תמונה ברשת רק כדי שהכרטיס לא ייראה ריק.
+/// נושא כמעט תמיד את האייקון של התוכנה עצמה.
 ///
-/// ווינדוס בלבד: העבודה נעשית ב-PowerShell מול `PrivateExtractIcons`
-/// (256×256, הגודל הגדול ביותר שיש בקובץ), עם נפילה חזרה ל-
-/// `ExtractAssociatedIcon` שנותן 32×32. `flutter_svg` ואריזות תמונה
-/// אינן בפרויקט, ולכן אין כאן פענוח PE משלנו.
+/// ווינדוס בלבד: `PrivateExtractIcons` (256×256) עם נפילה ל-
+/// `ExtractAssociatedIcon` (32×32), וקידוד ל-PNG — הכול ב-isolate.
 abstract final class ExeIconExtractor {
   static bool get isSupported => Platform.isWindows;
 
   /// מחלץ את האייקון של [exePath] לקובץ PNG **זמני** ומחזיר את נתיבו, או
   /// `null` כשאין אייקון או שהחילוץ נכשל.
-  ///
-  /// הקובץ זמני בכוונה: מי שקורא מוסר אותו כמקור ל-`saveMedia`, שמעתיק
-  /// אותו אל `media/` של התוכנה — אותו מסלול בדיוק כמו תמונה שנבחרה ביד.
   static Future<String?> extract(
     String exePath, {
-    IconScriptRunner? runner,
+    IconPngWriter? writer,
   }) async {
     if (!isSupported) return null;
     if (!await File(exePath).exists()) return null;
 
     final dir = await Directory.systemTemp.createTemp('otzaria_icon_');
-    final script = File(p.join(dir.path, 'extract_icon.ps1'));
     final out = p.join(dir.path, 'icon.png');
-
     try {
-      await script.writeAsString(_script);
-      final exitCode = await (runner ?? _run)('powershell.exe', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        script.path,
-        '-Exe',
-        exePath,
-        '-Out',
-        out,
-      ]);
-
+      final written = await (writer ?? _writeInIsolate)(exePath, out);
       final file = File(out);
-      // קוד יציאה 1 הוא "לא נמצא אייקון" — מצב תקין לגמרי, ולא שגיאה.
-      if (exitCode != 0 || !await file.exists()) return null;
+      if (!written || !await file.exists()) return null;
       if (await file.length() == 0) return null;
       return out;
     } catch (e) {
@@ -71,45 +50,232 @@ abstract final class ExeIconExtractor {
     }
   }
 
-  static Future<int> _run(String executable, List<String> arguments) async {
-    final result = await Process.run(executable, arguments);
-    return result.exitCode;
+  static Future<bool> _writeInIsolate(String exePath, String outPath) =>
+      Isolate.run(() => writeExeIconPng(exePath, outPath));
+}
+
+/// עבודת GDI סינכרונית — לקרוא רק מתוך isolate.
+bool writeExeIconPng(String exePath, String outPath) {
+  final icon = _loadIcon(exePath);
+  if (icon == 0) return false;
+  try {
+    final image = _iconPixels(icon);
+    if (image == null) return false;
+    File(outPath).writeAsBytesSync(
+      encodeRgbaPng(image.width, image.height, image.rgba),
+    );
+    return true;
+  } finally {
+    DestroyIcon(icon);
+  }
+}
+
+int _loadIcon(String exePath) {
+  final file = exePath.toNativeUtf16();
+  final handle = calloc<IntPtr>();
+  final id = calloc<Uint32>();
+  final path = calloc<Uint16>(MAX_PATH + 1);
+  final index = calloc<Uint16>();
+  try {
+    final count = PrivateExtractIcons(file, 0, 256, 256, handle, id, 1, 0);
+    if (count > 0 && count != 0xFFFFFFFF && handle.value != 0) {
+      return handle.value;
+    }
+    if (exePath.length > MAX_PATH) return 0;
+    for (var i = 0; i < exePath.length; i++) {
+      path[i] = exePath.codeUnitAt(i);
+    }
+    path[exePath.length] = 0;
+    return ExtractAssociatedIcon(0, path.cast<Utf16>(), index);
+  } finally {
+    free(file);
+    free(handle);
+    free(id);
+    free(path);
+    free(index);
+  }
+}
+
+typedef _Pixels = ({int width, int height, Uint8List rgba});
+
+_Pixels? _iconPixels(int icon) {
+  final info = calloc<ICONINFO>();
+  final bitmap = calloc<BITMAP>();
+  final header = calloc<BITMAPINFO>();
+  final screen = GetDC(NULL);
+  try {
+    if (GetIconInfo(icon, info) == 0) return null;
+    final color = info.ref.hbmColor;
+    final mask = info.ref.hbmMask;
+    try {
+      if (color == 0) return _monochromePixels(screen, mask, bitmap, header);
+      if (GetObject(color, sizeOf<BITMAP>(), bitmap) == 0 ||
+          bitmap.ref.bmWidth <= 0 ||
+          bitmap.ref.bmHeight <= 0) {
+        return null;
+      }
+      final width = bitmap.ref.bmWidth;
+      final height = bitmap.ref.bmHeight;
+      final bgra = _readBits(screen, color, header, width, height);
+      if (bgra == null) return null;
+      final andMask =
+          mask == 0 ? null : _readBits(screen, mask, header, width, height);
+      return (
+        width: width,
+        height: height,
+        rgba: bgraToRgba(bgra, andMask),
+      );
+    } finally {
+      if (color != 0) DeleteObject(color);
+      if (mask != 0) DeleteObject(mask);
+    }
+  } finally {
+    ReleaseDC(NULL, screen);
+    free(info);
+    free(bitmap);
+    free(header);
+  }
+}
+
+/// אייקון מונוכרום: אין `hbmColor`, ומסכה אחת בגובה כפול — חציה העליון
+/// AND (שקיפות) והתחתון XOR (שחור/לבן).
+_Pixels? _monochromePixels(
+  int screen,
+  int mask,
+  Pointer<BITMAP> bitmap,
+  Pointer<BITMAPINFO> header,
+) {
+  if (mask == 0 ||
+      GetObject(mask, sizeOf<BITMAP>(), bitmap) == 0 ||
+      bitmap.ref.bmWidth <= 0 ||
+      bitmap.ref.bmHeight < 2) {
+    return null;
+  }
+  final width = bitmap.ref.bmWidth;
+  final height = bitmap.ref.bmHeight ~/ 2;
+  final bits = _readBits(screen, mask, header, width, height * 2);
+  if (bits == null) return null;
+  return (
+    width: width,
+    height: height,
+    rgba: monochromeToRgba(bits, width, height)
+  );
+}
+
+/// [bits] הוא 32bpp של המסכה בגובה כפול. AND=1 ו-XOR=0 שקוף; אחרת XOR קובע
+/// לבן או שחור (פיקסל "הפוך" מוצג שחור).
+Uint8List monochromeToRgba(Uint8List bits, int width, int height) {
+  final rgba = Uint8List(width * height * 4);
+  final half = width * height * 4;
+  for (var i = 0; i < half; i += 4) {
+    final and = bits[i] != 0;
+    final xor = bits[half + i] != 0;
+    final value = xor && !and ? 255 : 0;
+    rgba
+      ..[i] = value
+      ..[i + 1] = value
+      ..[i + 2] = value
+      ..[i + 3] = and && !xor ? 0 : 255;
+  }
+  return rgba;
+}
+
+Uint8List? _readBits(
+  int dc,
+  int bitmap,
+  Pointer<BITMAPINFO> header,
+  int width,
+  int height,
+) {
+  final bytes = width * height * 4;
+  final buffer = calloc<Uint8>(bytes);
+  try {
+    header.ref.bmiHeader
+      ..biSize = sizeOf<BITMAPINFOHEADER>()
+      ..biWidth = width
+      ..biHeight = -height
+      ..biPlanes = 1
+      ..biBitCount = 32
+      ..biCompression = BI_RGB;
+    final lines =
+        GetDIBits(dc, bitmap, 0, height, buffer, header, DIB_RGB_COLORS);
+    if (lines != height) return null;
+    return Uint8List.fromList(buffer.asTypedList(bytes));
+  } finally {
+    free(buffer);
+  }
+}
+
+/// BGRA של GDI ל-RGBA. אייקון בלי אלפא מקבל שקיפות ממסכת ה-AND, כמו
+/// ב-`Icon.ToBitmap`.
+Uint8List bgraToRgba(Uint8List bgra, Uint8List? andMask) {
+  var hasAlpha = false;
+  for (var i = 3; i < bgra.length; i += 4) {
+    if (bgra[i] != 0) {
+      hasAlpha = true;
+      break;
+    }
+  }
+  final rgba = Uint8List(bgra.length);
+  for (var i = 0; i < bgra.length; i += 4) {
+    rgba[i] = bgra[i + 2];
+    rgba[i + 1] = bgra[i + 1];
+    rgba[i + 2] = bgra[i];
+    rgba[i + 3] = hasAlpha
+        ? bgra[i + 3]
+        : andMask != null && andMask[i] != 0
+            ? 0
+            : 255;
+  }
+  return rgba;
+}
+
+/// PNG מינימלי, צבע מלא עם אלפא (filter 0, zlib).
+Uint8List encodeRgbaPng(int width, int height, Uint8List rgba) {
+  final raw = BytesBuilder(copy: false);
+  final stride = width * 4;
+  for (var y = 0; y < height; y++) {
+    raw
+      ..addByte(0)
+      ..add(Uint8List.sublistView(rgba, y * stride, (y + 1) * stride));
+  }
+  final header = ByteData(13)
+    ..setUint32(0, width)
+    ..setUint32(4, height)
+    ..setUint8(8, 8)
+    ..setUint8(9, 6);
+  final out = BytesBuilder(copy: false)
+    ..add(const [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  void chunk(String type, List<int> data) {
+    final typed = Uint8List.fromList([...type.codeUnits, ...data]);
+    out
+      ..add((ByteData(4)..setUint32(0, data.length)).buffer.asUint8List())
+      ..add(typed)
+      ..add((ByteData(4)..setUint32(0, _crc32(typed))).buffer.asUint8List());
   }
 
-  /// ⚠️ `PrivateExtractIcons` ולא `ExtractAssociatedIcon` כברירת מחדל:
-  /// השני מחזיר 32×32 בלבד, והתמונה בדף התוכנה רחבה 340 — אייקון כזה
-  /// נראה שם כמו כתם מטושטש.
-  static const String _script = r'''
-param([Parameter(Mandatory=$true)][string]$Exe, [Parameter(Mandatory=$true)][string]$Out)
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Drawing
-Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-public static class OtzIconApi {
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-  public static extern int PrivateExtractIcons(string file, int index, int cx, int cy, IntPtr[] icons, int[] ids, int count, int flags);
-  [DllImport("user32.dll")]
-  public static extern bool DestroyIcon(IntPtr icon);
+  chunk('IHDR', header.buffer.asUint8List());
+  chunk('IDAT', ZLibCodec().encode(raw.takeBytes()));
+  chunk('IEND', const []);
+  return out.takeBytes();
 }
-'@
-function Save-Bitmap($icon, $path) {
-  $bmp = $icon.ToBitmap()
-  $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
-  $bmp.Dispose()
-}
-$handles = New-Object IntPtr[] 1
-$ids = New-Object int[] 1
-$count = [OtzIconApi]::PrivateExtractIcons($Exe, 0, 256, 256, $handles, $ids, 1, 0)
-if ($count -gt 0 -and $handles[0] -ne [IntPtr]::Zero) {
-  $icon = [System.Drawing.Icon]::FromHandle($handles[0])
-  Save-Bitmap $icon $Out
-  $icon.Dispose()
-  [void][OtzIconApi]::DestroyIcon($handles[0])
-  exit 0
-}
-$assoc = [System.Drawing.Icon]::ExtractAssociatedIcon($Exe)
-if ($assoc -ne $null) { Save-Bitmap $assoc $Out; $assoc.Dispose(); exit 0 }
-exit 1
-''';
+
+final Uint32List _crcTable = () {
+  final table = Uint32List(256);
+  for (var n = 0; n < 256; n++) {
+    var c = n;
+    for (var k = 0; k < 8; k++) {
+      c = c & 1 != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+    }
+    table[n] = c;
+  }
+  return table;
+}();
+
+int _crc32(List<int> bytes) {
+  var crc = 0xFFFFFFFF;
+  for (final b in bytes) {
+    crc = _crcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+  }
+  return crc ^ 0xFFFFFFFF;
 }

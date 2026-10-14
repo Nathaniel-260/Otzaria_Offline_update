@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
+
 /// דיווח טעות אחד שנאסף מהתור של אוצריא, כפי שהוא יושב בתיבת היציאה עד
 /// שיישלח.
 class OutboxReport {
@@ -89,6 +91,29 @@ class OutboxReport {
     );
   }
 
+  /// הקידומת של מזהה הקובץ בתיבה, כמו באיסוף: `app-`/`plugin-`, ובלי קידומת
+  /// לדיווח על ספר.
+  static String idPrefixFor(Uri endpoint) => switch (endpoint.path) {
+        '/api/app-reports' => 'app-',
+        '/api/plugin-reports' => 'plugin-',
+        _ => '',
+      };
+
+  /// טביעה של תוכן הדיווח בלי המזהה שלו — זהה לשני העותקים שנשארים אחרי
+  /// קריסה בין כתיבת המזהה החדש (409) למחיקת הישן.
+  static String? contentKeyOf(Map<String, dynamic> fileJson) {
+    final body = fileJson['body'];
+    if (body is! Map<String, dynamic>) return null;
+    final idKey = body.containsKey('report_id') ? 'report_id' : 'reportId';
+    if (body[idKey] is! String) return null;
+    final content = Map.of(body)
+      ..remove(idKey)
+      ..remove('product');
+    return sha256
+        .convert(utf8.encode('${fileJson['endpoint']}\n${jsonEncode(content)}'))
+        .toString();
+  }
+
   static Uint8List encodeFile(Map<String, dynamic> fileJson) =>
       utf8.encode(jsonEncode(fileJson));
 
@@ -105,5 +130,17 @@ class OutboxReport {
       endpoint.scheme == 'https' &&
       endpoint.host.toLowerCase() == 'otzaria.org' &&
       endpoint.userInfo.isEmpty &&
-      (!endpoint.hasPort || endpoint.port == 443);
+      (!endpoint.hasPort || endpoint.port == 443) &&
+      !endpoint.hasQuery &&
+      !endpoint.hasFragment &&
+      _allowedPaths.contains(endpoint.path);
+
+  static final Set<String> _allowedPaths = {
+    for (final url in [
+      reportingEndpoint,
+      appReportingEndpoint,
+      pluginReportingEndpoint,
+    ])
+      Uri.parse(url).path,
+  };
 }

@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:path/path.dart' as p;
 
 /// ה-state הזה הוא מה שמבדיל בין "מסד שהותקן על ידינו" לבין "מסד שמצאנו":
-/// בלי רשומת `appliedReleases` של המחשב הזה, `LibraryUpdatePlanner` **לא**
+/// בלי רשומת `appliedReleases` של המחשב הזה, `OfflineLibraryUpdatePlanner` **לא**
 /// מנחש שמדובר בפרסום מחדש — אחרת כל פתיחה הייתה מציעה הורדה של ~1GB.
 void main() {
   late Directory tempDir;
@@ -863,4 +864,17 @@ void main() {
       expect(await store.lowestKnownDbVersion(), isNull);
     });
   });
+
+  test('MachineGuid נקרא מהרג׳יסטרי ב-isolate, בלי reg.exe', () async {
+    final id = await Isolate.run(readWindowsMachineGuid);
+    expect(id, matches(RegExp(r'^[0-9a-fA-F-]{36}$')));
+    final reg = await Process.run('reg', [
+      'query',
+      r'HKLM\SOFTWARE\Microsoft\Cryptography',
+      '/v',
+      'MachineGuid',
+      '/reg:64',
+    ]);
+    expect(id, LibraryStateStore.parseMachineId('${reg.stdout}'));
+  }, skip: !Platform.isWindows);
 }

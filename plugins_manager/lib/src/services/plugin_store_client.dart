@@ -90,6 +90,9 @@ class PluginStoreClient {
     } catch (e) {
       throw PluginStoreException(strings.siteUnreachable(describeError(e)));
     }
+    if (isShabbatResponse(response.statusCode, response.bodyBytes)) {
+      throw PluginStoreShabbatException(strings.siteClosedForShabbat);
+    }
     if (response.statusCode != 200) {
       throw PluginStoreException(strings.loadFailed(what, response.statusCode));
     }
@@ -97,6 +100,25 @@ class PluginStoreClient {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } catch (_) {
       throw PluginStoreException(strings.responseNotJson(what));
+    }
+  }
+
+  Future<bool> _isShabbat(String url) async {
+    try {
+      final response = await _client.get(Uri.parse(url)).timeout(timeout);
+      return isShabbatResponse(response.statusCode, response.bodyBytes);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static bool isShabbatResponse(int status, List<int> body) {
+    if (status != 503) return false;
+    try {
+      final decoded = jsonDecode(utf8.decode(body));
+      return decoded is Map && decoded['error'] == 'shabbat';
+    } on FormatException {
+      return false;
     }
   }
 
@@ -112,8 +134,9 @@ class PluginStoreClient {
     String? preferredExt,
     String? requiredExt,
     int? expectedSize,
+    String? expectedSha256,
     void Function()? checkCancelled,
-    bool Function(String path)? isValid,
+    FutureOr<String?> Function(String path)? rejection,
   }) async {
     final target = absolute(url);
     final targetUri = Uri.tryParse(target);
@@ -128,26 +151,43 @@ class PluginStoreClient {
       );
     }
     final stagingPath = '$destPathNoExt.download';
-    final response = await downloadFile(
-      client: _client,
-      url: target,
-      destinationPath: stagingPath,
-      connectTimeout: timeout,
-      stallTimeout: stallTimeout,
-      expectedSize: expectedSize,
-      checkCancelled: checkCancelled,
-      statusError: (status) => PluginStoreException(
-        AppL10n.strings.pluginsDomain.httpStatusFor(status, url),
-      ),
-      sizeError: (actual, expected) => PluginStoreException(
-        AppL10n.strings.appDomain.installerSizeMismatch(actual, expected),
-      ),
-    );
-    if (isValid != null && !isValid(stagingPath)) {
+    final FileDownloadResult response;
+    try {
+      response = await downloadFile(
+        client: _client,
+        url: target,
+        destinationPath: stagingPath,
+        connectTimeout: timeout,
+        stallTimeout: stallTimeout,
+        expectedSize: expectedSize,
+        checkCancelled: checkCancelled,
+        statusError: (status) => _HttpStatusException(
+          AppL10n.strings.pluginsDomain.httpStatusFor(status, url),
+          status,
+        ),
+        sizeError: (actual, expected) => PluginStoreException(
+          AppL10n.strings.appDomain.installerSizeMismatch(actual, expected),
+        ),
+        calculateSha256: expectedSha256 != null,
+      );
+    } on _HttpStatusException catch (e) {
+      if (e.status == 503 && await _isShabbat(target)) {
+        throw PluginStoreShabbatException(
+          AppL10n.strings.pluginsDomain.siteClosedForShabbat,
+        );
+      }
+      rethrow;
+    }
+    if (expectedSha256 != null && response.sha256 != expectedSha256) {
       await File(stagingPath).delete();
       throw PluginStoreException(
-        AppL10n.strings.pluginsDomain.downloadedFileNotPlugin,
+        AppL10n.strings.pluginsDomain.downloadedFileHashMismatch,
       );
+    }
+    final rejected = await rejection?.call(stagingPath);
+    if (rejected != null) {
+      await File(stagingPath).delete();
+      throw PluginStoreException(rejected);
     }
 
     final fromDisposition = parseContentDisposition(
@@ -261,4 +301,13 @@ class PluginStoreException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class _HttpStatusException extends PluginStoreException {
+  const _HttpStatusException(super.message, this.status);
+  final int status;
+}
+
+class PluginStoreShabbatException extends PluginStoreException {
+  const PluginStoreShabbatException(super.message);
 }

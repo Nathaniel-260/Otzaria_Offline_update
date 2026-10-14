@@ -93,7 +93,12 @@ class PluginStoreCard extends StatelessWidget {
                     label: '${plugin.downloadCount}',
                     icon: FluentIcons.arrow_download_24_regular,
                   ),
-                  PluginInstallChip(status: installStatus, compact: true),
+                  PluginInstallChip(
+                    status: installStatus,
+                    compact: true,
+                    disabled: controller.isDisabledInOtzaria(plugin),
+                    development: controller.isDevelopmentInOtzaria(plugin),
+                  ),
                   // כמו באתר: תוסף שטרם דורג אינו מציג גלולת דירוג ריקה.
                   if (plugin.ratingCount > 0) PluginRatingBadge(plugin: plugin),
                 ],
