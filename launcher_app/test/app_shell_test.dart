@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
 import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
+import 'package:launcher_app/src/controllers/library_module_controller.dart';
+import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
 import 'package:launcher_app/src/screens/faq/faq_floating_button.dart';
@@ -15,6 +17,7 @@ import 'package:launcher_app/src/screens/settings_screen.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/mirror_download_undo.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
+import 'package:launcher_app/src/services/sleep_inhibitor.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
@@ -58,6 +61,7 @@ void main() {
     MemoryNoticesStore? notices,
     bool readOnly = false,
     bool driveFull = false,
+    SleepInhibitor? sleepInhibitor,
   }) async {
     useViewSize(tester, const Size(1400, 1000));
     await tester.pumpWidget(
@@ -68,6 +72,7 @@ void main() {
           runningLocator: locator,
           readOnly: readOnly,
           driveFull: driveFull,
+          sleepInhibitor: sleepInhibitor,
           // ברירת המחדל: ההסבר החד-פעמי כבר הוצג, כדי שלא יצוץ באמצע בדיקה
           // שאינה שלו.
           noticesStore: notices ??
@@ -84,6 +89,63 @@ void main() {
   /// [IndexedStack] מסתיר את מי שאינו נבחר, ולכן החיפוש חייב לכלול offstage —
   /// אחרת "לא נמצא" היה יכול להיות "נבנה אבל מוסתר".
   Finder screen(Type type) => find.byType(type, skipOffstage: false);
+
+  testWidgets('מניעת שינה נשמרת עד סיום כל הפעולות ומשוחררת בסגירה',
+      (tester) async {
+    var acquired = 0;
+    var released = 0;
+    final inhibitor = SleepInhibitor(acquire: () {
+      acquired++;
+      return () => released++;
+    });
+    await pumpShell(tester, sleepInhibitor: inhibitor, readOnly: true);
+    final home = tester.widget<HomeScreen>(screen(HomeScreen));
+    expect(acquired, 0);
+
+    void changed() => settings.notifyListeners();
+
+    home.library.status = LibraryModuleStatus.updating;
+    changed();
+    expect(inhibitor.isActive, isTrue);
+    home.otzaria.status = OtzariaModuleStatus.installing;
+    changed();
+    home.library.status = LibraryModuleStatus.error;
+    changed();
+    expect(acquired, 1);
+    expect(released, 0);
+    home.otzaria.status = OtzariaModuleStatus.error;
+    changed();
+    expect(released, 1);
+
+    home.library.downloadStatus = MirrorDownloadStatus.downloading;
+    changed();
+    expect(inhibitor.isActive, isTrue);
+    home.library.downloadStatus = MirrorDownloadStatus.done;
+    changed();
+    expect(inhibitor.isActive, isFalse);
+
+    home.otzaria.downloadStatus = OtzariaDownloadStatus.downloading;
+    changed();
+    home.otzaria.downloadStatus = OtzariaDownloadStatus.error;
+    changed();
+    expect(inhibitor.isActive, isFalse);
+
+    home.launcherUpdate.status = LauncherUpdateStatus.downloading;
+    changed();
+    expect(inhibitor.isActive, isTrue);
+    home.launcherUpdate.status = LauncherUpdateStatus.error;
+    changed();
+    expect(inhibitor.isActive, isFalse);
+
+    home.launcherUpdate.status = LauncherUpdateStatus.installing;
+    changed();
+    expect(inhibitor.isActive, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(inhibitor.isActive, isFalse);
+    expect(acquired, 5);
+    expect(released, 5);
+    expect(tester.takeException(), isNull);
+  });
 
   /// ב-[NavRailItem] רק הסמל לחיץ; התווית יושבת מתחתיו כאחות שלו.
   Future<void> tapNav(WidgetTester tester, String label) async {

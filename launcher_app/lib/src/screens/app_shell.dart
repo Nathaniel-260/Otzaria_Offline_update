@@ -34,6 +34,7 @@ import '../services/file_reveal.dart';
 import '../services/mirror_junk_sweeper.dart';
 import '../services/notices_seen_store.dart';
 import '../services/report_offer_coordinator.dart';
+import '../services/sleep_inhibitor.dart';
 import '../settings/app_settings.dart';
 import '../settings/safer_mode.dart';
 import '../settings/settings_controller.dart';
@@ -71,6 +72,7 @@ class AppShell extends StatefulWidget {
     this.showWindowButtons,
     this.noticesStore,
     this.appReports,
+    this.sleepInhibitor,
   }) : _stateDir = stateDir;
 
   /// התיקייה שלצד התוכנה — המראה, כלומר המקור שממנו קוראים ומתקינים.
@@ -105,11 +107,15 @@ class AppShell extends StatefulWidget {
   /// מפעיל טיימר שליחה ופונה לרשת.
   final AppReportsController? appReports;
 
+  final SleepInhibitor? sleepInhibitor;
+
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
+  late final SleepInhibitor _sleepInhibitor =
+      widget.sleepInhibitor ?? SleepInhibitor();
   late final OtzariaModuleController _otzaria;
   late final LibraryModuleController _library;
   late final PluginsModuleController _plugins;
@@ -328,6 +334,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    _sleepInhibitor.dispose();
     if (LauncherCrashSession.closeGuard == _confirmClose) {
       LauncherCrashSession.closeGuard = null;
     }
@@ -357,6 +364,7 @@ class _AppShellState extends State<AppShell> {
 
   void _onChange() {
     if (!mounted) return;
+    _syncSleepInhibition();
     _offers.onRunningState(running: _otzariaIsRunning);
     _offers.resume();
     _applySettings(widget.settings.settings);
@@ -368,6 +376,7 @@ class _AppShellState extends State<AppShell> {
 
   void _onReportsChange() {
     if (!mounted) return;
+    _syncSleepInhibition();
     _offers.resume();
     unawaited(_maybeOfferElevation());
   }
@@ -638,6 +647,7 @@ class _AppShellState extends State<AppShell> {
             if (!mounted) return;
             if (uploading) _reportsStopRequested = false;
             setState(() => _uploadingReports = uploading);
+            _syncSleepInhibition();
             _offers.resume();
           },
         ),
@@ -714,6 +724,14 @@ class _AppShellState extends State<AppShell> {
       _customApps.isBusy;
 
   bool get _exitPending => _elevationPending || _launcherUpdate.isInstalling;
+
+  void _syncSleepInhibition() => _sleepInhibitor.setActive(
+        _exitWouldInterrupt ||
+            _launcherUpdate.isDownloading ||
+            _library.downloadStatus == MirrorDownloadStatus.downloading ||
+            _otzaria.downloadStatus == OtzariaDownloadStatus.downloading ||
+            _plugins.isAwaitingInstall,
+      );
 
   bool get _exitWouldInterrupt =>
       _longTaskRunning ||
@@ -874,6 +892,7 @@ class _AppShellState extends State<AppShell> {
 
   void _rebuild() {
     if (!mounted) return;
+    _syncSleepInhibition();
     setState(() {});
     _offers.resume();
   }
