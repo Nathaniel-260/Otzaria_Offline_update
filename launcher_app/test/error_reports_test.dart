@@ -27,7 +27,9 @@ import 'package:launcher_app/src/services/report_offer_trigger.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 
 import 'test_harness.dart';
 import 'test_support.dart';
@@ -39,17 +41,31 @@ Map<String, dynamic> _report(String id) => OutboxReport.fileJson(
       body: {'report_id': id},
     );
 
+// box של hive_ce 2.20.2 עם שני דיווחים ב-pending_reports ואחד ב-sent_reports.
+final _hiveWithPending = base64.decode(
+  'UQAAAAEPcGVuZGluZ19yZXBvcnRzCgIAAAALAgAAAAQCAAAAaWQEAQAAAHgEAQAAAG4BAAAAAAAA'
+  '8D8LAQAAAAQCAAAAaWQEAQAAAHmDJV/vLQAAAAEMc2VudF9yZXBvcnRzCgEAAAALAQAAAAQCAAAA'
+  'aWQEAQAAAHrN8gho',
+);
+const _hiveSentOnly =
+    'LQAAAAEMc2VudF9yZXBvcnRzCgEAAAALAQAAAAQCAAAAaWQEAQAAAHFFK9r/';
+
 class _MemoryOutbox implements ReportOutbox {
   final reports = <OutboxReport>[];
-  Future<void> Function()? beforeList;
+  Future<void> Function()? beforeCount;
 
   void add(String id) =>
       reports.add(OutboxReport.fromJson(_report(id), filePath: id));
 
   @override
   Future<List<OutboxReport>> list() async {
-    await beforeList?.call();
     return List.of(reports);
+  }
+
+  @override
+  Future<int> count() async {
+    await beforeCount?.call();
+    return reports.length;
   }
 
   @override
@@ -721,7 +737,7 @@ void main() {
       );
       addTearDown(feedback.dispose);
       final gate = Completer<void>();
-      outbox.beforeList =
+      outbox.beforeCount =
           () => outbox.reports.isEmpty ? gate.future : Future<void>.value();
       var stopped = false;
       late BuildContext ctx;
@@ -1005,23 +1021,164 @@ void main() {
             p.join(dataRoot, 'databases', 'user_state.db'));
       });
 
+      Future<List<String>> unmigrated() =>
+          ErrorReportsController.unmigratedLegacyReports(
+            launchPath: launch,
+            locator: LibraryDbLocator(
+              stateStore: LibraryStateStore(p.join(temp.path, 's.json')),
+            ),
+          );
+
+      void userStateDb({List<String> kinds = const []}) {
+        final path = p.join(dataRoot, 'databases', 'user_state.db');
+        Directory(p.dirname(path)).createSync(recursive: true);
+        final db = sqlite3.open(path)
+          ..execute(
+            'CREATE TABLE pending_reports (id INTEGER PRIMARY KEY, '
+            'kind TEXT NOT NULL, payload_json TEXT NOT NULL, '
+            'created_at INTEGER NOT NULL)',
+          );
+        for (final kind in kinds) {
+          db.execute(
+            'INSERT INTO pending_reports (kind, payload_json, created_at) '
+            "VALUES (?, '{}', 0)",
+            [kind],
+          );
+        }
+        db.close();
+      }
+
       for (final box in [
         'error_reports_queue',
         'app_reports_queue',
         'plugin_reports_queue',
       ]) {
-        test('$box עדיין ב-Hive — לא נוגעים', () async {
-          File(p.join(dataRoot, 'databases', 'user_state.db'))
-              .createSync(recursive: true);
+        test('$box.hive שנשאר אחרי ההעברה אינו חוסם את האיסוף', () async {
+          userStateDb(kinds: ['$box/sent_reports']);
+          File(p.join(dataRoot, '$box.hive'))
+              .writeAsBytesSync(_hiveWithPending);
+
+          expect(await resolve(), isA<UserStateReportQueue>());
+          expect(await unmigrated(), isEmpty);
+        });
+
+        test('$box.hive ריק אינו נחשב תור שלא הועבר', () async {
+          userStateDb();
           File(p.join(dataRoot, '$box.hive')).createSync();
-          expect(await resolve(), isNull);
+
+          expect(await resolve(), isA<UserStateReportQueue>());
+          expect(await unmigrated(), isEmpty);
+        });
+
+        test('$box.hive עם היסטוריה בלבד — אין הודעה', () async {
+          userStateDb();
+          File(p.join(dataRoot, '$box.hive'))
+              .writeAsBytesSync(base64.decode(_hiveSentOnly));
+
+          expect(await unmigrated(), isEmpty);
+        });
+
+        test(
+            '$box.hive עם ממתינים ובלי שום שורה שלו במסד — מדווח, והאיסוף ממשיך',
+            () async {
+          userStateDb();
+          File(p.join(dataRoot, '$box.hive'))
+              .writeAsBytesSync(_hiveWithPending);
+
+          expect(await resolve(), isA<UserStateReportQueue>());
+          expect(await unmigrated(), [box]);
         });
       }
+
+      test('reportsQueueFormat מ-otzaria_capabilities.json עובר לתור',
+          () async {
+        userStateDb();
+        File(p.join(dataRoot, OtzariaCapabilities.fileName))
+            .writeAsStringSync('{"formatVersion":1,"reportsQueueFormat":1}');
+
+        final queue = await resolve() as UserStateReportQueue;
+
+        expect(queue.reportsQueueFormat, 1);
+      });
+
+      test('בלי otzaria_capabilities.json — לפי user_version כמו קודם',
+          () async {
+        userStateDb();
+
+        final queue = await resolve() as UserStateReportQueue;
+
+        expect(queue.reportsQueueFormat, isNull);
+      });
 
       test('אין מסד — null, ושום תיקייה אינה נוצרת', () async {
         expect(await resolve(), isNull);
         expect(Directory(dataRoot).existsSync(), isFalse);
       });
+    });
+
+    testWidgets('תורי Hive שלא הועברו — הודעה ברורה, ואחריה ההצעה לאסוף',
+        (tester) async {
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => _FakeQueue(2),
+        findUnmigratedLegacy: () async => ['error_reports_queue'],
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+      final notices = MemoryNoticesStore();
+
+      unawaited(offerErrorReportCollection(
+        ctx,
+        c,
+        isOtzariaRunning: () async => false,
+        notices: notices,
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text(t.legacyReportsDialogTitle), findsOneWidget);
+      expect(find.text(t.legacyReportsDialogContent), findsOneWidget);
+
+      await tester.tap(find.text(t.introDialogConfirm));
+      await tester.pumpAndSettle();
+      expect(find.text(t.collectDialogTitle), findsOneWidget);
+      expect(notices.marked, [NoticesSeenStore.legacyReportsNotice]);
+    });
+
+    testWidgets('הודעת ה-Hive הישן — פעם אחת בלבד במחשב', (tester) async {
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => _FakeQueue(0),
+        findUnmigratedLegacy: () async => ['error_reports_queue'],
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+
+      unawaited(offerErrorReportCollection(
+        ctx,
+        c,
+        isOtzariaRunning: () async => false,
+        notices: MemoryNoticesStore(
+          seen: {NoticesSeenStore.legacyReportsNotice},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.legacyReportsDialogTitle), findsNothing);
+    });
+
+    test('כל איסוף קורא מחדש את התור ואת היכולות של אוצריא', () async {
+      var resolved = 0;
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async {
+          resolved++;
+          return _FakeQueue(resolved == 1 ? 1 : 0);
+        },
+      );
+      addTearDown(c.dispose);
+
+      expect(await c.pendingToOffer(), 1);
+      expect((await c.collect()).collected, 0);
+      expect(resolved, 2);
     });
 
     test('כשל חלקי באיסוף — מה שהועבר נספר, והשגיאה נמסרת', () async {
@@ -1095,6 +1252,9 @@ class _BrokenOutbox implements ReportOutbox {
   @override
   Future<List<OutboxReport>> list() async =>
       throw const FileSystemException('drive removed');
+
+  @override
+  Future<int> count() async => throw const FileSystemException('drive removed');
 
   @override
   Future<Uint8List> requestBody(OutboxReport report) async =>

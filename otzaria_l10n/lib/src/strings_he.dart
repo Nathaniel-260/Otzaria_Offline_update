@@ -203,6 +203,18 @@ class _Home extends HomeStrings {
   String get closeOtzariaForLibraryPrompt =>
       'אוצריא נפתחה בסיום ההתקנה, והיא נועלת את קובץ הספרייה. סגור אותה '
       'ולחץ "נסה שוב" כדי להמשיך בהתקנת הספרייה.';
+  @override
+  String get closeOtzariaForAppInstallDialogTitle => 'אוצריא פתוחה';
+  @override
+  String get closeOtzariaForAppInstallPrompt =>
+      'כדי להתקין את הגרסה החדשה יש לסגור את אוצריא. לסגור אותה עכשיו '
+      'ולהמשיך בהתקנה?';
+  @override
+  String get closeOtzariaAndInstallConfirm => 'סגירה והתקנה';
+  @override
+  String get elevatedAsOtherUserWarning =>
+      'התוכנה רצה כמנהל בשם משתמש אחר — התקנה "למשתמש הנוכחי" תיכנס לחשבון '
+      'של המנהל ולא לחשבון שלך. מומלץ להפעיל אותה בלי "הפעל כמנהל".';
 
   @override
   String get otzariaOpenSnack => 'אוצריא פתוחה — יש לסגור אותה ואז לנסות שוב.';
@@ -225,6 +237,9 @@ class _Home extends HomeStrings {
       'רק אחרי שהגרסה החדשה תיבדק בהצלחה.';
   @override
   String get libraryUpdateConfirm => 'עדכן עכשיו';
+  @override
+  String libraryApplyEstimate(int lowMinutes, int highMinutes) =>
+      'צפוי כ-$lowMinutes עד $highMinutes דקות, לפי מהירות המחשב.';
   @override
   String libraryUpdatedSnack(String version) => 'המסד עודכן לגרסה $version';
 
@@ -324,6 +339,8 @@ class _Home extends HomeStrings {
   String get libraryNotInstalledYet => 'טרם הותקנה ספרייה';
   @override
   String get libraryUpdating => 'מעדכן...';
+  @override
+  String get libraryApplyActive => 'עדכון ספרייה פעיל';
   @override
   String get libraryNothingDownloaded => 'טרם הורדו עדכונים';
   @override
@@ -508,6 +525,22 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get installUpdateButton => 'התקנת העדכון';
   @override
   String get updateDialogTitle => 'עדכון ספריית הספרים';
+  @override
+  String get changesTitle => 'מה חדש בספרייה';
+  @override
+  String changesPendingSubtitle(String version) =>
+      'הספרים שנוספו והשתנו עד גרסה $version, שהעדכון יתקין.';
+  @override
+  String changesAppliedSubtitle(String version) =>
+      'הספרים שנוספו והשתנו עד גרסה $version, שהותקנה. '
+      'גרסאות אוצריא שתומכות בכך יציגו את הרשימה גם בפתיחה הבאה.';
+  @override
+  String changesPartial(int shown, int total) =>
+      'הרשימה חלקית: יש בה $shown מתוך $total הגרסאות שבטווח.';
+  @override
+  String get changesButton => 'הצגה';
+  @override
+  String get changesNotFound => 'רשימת השינויים לא נמצאה על הכונן.';
 
   @override
   String get reindexTitle => 'אינדקס החיפוש של אוצריא';
@@ -949,6 +982,12 @@ class _Plugins extends PluginsStrings {
   String installDoneSnack(String pluginName) =>
       'התוסף $pluginName הותקן בהצלחה';
   @override
+  String installCancelledSnack(String pluginName) =>
+      'התקנת $pluginName בוטלה באוצריא';
+  @override
+  String installRejectedSnack(String pluginName, String? reason) =>
+      'אוצריא לא התקינה את $pluginName${reason == null ? '' : ': $reason'}';
+  @override
   String get installFailedSnack => 'ההתקנה נכשלה';
 
   @override
@@ -1120,6 +1159,12 @@ class _Plugins extends PluginsStrings {
       'עדכון זמין (מותקן $installedVersion)';
   @override
   String get installChipIncompatible => 'דורש אוצריא חדשה יותר';
+  @override
+  String get installChipDisabled => 'מותקן, מושבת באוצריא';
+  @override
+  String get installChipDisabledUpdate => 'עדכון זמין, מושבת באוצריא';
+  @override
+  String get installChipDevelopment => 'גרסת פיתוח מקומית';
 
   @override
   String get infoPanelTitle => 'מידע כללי';
@@ -1431,7 +1476,9 @@ class _Faq extends FaqStrings {
   String get aLauncherSelfUpdate =>
       'כן. כשיש לה גרסה חדשה היא מציעה להוריד אותה במחשב שיש בו אינטרנט, ואז '
       'מחליפה את עצמה ונפתחת מחדש. ההגדרות, הספרים והתוספים שכבר על הכונן '
-      'נשארים כמו שהם.';
+      'נשארים כמו שהם. אם ההחלפה נקטעה (למשל בכיבוי המחשב) והקובץ של התוכנה '
+      'נעלם, יש להפעיל את ‎.launcher-previous.exe שלצידו — הוא משחזר את '
+      'הגרסה הקודמת בשמה הרגיל.';
   @override
   String get qFree => 'וואו, הכול בחינם?';
   @override
@@ -1548,6 +1595,19 @@ class _SetupError extends SetupErrorStrings {
       'אותה שוב.';
   @override
   String get appTranslocatedTitle => 'macOS מריץ את התוכנה מעותק זמני';
+  @override
+  String get runningFromTemp =>
+      'התוכנה הופעלה מתוך קובץ ZIP או מתיקייה זמנית, וכל מה שהיא תוריד משם '
+      'יימחק יחד עם התיקייה הזמנית. יש לחלץ את הקובץ לכונן הנייד (או לתיקייה '
+      'קבועה בדיסק) ולהפעיל אותו משם.';
+  @override
+  String get runningFromTempTitle => 'חלץ את הקובץ לכונן לפני ההפעלה';
+  @override
+  String get macVolumeAccessDenied =>
+      'macOS לא אישר לתוכנה לכתוב לתיקייה שלצידה. יש לפתוח את הגדרות '
+      'המערכת ← פרטיות ואבטחה ← קבצים ותיקיות (או גישה מלאה לדיסק), לאפשר '
+      'לעדכוני אוצריא גישה למיקום הזה — כונן נשלף, מסמכים, שולחן העבודה או '
+      'הורדות — ולפתוח את התוכנה מחדש.';
 }
 
 class _ReadOnlyDrive extends ReadOnlyDriveStrings {
@@ -1758,6 +1818,14 @@ class _LauncherUpdate extends LauncherUpdateStrings {
   String replaceFailed(String error) =>
       'החלפת קובץ ההרצה נכשלה: $error. הקובץ הקודם הוחזר למקומו.';
   @override
+  String replaceFailedNotRestored(
+    String error,
+    String previousPath,
+    String executableName,
+  ) =>
+      'החלפת קובץ ההרצה נכשלה: $error, וגם החזרת הקובץ הקודם נכשלה. הוא '
+      'שמור ב-$previousPath — יש לשנות את שמו בחזרה ל-$executableName.';
+  @override
   String restartFailed(String error) =>
       'הפעלת הגרסה החדשה נכשלה: $error. יש לסגור את התוכנה ולהפעיל אותה '
       'מחדש ידנית — ההחלפה עצמה כבר הושלמה.';
@@ -1953,6 +2021,19 @@ class _LibraryDomain extends LibraryDomainStrings {
       'הגרסה האחרונה של הספרייה ($latestVersion) בנויה על סכמת מסד '
       '$schemaVersion, שגרסה זו של התוכנה אינה יודעת להחיל דרך קובצי עדכון';
   @override
+  String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion) =>
+      'גרסת הספרייה $latestVersion דורשת גרסה חדשה יותר של אוצריא: הגרסה '
+      'המותקנת קוראת מסד עד סכמה $readableSchema בלבד. יש לעדכן קודם את '
+      'אוצריא, ואחר כך את הספרייה.';
+  @override
+  String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion) =>
+      'הספרייה תעודכן עד גרסה $reachedVersion. גרסה $latestVersion דורשת '
+      'גרסה חדשה יותר של אוצריא — אחרי עדכון אוצריא אפשר להמשיך.';
+  @override
+  String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion) =>
+      'בכונן יש את אוצריא $otzariaVersion, שקוראת את הספרייה החדשה: יש לעדכן '
+      'קודם את אוצריא, ואחר כך את הספרייה.';
+  @override
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion) =>
       'קובצי העדכון של הגרסה האחרונה ($latestVersion) בנויים בפורמט '
       '$patchFormatVersion, שגרסה זו של התוכנה אינה יודעת להחיל';
@@ -2141,6 +2222,60 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String localFileHashMismatch(String url) =>
       'sha256 של הקובץ המקומי אינו תואם: $url';
+  @override
+  String get manifestMissingPatchFormatVersion =>
+      'שדה חובה חסר במניפסט של schema 4+: patchFormatVersion';
+  @override
+  String manifestInvalidOptionalField(String key) =>
+      'שדה אופציונלי לא תקין במניפסט: $key';
+  @override
+  String manifestInvalidHashMap(String key) =>
+      'ערך לא תקין במפת ה-hash במניפסט: $key';
+  @override
+  String splitManifestDownloadFailed(String name, int statusCode) =>
+      'שגיאה בהורדת מניפסט הפיצול ($name): $statusCode';
+  @override
+  String get interruptedUpdateWithoutBackup =>
+      'נמצא סימון עדכון שלא הושלם ללא גיבוי — יש לוודא תקינות ה-DB';
+  @override
+  String get interruptedUpdateRestored =>
+      'עדכון שנקטע זוהה — ה-DB שוחזר מהגיבוי';
+  @override
+  String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema) =>
+      'הספרייה עברה לסכמת DB $schemaVersion, '
+      'חדשה מהנתמך (DB $supportedSchema) — נדרש עדכון אפליקציה';
+  @override
+  String planSchemaBarrierNeedsFullDownload(int schemaVersion) =>
+      'הספרייה עברה לסכמת DB $schemaVersion; המעבר מחייב הורדה מלאה';
+  @override
+  String planDeltaNeedsAppUpdate(
+    int latestVersion,
+    int supportedSchema,
+    int supportedPatchFormat,
+  ) =>
+      'מסלול הדלתא לגרסה $latestVersion דורש סכמת DB או פורמט patch '
+      'חדשים מהנתמך (DB $supportedSchema, '
+      'patch $supportedPatchFormat) — נדרש עדכון אפליקציה';
+  @override
+  String planHeavyDelta(String deltaSize, String localDbSize) =>
+      'מסלול הדלתא פורס $deltaSize לעומת DB מקומי בגודל '
+      '$localDbSize, ושלב ההחלה עלול להימשך זמן רב';
+  @override
+  String tableHashMismatch(String tables) =>
+      'ה-hash אחרי apply אינו תואם ל-toTableContentHashes בטבלאות: $tables';
+  @override
+  String patchOpenFailed(String path, String detail) =>
+      'לא ניתן לפתוח את קובץ ה-patch ($path): $detail';
+  @override
+  String get networkInterrupted => 'החיבור לרשת נקטע במהלך ההורדה';
+  @override
+  String get deletePreviousArchiveFailed =>
+      'מחיקת ארכיון קודם נכשלה — לא ניתן לחבר את חלקי ההורדה';
+  @override
+  String joinedArchiveSizeMismatch(int written, int expected) =>
+      'גודל הארכיון המחובר ($written) אינו תואם לצפוי ($expected)';
+  @override
+  String get joinedArchiveHashMismatch => 'sha256 של הארכיון המחובר אינו תואם';
 
   @override
   String get mirrorMissing =>
@@ -2166,6 +2301,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get fullDbNeedsNativeZstd =>
       'חילוץ ה-DB המלא דורש את ספריית zstd, והיא אינה זמינה במחשב הזה';
+  @override
+  String get patchNeedsNativeZstd =>
+      'חילוץ קובץ העדכון דורש את ספריית zstd, והיא אינה זמינה במחשב הזה';
   @override
   String versionMismatchAfterWrite(int? actual, int? expected) =>
       'אחרי כתיבת ה-DB המלא, הגרסה שנקראה ($actual) לא תואמת ליעד '
@@ -2227,6 +2365,8 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get companionSemanticName => 'החיפוש החכם';
   @override
+  String get libraryChangesNotesName => 'רשימת "מה חדש בספרייה"';
+  @override
   String get semanticDownloading => 'מוריד את קובצי החיפוש החכם';
   @override
   String get semanticInstalling => 'מתקין את החיפוש החכם';
@@ -2241,7 +2381,8 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get semanticFeedbackCollectTitle => 'איסוף נתוני אימון לחיפוש החכם';
   @override
   String semanticFeedbackCollectBody(int count) =>
-      'באוצריא ממתינות $count רשומות נתוני שימוש בחיפוש החכם, שנאספו בהסכמתכם. להעביר אותן לכונן כדי לשלוח לאוצריא מהמחשב המקוון? הנתונים יוסרו מהתור של אוצריא רק לאחר שמירתם בכונן.';
+      'באוצריא ממתינות $count רשומות נתוני שימוש בחיפוש החכם, שנאספו בהסכמתכם. להעביר אותן לכונן כדי לשלוח לאוצריא מהמחשב המקוון? הנתונים יוסרו מהתור של אוצריא רק לאחר שמירתם בכונן.\n\n'
+      'שימו לב: הרשומות, כולל מילות החיפוש, נשמרות בכונן בלי הצפנה עד שיישלחו, יחד עם המפתח האנונימי שחותם עליהן. המפתח נמחק מהכונן כשכל הרשומות נשלחו.';
   @override
   String get semanticFeedbackUploadTitle => 'שליחת נתוני אימון לאוצריא';
   @override
@@ -2391,6 +2532,15 @@ class _AppDomain extends AppDomainStrings {
   String get wizardStillOpen =>
       'המתקין של אוצריא נפתח. כשתסיים אותו, לחץ "בדיקה מחדש" כדי שהתוכנה '
       'תזהה את ההתקנה.';
+  @override
+  String get wizardEndedWithoutInstall =>
+      'המתקין נסגר, אבל הגרסה החדשה לא נמצאה על המחשב. אם התקנת לתיקייה '
+      'אחרת, אפשר לבחור אותה ב"בחירת מיקום ידנית"; אחרת יש להתקין שוב.';
+  @override
+  String get setupContinuesElsewhere =>
+      'המתקין ממשיך לעדכן את אוצריא בחלון משלו — ממתינים לסיומו…';
+  @override
+  String get stopWaitingForSetup => 'הפסקת ההמתנה';
 
   @override
   String get noInstallableReleaseForPlatform =>
@@ -2426,6 +2576,10 @@ class _AppDomain extends AppDomainStrings {
   String installerSizeMismatch(int received, int expected) =>
       'קובץ ההתקנה שהורד לא בגודל הצפוי (התקבלו $received בתים, '
       'צפוי $expected) — כנראה שהורדה נקטעה.';
+  @override
+  String get installerDigestMismatch =>
+      'קובץ ההתקנה של אוצריא שבתיקייה פגום — הוא אינו תואם לחתימה שגיטהאב '
+      'מפרסם לו. יש להוריד אותו מחדש במחשב שיש בו אינטרנט.';
   @override
   String installerExitCode(int exitCode, String output) =>
       'ריצת ה-installer החזירה קוד יציאה $exitCode.\n$output';
@@ -2484,6 +2638,17 @@ class _AppDomain extends AppDomainStrings {
   }
 
   @override
+  String networkBlockedByFilter(int statusCode, String host) =>
+      'הגישה אל $host נחסמה (סטטוס $statusCode). כנראה סינון האינטרנט '
+      '(למשל נטפרי) חוסם את הכתובת — יש לבקש לפתוח אותה בסינון, או להוריד '
+      'ממחשב אחר.';
+  @override
+  String networkCertificateRejected(String host) =>
+      'החיבור המאובטח אל $host נכשל: האישור (תעודת האבטחה) שהתקבל אינו '
+      'מוכר. אם המחשב מחובר דרך סינון כמו נטפרי, יש להתקין את תעודת הסינון '
+      'במחשב, או להוריד ממחשב אחר.';
+
+  @override
   String noReleasesAtAll(String repo) => 'לא נמצאו releases בכלל ב-$repo.';
   @override
   String get windowsOnlyReader => 'WindowsExeVersionReader עובד רק בווינדוס.';
@@ -2508,6 +2673,9 @@ class _PluginsDomain extends PluginsDomainStrings {
   @override
   String get localPluginFileMissing =>
       'קובץ התוסף המקומי חסר. יש לבצע סנכרון מחדש.';
+  @override
+  String get localPluginFileCorrupt =>
+      'קובץ התוסף שבכונן פגום או אינו הגרסה שנבחרה. יש להוריד את החנות מחדש במחשב המחובר לרשת.';
   @override
   String get badPluginExtension => 'קובץ התוסף אינו בסיומת otzplugin תקינה.';
   @override
@@ -2552,6 +2720,18 @@ class _PluginsDomain extends PluginsDomainStrings {
       'לא ניתן להוריד את קובץ התוסף $name: $error';
   @override
   String get downloadedFileNotPlugin => 'הקובץ שירד אינו קובץ תוסף תקין';
+  @override
+  String get downloadedFileNotImage =>
+      'הקובץ שירד אינו תמונה (ייתכן שזה דף חסימה של סינון)';
+  @override
+  String get downloadedFileHashMismatch =>
+      'הקובץ שירד אינו תואם לחתימה שהאתר פרסם';
+  @override
+  String get downloadedFileWrongBuild =>
+      'הקובץ שירד אינו הגרסה שנבחרה של התוסף';
+  @override
+  String get siteClosedForShabbat =>
+      'אתר אוצריא סגור בשבת ובימים טובים. החנות שכבר בכונן ממשיכה לעבוד, ואפשר להוריד עדכונים אחרי צאת השבת.';
 
   @override
   String get whatPluginList => 'רשימת התוספים';
@@ -2653,15 +2833,26 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
   @override
   String installerElevatedRetryDeclined(int firstExitCode) =>
       'ההתקנה הסתיימה בשגיאה (קוד $firstExitCode). ניסיון חוזר בהרשאות '
-      'מנהל לא בוצע, כי הבקשה נדחתה בחלון ההרשאות של ווינדוס.';
+      'מנהל לא בוצע: הבקשה נדחתה בחלון ההרשאות של ווינדוס, או שהגישה נחסמה.';
   @override
   String get installerElevationDeclined =>
-      'המתקין דורש הרשאות מנהל, והבקשה נדחתה. כדי להתקין, יש לאשר את '
-      'חלון ההרשאות של ווינדוס.';
+      'המתקין דורש הרשאות מנהל, והבקשה נדחתה או שהגישה נחסמה. כדי להתקין, '
+      'יש לאשר את חלון ההרשאות של ווינדוס.';
   @override
   String get installerDigestMismatch =>
       'קובץ ההתקנה שעל הכונן פגום — הוא אינו זהה לקובץ שנשמר. יש להוריד '
       'או לצרף אותו מחדש במחשב שיש בו אינטרנט';
+  @override
+  String get installerUnverified =>
+      'לקובץ ההתקנה אין טביעת אצבע שמורה, ולכן אי אפשר לוודא שלא שונה. יש '
+      'לאשר אותו לפני ההתקנה';
+  @override
+  String get appNotTrustedHere =>
+      'התוכנה נוספה במחשב אחר. יש לאשר אותה במחשב הזה לפני ההתקנה';
+  @override
+  String get appNotTrustedForLaunch =>
+      'הרשומה של התוכנה נוספה או שונתה במחשב אחר. יש לאשר אותה במחשב הזה '
+      'לפני ההפעלה';
   @override
   String fileCopyFailed(String error) => 'העתקת הקובץ נכשלה: $error';
   @override
@@ -2673,7 +2864,7 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'קובץ ההרצה אינו נמצא: $launchPath';
   @override
   String get launchElevationDeclined =>
-      'התוכנה דורשת הרשאות מנהל, והבקשה נדחתה.';
+      'התוכנה דורשת הרשאות מנהל, והבקשה נדחתה או שהגישה נחסמה.';
 
   @override
   String mediaFileMissing(String path) => 'קובץ התמונה אינו נמצא: $path';
@@ -3064,6 +3255,24 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String installedSnack(String name) => '$name הותקנה';
   @override
+  String get trustDialogTitle => 'תוכנה שנוספה במחשב אחר';
+  @override
+  String trustDialogContent(String name, String source) =>
+      'את "$name" לא הוסיפו במחשב הזה — היא הגיעה על הכונן ממקום אחר '
+      '($source). התקנה מריצה את קובץ ההתקנה שלה במחשב הזה. להמשיך רק אם '
+      'ידוע מי הוסיף אותה ומה היא.';
+  @override
+  String get trustDialogConfirm => 'אני סומך על התוכנה, התקן';
+  @override
+  String get unverifiedDialogTitle => 'קובץ התקנה בלי טביעת אצבע';
+  @override
+  String unverifiedDialogContent(String fileName) =>
+      'ל-$fileName אין טביעת אצבע (sha256) שמורה, ולכן אי אפשר לוודא שהוא '
+      'הקובץ שצורף במקור. אישור יחשב אותה עכשיו וישמור אותה, ומכאן והלאה '
+      'כל שינוי בקובץ ייחסם.';
+  @override
+  String get unverifiedDialogConfirm => 'אמת ושמור';
+  @override
   String get learningLabel => 'מזהה את ההתקנה...';
   @override
   String learnedDetectionSnack(String exeName) =>
@@ -3100,7 +3309,10 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String collectDialogContent(int count) =>
       'נמצאו באוצריא ${_reports(count)} על ספרים, התוכנה ותוספים שעדיין לא נשלחו.\n\n'
-      'לאסוף אותם לכונן, כדי לשלוח אותם לאוצריא מהמחשב המחובר לרשת?';
+      'לאסוף אותם לכונן, כדי לשלוח אותם לאוצריא מהמחשב המחובר לרשת?\n\n'
+      'שימו לב: הדיווחים נשמרים בכונן כמו שהם, בלי הצפנה, עד שיישלחו — '
+      'כתובת המייל, הטקסט שכתבתם, קטעי יומן, צילומי מסך, ובדיווח על קריסה '
+      'שאישרתם גם תמונת זיכרון (dump). מי שמחזיק בכונן יכול לקרוא אותם.';
   @override
   String get collectConfirm => 'איסוף';
   @override
@@ -3116,6 +3328,14 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String get collectOtzariaOpenSnack =>
       'אוצריא פתוחה, ולכן הדיווחים לא נאספו. השאלה תחזור כשאוצריא תיסגר';
+  @override
+  String get legacyReportsDialogTitle => 'דיווחים ישנים שלא הועברו';
+  @override
+  String get legacyReportsDialogContent =>
+      'במחשב הזה נשארו דיווחים שנשמרו בגרסה ישנה של אוצריא, במבנה שגרסת '
+      'אוצריא הנוכחית כבר אינה מעבירה. לכן גם עדכוני אוצריא אינם יכולים '
+      'לאסוף אותם.\n\n'
+      'שאר הדיווחים נאספים ונשלחים כרגיל.';
 
   @override
   String get introDialogTitle => 'דיווחים לאוצריא ולמפתחי התוספים';
@@ -3196,6 +3416,9 @@ class _ErrorReportsDomain extends ErrorReportsDomainStrings {
 
   @override
   String uploadHttpStatus(int statusCode) => 'השרת השיב בקוד $statusCode';
+  @override
+  String get uploadShabbat =>
+      'אתר אוצריא סגור בשבת ובימים טובים. הדיווחים נשמרו בכונן ויישלחו בפעם הבאה, אחרי צאת השבת.';
   @override
   String get uploadTimedOut => 'השרת לא השיב בזמן';
   @override

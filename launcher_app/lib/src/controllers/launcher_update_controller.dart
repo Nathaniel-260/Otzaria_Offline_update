@@ -5,6 +5,7 @@ import '../self_update/launcher_release.dart';
 import '../self_update/launcher_self_updater.dart';
 import '../self_update/launcher_version.dart';
 import '../services/app_logger.dart';
+import '../services/elevation.dart';
 import 'dispose_guard.dart';
 import 'progress_notifier.dart';
 
@@ -47,6 +48,9 @@ class LauncherUpdateController extends ChangeNotifier
   DateTime? onlineCheckedAt;
 
   String? errorMessage;
+
+  /// ההחלפה נכשלה על הרשאות — הלאנצ'ר מותקן בתיקייה מוגנת (`Program Files`).
+  bool needsElevation = false;
 
   /// `false` כשאין לנו את קובץ ההרצה להחלפה (למשל הרצה מ-`flutter run`) —
   /// אז הכפתור "התקנה" אינו מוצג בכלל.
@@ -184,6 +188,7 @@ class LauncherUpdateController extends ChangeNotifier
   Future<bool> install() async {
     status = LauncherUpdateStatus.installing;
     errorMessage = null;
+    needsElevation = false;
     notifyListeners();
     AppLogger.instance.info(
       "התקנת גרסה חדשה של הלאנצ'ר: $currentVersion -> $downloadedVersion",
@@ -201,6 +206,7 @@ class LauncherUpdateController extends ChangeNotifier
       await _loadLocal(cleanupLeftovers: false);
       if (!hasUpdateReady) status = LauncherUpdateStatus.error;
       errorMessage = e.toString();
+      needsElevation = Elevation.isAccessDenied(e);
       notifyListeners();
       return false;
     }

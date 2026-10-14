@@ -8,6 +8,8 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/sandbox.dart';
+
 const _releasesPath = '/repos/Otzaria/otzaria/releases';
 
 class _FakeGithub {
@@ -78,13 +80,12 @@ class _EmptyRegistry extends WindowsInstallRegistry {
   const _EmptyRegistry();
 
   @override
-  List<String> installDirs({
-    bool Function(String displayName)? matchesDisplayName,
-  }) =>
-      const [];
+  Future<List<String>> otzariaInstallDirs() async => const [];
 }
 
 void main() {
+  sandboxRealDataRoot();
+
   late Directory temp;
   late _FakeGithub github;
 

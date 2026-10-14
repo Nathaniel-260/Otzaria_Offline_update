@@ -1,37 +1,42 @@
+import 'dart:async';
+
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
 class CustomAppDetectionSnapshot {
   CustomAppDetectionSnapshot({
-    required List<String> Function() runningImagePaths,
-    required List<InstallRegistryEntry> Function() uninstallEntries,
+    required FutureOr<List<String>> Function() runningImagePaths,
+    required FutureOr<List<InstallRegistryEntry>> Function() uninstallEntries,
   })  : _runningImagePaths = runningImagePaths,
         _uninstallEntries = uninstallEntries;
 
   factory CustomAppDetectionSnapshot.live() => CustomAppDetectionSnapshot(
-        runningImagePaths: RunningOtzariaLocator.windowsRunningImagePaths,
+        runningImagePaths:
+            RunningOtzariaLocator.windowsRunningImagePathsOffUiIsolate,
         uninstallEntries: () => const WindowsInstallRegistry()
-            .entries(matchesDisplayName: (_) => true),
+            .entriesOffUiIsolate(matchesDisplayName: _any),
       );
 
-  final List<String> Function() _runningImagePaths;
-  final List<InstallRegistryEntry> Function() _uninstallEntries;
+  static bool _any(String _) => true;
 
-  List<String>? _processes;
-  List<InstallRegistryEntry>? _entries;
+  final FutureOr<List<String>> Function() _runningImagePaths;
+  final FutureOr<List<InstallRegistryEntry>> Function() _uninstallEntries;
+
+  Future<List<String>>? _processes;
+  Future<List<InstallRegistryEntry>>? _entries;
 
   Future<String?> runningProcess(String exeName) async {
     final target = exeName.toLowerCase();
-    for (final path in _processes ??= _quietly(_runningImagePaths)) {
+    for (final path in await (_processes ??= _quietly(_runningImagePaths))) {
       if (p.basename(path).toLowerCase() == target) return path;
     }
     return null;
   }
 
-  List<String> uninstallDirs(RegExp displayName) {
+  Future<List<String>> uninstallDirs(RegExp displayName) async {
     final dirs = <String>[];
     final seen = <String>{};
-    for (final entry in _entries ??= _quietly(_uninstallEntries)) {
+    for (final entry in await (_entries ??= _quietly(_uninstallEntries))) {
       final dir = entry.installDir;
       if (dir == null || !displayName.hasMatch(entry.displayName)) continue;
       if (seen.add(dir.toLowerCase())) dirs.add(dir);
@@ -39,9 +44,11 @@ class CustomAppDetectionSnapshot {
     return dirs;
   }
 
-  static List<T> _quietly<T>(List<T> Function() read) {
+  static Future<List<T>> _quietly<T>(
+    FutureOr<List<T>> Function() read,
+  ) async {
     try {
-      return read();
+      return await read();
     } catch (_) {
       return const [];
     }

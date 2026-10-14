@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
@@ -59,6 +60,93 @@ Future<bool> _canWriteIn(String dir) async {
   }
 }
 
+const List<String> legacyReportBoxes = [
+  'error_reports_queue',
+  'app_reports_queue',
+  'plugin_reports_queue',
+];
+
+/// תורי Hive שלא הועברו: ב-`.hive` יש דיווחים **ממתינים**, ואין לתור אף שורה
+/// ב-`user_state.db`. אוצריא הנוכחית כבר אינה מעבירה אותם, ולכן אינם חוסמים.
+Future<List<String>> findUnmigratedReportBoxes({
+  required String dataRoot,
+  String? userStateDb,
+}) async {
+  final candidates = <String>[];
+  for (final box in legacyReportBoxes) {
+    final file = File(p.join(dataRoot, '$box.hive'));
+    if (!await file.exists()) continue;
+    final bytes = await file.readAsBytes();
+    if ((await Isolate.run(() => hivePendingReportCount(bytes)) ?? 0) > 0) {
+      candidates.add(box);
+    }
+  }
+  if (candidates.isEmpty || userStateDb == null) return candidates;
+  return Isolate.run(() => _boxesWithoutRows(userStateDb, candidates));
+}
+
+/// מספר הפריטים ברשימה `pending_reports` בקובץ box של hive_ce (המסגרת האחרונה
+/// של המפתח קובעת). `null` כשהקובץ אינו בפורמט המוכר.
+int? hivePendingReportCount(Uint8List bytes) {
+  const key = 'pending_reports';
+  final data = ByteData.sublistView(bytes);
+  int? count;
+  var offset = 0;
+  while (offset + 4 <= bytes.length) {
+    final length = data.getUint32(offset, Endian.little);
+    if (length < 10 || offset + length > bytes.length) return null;
+    final frameEnd = offset + length - 4;
+    var pos = offset + 4;
+    final keyType = bytes[pos++];
+    String? name;
+    if (keyType == 1) {
+      final keyLength = bytes[pos++];
+      if (pos + keyLength > frameEnd) return null;
+      name = utf8.decode(bytes.sublist(pos, pos + keyLength),
+          allowMalformed: true);
+      pos += keyLength;
+    } else if (keyType == 0) {
+      pos += 4;
+    } else {
+      return null;
+    }
+    if (name == key) {
+      if (pos >= frameEnd) {
+        count = 0;
+      } else {
+        final type = bytes[pos];
+        count = (type == 9 || type == 10) && pos + 5 <= frameEnd
+            ? data.getUint32(pos + 1, Endian.little)
+            : 0;
+      }
+    }
+    offset += length;
+  }
+  return count;
+}
+
+List<String> _boxesWithoutRows(String dbPath, List<String> boxes) {
+  if (!File(dbPath).existsSync()) return boxes;
+  final db = sqlite3.open(dbPath, mode: OpenMode.readOnly);
+  try {
+    final table = db.select(
+      "SELECT 1 FROM sqlite_master WHERE type='table' "
+      "AND name='pending_reports'",
+    );
+    if (table.isEmpty) return boxes;
+    return [
+      for (final box in boxes)
+        if (db.select(
+          'SELECT 1 FROM pending_reports WHERE kind IN (?, ?) LIMIT 1',
+          ['$box/pending_reports', '$box/sent_reports'],
+        ).isEmpty)
+          box,
+    ];
+  } finally {
+    db.close();
+  }
+}
+
 /// תוצאת איסוף: כמה שורות הועברו בפועל, ושגיאה אם חלק לא הועברו.
 typedef QueueCollectResult = ({int collected, String? error});
 
@@ -81,6 +169,7 @@ typedef IsolateRunner = Future<R> Function<R>(
 class UserStateReportQueue implements OtzariaReportQueue {
   UserStateReportQueue(
     this.dbPath, {
+    this.reportsQueueFormat,
     DateTime Function()? clock,
     IsolateRunner? runIsolated,
   })  : _clock = clock ?? DateTime.now,
@@ -91,6 +180,10 @@ class UserStateReportQueue implements OtzariaReportQueue {
   /// ה-`user_version` שאוצריא כותבת (`UserStateDatabase._schemaVersion`). מסד
   /// חדש ממנו — לא נוגעים בו בכלל.
   static const int knownSchemaVersion = 1;
+
+  static const int knownQueueFormat = 1;
+
+  static const String carriedBy = 'offline-update';
 
   // שמות מ-`DirectErrorReportService` ו-`SentReportsCounter` באוצריא.
   static const String pendingKind = 'error_reports_queue/pending_reports';
@@ -103,30 +196,38 @@ class UserStateReportQueue implements OtzariaReportQueue {
   static const int maxSentReportsToKeep = 100;
 
   final String dbPath;
+
+  /// `reportsQueueFormat` מ-`otzaria_capabilities.json`; `null` = הקובץ חסר.
+  /// גם כשהוא מוכר, `PRAGMA user_version` חייב להיות מוכר.
+  final int? reportsQueueFormat;
   final DateTime Function() _clock;
   final IsolateRunner _run;
 
   @override
   Future<int> countSendable() {
     final path = dbPath;
-    return _run(() => _readSendable(path, (mark, _) => mark)?.length ?? 0);
+    final format = reportsQueueFormat;
+    return _run(() => _readSendable(path, format).length);
   }
 
   @override
   Future<QueueCollectResult> collectTo(ReportOutbox outbox) async {
     final path = dbPath;
-    final rows = await _run(() => _readSendable(path, _PendingRow.encode));
-    if (rows == null || rows.isEmpty) return (collected: 0, error: null);
+    final format = reportsQueueFormat;
+    final rows = await _run(() => _readSendable(path, format));
+    if (rows.isEmpty) return (collected: 0, error: null);
 
     String? error;
     final written = <_MarkRow>[];
     for (final row in rows) {
       try {
-        await outbox.write(row.mark.outboxId, row.fileBytes);
-        written.add(row.mark);
+        final bytes = await _run(() => _encodeRow(path, format, row));
+        if (bytes == null) continue;
+        await outbox.write(row.outboxId, bytes);
+        written.add(row);
       } catch (e) {
         error ??= '$e';
-        await _discardQuietly(outbox, row.mark.outboxId);
+        await _discardQuietly(outbox, row.outboxId);
       }
     }
     if (written.isEmpty) return (collected: 0, error: error);
@@ -134,7 +235,7 @@ class UserStateReportQueue implements OtzariaReportQueue {
     final nowMs = _clock().millisecondsSinceEpoch;
     final List<({bool moved, String? error})> marks;
     try {
-      marks = await _markIsolated(_run, path, written, nowMs);
+      marks = await _markIsolated(_run, path, format, written, nowMs);
     } catch (_) {
       for (final row in written) {
         await _discardQuietly(outbox, row.outboxId);
@@ -159,10 +260,11 @@ class UserStateReportQueue implements OtzariaReportQueue {
   static Future<List<({bool moved, String? error})>> _markIsolated(
     IsolateRunner run,
     String path,
+    int? format,
     List<_MarkRow> rows,
     int nowMs,
   ) =>
-      run(() => _markAllIn(path, rows, nowMs));
+      run(() => _markAllIn(path, format, rows, nowMs));
 
   static Future<void> _discardQuietly(ReportOutbox outbox, String id) async {
     try {
@@ -172,9 +274,10 @@ class UserStateReportQueue implements OtzariaReportQueue {
 
   // ── מכאן — רק בתוך ה-isolate ────────────────────────────────────────────
 
-  /// `null` = אין מה לגעת בו: אין קובץ, סכמה חדשה מהמוכרת, או בלי הטבלה.
-  static Database? _open(String dbPath) {
+  /// `null` = אין מה לגעת בו: אין קובץ, פורמט תור לא מוכר, או בלי הטבלה.
+  static Database? _open(String dbPath, int? queueFormat) {
     if (!File(dbPath).existsSync()) return null;
+    if (queueFormat != null && queueFormat != knownQueueFormat) return null;
     final db = sqlite3.open(dbPath, mode: OpenMode.readWrite);
     try {
       db.execute('PRAGMA busy_timeout=5000');
@@ -183,7 +286,8 @@ class UserStateReportQueue implements OtzariaReportQueue {
         "SELECT 1 FROM sqlite_master WHERE type='table' "
         "AND name='pending_reports'",
       );
-      if (version is! int || version > knownSchemaVersion || table.isEmpty) {
+      final knownLayout = version is int && version <= knownSchemaVersion;
+      if (!knownLayout || table.isEmpty) {
         db.close();
         return null;
       }
@@ -194,82 +298,27 @@ class UserStateReportQueue implements OtzariaReportQueue {
     }
   }
 
-  static List<R>? _readSendable<R>(
-    String dbPath,
-    R Function(_MarkRow mark, Map<String, dynamic> fileJson) toRow,
-  ) {
-    final db = _open(dbPath);
-    if (db == null) return null;
+  static List<_MarkRow> _readSendable(String dbPath, int? queueFormat) {
+    final db = _open(dbPath, queueFormat);
+    if (db == null) return const [];
     try {
-      final out = <R>[];
+      final out = <_MarkRow>[];
       final seen = <String>{};
-      final rows = db.select(
-        'SELECT id, kind, payload_json FROM pending_reports WHERE kind IN (?, ?, ?) '
-        'ORDER BY id',
-        [pendingKind, appPendingKind, pluginPendingKind],
+      final statement = db.prepare(
+        'SELECT id, kind, payload_json FROM pending_reports '
+        'WHERE kind IN (?, ?, ?) ORDER BY id',
       );
-      for (final row in rows) {
-        final json = row['payload_json'] as String;
-        try {
-          final decoded = jsonDecode(json);
-          if (decoded is! Map<String, dynamic>) continue;
-          final kind = _ReportKind.values
-              .firstWhere((kind) => kind.pendingKind == row['kind']);
-          final String id;
-          final String title;
-          final String createdAt;
-          final Map<String, dynamic> body;
-          switch (kind) {
-            case _ReportKind.book:
-              final report = DirectErrorReport.fromJson(decoded);
-              if (!report.isSendable) continue;
-              id = report.id;
-              title = report.bookTitle;
-              createdAt = decoded['createdAt'] as String;
-              body = report.toApiPayload();
-            case _ReportKind.app:
-              // דיווח מהתור של אוצריא הוא על אוצריא — `product` לעולם לא עובר.
-              final report =
-                  AppReport.fromJson(decoded).copyWith(product: null);
-              if (report.validate() != null) continue;
-              id = report.reportId;
-              title = report.title;
-              createdAt = report.createdAt.toUtc().toIso8601String();
-              body = report.toApiPayload();
-              if (utf8.encode(jsonEncode(body)).length >
-                  AppReport.maxRequestBytes) {
-                continue;
-              }
-            case _ReportKind.plugin:
-              final report = PluginReportRecord.fromJson(decoded);
-              if (report.reportId.isEmpty ||
-                  report.pluginUid.isEmpty ||
-                  report.details.trim().isEmpty) {
-                continue;
-              }
-              id = report.reportId;
-              title = report.pluginName;
-              createdAt = report.createdAt.toIso8601String();
-              body = report.toApiPayload();
-          }
-          final mark = _MarkRow(
-            rowId: row['id'] as int,
-            payloadJson: json,
-            kind: kind,
-            reportId: id,
-          );
-          if (!seen.add(mark.outboxId)) continue;
-          out.add(toRow(
-            mark,
-            OutboxReport.fileJson(
-              reportId: mark.outboxId,
-              bookTitle: title,
-              createdAt: createdAt,
-              body: body,
-              endpoint: kind.endpoint,
-            ),
-          ));
-        } catch (_) {}
+      try {
+        final cursor = statement.selectCursor(
+          [pendingKind, appPendingKind, pluginPendingKind],
+        );
+        while (cursor.moveNext()) {
+          final built = _build(cursor.current);
+          if (built == null || !seen.add(built.mark.outboxId)) continue;
+          out.add(built.mark);
+        }
+      } finally {
+        statement.close();
       }
       return out;
     } finally {
@@ -277,12 +326,100 @@ class UserStateReportQueue implements OtzariaReportQueue {
     }
   }
 
+  static Uint8List? _encodeRow(String dbPath, int? queueFormat, _MarkRow mark) {
+    final db = _open(dbPath, queueFormat);
+    if (db == null) return null;
+    try {
+      final rows = db.select(
+        'SELECT id, kind, payload_json FROM pending_reports '
+        'WHERE id = ? AND kind = ?',
+        [mark.rowId, mark.kind.pendingKind],
+      );
+      if (rows.isEmpty) return null;
+      final built = _build(rows.first);
+      if (built == null || built.mark.payloadDigest != mark.payloadDigest) {
+        return null;
+      }
+      return OutboxReport.encodeFile(built.fileJson);
+    } finally {
+      db.close();
+    }
+  }
+
+  static ({_MarkRow mark, Map<String, dynamic> fileJson})? _build(Row row) {
+    final json = row['payload_json'] as String;
+    try {
+      final decoded = jsonDecode(json);
+      if (decoded is! Map<String, dynamic>) return null;
+      final kind = _ReportKind.values
+          .firstWhere((kind) => kind.pendingKind == row['kind']);
+      final String id;
+      final String title;
+      final String createdAt;
+      final Map<String, dynamic> body;
+      switch (kind) {
+        case _ReportKind.book:
+          final report = DirectErrorReport.fromJson(decoded);
+          if (!report.isSendable) return null;
+          id = report.id;
+          title = report.bookTitle;
+          createdAt = decoded['createdAt'] as String;
+          body = report.toApiPayload();
+        case _ReportKind.app:
+          // דיווח מהתור של אוצריא הוא על אוצריא — `product` לעולם לא עובר.
+          final report = AppReport.fromJson(decoded).copyWith(product: null);
+          if (report.validate() != null) return null;
+          id = report.reportId;
+          title = report.title;
+          createdAt = report.createdAt.toUtc().toIso8601String();
+          body = report.toApiPayload();
+          if (utf8.encode(jsonEncode(body)).length >
+              AppReport.maxRequestBytes) {
+            return null;
+          }
+        case _ReportKind.plugin:
+          final report = PluginReportRecord.fromJson(decoded);
+          if (report.reportId.isEmpty ||
+              report.pluginUid.isEmpty ||
+              report.details.trim().isEmpty) {
+            return null;
+          }
+          id = report.reportId;
+          title = report.pluginName;
+          createdAt = report.createdAt.toIso8601String();
+          body = report.toApiPayload();
+      }
+      final mark = _MarkRow(
+        rowId: row['id'] as int,
+        payloadDigest: _digest(json),
+        kind: kind,
+        reportId: id,
+      );
+      return (
+        mark: mark,
+        fileJson: OutboxReport.fileJson(
+          reportId: mark.outboxId,
+          bookTitle: title,
+          createdAt: createdAt,
+          body: body,
+          endpoint: kind.endpoint,
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _digest(String payloadJson) =>
+      sha256.convert(utf8.encode(payloadJson)).toString();
+
   static List<({bool moved, String? error})> _markAllIn(
     String dbPath,
+    int? queueFormat,
     List<_MarkRow> rows,
     int nowMs,
   ) {
-    final db = _open(dbPath);
+    final db = _open(dbPath, queueFormat);
     if (db == null) {
       const gone = 'user_state.db unusable when marking';
       return [for (final _ in rows) (moved: false, error: gone)];
@@ -322,7 +459,9 @@ class UserStateReportQueue implements OtzariaReportQueue {
         'SELECT payload_json FROM pending_reports WHERE id = ? AND kind = ?',
         [row.rowId, pendingKind],
       );
-      if (current.isEmpty || current.first['payload_json'] != row.payloadJson) {
+      final currentJson =
+          current.isEmpty ? null : current.first['payload_json'] as String;
+      if (currentJson == null || _digest(currentJson) != row.payloadDigest) {
         db.execute('ROLLBACK');
         return false;
       }
@@ -347,7 +486,7 @@ class UserStateReportQueue implements OtzariaReportQueue {
       db.execute(
         'INSERT INTO pending_reports (kind, payload_json, created_at) '
         'VALUES (?, ?, ?)',
-        [sentKind, row.historyJson(now), now],
+        [sentKind, row.historyJson(currentJson, now), now],
       );
       db.execute(
         'DELETE FROM pending_reports WHERE kind = ? AND id NOT IN ('
@@ -407,41 +546,35 @@ class UserStateReportQueue implements OtzariaReportQueue {
   }
 }
 
-class _PendingRow {
-  const _PendingRow(this.mark, this.fileBytes);
-
-  static _PendingRow encode(_MarkRow mark, Map<String, dynamic> fileJson) =>
-      _PendingRow(mark, OutboxReport.encodeFile(fileJson));
-
-  final _MarkRow mark;
-  final Uint8List fileBytes;
-}
-
 class _MarkRow {
   const _MarkRow({
     required this.rowId,
-    required this.payloadJson,
+    required this.payloadDigest,
     required this.reportId,
     required this.kind,
   });
 
   final int rowId;
   final _ReportKind kind;
-  final String payloadJson;
+  final String payloadDigest;
   final String reportId;
 
   String get outboxId =>
       kind == _ReportKind.book ? reportId : '${kind.name}-$reportId';
 
-  String historyJson(int now) {
-    if (kind != _ReportKind.app) return payloadJson;
+  String historyJson(String payloadJson, int now) {
     final json = jsonDecode(payloadJson) as Map<String, dynamic>;
-    json.remove('diagnostics');
-    json.remove('errorLog');
-    json.remove('images');
-    json.remove('minidump');
-    json['sentAt'] =
+    final at =
         DateTime.fromMillisecondsSinceEpoch(now, isUtc: true).toIso8601String();
+    if (kind == _ReportKind.app) {
+      json.remove('diagnostics');
+      json.remove('errorLog');
+      json.remove('images');
+      json.remove('minidump');
+      json['sentAt'] = at;
+    }
+    json['carriedBy'] = UserStateReportQueue.carriedBy;
+    json['carriedAt'] = at;
     return jsonEncode(json);
   }
 }

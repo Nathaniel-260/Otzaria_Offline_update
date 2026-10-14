@@ -33,5 +33,7 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>עדכוני אוצריא שומרת את ההורדות בתיקייה שלצידה על הכונן הנייד. / Otzaria Updates keeps its downloads in the folder next to it on the USB drive.</string>
 </dict>
 </plist>

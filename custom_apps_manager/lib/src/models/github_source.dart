@@ -26,11 +26,28 @@ class GithubSource {
   /// הכתובת שהמשתמש רואה — גם מה שהוא הדביק מלכתחילה.
   String get webUrl => 'https://github.com/$owner/$repo';
 
-  factory GithubSource.fromJson(Map<String, dynamic> json) => GithubSource(
-        owner: json['owner'] as String,
-        repo: json['repo'] as String,
-        assetPattern: json['asset'] as String? ?? '',
-      );
+  /// הרשומה נוסעת על הכונן, ולכן אותה בדיקה כמו ב-[parseUrl] —
+  /// `owner`/`repo` נכנסים לכתובת API.
+  factory GithubSource.fromJson(Map<String, dynamic> json) {
+    final owner = json['owner'];
+    final repo = json['repo'];
+    if (!isValidRepo(owner, repo)) {
+      throw FormatException('invalid GitHub repository', '$owner/$repo');
+    }
+    return GithubSource(
+      owner: owner as String,
+      repo: repo as String,
+      assetPattern: json['asset'] as String? ?? '',
+    );
+  }
+
+  static bool isValidRepo(Object? owner, Object? repo) =>
+      owner is String &&
+      repo is String &&
+      _ownerPattern.hasMatch(owner) &&
+      _repoPattern.hasMatch(repo) &&
+      repo != '.' &&
+      repo != '..';
 
   Map<String, dynamic> toJson() => {
         'owner': owner,
@@ -73,10 +90,7 @@ class GithubSource {
     // הכול שאחרי `owner/repo` (releases, tree/main…) אינו מעניין אותנו.
     final owner = parts[0];
     final repo = parts[1];
-    if (!_ownerPattern.hasMatch(owner) || !_repoPattern.hasMatch(repo)) {
-      return null;
-    }
-    if (repo == '.' || repo == '..') return null;
+    if (!isValidRepo(owner, repo)) return null;
     return (owner: owner, repo: repo);
   }
 }

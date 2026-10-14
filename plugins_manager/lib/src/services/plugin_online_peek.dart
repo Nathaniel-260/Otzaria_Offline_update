@@ -146,6 +146,7 @@ class PluginOnlinePeek {
       target,
       local?.sourceUrl ?? _recorded(known, target.version)?.downloadUrl ?? '',
       local?.size ?? 0,
+      recordedSha256: local?.sha256,
     );
   }
 

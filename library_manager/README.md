@@ -1,7 +1,7 @@
 # library_manager
 
 חבילת Flutter שמחווטת (wiring) את
-[`seforim_library_updater`](../README.md) אל תוך הלאנצ'ר המאוחד: איתור
+[`seforim_library_updater`](https://github.com/Otzaria/otzaria_library_updater) (מדיניות המראה: המחלקות `Offline*`) אל תוך הלאנצ'ר המאוחד: איתור
 תיקיית ה-DB בפועל של המשתמש, בדיקת גרסה מול הענן, והחלה בפועל (patch
 דלתאי או החלפת DB מלא) על ה-DB **החי** דרך [`LibraryUpdateApplier`](lib/src/services/library_update_applier.dart) —
 נבנה מחדש אחרי שהוסר עקב באג, ראו "היסטוריית התיקון" למטה.
@@ -114,8 +114,8 @@
 
 הצד השני של אותו מנגנון חי ב-`Otzaria/otzaria`, ב-`lib/library_update/`
 (`LibraryUpdateRepository`, `LibraryUpdateBloc`, `CompanionAssetsService`),
-מעל אותה חבילת מנוע בדיוק — `seforim_library_updater`, שהיא השורש של המאגר
-הזה. המנוע זהה; מה שיושר כאן (אוגוסט 2026) הוא שכבת התזמור:
+מעל אותה חבילת מנוע בדיוק — `seforim_library_updater`, שהמאגר הזה תלוי בה
+כתלות git. המנוע זהה; מה שיושר כאן (אוגוסט 2026) הוא שכבת התזמור:
 
 - **דגלי ה-apply** — `checkForeignKeys: false`, כמו
   `LibraryUpdateRepository._runApplyIsolate`. אימות ה-hash שאחרי ההחלה הוא
@@ -142,7 +142,7 @@
   גרסה בסכמה שאין לה סדר hash (v26 יצאה בסכמה 4; ראו
   `kHashTableOrderBySchemaVersion`), אין מסלול patches אליה. אוצריא
   המקוונת מורידה במקרה כזה את המסד המלא מחדש, וכך גם כאן: הקשתות האלה
-  מסוננות ב-`LibraryUpdateDiscovery`, המראה אינה נושאת את קובציהן, ובחירת
+  מסוננות ב-`OfflineLibraryUpdateDiscovery`, המראה אינה נושאת את קובציהן, ובחירת
   המסד המלא (`_chooseFullDbCarrier`) כבר אינה סופרת אותן כ"מסלול" — ולכן
   מסד מלא ישן שכבר על הכונן מפנה את מקומו לחדש. שתי הגנות נוספות מאותה
   תקלה: תוכנית שאינה עוברת את הגרסה המקומית חוזרת כ-`blocked` מנומק במקום
@@ -418,7 +418,7 @@ otzaria://library/reindex
 > אטומי) או fullDownload (הורדה + חילוץ zstd + אימות + החלפה ב-rename),
 > ומאמת את הגרסה הסופית מול `LocalDbVersionReader`.
 >
-> **אין גיבוי של המסד, ואין הגדרה כזו.** `LibraryDbRecoveryService` כותב
+> **אין גיבוי של המסד, ואין הגדרה כזו.** `OfflineLibraryDbRecoveryService` כותב
 > סימון (`<db>.applying`) ולא יותר: מסלול patch עטוף ב-transaction יחיד
 > שמתגלגל אחורה מעצמו, ומסלול המסד המלא מחלץ ל-`<db>.new`, מאמת אותו
 > (`quick_check` + גרסה) ורק אז מחליף ב-rename — כלומר בשני המסלולים המסד

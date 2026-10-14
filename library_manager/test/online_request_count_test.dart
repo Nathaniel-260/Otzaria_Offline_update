@@ -22,6 +22,9 @@ class _FakeGithub {
   final requests = <Uri>[];
   int libraryTo = 2;
 
+  /// `library-changes.md` לפי גרסה; `null` = רשום ברשימת הנכסים אך 404.
+  final notes = <int, String?>{};
+
   int count(String path) => requests
       .where((u) => u.host == 'api.github.com' && u.path == path)
       .length;
@@ -93,6 +96,13 @@ class _FakeGithub {
             'patch-v${to - 1}-v$to.db.zst',
           ])
             _asset(name, 'https://lib/v$to-20261011/$name'),
+          if (notes.containsKey(to))
+            {
+              'name': 'library-changes.md',
+              'browser_download_url':
+                  'https://lib/v$to-20261011/library-changes.md',
+              'size': utf8.encode(notes[to] ?? '').length,
+            },
         ],
       },
   ];
@@ -120,6 +130,12 @@ class _FakeGithub {
       } else if (url.path == _dictionaryPath) {
         body = _utf8(_companionRelease('dict-v7', ['lexical.db']));
       }
+    } else if (url.pathSegments.last == 'library-changes.md') {
+      final version = int.parse(
+        RegExp(r'^v(\d+)').firstMatch(url.pathSegments.first)!.group(1)!,
+      );
+      final text = notes[version];
+      body = text == null ? null : Uint8List.fromList(utf8.encode(text));
     } else {
       body = _body(url.pathSegments.last);
     }
@@ -317,6 +333,64 @@ void main() {
         expect(github.companionApiCalls, 3);
       });
     });
+
+    test('the download brings the what-is-new notes without failing on a '
+        'missing one', () async {
+      await online(() async {
+        github
+          ..libraryTo = 3
+          ..notes.addAll({3: '# v3', 2: null});
+        final manager = LibraryManager(dataDir: dataDir);
+        addTearDown(manager.dispose);
+        final warnings = <String>[];
+
+        await manager.downloadToMirror(
+          onCompanionWarning: (name, _) => warnings.add(name),
+        );
+
+        final changes = p.join(manager.mirrorDir, 'changes');
+        expect(
+          File(p.join(changes, 'v3-20261011.md')).readAsStringSync(),
+          '# v3',
+        );
+        expect(File(p.join(changes, 'v2-20261011.md')).existsSync(), isFalse);
+        expect(warnings, isEmpty);
+        expect(github.count(_libraryReleasesPath), 1);
+      });
+    });
+
+    test(
+      'the notes reuse the export list even after a long download',
+      () async {
+        await online(() async {
+          github
+            ..libraryTo = 3
+            ..notes[3] = '# v3';
+          final start = DateTime.utc(2026, 10, 13, 8);
+          var clockCalls = 0;
+          final manager = LibraryManager(
+            dataDir: dataDir,
+            releaseClient: RecentLibraryReleasesClient(
+              httpClient: github.client,
+              clock: () => clockCalls++ == 0
+                  ? start
+                  : start.add(const Duration(hours: 1)),
+            ),
+          );
+          addTearDown(manager.dispose);
+
+          await manager.downloadToMirror();
+
+          expect(github.count(_libraryReleasesPath), 1);
+          expect(
+            File(
+              p.join(manager.mirrorDir, 'changes', 'v3-20261011.md'),
+            ).existsSync(),
+            isTrue,
+          );
+        });
+      },
+    );
 
     test('a new light check asks GitHub again', () async {
       await online(() async {

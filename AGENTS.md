@@ -174,29 +174,33 @@ runs **only** after the write probe failed. An empty locked folder is still
 
 ## 2. Repository layout
 
-Nine Dart/Flutter packages, each with its own `pubspec.yaml`. The main package
-sits at the repo root (historical — do not move it).
+Nine Dart/Flutter packages, each with its own `pubspec.yaml`. The root holds
+only repo tooling; the update engine is an external package (below).
 
 | Path | Package | Role |
 | --- | --- | --- |
-| `otzaria_downloads/` | `otzaria_downloads` | Pure Dart. Shared resumable file transfers for app, launcher, store and custom apps, and the one GitHub API transport they use (`githubGet`: headers, timeout, `GithubRateLimitException` with a fail-fast gate). `library_manager` keeps an equivalent internal copy (`github_fetch.dart`) instead of depending on it. |
+| `otzaria_downloads/` | `otzaria_downloads` | Pure Dart. Shared resumable file transfers for app, launcher, store and custom apps, and the one GitHub API transport they use (`githubGet`: headers, timeout, `GithubRateLimitException` with a fail-fast gate). Also the Windows elevation helpers shared by `otzaria_manager`, `custom_apps_manager` and `launcher_app` (`windows_elevation.dart`: token query, the one argument-quoting function, de-elevated launch, `ShellExecuteExW` `runas`). `library_manager` keeps an equivalent internal copy (`github_fetch.dart`) instead of depending on it. |
 | `otzaria_l10n/` | `otzaria_l10n` | Pure Dart, **no dependencies at all**. Every user-visible string, Hebrew + English. The updater, managers and launcher depend on it, which is why it cannot use Flutter. See §4. |
-| `.` (root, `lib/`) | `seforim_library_updater` | Flutter. Client side of the `Otzaria/SeforimLibrary` delta format: discover releases, plan a route (delta vs. full), download, verify the logical hash, apply patches atomically. |
+| `.` (root, `tool/`, `test/`) | `otzaria_offline_update` | Flutter. Repo tooling only: `tool/coverage.dart` over the eight sub-packages and the logical-hash measuring tools. Nothing depends on it. |
 | `otzaria_manager/` | `otzaria_manager` | Pure Dart. The **Otzaria app itself**: check, download, silent install, launch. Windows + macOS. |
-| `library_manager/` | `library_manager` | Flutter. Wires the root package into the launcher: locate the real `seforim.db`, check versions, apply to the **live** DB, export/consume the mirror. |
+| `library_manager/` | `library_manager` | Flutter. Wires `seforim_library_updater` into the launcher: locate the real `seforim.db`, check versions, apply to the **live** DB, export/consume the mirror. |
 | `plugins_manager/` | `plugins_manager` | Pure Dart. The **offline plugin store**: syncs `otzaria.org/api/plugins` into the mirror, detects what Otzaria has, installs via `otzaria://`. Converted from `Yehuda-Zakesh/Offline-repository-plugin-store` (itself derived from `Otzaria/Otzaria_Website`); details in `plugins_manager/README.md`. |
 | `custom_apps_manager/` | `custom_apps_manager` | Pure Dart. **User-added programs**: a record filled in a form (name, GitHub repo *or* local installer, install location, detection rules) so the drive can carry a program that is not Otzaria. Not a plugin system — no runtime, no WebView, no permissions, and **no importing a record from a file**, so every repo and file was chosen by the user. |
 | `error_reports_manager/` | `error_reports_manager` | Pure Dart. **Otzaria's unsent book, app and plugin reports**, carried offline → online: read Otzaria's queues in `user_state.db` directly (Otzaria unchanged), port of its `toApiPayload`, a drive outbox, upload to `otzaria.org` in rate-limited batches — **and the launcher's own problem reports** (a port of Otzaria's app reports, routed by `product`), with their queue and crash detection. See §5.10. |
-| `launcher_app/` | `launcher_app` | The Flutter desktop app (Windows + macOS) wiring the modules into one dashboard. Depends on the other eight by relative `path:`, so it must stay their sibling. |
+| `launcher_app/` | `launcher_app` | The Flutter desktop app (Windows + macOS) wiring the modules into one dashboard. Depends on the seven sub-packages by relative `path:`, so it must stay their sibling. |
 
 Producer vs. consumer: the Kotlin repo `Otzaria/SeforimLibrary` *produces* the DB
 and the patches; this repo only *consumes* them.
 
-**The root package is a fork of `Otzaria/otzaria_library_updater`** — the package
-Otzaria itself depends on for its online update. Keep the engine (discovery,
-planner, hasher, `PatchApplier`, `PatchDownloader`) in step with upstream; our
-deliberate additions are the l10n calls, the offline mirror source/exporter, and
-`LibraryUpdatePlanner.localReleaseTag`. Otzaria's consumer side is
+**The update engine is `seforim_library_updater` of
+`Otzaria/otzaria_library_updater`** — the package Otzaria itself uses for its
+online update — pinned as a git dependency in the root, `library_manager` and
+`launcher_app` pubspecs (move the three refs together). The mirror policy is its
+`Offline*` classes (`OfflineLibraryUpdateDiscovery`, which alone takes
+`supportedDbSchemaVersion`, `OfflineLibraryUpdatePlanner`,
+`OfflineLibraryDbRecoveryService`); the
+unprefixed names are Otzaria's online route and still compile here, so never use
+them. Engine changes go upstream. Otzaria's consumer side is
 `Otzaria/otzaria` under `lib/library_update/` — read it before changing how the
 launcher orchestrates an update, and see `library_manager/README.md` §
 "התאמה לעדכון המקוון של אוצריא".
@@ -247,7 +251,7 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
   weekly `cron` was removed 2026-08-11. The Windows coverage runs as four shards
   (`--packages=`; the pure-Dart ones on `setup-dart`, not Flutter), with the
   test runner's default concurrency, and `tests + coverage (total)` merges
-  their reports and enforces the thresholds over all nine packages.
+  their reports and enforces the thresholds over the eight sub-packages.
 - **Publishing is a deliberate click, not a push.** A push to `main` only runs
   `ci.yml`. A release comes from Actions → **Release** → *Run workflow* (`main`
   only): `release.yml` runs the whole of `ci.yml` via `workflow_call`, then its
@@ -285,18 +289,18 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
 
 ## 4. Code style
 
-- **Do not write comments in code.** Explanations go in the commit message
-  summary, not in the source — comments only weigh the code down. When you find a
-  comment in code you touch, delete it. Never record history in a comment ("used
-  to…", "changed in…", commented-out code) — git keeps that.
+- **Comments are rare and short.** Add one only for a non-obvious *why* or a
+  trap that would bring a bug back, at most two lines; the rest goes in the
+  commit message. Never record history in a comment ("used to…", "changed
+  in…", commented-out code) — git keeps that. The codebase still carries many
+  long comments: do not mass-edit them, but shorten one you touch anyway.
 - **Fix bugs at the root, minimally.** Investigate first — `git log` on the code,
   read it, name the cause — then prefer removing or reverting the code that caused
   it over adding more. A `try/catch` that silences an error, a null check that
   "shouldn't be needed", a workaround flag, or a fix over ~15 lines means the cause
   has not been found yet.
 - Match the surrounding naming and idiom. Follow `flutter_lints`.
-- **Keep the module boundaries.** `otzaria_manager` must not depend on Flutter;
-  the root package must not depend on Otzaria app code or on the launcher.
+- **Keep the module boundaries.** `otzaria_manager` must not depend on Flutter.
   `otzaria_l10n` is the one package everything may depend on — which is why it has
   no dependencies of its own.
 - Do not silently widen scope. Fix what was asked, then say what you left out.
@@ -380,9 +384,9 @@ Change either and every update starts getting rejected. Golden-hash tests guard 
 detected during *planning*.** `kHashTableOrderBySchemaVersion` in
 `patch_table_spec.dart` is the single source of truth (`isSupportedSchemaVersion`);
 adding a schema is one line. Everything downstream reads it:
-`PatchEdge.hasSupportedSchema`, `LibraryUpdateDiscovery.discover` (drops those
+`PatchEdge.hasSupportedSchema`, `OfflineLibraryUpdateDiscovery.discover` (drops those
 edges but still counts them toward `latestVersion`, so a new release never reads
-as "up to date"), `LibraryUpdatePlanner`, `LibraryMirrorExporter` (keeps the tiny
+as "up to date"), `OfflineLibraryUpdatePlanner`, `LibraryMirrorExporter` (keeps the tiny
 `.manifest.json` but not the patch files, and a full DB in an unknown schema as a
 zero-byte name-only marker that `fullDbAsset` never selects). Do not move the
 check back into `PatchApplier`: SeforimLibrary shipped v26 in schema 4, and a
@@ -530,6 +534,16 @@ The library is never skipped in personal-update mode, where the target comes fro
 the recorded DB version. The skip is announced in a snackbar; a silent one produced
 the "why did it not download the plugins" confusion.
 
+**Filtered networks get their own messages and NetFree's CA.** A filter answers
+418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
+handshake dump. `otzaria_downloads` maps them to `NetworkBlockedException` /
+`NetworkCertificateException` (`githubGet` maps 418 only, since its callers read
+403 themselves; `downloadFile` maps 418 only, since a 403 there is usually an
+expired signed URL; `OtzariaReleaseClient` maps both), and `main.dart`
+loads `assets/ca/*.pem` (copied from Otzaria) into
+`SecurityContext.defaultContext` — the one context every client in the UI
+isolate uses, `library_manager`'s included — before the first frame.
+
 **The library's light check covers the companions, not just the DB version.**
 They download only inside the library download, which `skipLibrary` skipped whenever
 the mirror's DB matched the latest online — so a drive that once missed the Talmud
@@ -560,6 +574,14 @@ The exporter reads it best-effort — an unreadable record counts as empty.
 reached several gigabytes. Ten releases cover a machine that updates occasionally;
 anything older falls back to the full-DB route, always present in the mirror.
 
+**"What's new" notes live in `mirror/library/changes/<tag>.md`, never under
+`assets/`.** The exporter's `_pruneStaleAssets` and `MirrorJunkSweeper` delete
+anything there that `releases.json` does not name, so notes there would vanish
+on every download. `LibraryChangesNotes.syncMirror` fetches them after the
+export (asset list only; 404 = not uploaded yet, retried next run) and never
+fails the download; after an apply they go to Otzaria's
+`pending_library_changes` (issue Otzaria/otzaria#1966).
+
 **What goes into the mirror is decided by how long the update will take on the
 *offline* machine, not by which files are smaller.** A patch pays a full-database
 hash scan **per chain** on top of the apply; the full route is one decompress.
@@ -579,7 +601,7 @@ full DB included.
   size comparison — an 8.5MB patch and a 585MB one start from the same fixed cost,
   which is what a size rule cannot see.
   **The ten minutes are widened by a download credit** (on the exporter side only —
-  once both files are on the drive the download is sunk, so `LibraryUpdatePlanner`
+  once both files are on the drive the download is sunk, so `OfflineLibraryUpdatePlanner`
   passes none): `isOutOfRange(..., savedDownloadBytes:)` adds
   `downloadSecondsPerMb` (0.5, ~2MB/s aggregate from GitHub) for every byte the
   patch route saves against the full DB (full size minus the patch route, floored at
@@ -661,7 +683,7 @@ to be filtered out while the mode reported "up to date"), and the "turn personal
 update off and download again" message now fires only at a real dead end.
 
 **Only the patches are per-release; `seforim.db.zst` is downloaded once**, from the
-highest version carrying one — the only full-DB asset `LibraryUpdateDiscovery` ever
+highest version carrying one — the only full-DB asset `OfflineLibraryUpdateDiscovery` ever
 selects offline, so a copy per release meant ~7.5GB nothing would read. After a
 successful download, anything under `assets/` missing from the new manifest is
 deleted (`_pruneStaleAssets`); the `.resume` sidecars of assets that *are* in it
@@ -704,8 +726,8 @@ GitHub, which the code already knew (`_streamToFile` treats "ignored Range → 2
 a restart). What the CDN *does* throttle is each connection separately: ~0.7MB/s on
 one against ~2.1MB/s aggregate on four.
 
-`DownloadScheduler` (root package, exported) is that pool, and it is a **shared
-semaphore on purpose**: `LibraryManager` hands the same instance to
+`DownloadScheduler` (`seforim_library_updater`, exported) is that pool, and it
+is a **shared semaphore on purpose**: `LibraryManager` hands the same instance to
 `LibraryMirrorExporter` and `CompanionAssetsMirror` and runs them concurrently (the
 ~509MB of companions used to queue behind the ~1.55GB DB), so the two stages
 together never open more than four connections. The smart-search sync
@@ -716,8 +738,8 @@ through `slot(existingBytes:)` before its `announce()`, and reports into a new
 resetting when it starts; an
 export that returned "up to date" without ever reporting gets a zero total first,
 or the outer total would stay unknown. `plugins_manager` cannot depend on
-the root package (pure Dart vs. Flutter) and carries its own 40-line `runPooled`;
-keep them in step conceptually, without a cross-package dependency. Three
+`seforim_library_updater` (pure Dart vs. Flutter) and carries its own 40-line
+`runPooled`; keep them in step conceptually, without a cross-package dependency. Three
 load-bearing consequences:
 
 - **The biggest asset starts first** (`jobs.sort` by size, descending) — with the
@@ -813,7 +835,7 @@ which differs from the DB's parent when a library folder name is set.
 `OtzariaSettingsWriter.finishSemanticInstall` install and enable the data.
 
 **The offline machine picks the fastest route it has, and that route can be the full
-database.** `LibraryUpdatePlanner` used to take the delta chain whenever it reached
+database.** `OfflineLibraryUpdatePlanner` used to take the delta chain whenever it reached
 at least as high as the full route — but by then both assets sit on the drive, so
 the only thing left to compare is how long the user waits. On the *same* target
 version the `ApplyTimeEstimate` range decides and a far-slower chain loses
@@ -823,10 +845,14 @@ compare, so the chain stands. A local DB that is not on the mirrored chain lands
 `LibraryUpdatePlanKind.blocked` with a reason (`_fullOrBlocked` → `planNoFullDbEither`).
 
 **DB location is discovered, not assumed — and Otzaria's own setting wins.**
-`LibraryDbLocator` checks, in order: a path we saved ourselves; **Otzaria's
-settings** (`key-library-path` + `key-library-folder-name` from its
-`app_preferences` Hive box, exactly like `DatabaseConstants.getDatabasePath`); a
-a library bundled by a legacy FULL install; `%APPDATA%\otzaria\books\`,
+`LibraryDbLocator` checks, in order: **Otzaria's settings** (`key-library-path` +
+`key-library-folder-name` from its `app_preferences` Hive box, exactly like
+`DatabaseConstants.getDatabasePath`), then its `library_database_path.txt` and
+the `libraryDbPath` of `otzaria_capabilities.json`; only then a path we saved
+ourselves (it used to come first, so a library moved inside Otzaria kept
+updating the stale copy) — unless the user picked it explicitly in OU
+(`saveCustomDbPath(explicit: true)`), which goes first, also for
+`resolveInstallDbPath`; a library bundled by a legacy FULL install; `%APPDATA%\otzaria\books\`,
 `%ProgramData%\otzaria\books\` (Windows) or
 `~/Library/Application Support/otzaria/books/` and the system-wide equivalent
 (macOS); finally `C:\אוצריא\`. Nothing found → `null`, and the UI must ask. Do not
@@ -903,8 +929,31 @@ executable puts its whole data root in `otzaria_data` beside it. Detecting that 
 Otzaria's launch path, which is why `AppShell.checkAll()` runs the app module's check
 **before** the library module's, sequentially.
 
+**Never install a DB schema the installed Otzaria cannot read.** Otzaria reads
+schema 6 only from 0.9.98; the mirror carries both, and OU picked the newest.
+`ReadableSchemaRoute` limits the full DB and the delta edges to
+`OtzariaCapabilities.resolveReadableDbSchema` (C1 `readableDbSchemaVersion`
+unless its `exePath` is another exe, else the app-version table); nothing
+compatible is `blocked` with "update Otzaria first", and `AutoInstallFlow` installs the app before the library.
+
+**An apply holds Otzaria's single-instance mutexes (Windows).** Otzaria checks
+`OtzariaAppSingleInstance` — a portable copy `OtzariaAppSingleInstance-<FNV-1a
+64 of its lower-cased data root>` — before touching the DB and exits, so its
+recovery cannot clear our `.applying` mid-apply. We hold both names
+(`OtzariaInstanceLock.mutexNamesFor`; vectors shared with `main.cpp`), and
+"launch Otzaria" is disabled meanwhile. Not a SQLite lock: `PatchApplier` opens
+its own connection.
+
+**Tests never see the real Otzaria data roots.** A test once installed a
+dictionary into the developer's real `%APPDATA%\otzaria\books`, and launcher tests
+read its real `otzaria_capabilities.json`. `LibraryDbLocator`,
+`InstalledPluginsScanner` and `OtzariaManager` each have `sandboxForTests`: the
+default environment points into a temp dir and any touch of a real root throws.
+`flutter_test_config.dart` (`library_manager`, `launcher_app`) calls those the
+package reaches; pure-Dart tests call `sandboxRealDataRoot()` in `main`.
+
 **There is no backup of `seforim.db`, and no setting for one.**
-`LibraryDbRecoveryService` writes a marker (`<db>.applying`) and nothing else. A
+`OfflineLibraryDbRecoveryService` writes a marker (`<db>.applying`) and nothing else. A
 second ~1GB copy doubles what the drive must hold while adding no real safety: the
 delta route is one SQLite transaction that rolls itself back, and the full route
 extracts to `<db>.new`, verifies it (`quick_check` + version), and only then swaps.
@@ -947,12 +996,12 @@ decompression take many minutes, and on macOS `unlink` on an open file succeeds.
 
 **A DB update can ship without a version bump.** SeforimLibrary sometimes
 re-publishes a corrected `seforim.db.zst` under the same `db_version`, which the
-version comparison reads as "up to date". `LibraryUpdatePlanner` therefore also
+version comparison reads as "up to date". `OfflineLibraryUpdatePlanner` therefore also
 compares the applied release tag (`LibraryStateStore.loadAppliedRelease()`) — but
 only when that tag is *known*: a DB not installed by this launcher has none, and
 guessing would offer a ~1GB download on every launch. Two traps, both once live:
 
-- The tag must be `LibraryDiscoveryResult.latestContentTag`, the newest release —
+- The tag must be `OfflineLibraryDiscoveryResult.latestContentTag`, the newest release —
   **not** `fullDbReleaseTag`, the release that happens to carry `seforim.db.zst`. A
   patches-only release is the newest while the full DB stays on an older tag, so
   recording the carrier told every up-to-date machine "the content changed" and
@@ -989,8 +1038,9 @@ instead (`dev`, `78f395f3`, [issue #734](https://github.com/Otzaria/otzaria/issu
 `StartIndexing` + `ReconcileIndex` even when their "auto index update" setting is off.
 Three things about our half:
 
-- **`.otzaria-external-update.json` is our own pending marker**, not a message to
-  Otzaria. `applyUpdate` writes it next to the DB, it survives restarts,
+- **`.otzaria-external-update.json` is also our pending marker.** Otzaria reads
+  it too (contract C5): `booksTouched` after a delta, `fullReconcile: true` and
+  no `booksTouched` after a full DB. `applyUpdate` writes it next to the DB, it survives restarts,
   `pendingReindexRequest()` reads it, and `clearReindexRequest()` deletes it **only
   after the request was delivered** — clearing it on the *offer* or on a failed
   launch leaves the index on old content with nobody aware. Hence
@@ -1073,7 +1123,8 @@ saved click. `HomeScreen._confirmAppInstall` offers both when
 
 **When the *user* installs, Otzaria's own wizard opens**
 (`update(check, useWizard: true)` → `OtzariaInstaller.installWithWizard`, no flags
-but `/LOG=`). Its two pages carry
+but `/LOG=`, `/NOLAUNCH=1` and, from an elevated launcher, `/CURRENTUSER`). Its two
+pages carry
 decisions only the person at the machine can make: which folder, and whether to
 create a desktop shortcut. `/VERYSILENT` deleted both pages — that is what the report
 "it didn't open the installer's dialog and made no shortcut" was. Do not "fix" it back
@@ -1088,8 +1139,10 @@ The dir we passed also **outranks detection** when deciding what got installed; 
 if no executable is there does detection answer.
 
 **Auto-install stays silent** (`AutoInstallFlow.run` passes `useWizard: false`): a
-wizard waiting for a click is not "install by itself", and that is the only path where
-`/MERGETASKS=desktopicon` still does anything.
+wizard waiting for a click is not "install by itself". `/MERGETASKS=desktopicon` goes
+only with a *fresh* silent install (`installDir == null`): `otzaria.iss` sets
+`UsePreviousTasks=no`, so sending it on every update recreated a shortcut the user
+had deleted.
 
 **A silent update must keep the install's scope.** Under `WizardSilent`,
 `otzaria.iss` returns from `InitializeSetup` before any scope detection, and its
@@ -1110,6 +1163,20 @@ both after relaunching itself (elevated, or silent for a 0.9.88+ upgrade) and af
 user refused UAC. So after exit 1 the exe that was in `installDir` counts as the update
 only once it changed (version, size or timestamp); an untouched exe, including a
 reinstall of the same build, ends as `OtzariaWizardStillOpen`, never as "installed".
+The relaunched setup is the same `{srcexe}`, so after exit 1 the installer waits for
+a process with that image path to exit (`RunningOtzariaLocator.waitForImageToExit`,
+up to `relaunchedSetupTimeout`, stoppable from the app screen; matched by image name,
+so another user's elevated setup still counts) and shows `setupContinuesElsewhere`; it used to give
+up after 20s while the silent upgrade was still running. Older installers do not
+forward `/NOLAUNCH`, so Otzaria may open afterwards — the following recheck sees it.
+
+**An elevated launcher must not run Otzaria elevated or turn a per-user install
+into an all-users one.** Elevated, `otzaria.iss` relaunches an upgrade with
+`/ALLUSERS`, and `Process.start` gave Otzaria the admin token. So per-user scopes
+always pass `/CURRENTUSER`, `OtzariaLauncher` starts Otzaria with the shell's token
+(`WindowsElevation.launchUnelevated`, `CreateProcessWithTokenW`, falling back to a
+plain start), and the install dialog warns when elevated as another user, whose
+profile (`HKCU`, `%LOCALAPPDATA%`) is the one detection and Inno would use.
 
 **A silent install must pass `/NOLAUNCH=1`, and the library goes first.**
 `otzaria.iss` carries a *second* `[Run]` entry firing **only** under `WizardSilent`,
@@ -1158,31 +1225,28 @@ and crashed on the next thing it loaded. `OtzariaManager._refuseIfRunningOnMac` 
 signed; `unzip` / `package:archive` destroy the symlinks and xattrs, and therefore the
 signature, and macOS refuses to run it.
 
-**Process detection uses exact matching.** `OtzariaProcessGuard` looks for
-`otzaria.exe` via `tasklist` and the Hebrew process name `אוצריא` via `pgrep -x`.
-`pgrep -f` or a substring match would also match the launcher itself (its path
-contains "otzaria") and block every DB update.
-
-**Two packages match that process, and their name lists must agree.**
-`OtzariaProcessGuard` (`library_manager`) blocks DB updates while Otzaria is open;
-`RunningOtzariaLocator` (`otzaria_manager`) reads that process's *path* to learn where
-Otzaria is installed — the authoritative answer, tried before the guesses in
-`_autoDetectDirs`. The packages do not depend on each other, so
-`launcher_app/test/process_names_test.dart` asserts the two `processNamesFor` lists are
-identical; drift gives "we can see Otzaria is running, yet we cannot tell where it is
-installed". The locator answers only for the *app* directory — `seforim.db` lives under
-`%APPDATA%` regardless and stays `LibraryDbLocator`'s job.
+**"Otzaria is running" = its mutex *or* an `otzaria.exe` process, probed off the
+UI isolate.** `RunningOtzariaLocator.probe` runs in `Isolate.run`: `OpenMutexW` on
+`OtzariaAppSingleInstance` (contract C7) plus, always, one
+`CreateToolhelp32Snapshot` scan by image *name* — portable builds, Otzaria before
+0.9.96 and other users' or elevated processes hold no mutex we can see or hide
+their path. Paths are only enrichment. `tasklist` cost ~300ms per call. A total
+failure is logged (`lastProbeFailure`) and **blocks** in `OtzariaProcessGuard`
+(which keeps `pgrep -x` on macOS). Resolve `GetLastError` before `OpenMutexW` —
+its lazy lookup clobbers the error. `OtzariaInstanceLock.acquire` (§5.4) points
+`OtzariaSelfLock.isHeldByThisProcess` at its own lease count, or every guard
+inside an apply took OU's mutex for Otzaria and threw `OtzariaIsRunningException`.
 
 **The Windows uninstall registry beats every guess.** `WindowsInstallRegistry` reads
 `InstallLocation` from the Inno entries under `…\CurrentVersion\Uninstall` (HKCU, then
 HKLM 64- and 32-bit), so an install in a folder nobody guessed is found *with Otzaria
 closed*. Only the **directory** comes from there; the version is still read from the
 exe, because `DisplayVersion` records what the installer wrote, not what is on disk
-now. The scan costs ~200ms, so `checkForUpdate` builds `_autoDetectDirs` only when
-nothing is known yet.
+now. The scan costs ~200ms, so it runs off the UI isolate and only when nothing is
+known yet.
 
-**Only `DisplayName` identifies an entry in that registry.** Matching on
-`InstallLocation` too let any third-party program in a path merely mentioning
+**Only the uninstall key name or `DisplayName` identifies an entry in that
+registry.** Matching on `InstallLocation` too let any third-party program in a path merely mentioning
 "otzaria" into `_autoDetectDirs`, where `sharedDir: false` means no further identity
 check. Both real Inno entries write a `DisplayName` ("אוצריא גירסה …"), verified on a
 real machine. `UninstallString` is only a fallback for the *directory*, and must be
@@ -1190,22 +1254,18 @@ parsed as a command line, not a path: `MsiExec.exe /X{GUID}` through `p.dirname`
 a **relative** string, because `package:path` treats the `/switch` as a path segment.
 
 **Where a fresh Windows install goes is the installer's call, not ours.**
-`installFromFile` passes `/DIR=` only when updating an install we already know about;
-for a fresh one it passes none and finds the result through detection. This repo once
-recorded `{autopf}\Otzaria` as "the installer's real default, verified with the Otzaria
-developers (2026-08-07) — not a guess", while `installer/otzaria.iss` in
-`Otzaria/otzaria` says `DefaultDirName=C:\אוצריא`. A copied default drifts from the
-thing it copies. `_windowsRealDefaultDirs` (`{autopf}\Otzaria`,
-`%ProgramFiles%\Otzaria`, `{Program Files}\אוצריא`, `C:\אוצריא`) is a **detection**
-list only, and `resolveDefaultInstallDir()` is a Windows *display* value plus the real
-macOS target (`/Applications`, falling back to `~/Applications`) — never an install
-argument on Windows. Verify installer facts against **`Otzaria/otzaria`** (what
-`OtzariaReleaseClient` downloads); `Sivan22/otzaria` has a similar-but-different
-`installer/` folder, and reading the wrong one produces confident wrong answers. This
-is a *different* directory from where the library DB lives (`%APPDATA%\otzaria\`) —
-don't conflate them when debugging "Otzaria not detected". The manual
-"בחירת מיקום ידנית" picker (`adoptInstallDir`) is the fallback for anything the paths
-do not cover.
+`installFromFile` passes `/DIR=` only when updating an install we already know
+about; for a fresh one it passes none and finds the result through detection.
+`otzaria.iss` (in `Otzaria/otzaria`, not `Sivan22/otzaria`) sets
+`DefaultDirName={code:GetDefaultInstallDir}`: the previous install (registry,
+`C:\אוצריא`, `{autopf}\אוצריא`, `{autopf}\Otzaria`), else `{autopf}\Otzaria`. A
+copied default drifts, so `_windowsRealDefaultDirs` is a **detection** list only
+and `resolveDefaultInstallDir()` a Windows *display* value (and the real macOS
+target). Detection first matches the Inno uninstall key
+`{EEC4F712-CD05-4D15-A753-509E840A51A5}_is1`, then `DisplayName`
+(`WindowsInstallRegistry.otzariaInstallDirs`, in `Isolate.run`, memoized per
+`checkForUpdate`). The install dir is not where the DB lives
+(`%APPDATA%\otzaria\`); `adoptInstallDir` covers anything else.
 
 **Never return the first `.exe` in the install folder.** `crashpad_handler.exe` ships
 next to `otzaria.exe`, sorts before it, *and* carries its own version resource
@@ -1256,15 +1316,31 @@ the top-level entry (the syncing platform's, for older launchers): `sync` preser
 other platforms' entries, and sync's prune plus `MirrorJunkSweeper` keep every file any
 platform references.
 
+**Windows installers travel for both architectures; ARM64 is never downgraded
+to x64.** The drive moves between PCs, so a Windows sync also mirrors each
+channel's `windows_arm64.exe` under `platforms.windows_arm64` (top-level entries
+stay x64 for older launchers), and records releases without one in
+`missingAssetTags`. On an ARM64 machine (`WindowsArch.machine`, IsWow64Process2 —
+the env vars lie under x64 emulation) `OtzariaManager._mirrorFor` prefers ARM64
+and falls back to x64 only when the installed exe is not ARM64 (PE header).
+
 ### 5.6 Plugins
 
 **Install-state matching uses `manifestId`, not the catalog `id`.** The `id` from
 `/api/plugins` is the website's database id; Otzaria installs under
-`plugins/installed/<manifest.id>/`. `manifestId` comes from the `manifest.json` inside
-the downloaded `.otzplugin` (`PluginManifestReader`, BOM-stripped like
-`LogicalContentHasher`). Compare by catalog id and *nothing* is ever detected as
-installed. A plugin whose file is not downloaded yet correctly reports
+`plugins/installed/<manifest.id>/`. `manifestId` is the site's `pluginUid`, or — on a
+site without it — the `manifest.json` inside the downloaded `.otzplugin`
+(`PluginManifestReader`, BOM-stripped like `LogicalContentHasher`). Compare by catalog
+id and *nothing* is ever detected as installed. A plugin with neither correctly reports
 `PluginInstallStatus.unknown` — not an error.
+
+**Every downloaded build is checked against the build it was fetched for**
+(`PluginBuildCheck`): a wrong manifest id or a `sha256` mismatch rejects the file. A
+different manifest *version* is only logged (`PluginSyncOutcome.versionMismatches`):
+site admins can change the listed version without a new file. A site that publishes
+`sha256` also gets version-pinned URLs (`?version=`), and a mirrored file recorded
+without a hash is hashed during sync and re-downloaded on mismatch — otherwise the
+install-time check (the same one, from the drive) would refuse it forever.
 
 **Otzaria has two on-disk layouts, and `InstalledPluginsScanner` must read both.**
 Older installs use `installed/<manifest.id>/current/`; newer ones
@@ -1285,9 +1361,9 @@ as `0.9.97.2+800` is not above a `maxAppVersion` of `0.9.97`.
 **The mirror carries the plugin build that will *run*, not the newest one published.**
 Every build declares `compatibleWith` (minimum Otzaria version) and `maxAppVersion`,
 and `/api/plugins` returns the whole `versions[]` history.
-`plugins_manager/lib/src/services/plugin_compatibility.dart` is a 1:1 port of the
-site's `src/lib/pluginCompatibility.js`: pick the **highest build whose range contains
-the app version**. Before this the sync always fetched the live build, so an offline
+`plugins_manager/lib/src/services/plugin_compatibility.dart` follows the site's
+`src/lib/pluginCompatibility.js` rule — pick the **highest build whose range contains
+the app version** — but compares app versions like Otzaria (core only, see above). Before this the sync always fetched the live build, so an offline
 machine got plugins that would not load — 8 of the 37 plugins on the site required a
 newer Otzaria than the latest stable when this was written.
 
@@ -1356,6 +1432,13 @@ internal registry beyond the `installed/` directory, and a manual unpack bypasse
 `install-local` reads from disk and needs no network; the older `install?url=` does and
 is deliberately unused.
 
+**Install completion comes from Otzaria's result file when it writes one, else from
+polling.** When `otzaria_capabilities.json` says `pluginInstallResults >= 1`,
+`plugin_install_results.jsonl` in Otzaria's data root is matched by the exact handed-off
+path and `at` ≥ the handoff, so a cancel or a rejection is reported at once. Without
+it (older Otzaria) the 5-minute rescan is the only signal, and a cancel looks like a
+timeout.
+
 **Everything about plugins hangs off the launch path the launcher already detected**
 (`OtzariaModuleController.launchPath`). Two consequences, both load-bearing for a
 **portable** Otzaria:
@@ -1363,8 +1446,9 @@ is deliberately unused.
 - `InstalledPluginsScanner` derives the plugins folder from it —
   `<exeDir>/otzaria_data/plugins` when `portable.marker` sits next to the executable
   **or that data folder already exists** (deliberately wider than `LibraryDbLocator`,
-  which demands the marker), otherwise `%APPDATA%\otzaria\plugins`, then the
-  system-wide install. The marker and data-folder names are duplicated in
+  which demands the marker), otherwise `%APPDATA%\otzaria\plugins`. There is no
+  system-wide candidate: Otzaria keeps plugins under its user data root only
+  (`AppPaths.getPluginsRootPath`). The marker and data-folder names are duplicated in
   `plugins_manager` and `library_manager`;
   `launcher_app/test/portable_paths_test.dart` verifies they never drift.
 - `PluginDirectInstaller` hands the `otzaria://…` URL straight to that executable as
@@ -1486,6 +1570,15 @@ load-bearing details:
   `UninstallDirLookup` turns it into detection. With only one wired, the record
   updates and the app still reports "not installed".
 
+**An installer runs only when this machine trusted that exact content.**
+Copying `apps/<id>/` is how a program is handed over, so a record from
+elsewhere ran its installer unasked, and a missing `sha256` skipped
+verification. Trust lives **on the machine** (`custom_apps_trust.json` in
+`AppPaths.machineStateDir`), never on the drive — a drive could carry its own
+— keyed by id + installer sha256 + a hash of name/source/install
+(`CustomAppTrustStore.keyFor`). A file this machine attached or downloaded is
+trusted automatically; anything else asks once (`installPreflight`).
+
 **Never pick the first `.exe` when learning either.** The learned exe name goes
 through `OtzariaAppLocator.findIn(nameMatches:)` — the same verified scanner with an
 injected name predicate. The form's suggestion used to take the first `.exe` from
@@ -1534,8 +1627,8 @@ the user: a Hebrew category name leaves nothing latin, so it falls back to
 `CustomAppsController.fillMissingIcons` extracts the icon of the installed exe —
 or, on the online machine where the program is not installed, of the installer
 on the drive, which carries the same icon — for every app that has none. Four
-things hold it together: it runs on entering the screen, not at launch, because
-each attempt costs a PowerShell process; a failed attempt is remembered for the
+things hold it together: it runs on entering the screen, not at launch (GDI
+work in an isolate, `writeExeIconPng`); a failed attempt is remembered for the
 run (`_iconAttempts`), since an exe with no icon fails every time; it passes the
 existing screenshots back to `saveMedia`, which rewrites *all* media and would
 otherwise delete them; and `readOnly` stops it, because it writes to the drive.
@@ -1580,6 +1673,16 @@ output is `launcher_app/build/עדכוני אוצריא.exe` (uploaded via a `bu
 not by its Hebrew name). Do not reintroduce an installer step without adding the
 dependency back first — that mismatch kept CI red from July 24 to August 6, 2026.
 
+**Builds are reproducible: every package commits its `pubspec.lock`, and CI
+resolves with `--enforce-lockfile`.** CI used to resolve fresh on every run, so
+the same commit could ship different dependencies. Flutter (`flutter-version`),
+the Dart SDK (`setup-dart` `sdk:`) and every action (commit SHA) are pinned in
+`.github/workflows/`; bump the toolchain and regenerate the locks together, and
+never change a lock without its `pubspec.yaml` in an unrelated change.
+`flutter create --platforms=windows` overwrites `pubspec.lock` and `.metadata`
+even with `--no-pub` (CI run 38382790213), so the Windows jobs `git checkout`
+both before `pub get --enforce-lockfile` and fail on any lock diff after it.
+
 **The distributed exe carries the whole file pile inside it.** `launcher_app.exe`
 cannot ship alone: `flutter_windows.dll` is a load-time import and `data/` is resolved
 relative to the exe's directory. So what ships is a tiny C stub
@@ -1598,8 +1701,20 @@ just launch. Five load-bearing details:
 - The completion guard is the `.ready` marker, not the presence of
   `launcher_app.exe`, so an interrupted extraction is never mistaken for a finished
   one.
-- Its single error message is the **one** user-visible string in this repo that is not
-  in `otzaria_l10n` — C cannot depend on a Dart package.
+- Its two message boxes (the failure, and "extract me first") are the **only**
+  user-visible strings in this repo outside `otzaria_l10n` — C cannot depend on
+  a Dart package.
+- **It refuses to run from under `%TEMP%`** (a temp that is a drive root
+  does not count; a folder merely named `*.zip` elsewhere is fine)
+  (`IsTemporaryLocation`; Dart twin `AppPaths.isTemporaryLocation` →
+  `AppPathsFailure.runningFromTemp`). Explorer runs an exe opened in a zip from
+  `%TEMP%\Temp1_<name>.zip\`, and everything downloaded there was discarded.
+- **It recovers a self-update cut between its two renames.** `_replaceFile`
+  writes the real exe name to `.launcher-update.target` before the first
+  rename (users rename the exe, e.g. `Otzaria-Updates (1).exe`); run as
+  `.launcher-previous.exe` / `.launcher-update.exe` while that name is
+  missing, the stub renames the previous one back to it
+  (`RecoverInterruptedUpdate`), and `cleanupLeftovers` never deletes it.
 
 **`package.ps1` must pack the payload before it compiles the stub.** `stub.rc` embeds
 `windows_stub/build/payload.otz`, so `rc.exe` needs that file to exist;
@@ -1714,8 +1829,11 @@ exe into `mirror/launcher/`, copies it over the stub (two renames, rollback on f
   `AbsorbPointer`/`ExcludeFocus`, `downloadAll` refuses, queued dialogs wait and the
   auto-install skips, since `exit(0)` follows. "Restart as administrator" obeys the same
   guard: the offer is deferred during such a task (and re-offered when a download ends),
-  and `Elevation.restartElevated` waits for PowerShell's `Start-Process -Verb RunAs` and
-  quits only on exit code 0, so a declined UAC leaves the launcher running.
+  and `Elevation.restartElevated` waits for `ShellExecuteExW` "runas"
+  (`ElevatedProcess.start`, in an isolate) and quits only on success, so a
+  declined UAC leaves the launcher running. Dart FFI clobbers `GetLastError`
+  after a non-leaf call, so a decline is read from `hInstApp`
+  (`shellExecuteFailureCode`: access denied under runas = 1223).
 - **Closing the window during a long task asks first.** AppShell._confirmClose is
   `LauncherCrashSession.closeGuard`, consulted by `onWindowClose` and by the
   `AppLifecycleListener.onExitRequested` that macOS Cmd+Q / Dock > Quit reach
@@ -1785,7 +1903,10 @@ administrator privileges` runs a *shell command* as root, not the app, behind a 
 indistinguishable from phishing). So `restartElevated` refuses there, `AppShell` never
 offers it, and `describe` appends `macHint` (pick a writable location, or grant Full
 Disk Access). Detection differs too: macOS returns `EPERM` (1) as well as `EACCES` (13)
-for a protected directory, while Windows counts only 5.
+for a protected directory, while Windows counts only 5. A removable volume the user never
+allowed (TCC) fails the data-folder probe with `EPERM`: `AppPaths.writeFailureMessage`
+says where to allow it, and `Info.plist` carries
+`NSRemovableVolumesUsageDescription` so macOS asks at all.
 
 **Nothing blocks the UI isolate at startup — on Windows it is the platform thread.**
 A synchronous native call there (`sqlite3` FFI, a registry write, `Process.run`)
@@ -1880,6 +2001,14 @@ never blocks the next run; the attempt retries for ~2s so a self-relaunch
 (`isContention`) counts as "already running": a drive whose filesystem cannot
 lock runs unguarded rather than refusing to start. The write probe in
 `AppPaths` is per-process (`.write-test-<pid>`) for the same reason.
+**One launcher per PC session too: `Local\OtzariaOfflineUpdate`.** The file
+lock is per drive, so two drives could apply to one `seforim.db` at once.
+`InstanceLock.acquireMachineWide` owns a named mutex (`CreateMutexW` +
+`WaitForSingleObject(0)`, no `GetLastError`, which Dart FFI clobbers). `Local\`
+is per logon session, so another user's launcher is not seen. An elevated
+holder makes `CreateMutexW` fail for a normal one, hence the
+`OpenMutexW(SYNCHRONIZE)` fallback; a mutex that cannot be opened at all runs
+unguarded, like the file lock.
 
 **The background flush must never fail loudly.** A disk error goes to the
 injected `log`, never an uncaught error — that line is itself crash
@@ -1908,10 +2037,14 @@ and `lib/utils/canonical_json.dart`, plus `AppReport` and `PluginReportRecord`.
 by Otzaria's own code (commit named in the fixture); a change there must be re-ported
 and the vectors regenerated, or the server receives a body Otzaria would never send.
 
-**Never write to a DB we do not understand.** `PRAGMA user_version` above
-`UserStateReportQueue.knownSchemaVersion`, a missing `pending_reports` table, a
-book report's `schemaVersion` above 2, or a still-present report queue `.hive` file
-(queue not yet migrated out of Hive) all mean "no offer" and no write. The DB and its
+**Never write to a DB we do not understand.** A `reportsQueueFormat` other than 1 in
+`otzaria_capabilities.json` (or, without that file, `PRAGMA user_version` above
+`UserStateReportQueue.knownSchemaVersion`), a missing `pending_reports` table, or a
+book report's `schemaVersion` above 2 all mean "no offer" and no write. A leftover
+queue `.hive` does **not** block: current Otzaria no longer migrates Hive, so a file
+left behind blocked collection forever. Only a box whose last `pending_reports` frame
+is a non-empty list (`hivePendingReportCount`, read from hive_ce's frame format), with
+no rows of its box in the DB, is reported — once per computer (`NoticesSeenStore`). The DB and its
 folder are never created. Unsendable reports (`isSendable`, Otzaria's own export filter
 plus the 256KB book limit), invalid app/plugin records and oversized app requests
 stay in the queue. App attachments travel in the outbox, not the sent history.
@@ -1952,8 +2085,11 @@ mid-request: the in-flight POST is aborted (`AbortableRequest`, also on timeout)
 file stays, and a re-send of what the server already got answers `duplicate`.
 
 **Only a 2xx whose body is a JSON object with `success:true` deletes a file as sent
-(a filter's 200 HTML page must not); 400/409/413/422 and a non-`https://otzaria.org`
-endpoint delete it as rejected; anything else keeps it and stops the run.** A drive
+(a filter's 200 HTML page must not); 400/409/413/422 and an endpoint other than the
+three `https://otzaria.org` report paths (no query) delete it as rejected; anything else keeps it and stops the run.** A first 409
+means "this content was not ingested under that id": as in Otzaria, the report gets a
+new id (`report_id` / `reportId`), is rewritten in the outbox under it, and is re-sent
+once. A 503 `{"error":"shabbat"}` stops the run with its own message. A drive
 file can come from anywhere, so the endpoint is checked before any POST — and before
 the rate-limit wait, since it is not a request. Rejection reasons go to the log only.
 One exception, as in Otzaria: an app report carrying the consented crash `minidump`
@@ -1978,7 +2114,7 @@ verify something new.
 | `WindowsExeVersionReader`, `WindowsInstallRegistry` | **Run against a real install** (`otzaria.exe` 0.9.96+90960, Windows 11, 2026-08-10) |
 | `otzaria_manager` on macOS + launcher build/run there | **Verified** against a real `otzaria-macos.zip` — but that predates the custom title bar and `RunningOtzariaLocator._probeMac` |
 | `ZstdFileDecompressor` | Verified against real libzstd on Windows (`library_manager/test/zstd_file_decompressor_test.dart`) — **not** on a full ~1GB DB. `flutter test` never builds the plugin binary, so `_openLibrary` falls back to `ZSTD_LIBRARY_PATH` and then the system `libzstd`; the zstd tests load it through `nativeZstd()` (`test/support/zstd_fixtures.dart`), which skips without it unless `REQUIRE_NATIVE_ZSTD=1` — set on the Linux `analyze + native zstd (linux)` CI job, so there they run instead of skipping. Locally on macOS: `ZSTD_LIBRARY_PATH=/opt/homebrew/lib/libzstd.dylib` |
-| `LibraryUpdateApplier` on Windows | Not verified on real hardware (full ~1GB download, delta chains, `tasklist`) |
+| `LibraryUpdateApplier` on Windows | Not verified on real hardware (full ~1GB download, delta chains, the running-Otzaria probe) |
 | `RunningOtzariaLocator` FFI half (`QueryFullProcessImageNameW`), Windows `.db` picker filter | Not verified |
 | Plugin store round trip | Unit-tested only — never a real `sync()` against `otzaria.org`, a USB trip, and `install-local` against a real Otzaria |
 | Launcher self-update | Dart side unit-tested end to end (GitHub client against a mock, mirror round trip, location fallbacks, a real swap in a temp dir asserting `OtzariaData/` survives); `stub.c` compiles clean at `/W4`. **Never run for real**: a published tag found by a shipped exe, the `--after-update=<pid>` wait, the re-extract over a live `app-files\`, the macOS bundle swap |

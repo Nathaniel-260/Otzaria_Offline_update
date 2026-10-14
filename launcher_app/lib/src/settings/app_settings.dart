@@ -57,7 +57,7 @@ AppLanguage systemLanguage() {
 /// **אין כאן נתיבים.** תיקיית הנתונים תמיד צמודה לקובץ ההרצה (ראו
 /// `AppPaths`), והמיקום של אוצריא עצמה מתגלה ואינו מוגדר.
 class AppSettings {
-  /// 4: מקטע `storage` (גיבוי המסד) הוסר — ראו `LibraryDbRecoveryService`.
+  /// 4: מקטע `storage` (גיבוי המסד) הוסר — ראו `OfflineLibraryDbRecoveryService`.
   /// 5: `ui.language` מקבל גם `system` — לפי שפת המחשב, וזו ברירת המחדל.
   /// 6: `ui.seedColor` / `ui.darkSeedColor` — פלטת הצבעים של אוצריא.
   /// 7: `sync.personalMode` — הורדה למחשב שלי בלבד, בלי המסד המלא.

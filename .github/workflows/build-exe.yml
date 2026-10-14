@@ -11,20 +11,27 @@ jobs:
       run:
         working-directory: launcher_app
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
+          flutter-version: 3.47.2
       - run: flutter config --enable-windows-desktop
-      - run: flutter create --platforms=windows .
-      - run: flutter pub get
+      - run: flutter create --no-pub --platforms=windows .
+      - name: Restore the lock and metadata flutter create rewrites
+        shell: bash
+        run: git checkout -- pubspec.lock .metadata
+      - run: flutter pub get --enforce-lockfile
+      - name: Locks unchanged by create/pub get
+        shell: bash
+        run: git diff --exit-code -- pubspec.lock
       - run: flutter build windows --release
       - name: Package portable build
         shell: pwsh
         run: .\windows_stub\package.ps1
         env:
           PAYLOAD_BUILD_ID: ${{ github.sha }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: launcher_app-windows-portable
           path: launcher_app/build/*.exe

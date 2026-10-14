@@ -38,12 +38,14 @@ class OtzariaModuleController extends ChangeNotifier
     RunningOtzariaLocator runningLocator = const RunningOtzariaLocator(),
     Future<String?> Function()? pendingLaunchUri,
     Future<void> Function()? onLaunchUriDelivered,
+    bool Function()? isLibraryApplying,
     OtzariaLauncher launcher = const OtzariaLauncher(),
     OtzariaProcessCloser? processCloser,
     OtzariaTargetPlatform? platform,
   })  : _preferPrerelease = preferPrerelease,
         _pendingLaunchUri = pendingLaunchUri,
         _onLaunchUriDelivered = onLaunchUriDelivered,
+        _isLibraryApplying = isLibraryApplying,
         _runningLocator = runningLocator,
         _processCloser =
             processCloser ?? OtzariaProcessCloser(locator: runningLocator),
@@ -63,6 +65,9 @@ class OtzariaModuleController extends ChangeNotifier
   /// הספרייה, והמסירה לקובץ ההרצה — כאן.
   final Future<String?> Function()? _pendingLaunchUri;
   final Future<void> Function()? _onLaunchUriDelivered;
+  final bool Function()? _isLibraryApplying;
+
+  bool get libraryApplyActive => _isLibraryApplying?.call() ?? false;
 
   /// אותו locator שה-manager מקבל — נשמר גם כאן כדי ש-[refreshRunningState]
   /// תוכל לבדוק "אוצריא פתוחה?" לבד, בלי בדיקת גרסאות שלמה.
@@ -101,6 +106,12 @@ class OtzariaModuleController extends ChangeNotifier
   String? latestVersion;
   String? errorMessage;
 
+  String? installStage;
+
+  bool _stopSetupWait = false;
+
+  void stopWaitingForSetup() => _stopSetupWait = true;
+
   /// הודעה שאינה שגיאה — "ביטלת באשף", "האשף עוד פתוח". נפרדת מ-
   /// [errorMessage] כדי שהממשק לא יצבע בחירה של המשתמש כתקלה אדומה.
   String? noticeMessage;
@@ -122,7 +133,7 @@ class OtzariaModuleController extends ChangeNotifier
   bool hasStaleFullPackage = false;
 
   /// האם אוצריא פתוחה, לפי בדיקת התהליך ש-[checkForUpdate] מבצעת ממילא.
-  /// כך הלאנצ'ר לא מריץ `tasklist` שני משלו בעלייה. [refreshRunningState]
+  /// כך הלאנצ'ר לא בודק פעם שנייה בעלייה. [refreshRunningState]
   /// מרעננת אותה לבדה.
   bool isRunning = false;
 
@@ -156,7 +167,9 @@ class OtzariaModuleController extends ChangeNotifier
   OtzariaRelease? get onlineLatestRelease =>
       onlineChannels?.select(preferPrerelease: preferPrerelease);
 
-  bool get canLaunch => currentVersion != null;
+  bool get canLaunch => currentVersion != null && !libraryApplyActive;
+
+  bool get elevatedAsOtherUser => _manager.elevatedAsOtherUser;
 
   /// התיקייה שלצד התוכנה שממנה מותקנת/מתעדכנת אוצריא — המקור היחיד.
   String get mirrorDir => _manager.mirrorDir;
@@ -242,7 +255,7 @@ class OtzariaModuleController extends ChangeNotifier
 
   /// מרענן **רק** את "אוצריא פתוחה?" — כדי שסגירה שלה תזוהה בזמן שהלאנצ'ר
   /// פתוח, ולא רק בהפעלה מחדש שלו. קורא שמגיע בזמן בדיקה שרצה מצטרף אליה
-  /// במקום להריץ `tasklist` שני.
+  /// במקום להריץ בדיקה שנייה.
   ///
   /// [force] מחייב בדיקה שמתחילה **עכשיו**, וממתין לזו שבאוויר לפני כן.
   /// נחוץ לפני פעולה שאוצריא הפתוחה חוסמת: הצטרפות מחזירה תמונה מלפני עד
@@ -255,9 +268,22 @@ class OtzariaModuleController extends ChangeNotifier
     return inFlight.then((_) => _runningProbe ??= _probeRunning());
   }
 
+  Object? _loggedProbeFailure;
+
+  void _noteProbeFailure() {
+    final failure = RunningOtzariaLocator.lastProbeFailure;
+    if (failure != null && failure != _loggedProbeFailure) {
+      AppLogger.maybeInstance?.warn(
+        'בדיקת "אוצריא פתוחה?" נכשלה ונחשבת "סגורה": $failure',
+      );
+    }
+    _loggedProbeFailure = failure;
+  }
+
   Future<bool> _probeRunning() async {
     try {
       final probe = await _runningLocator.probe();
+      _noteProbeFailure();
       if (isDisposed) return probe.isRunning;
       final changed = isRunning != probe.isRunning;
       isRunning = probe.isRunning;
@@ -398,8 +424,10 @@ class OtzariaModuleController extends ChangeNotifier
       stableVersion = check.stableRelease?.tagName;
       prereleaseVersion = check.prereleaseRelease?.tagName;
       hasChannelChoice = check.hasChannelChoice;
-      hasStaleFullPackage = check.hasStaleFullPackage;
+      hasStaleFullPackage =
+          check.hasStaleFullPackage || check.mirrorLacksArchitectures;
       isRunning = check.isOtzariaRunning;
+      _noteProbeFailure();
       status = switch (check) {
         _ when check.needsDownload => OtzariaModuleStatus.needsDownload,
         _ when check.installedIsNewer => OtzariaModuleStatus.installedIsNewer,
@@ -418,6 +446,7 @@ class OtzariaModuleController extends ChangeNotifier
 
   Future<void> install({bool useWizard = true}) async {
     if (_lastCheck == null || _installing) return;
+    if (_refuseWhileLibraryApplies()) return;
     for (var pending = _checkInFlight;
         pending != null;
         pending = _checkInFlight) {
@@ -428,6 +457,7 @@ class OtzariaModuleController extends ChangeNotifier
     if (check == null) return;
 
     _installing = true;
+    _stopSetupWait = false;
     _recheckAfterInstall = false;
     status = OtzariaModuleStatus.installing;
     needsElevation = false;
@@ -441,7 +471,15 @@ class OtzariaModuleController extends ChangeNotifier
 
     var recheck = false;
     try {
-      final state = await _manager.update(check, useWizard: useWizard);
+      final state = await _manager.update(
+        check,
+        useWizard: useWizard,
+        onSetupContinuesElsewhere: () {
+          installStage = AppL10n.strings.appDomain.setupContinuesElsewhere;
+          if (!isDisposed) notifyListeners();
+        },
+        isWaitCancelled: () => _stopSetupWait || isDisposed,
+      );
       currentVersion = state.installedTagName;
       status = OtzariaModuleStatus.upToDate;
       AppLogger.instance.info('התקנת אוצריא הסתיימה בהצלחה');
@@ -462,6 +500,7 @@ class OtzariaModuleController extends ChangeNotifier
       AppLogger.instance.error('התקנת אוצריא נכשלה', e, st);
     } finally {
       _installing = false;
+      installStage = null;
       _manager.preferPrerelease = _preferPrerelease;
     }
     if (recheck || _recheckAfterInstall) {
@@ -473,6 +512,7 @@ class OtzariaModuleController extends ChangeNotifier
   }
 
   Future<void> launch() async {
+    if (_refuseWhileLibraryApplies()) return;
     if (errorMessage != null && status != OtzariaModuleStatus.error) {
       errorMessage = null;
       notifyListeners();
@@ -497,6 +537,7 @@ class OtzariaModuleController extends ChangeNotifier
   ///
   /// `false` = לא היה למי למסור (למשל לא זוהתה התקנה); הסיבה ב-[errorMessage].
   Future<bool> requestLibraryReindex() async {
+    if (_refuseWhileLibraryApplies()) return false;
     try {
       await _manager.requestLibraryReindex();
       if (!isRunning) {
@@ -510,6 +551,13 @@ class OtzariaModuleController extends ChangeNotifier
       notifyListeners();
       return false;
     }
+  }
+
+  bool _refuseWhileLibraryApplies() {
+    if (!libraryApplyActive) return false;
+    noticeMessage = AppL10n.strings.home.libraryApplyActive;
+    notifyListeners();
+    return true;
   }
 
   @override

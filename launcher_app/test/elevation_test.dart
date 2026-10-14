@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/services/elevation.dart';
+import 'package:otzaria_downloads/otzaria_downloads.dart' show ElevatedProcess;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 /// הזיהוי כאן הוא מה שמפעיל את ההצעה "להפעיל כמנהל" (הצעה #25 בגיטהאב, אבל
@@ -136,7 +137,8 @@ void main() {
   });
 
   group('Elevation.restartElevated', () {
-    test('מרים דרך PowerShell עם -Verb RunAs, ורק אחרי הצלחה סוגר', () async {
+    test('מרים את קובץ ההרצה עצמו, בלי PowerShell, ורק אחרי הצלחה סוגר',
+        () async {
       String? executable;
       List<String>? arguments;
       var quit = false;
@@ -152,17 +154,8 @@ void main() {
       );
 
       expect(failure, isNull);
-      expect(executable, 'powershell');
-      expect(arguments, contains('-NoProfile'));
-      expect(
-        arguments!.last,
-        allOf(
-          contains('Start-Process -FilePath '),
-          contains(Platform.resolvedExecutable),
-          contains('-Verb RunAs -ErrorAction Stop'),
-          contains('catch { exit 1 }'),
-        ),
-      );
+      expect(executable, Platform.resolvedExecutable);
+      expect(arguments, isEmpty);
       expect(quit, isTrue);
     }, skip: !Platform.isWindows);
 
@@ -170,12 +163,11 @@ void main() {
       var quit = false;
 
       final failure = await Elevation.restartElevated(
-        run: (exe, args) async => 1,
+        run: (exe, args) async => ElevatedProcess.cancelledCode,
         quit: () => quit = true,
       );
 
-      expect(failure, isNotNull);
-      expect('$failure', contains('1'));
+      expect(failure, same(Elevation.cancelled));
       expect(quit, isFalse);
     }, skip: !Platform.isWindows);
 

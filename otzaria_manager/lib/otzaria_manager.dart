@@ -1,3 +1,5 @@
+export 'src/models/otzaria_capabilities.dart';
+export 'src/models/otzaria_data_root.dart';
 export 'src/models/otzaria_deep_links.dart';
 export 'src/models/otzaria_install_state.dart';
 export 'src/models/otzaria_release.dart';
@@ -16,5 +18,6 @@ export 'src/services/otzaria_process_closer.dart';
 export 'src/services/otzaria_release_client.dart';
 export 'src/services/otzaria_state_store.dart';
 export 'src/services/running_otzaria_locator.dart';
+export 'src/services/windows_arch.dart';
 export 'src/services/windows_exe_version_reader.dart';
 export 'src/services/windows_install_registry.dart';

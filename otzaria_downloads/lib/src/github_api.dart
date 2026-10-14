@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
+import 'network_errors.dart';
+
 const String githubUserAgent = 'otzaria-launcher';
 
 const Map<String, String> githubApiHeaders = {
@@ -198,12 +200,20 @@ Future<http.Response> githubGet(
     final blocked = limiter.blocked(uri);
     if (blocked != null) throw blocked;
   }
-  final response = await client.get(uri, headers: headers).timeout(timeout);
+  final http.Response response;
+  try {
+    response = await client.get(uri, headers: headers).timeout(timeout);
+  } on TlsException catch (e) {
+    throw NetworkCertificateException(uri: uri, cause: e);
+  }
   if (api) {
     final limit = githubRateLimitOf(response);
     if (limit != null) {
       throw limiter.limited(uri, response.statusCode, limit.wait);
     }
+  }
+  if (response.statusCode == 418) {
+    throw NetworkBlockedException(uri: uri, statusCode: response.statusCode);
   }
   return response;
 }

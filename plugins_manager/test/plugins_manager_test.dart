@@ -12,6 +12,7 @@ import 'package:test/test.dart';
 import 'support.dart';
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
   late PluginMirrorStore store;
   final strings = AppL10n.strings.pluginsDomain;
@@ -55,7 +56,8 @@ void main() {
   StorePlugin withLocalFile({String id = 'a'}) {
     final file = File(p.join(store.pluginDir(id), 'plugin.otzplugin'));
     file.parent.createSync(recursive: true);
-    file.writeAsBytesSync(pluginBytes('{"id":"manifest-$id"}'));
+    file.writeAsBytesSync(
+        pluginBytes('{"id":"manifest-$id","version":"1.0.0"}'));
 
     return plugin(id: id).copyWith(
       localFiles: {
@@ -145,7 +147,8 @@ void main() {
       final manager = portableManager(portableInstall());
       await store.save(PluginCatalog(plugins: [plugin()]));
 
-      expect(await manager.scanInstalled(), (await manager.load()).installed);
+      expect((await manager.scanInstalled()).versions,
+          (await manager.load()).installed);
     });
   });
 
@@ -285,7 +288,7 @@ void main() {
           baseUrl: 'https://otzaria.test',
           httpClient: MockClient(
             (_) async => http.Response.bytes(
-              pluginBytes('{"id":"manifest-a"}'),
+              pluginBytes('{"id":"manifest-a","version":"1.0.0"}'),
               200,
               headers: {
                 'content-disposition': 'attachment; filename="plugin.zip"',
@@ -334,7 +337,7 @@ void main() {
           baseUrl: 'https://otzaria.test',
           httpClient: MockClient(
             (_) async => http.Response.bytes(
-              pluginBytes('{"id":"manifest-a"}'),
+              pluginBytes('{"id":"manifest-a","version":"1.0.0"}'),
               200,
               headers: {
                 'content-disposition': 'attachment; filename="plugin.zip"',
@@ -432,7 +435,7 @@ void main() {
         if (path.endsWith('/download')) {
           downloads.add(path);
           return http.Response.bytes(
-            pluginBytes('{"id":"manifest-a"}'),
+            pluginBytes('{"id":"manifest-a","version":"1.0.0"}'),
             200,
             headers: {
               'content-disposition': 'attachment; filename="p.otzplugin"'

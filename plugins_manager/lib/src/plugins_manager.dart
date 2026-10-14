@@ -11,7 +11,9 @@ import 'models/plugin_version_entry.dart';
 import 'models/plugins_online_status.dart';
 import 'models/store_app_release.dart';
 import 'models/store_plugin.dart';
+import 'services/installed_plugins_registry.dart';
 import 'services/installed_plugins_scanner.dart';
+import 'services/plugin_build_check.dart';
 import 'services/plugin_direct_installer.dart';
 import 'services/plugin_manifest_reader.dart';
 import 'services/plugin_mirror_store.dart';
@@ -28,6 +30,8 @@ class PluginStoreView {
     required this.catalog,
     required this.installed,
     required this.pluginsDir,
+    this.disabled = const {},
+    this.development = const {},
   });
 
   final PluginCatalog catalog;
@@ -37,6 +41,9 @@ class PluginStoreView {
 
   /// שורש קובצי החנות במראה — הממשק מרכיב ממנו נתיבים מוחלטים לתמונות.
   final String pluginsDir;
+
+  final Set<String> disabled;
+  final Set<String> development;
 }
 
 /// נקודת הכניסה היחידה שמודול ה-UI אמור להשתמש בה לחנות התוספים.
@@ -105,19 +112,31 @@ class PluginsManager {
   /// זו הפעולה שרצה בפתיחת המסך.
   Future<PluginStoreView> load() async {
     final store = await _store();
+    final installed = await scanInstalled();
 
     return PluginStoreView(
       catalog: await store.load(),
-      installed: await scanInstalled(),
+      installed: installed.versions,
       pluginsDir: store.pluginsDir,
+      disabled: installed.disabled,
+      development: installed.development,
     );
   }
 
-  Future<Map<String, String>> scanInstalled() async => InstalledPluginsScanner(
+  Future<String?> otzariaDataRoot() async {
+    final installed = InstalledPluginsScanner(
+      customPluginsDir: await resolvePluginsDir?.call(),
+      otzariaLaunchPath: await otzariaLaunchPath?.call(),
+    ).resolveInstalledDir();
+    return installed == null ? null : p.dirname(p.dirname(installed));
+  }
+
+  Future<InstalledPluginsState> scanInstalled() async =>
+      InstalledPluginsScanner(
         customPluginsDir: await resolvePluginsDir?.call(),
         otzariaLaunchPath: await otzariaLaunchPath?.call(),
         locatePluginsDb: locatePluginsDb,
-      ).scan();
+      ).scanState();
 
   /// מסנכרן את הקטלוג והקבצים מהאתר אל המראה. דורש אינטרנט. מוריד **רק**
   /// את מה שחסר או השתנה — ראו [PluginSyncOutcome].
@@ -288,14 +307,28 @@ class PluginsManager {
 
     var local = plugin.localFileFor(target.version);
     if (local == null || !await store.hasFileFor(plugin, target.version)) {
-      local = await _fetchMissingFile(store, plugin, target, onPluginUpdated);
+      try {
+        local = await _fetchMissingFile(store, plugin, target, onPluginUpdated);
+      } on PluginStoreShabbatException catch (e) {
+        return PluginInstallResult.failure(e.message);
+      }
       if (local == null) {
         return PluginInstallResult.failure(strings.pluginFileNotAvailable);
       }
     }
 
+    final path = store.absolutePath(local.relativePath);
+    if (!await PluginBuildCheck.verifyLocal(
+      path,
+      local: local,
+      target: target,
+      expectedId: plugin.manifestId,
+    )) {
+      return PluginInstallResult.failure(strings.localPluginFileCorrupt);
+    }
+
     return PluginDirectInstaller.install(
-      store.absolutePath(local.relativePath),
+      path,
       otzariaLaunchPath: await otzariaLaunchPath?.call(),
     );
   }
@@ -328,9 +361,14 @@ class PluginsManager {
         preferredExt: PluginMirrorStore.pluginFileExt,
         requiredExt: PluginMirrorStore.pluginFileExt,
         expectedSize: target.fileSize,
-        isValid: (path) {
+        expectedSha256: target.sha256,
+        rejection: (path) {
           manifest = PluginManifestReader.read(path);
-          return manifest != null;
+          return PluginMirrorSync.buildRejection(
+            manifest,
+            target,
+            plugin.manifestId,
+          );
         },
       );
 
@@ -341,6 +379,7 @@ class PluginsManager {
         size: asset.size,
         sourceUrl: target.downloadUrl,
         targetedAt: DateTime.now(),
+        sha256: target.sha256,
       );
       final updated = await _withCatalogLock<StorePlugin?>(() async {
         final catalog = await store.load();
@@ -366,6 +405,8 @@ class PluginsManager {
       });
       if (updated != null) onPluginUpdated?.call(updated);
       return file;
+    } on PluginStoreShabbatException {
+      rethrow;
     } catch (_) {
       return null;
     }

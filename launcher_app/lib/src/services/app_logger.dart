@@ -12,10 +12,8 @@ import 'package:path/path.dart' as p;
 /// חלק מהלוגיקה.
 ///
 /// שתי תכונות שאינן מובנות מאליהן:
-/// * **הכתיבות מוסדרות בטור.** קודם כל קריאה שיגרה `writeAsString` נפרד ולא
-///   מחכה לו; כמה שורות שנכתבו באותו tick (למשל שגיאה עם stack trace ומיד
-///   אחריה עוד אחת) יכלו להיכנס לקובץ מעורבבות או לדרוס זו את זו, כי כל
-///   קריאה פותחת handle משלה. כאן יש תור: שרשרת Future אחת, שורה אחרי שורה.
+/// * **הכתיבות מוסדרות בטור**, דרך sink אחד פתוח, באצוות: השורות שהצטברו
+///   נכתבות יחד ובסדר.
 /// * **יש רוטציה.** הקובץ יושב על אותו כונן נייד שנוסע עם התוכנה, ובלי גבול
 ///   הוא היה גדל לנצח.
 class AppLogger {
@@ -93,10 +91,6 @@ class AppLogger {
 
   final File _file;
 
-  /// תור הכתיבה — ראו ה-doc של המחלקה.
-  Future<void> _queue = Future<void>.value();
-  int _pendingLines = 0;
-
   String get filePath => _file.path;
   String get logDir => p.dirname(_file.path);
 
@@ -105,9 +99,7 @@ class AppLogger {
   void warn(String message) => _write('WARN', message);
 
   /// [error]/[stackTrace] אופציונליים — אם קיימים, ה-stack trace המלא
-  /// נכתב ללוג. זה בדיוק מה שהיה חסר קודם: בלי זה, שגיאות "מוזרות" (כמו
-  /// unsendable-isolate) נראות רק ב-UI כטקסט קצר, ולא ניתן לשחזר מאיפה
-  /// זה הגיע.
+  /// נכתב ללוג.
   void error(String message, [Object? error, StackTrace? stackTrace]) {
     final buffer = StringBuffer(message);
     if (error != null) buffer.write('\nerror: $error');
@@ -115,9 +107,14 @@ class AppLogger {
     _write('ERROR', buffer.toString());
   }
 
-  /// חסם עליון על תור הכתיבה. דיסק שנתקע (כונן USB שנשלף) לא יגרום לצבירת
-  /// שורות בזיכרון בלי גבול — עדיף לאבד שורות לוג מלנפח את התהליך.
+  /// חסם עליון על השורות שממתינות לדיסק. כונן שנשלף לא ינפח את התהליך;
+  /// מה שנזרק נספר ונרשם בשורה אחת כשהכתיבה חוזרת.
   static const int _maxPendingLines = 512;
+
+  final List<String> _pending = [];
+  int _dropped = 0;
+  Future<void>? _drain;
+  IOSink? _sink;
 
   void _write(String level, String message) {
     final line = '${DateTime.now().toIso8601String()} [$level] $message\n';
@@ -125,28 +122,52 @@ class AppLogger {
       // ignore: avoid_print
       print(line);
     }
-    if (_pendingLines >= _maxPendingLines) return;
-    _pendingLines++;
-    // fire-and-forget בכוונה — הקורא לא מחכה לדיסק — אבל דרך תור, כדי
-    // שהשורות ייכתבו בסדר ולא יתנגשו על אותו קובץ.
-    _queue = _queue.then((_) => _append(line)).whenComplete(() {
-      _pendingLines--;
-    });
+    if (_pending.length >= _maxPendingLines) {
+      _dropped++;
+      return;
+    }
+    _pending.add(line);
+    _drain ??= _drainPending().whenComplete(() => _drain = null);
   }
 
-  Future<void> _append(String line) async {
-    try {
-      await _rotateIfNeeded();
-      await _file.writeAsString(line, mode: FileMode.append, flush: false);
-    } catch (_) {
-      // כשל כתיבה (דיסק מלא / כונן שנשלף) נבלע — הלוג לא יפיל את התוכנה.
+  /// sink פתוח אחד ובדיקת גודל אחת לכל אצווה, ולא פתיחה ובדיקה לכל שורה.
+  Future<void> _drainPending() async {
+    while (_pending.isNotEmpty) {
+      final batch = StringBuffer();
+      if (_dropped > 0) {
+        batch.write('${DateTime.now().toIso8601String()} [WARN] '
+            '$_dropped log lines were dropped\n');
+      }
+      final lines = List.of(_pending);
+      _pending.clear();
+      lines.forEach(batch.write);
+      final dropped = _dropped;
+      try {
+        await _rotateIfNeeded();
+        final sink = _sink ??= _file.openWrite(mode: FileMode.append);
+        sink.write(batch);
+        await sink.flush();
+        _dropped -= dropped;
+      } catch (_) {
+        _dropped += lines.length;
+        await _closeSink();
+      }
     }
+  }
+
+  Future<void> _closeSink() async {
+    final sink = _sink;
+    _sink = null;
+    try {
+      await sink?.close();
+    } catch (_) {}
   }
 
   Future<void> _rotateIfNeeded() async {
     try {
       if (!await _file.exists()) return;
       if (await _file.length() < maxBytes) return;
+      await _closeSink();
       final previous = File('${_file.path}.1');
       if (await previous.exists()) await previous.delete();
       await _file.rename(previous.path);
@@ -157,7 +178,14 @@ class AppLogger {
 
   /// מוודא שכל מה שנרשם עד כה כבר על הדיסק. נחוץ רק בבדיקות ובנקודות סגירה
   /// מסודרת; הקוד הרגיל לא ממתין ללוג.
-  Future<void> flush() => _queue;
+  Future<void> flush() async {
+    for (var drain = _drain; drain != null; drain = _drain) {
+      await drain;
+    }
+    // משחרר את הקובץ (יציאה, או בדיקה שמוחקת את התיקייה); השורה הבאה
+    // פותחת אותו מחדש.
+    if (_drain == null) await _closeSink();
+  }
 
   /// חשוף לבדיקות: מאפס את ה-singleton כדי שכל בדיקה תתחיל מקובץ נקי.
   @visibleForTesting

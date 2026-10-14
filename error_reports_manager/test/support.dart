@@ -50,6 +50,9 @@ class MemoryOutbox implements ReportOutbox {
   Future<List<OutboxReport>> list() async => List.of(reports);
 
   @override
+  Future<int> count() async => reports.length;
+
+  @override
   Future<Uint8List> requestBody(OutboxReport report) async {
     bodyReads.add(report.reportId);
     return OutboxReport.requestBodyOf(files[report.filePath]!);

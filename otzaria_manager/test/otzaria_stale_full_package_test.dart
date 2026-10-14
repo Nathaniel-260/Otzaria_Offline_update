@@ -4,6 +4,8 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/sandbox.dart';
+
 /// חבילת ה-FULL אינה נתמכת יותר. מה שנבדק כאן הוא **הניקוי**: קובץ של 2GB
 /// שירד בגרסה ישנה של הלאנצ'ר חייב להימצא ולהימחק, ולא להישאר על הכונן
 /// לנצח — ומנגד, אסור שהניקוי ייגע במתקין הרגיל.
@@ -20,6 +22,8 @@ Future<File> _write(String path, String contents) async {
 }
 
 void main() {
+  sandboxRealDataRoot();
+
   late Directory temp;
   late OtzariaManager manager;
 

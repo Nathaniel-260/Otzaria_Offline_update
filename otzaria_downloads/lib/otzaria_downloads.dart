@@ -5,9 +5,13 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
+import 'src/network_errors.dart';
+
 export 'src/atomic_file.dart'
     show isAtomicTempNameOf, writeBytesAtomically, writeStringAtomically;
 export 'src/github_api.dart';
+export 'src/network_errors.dart';
+export 'src/windows_elevation.dart';
 
 class FileDownloadResult {
   const FileDownloadResult(this.size, this.headers, this.sha256);
@@ -15,6 +19,11 @@ class FileDownloadResult {
   final Map<String, String> headers;
   final String? sha256;
 }
+
+/// מתחיל את ה-SHA-256 המוזרם של [downloadFile]. אפליקציית Flutter מציבה
+/// כאן מימוש נייטיבי; `close` חייב גם לשחרר את מה שהוא מחזיק.
+ByteConversionSink Function(Sink<Digest> output) startSha256 =
+    sha256.startChunkedConversion;
 
 /// החלקי נשמר בנפרד מהיעד, ורק ETag חזק מאפשר לחבר אליו בייטים חדשים.
 Future<FileDownloadResult> downloadFile({
@@ -138,7 +147,12 @@ Future<FileDownloadResult> _downloadFile({
           } catch (_) {}
         }
       }, onError: (Object _) {}));
-      final response = await pending.timeout(connectTimeout);
+      final http.StreamedResponse response;
+      try {
+        response = await pending.timeout(connectTimeout);
+      } on TlsException catch (e) {
+        throw NetworkCertificateException(uri: request.url, cause: e);
+      }
       if (response case http.BaseResponseWithUrl(url: final finalUrl)) {
         if (request.url.scheme == 'https' && finalUrl.scheme != 'https') {
           await response.stream.listen((_) {}).cancel();
@@ -156,6 +170,12 @@ Future<FileDownloadResult> _downloadFile({
       }
       if (response.statusCode != 200 && response.statusCode != 206) {
         await response.stream.listen((_) {}).cancel();
+        if (response.statusCode == 418) {
+          throw NetworkBlockedException(
+            uri: request.url,
+            statusCode: response.statusCode,
+          );
+        }
         throw statusError(response.statusCode);
       }
       Map<String, String> headers;
@@ -209,7 +229,7 @@ Future<FileDownloadResult> _downloadFile({
         await _delete(metadata);
       }
       if (calculateSha256) {
-        hasher = sha256.startChunkedConversion(
+        hasher = startSha256(
           ChunkedConversionSink<Digest>.withCallback(
               (value) => digest = value.single),
         );

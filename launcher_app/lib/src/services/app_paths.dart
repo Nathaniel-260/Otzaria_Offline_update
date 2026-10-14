@@ -1,9 +1,17 @@
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
+
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
+import 'package:win32/win32.dart';
 
-enum AppPathsFailure { cannotWrite, driveFull, appTranslocated }
+enum AppPathsFailure {
+  cannotWrite,
+  driveFull,
+  appTranslocated,
+  runningFromTemp
+}
 
 class AppPathsException implements Exception {
   const AppPathsException({
@@ -61,8 +69,11 @@ class AppPaths {
     Map<String, String>? environment,
     String? resolvedExecutable,
     bool? isMacOS,
+    bool? isWindows,
+    List<String>? tempDirs,
   }) async {
     final macOS = isMacOS ?? Platform.isMacOS;
+    final windows = isWindows ?? Platform.isWindows;
     final executable = resolvedExecutable ?? Platform.resolvedExecutable;
     final dataDir = p.join(
       executableRoot(executable, isMacOS: macOS),
@@ -73,6 +84,17 @@ class AppPaths {
         message: AppL10n.strings.setupError.appTranslocated,
         attemptedDir: dataDir,
         kind: AppPathsFailure.appTranslocated,
+      );
+    }
+    if (windows &&
+        isTemporaryLocation(
+          p.windows.dirname(executable),
+          tempDirs: tempDirs ?? _windowsTempDirs(environment),
+        )) {
+      throw AppPathsException(
+        message: AppL10n.strings.setupError.runningFromTemp,
+        attemptedDir: dataDir,
+        kind: AppPathsFailure.runningFromTemp,
       );
     }
     final failure = await _probeWritable(dataDir);
@@ -100,11 +122,66 @@ class AppPaths {
     throw AppPathsException(
       message: diskFull
           ? AppL10n.strings.setupError.driveFull
-          : AppL10n.strings.setupError.cannotWriteToDataDir(
-              failure.osError?.message ?? failure.message),
+          : writeFailureMessage(failure, isMacOS: macOS),
       attemptedDir: dataDir,
       kind: diskFull ? AppPathsFailure.driveFull : AppPathsFailure.cannotWrite,
     );
+  }
+
+  /// Explorer מריץ exe שנפתח מתוך zip מעותק תחת `%TEMP%` (`Temp1_<שם>.zip`),
+  /// ומה שנכתב שם נמחק. תיקיית temp שהיא שורש כונן אינה נחשבת. = `stub.c`.
+  static bool isTemporaryLocation(
+    String dir, {
+    required List<String> tempDirs,
+  }) {
+    final normalized = p.windows.normalize(dir).toLowerCase();
+    for (final temp in tempDirs) {
+      if (temp.isEmpty) continue;
+      final root = p.windows.normalize(temp).toLowerCase();
+      if (p.windows.rootPrefix(root) == root) continue;
+      if (normalized == root || p.windows.isWithin(root, normalized)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static List<String> _windowsTempDirs(Map<String, String>? environment) {
+    final env = environment ?? Platform.environment;
+    final dirs = <String>{
+      for (final key in const ['TEMP', 'TMP'])
+        if (env[key] case final value? when value.isNotEmpty) value,
+    };
+    final buffer = wsalloc(MAX_PATH + 1);
+    try {
+      final length = GetTempPath(MAX_PATH + 1, buffer);
+      if (length > 0 && length <= MAX_PATH) dirs.add(buffer.toDartString());
+      for (final dir in dirs.toList()) {
+        final short = dir.toNativeUtf16();
+        try {
+          final long = GetLongPathName(short, buffer, MAX_PATH + 1);
+          if (long > 0 && long <= MAX_PATH) dirs.add(buffer.toDartString());
+        } finally {
+          free(short);
+        }
+      }
+    } finally {
+      free(buffer);
+    }
+    return dirs.toList();
+  }
+
+  /// ב-macOS מיקום שהמשתמש לא אישר (TCC) נכשל ב-EPERM, והודעת המערכת אינה
+  /// אומרת איפה מאשרים.
+  static String writeFailureMessage(
+    FileSystemException failure, {
+    required bool isMacOS,
+  }) {
+    final t = AppL10n.strings.setupError;
+    if (isMacOS && failure.osError?.errorCode == 1) {
+      return t.macVolumeAccessDenied;
+    }
+    return t.cannotWriteToDataDir(failure.osError?.message ?? failure.message);
   }
 
   static bool _isDiskFull(FileSystemException error) {

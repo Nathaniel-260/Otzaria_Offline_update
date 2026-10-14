@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
+import '../services/windows_arch.dart';
 import 'otzaria_release_channel.dart';
 
 /// הגרסאות שנמצאו ברשת, לפי ערוץ — ראו [OtzariaChannelPair].
@@ -91,6 +92,8 @@ class OtzariaRelease extends Equatable {
     required this.installerSizeBytes,
     this.installerSha256,
     this.releaseNotes,
+    this.installerArch = OtzariaArch.x64,
+    this.arm64Variant,
   });
 
   final String tagName;
@@ -114,6 +117,10 @@ class OtzariaRelease extends Equatable {
   final int installerSizeBytes;
   final String? installerSha256;
 
+  final OtzariaArch installerArch;
+
+  final OtzariaRelease? arm64Variant;
+
   /// עותק עם [releaseNotes] מוחלף — משמש להעדיף פסקה מיומן השינויים
   /// המרוכז (ראו `OtzariaChangelogClient`) על פני תיאור ה-release הגולמי.
   OtzariaRelease copyWithReleaseNotes(String? releaseNotes) => OtzariaRelease(
@@ -128,6 +135,24 @@ class OtzariaRelease extends Equatable {
         installerSizeBytes: installerSizeBytes,
         installerSha256: installerSha256,
         releaseNotes: releaseNotes,
+        installerArch: installerArch,
+        arm64Variant: arm64Variant?.copyWithReleaseNotes(releaseNotes),
+      );
+
+  OtzariaRelease withArm64Variant(OtzariaRelease? variant) => OtzariaRelease(
+        tagName: tagName,
+        name: name,
+        isPrerelease: isPrerelease,
+        isDraft: isDraft,
+        publishedAt: publishedAt,
+        installerKind: installerKind,
+        installerAssetName: installerAssetName,
+        installerDownloadUrl: installerDownloadUrl,
+        installerSizeBytes: installerSizeBytes,
+        installerSha256: installerSha256,
+        releaseNotes: releaseNotes,
+        installerArch: installerArch,
+        arm64Variant: variant,
       );
 
   Map<String, dynamic> toJson() => {
@@ -142,6 +167,8 @@ class OtzariaRelease extends Equatable {
         'installerSizeBytes': installerSizeBytes,
         if (installerSha256 != null) 'installerSha256': installerSha256,
         'releaseNotes': releaseNotes,
+        if (installerArch != OtzariaArch.x64)
+          'installerArch': installerArch.name,
       };
 
   static String? normalizedSha256(Object? raw) {
@@ -157,7 +184,12 @@ class OtzariaRelease extends Equatable {
     final kind = OtzariaInstallerKind.values
         .where((k) => k.name == kindName)
         .firstOrNull;
-    if (json['tagName'] is! String ||
+    final archName = json['installerArch'];
+    final arch = archName == null
+        ? OtzariaArch.x64
+        : OtzariaArch.values.where((a) => a.name == archName).firstOrNull;
+    if (arch == null ||
+        json['tagName'] is! String ||
         json['installerAssetName'] is! String ||
         json['installerSizeBytes'] is! int ||
         kind == null) {
@@ -178,6 +210,7 @@ class OtzariaRelease extends Equatable {
       installerSizeBytes: json['installerSizeBytes'] as int,
       installerSha256: normalizedSha256(json['installerSha256']),
       releaseNotes: json['releaseNotes'] as String?,
+      installerArch: arch,
     );
   }
 
@@ -194,6 +227,8 @@ class OtzariaRelease extends Equatable {
         installerSizeBytes,
         installerSha256,
         releaseNotes,
+        installerArch,
+        arm64Variant,
       ];
 }
 

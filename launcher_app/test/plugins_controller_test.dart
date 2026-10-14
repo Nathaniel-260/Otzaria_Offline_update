@@ -3,9 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:plugins_manager/plugins_manager.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -717,6 +720,51 @@ void main() {
       expect(c.installed, {pluginId: '1.5.0'});
     });
 
+    test('תוסף מושבת ותוסף בפיתוח באוצריא מזוהים מהרישום', () async {
+      launchPath = exe;
+      final dbPath = p.join(
+        p.dirname(exe),
+        InstalledPluginsScanner.portableDataFolderName,
+        'databases',
+        pluginsRegistryFileName,
+      );
+      Directory(p.dirname(dbPath)).createSync(recursive: true);
+      sqlite3.open(dbPath)
+        ..execute(
+          'CREATE TABLE plugin_installation (plugin_id TEXT PRIMARY KEY, '
+          'version TEXT NOT NULL, enabled INTEGER NOT NULL, source_type TEXT)',
+        )
+        ..execute(
+          'INSERT INTO plugin_installation VALUES (?, ?, 0, ?), (?, ?, 1, ?)',
+          ['off', '1.0.0', 'packaged', 'dev', '0.1.0', 'development'],
+        )
+        ..close();
+      await saveCatalog(
+        PluginCatalog(
+          plugins: [
+            plugin('a', 'א', version: '2.0.0', manifestId: 'off'),
+            plugin('b', 'ב', version: '2.0.0', manifestId: 'dev'),
+          ],
+        ),
+      );
+      final c = PluginsModuleController(
+        mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        otzariaLaunchPath: () async => launchPath,
+        locatePluginsDb: PluginsModuleController.locateOtzariaPluginsDb,
+      );
+      addTearDown(c.dispose);
+
+      await c.load();
+      final off = c.byId('a')!;
+      final dev = c.byId('b')!;
+
+      expect(c.isDisabledInOtzaria(off), isTrue);
+      expect(c.statusOf(off), PluginInstallStatus.updateAvailable);
+      expect(c.isDevelopmentInOtzaria(dev), isTrue);
+      expect(c.statusOf(dev), PluginInstallStatus.upToDate);
+      expect(c.updatablePlugins.map((p) => p.id), ['a']);
+    });
+
     test('refreshInstalled סורק מחדש אחרי שנתיב ההתקנה התברר', () async {
       final c = portableController();
       await c.load();
@@ -857,6 +905,111 @@ void main() {
 
       expect(c.isAwaitingInstall, isFalse);
       expect(announced, isFalse);
+    });
+
+    group('תוצאת ההתקנה שאוצריא כותבת (C2)', () {
+      late String dataRoot;
+      late String delivered;
+
+      setUp(() {
+        dataRoot = p.dirname(p.dirname(installedDir));
+        delivered = p.join(tempDir.path, 'plugin-1.0.0.otzplugin');
+      });
+
+      void capabilities(int pluginInstallResults) => File(
+            p.join(dataRoot, OtzariaCapabilities.fileName),
+          ).writeAsStringSync(
+            jsonEncode({
+              'formatVersion': 1,
+              'pluginInstallResults': pluginInstallResults,
+            }),
+          );
+
+      void otzariaReports(String outcome, {String? message}) {
+        final line = jsonEncode({
+          'path': delivered,
+          'pluginId': manifestId,
+          'version': '2.0.0',
+          'outcome': outcome,
+          'message': message,
+          'at': DateTime.now().toUtc().toIso8601String(),
+        });
+        File(p.join(dataRoot, PluginInstallResults.fileName))
+            .writeAsStringSync('$line\n', mode: FileMode.append);
+      }
+
+      test('ביטול באוצריא נסגר מיד ומדווח, בלי לחכות לפסק הזמן', () async {
+        capabilities(1);
+        final c = watching();
+        await c.load();
+        final rejected = c.installRejections.first;
+        var succeeded = false;
+        c.installCompletions.listen((_) => succeeded = true);
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('cancelled');
+
+        final entry = await rejected;
+        expect(entry.name, 'תוסף');
+        expect(entry.report.cancelled, isTrue);
+        expect(c.isAwaitingInstall, isFalse);
+        expect(succeeded, isFalse);
+      });
+
+      test('כשל עם הודעה מאוצריא עובר הלאה', () async {
+        capabilities(1);
+        final c = watching();
+        await c.load();
+        final rejected = c.installRejections.first;
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('rejected_incompatible', message: 'דורש 0.9.99');
+
+        expect((await rejected).report.message, 'דורש 0.9.99');
+      });
+
+      test('הצלחה מהקובץ מודיעה כמו הסריקה', () async {
+        capabilities(1);
+        final c = watching();
+        await c.load();
+        final announced = c.installCompletions.first;
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('installed');
+
+        expect(await announced, 'תוסף');
+      });
+
+      test('אוצריא ישנה בלי היכולת — הקובץ אינו נקרא, הסריקה ממשיכה', () async {
+        final c = watching(timeout: const Duration(milliseconds: 150));
+        await c.load();
+        var rejected = false;
+        c.installRejections.listen((_) => rejected = true);
+
+        c.watchForInstall(
+          plugin('חדש', 'תוסף', manifestId: manifestId),
+          deliveredPath: delivered,
+          handedOffAt: DateTime.now(),
+        );
+        otzariaReports('cancelled');
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+
+        expect(c.isAwaitingInstall, isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(rejected, isFalse);
+      });
     });
 
     test('תוסף בלי מזהה מניפסט אינו נכנס להמתנה', () async {
@@ -1067,6 +1220,57 @@ void main() {
       expect(identical(first, second), isTrue);
       await first;
       expect(controller.isSyncing, isFalse);
+    });
+
+    test('שבת בבדיקה הקלה — הודעת השבת, והמראה אינה נחשבת מעודכנת', () async {
+      final closed = PluginsModuleController(
+        mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({'error': 'shabbat'}),
+            503,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+      addTearDown(closed.dispose);
+      await closed.load();
+
+      await closed.checkOnline();
+
+      expect(closed.status, PluginsModuleStatus.ready);
+      expect(
+        closed.onlineCheckError,
+        AppL10n.strings.pluginsDomain.siteClosedForShabbat,
+      );
+    });
+
+    test('שבת: המראה הקיימת נשארת מוכנה, עם הודעה ייעודית ובלי שגיאה',
+        () async {
+      await saveCatalog(PluginCatalog(plugins: [plugin('a', 'א')]));
+      final closed = PluginsModuleController(
+        mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({'error': 'shabbat', 'message': 'x'}),
+            503,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+      addTearDown(closed.dispose);
+      await closed.load();
+
+      await closed.sync();
+
+      expect(closed.status, PluginsModuleStatus.ready);
+      expect(closed.errorMessage, isNull);
+      expect(
+        closed.shabbatNotice,
+        AppL10n.strings.pluginsDomain.siteClosedForShabbat,
+      );
+      expect(closed.plugins.map((plugin) => plugin.id), ['a']);
+      expect(closed.lastSyncFailed, isTrue);
     });
 
     test('a new sync drops the previous outcome', () async {

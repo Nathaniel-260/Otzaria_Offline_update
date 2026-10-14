@@ -86,6 +86,9 @@ class LibraryModulePort implements LibraryMirrorModule, AutoInstallLibrary {
 
   @override
   Future<void> update() => _library.update();
+
+  @override
+  Future<void> recheck() => _library.checkForUpdate();
 }
 
 class PluginsModulePort implements PluginsMirrorModule {

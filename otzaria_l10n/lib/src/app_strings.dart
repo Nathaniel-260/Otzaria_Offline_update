@@ -138,6 +138,10 @@ abstract class HomeStrings {
   /// הצליחה — רק אז מבקשים מהמשתמש לסגור ידנית.
   String get closeOtzariaForLibraryDialogTitle;
   String get closeOtzariaForLibraryPrompt;
+  String get closeOtzariaForAppInstallDialogTitle;
+  String get closeOtzariaForAppInstallPrompt;
+  String get closeOtzariaAndInstallConfirm;
+  String get elevatedAsOtherUserWarning;
 
   String get otzariaOpenSnack;
 
@@ -150,6 +154,9 @@ abstract class HomeStrings {
   String libraryFreshInstallPrompt(String targetVersion);
   String libraryUpdatePrompt(String localVersion, String targetVersion);
   String get libraryUpdateConfirm;
+
+  /// טווח ולא מספר: הזמן בפועל משתנה פי 3–5 בין מחשבים.
+  String libraryApplyEstimate(int lowMinutes, int highMinutes);
   String libraryUpdatedSnack(String version);
 
   /// אזהרה לפני עדכון הספרייה ולאורכו — התוכנה והעדכונים יושבים על הכונן
@@ -227,6 +234,7 @@ abstract class HomeStrings {
   // ── תוויות מצב הספרייה, משותפות לדף הבית ולמסך הספרייה ──────────────────
   String get libraryNotInstalledYet;
   String get libraryUpdating;
+  String get libraryApplyActive;
   String get libraryNothingDownloaded;
   String get libraryNeedsManualPath;
   String get libraryPersonalOtherMachine;
@@ -339,6 +347,16 @@ abstract class LibraryScreenStrings {
   String get updatingProgress;
   String get installUpdateButton;
   String get updateDialogTitle;
+
+  /// "מה חדש בספרייה" — `library-changes.md` של הגרסאות שבטווח העדכון.
+  String get changesTitle;
+  String changesPendingSubtitle(String version);
+  String changesAppliedSubtitle(String version);
+
+  /// הטווח ארוך ממה שיש על הכונן: חלק מהגרסאות בלי רשימה, או מעבר לעשר.
+  String changesPartial(int shown, int total);
+  String get changesButton;
+  String get changesNotFound;
 
   /// בקשת עדכון אינדקס החיפוש באוצריא, אחרי שהמסד הוחלף מבחוץ.
   String get reindexTitle;
@@ -598,6 +616,8 @@ abstract class PluginsStrings {
 
   /// אחרי שהסריקה הוכיחה שאוצריא סיימה — ולא כשהמסירה אליה הצליחה.
   String installDoneSnack(String pluginName);
+  String installCancelledSnack(String pluginName);
+  String installRejectedSnack(String pluginName, String? reason);
   String get installFailedSnack;
 
   String get loadingCatalog;
@@ -691,6 +711,9 @@ abstract class PluginsStrings {
   /// היה נראה כתקלה. בכל שאר המצבים הבחירה שקופה — מוצג פשוט מספר הגרסה
   /// שתותקן.
   String get installChipIncompatible;
+  String get installChipDisabled;
+  String get installChipDisabledUpdate;
+  String get installChipDevelopment;
 
   String get infoPanelTitle;
   String get tagsPanelTitle;
@@ -923,6 +946,11 @@ abstract class SetupErrorStrings {
   String get driveFullTitle;
   String get appTranslocated;
   String get appTranslocatedTitle;
+  String get runningFromTemp;
+  String get runningFromTempTitle;
+
+  /// macOS (TCC) חסם כתיבה לתיקייה שליד התוכנה — EPERM, לא הרשאות קובץ.
+  String get macVolumeAccessDenied;
 }
 
 // ── כונן מוגן-כתיבה: מצב קריאה ────────────────────────────────────────────────
@@ -1059,6 +1087,11 @@ abstract class LauncherUpdateStrings {
   String downloadFailed(int statusCode);
   String sizeMismatch(int received, int expected);
   String replaceFailed(String error);
+  String replaceFailedNotRestored(
+    String error,
+    String previousPath,
+    String executableName,
+  );
   String restartFailed(String error);
   String restartFailedRolledBack(String error);
   String get digestMismatch;
@@ -1196,6 +1229,9 @@ abstract class LibraryDomainStrings {
   );
   String planNoFullDbEither(String reason);
   String planPatchSchemaTooNew(int schemaVersion, int latestVersion);
+  String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion);
+  String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion);
+  String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion);
 
   /// אותו מצב על ציר פורמט ה-patch: הסכמה מוכרת, הפורמט לא.
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion);
@@ -1277,6 +1313,26 @@ abstract class LibraryDomainStrings {
   String localSourceNotFound(String url);
   String localFileSizeMismatch(int expected, int actual, String url);
   String localFileHashMismatch(String url);
+  String get manifestMissingPatchFormatVersion;
+  String manifestInvalidOptionalField(String key);
+  String manifestInvalidHashMap(String key);
+  String splitManifestDownloadFailed(String name, int statusCode);
+  String get interruptedUpdateWithoutBackup;
+  String get interruptedUpdateRestored;
+  String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema);
+  String planSchemaBarrierNeedsFullDownload(int schemaVersion);
+  String planDeltaNeedsAppUpdate(
+    int latestVersion,
+    int supportedSchema,
+    int supportedPatchFormat,
+  );
+  String planHeavyDelta(String deltaSize, String localDbSize);
+  String tableHashMismatch(String tables);
+  String patchOpenFailed(String path, String detail);
+  String get networkInterrupted;
+  String get deletePreviousArchiveFailed;
+  String joinedArchiveSizeMismatch(int written, int expected);
+  String get joinedArchiveHashMismatch;
 
   // library_manager
   String get mirrorMissing;
@@ -1288,6 +1344,7 @@ abstract class LibraryDomainStrings {
   String get fullDbAssetMissingFromPlan;
   String get fullDbExtractionFailed;
   String get fullDbNeedsNativeZstd;
+  String get patchNeedsNativeZstd;
   String versionMismatchAfterWrite(int? actual, int? expected);
   String get updateCancelled;
 
@@ -1320,6 +1377,7 @@ abstract class LibraryDomainStrings {
   String get companionCatalogName;
   String get companionDictionaryName;
   String get companionSemanticName;
+  String get libraryChangesNotesName;
   String get semanticDownloading;
   String get semanticInstalling;
   String get semanticDownloadPrompt;
@@ -1408,6 +1466,9 @@ abstract class AppDomainStrings {
   /// האשף רץ, סיים, וההתקנה עדיין לא נראית על הדיסק — כמעט תמיד משמע
   /// שהמשתמש עוד באמצע. לא שגיאה: הודעה שאומרת מה לעשות.
   String get wizardStillOpen;
+  String get wizardEndedWithoutInstall;
+  String get setupContinuesElsewhere;
+  String get stopWaitingForSetup;
 
   String get noInstallableReleaseForPlatform;
   String get mirrorEmptyRunDownload;
@@ -1422,6 +1483,7 @@ abstract class AppDomainStrings {
 
   String installerDownloadFailed(int statusCode);
   String installerSizeMismatch(int received, int expected);
+  String get installerDigestMismatch;
   String installerExitCode(int exitCode, String output);
   String installerLogTail(String tail);
   String get macAppNotFoundInArchive;
@@ -1444,6 +1506,8 @@ abstract class AppDomainStrings {
   String launchFailed(int exitCode, String stderr);
   String githubStatus(int statusCode, String uri);
   String githubRateLimited(int? retryAfterMinutes);
+  String networkBlockedByFilter(int statusCode, String host);
+  String networkCertificateRejected(String host);
   String noReleasesAtAll(String repo);
   String get windowsOnlyReader;
   String get macOnlyReader;
@@ -1461,6 +1525,7 @@ abstract class PluginsDomainStrings {
   /// אין לתוסף אף בילד שירוץ על גרסת אוצריא שבמחשב הזה.
   String get noCompatibleBuild;
   String get localPluginFileMissing;
+  String get localPluginFileCorrupt;
   String get badPluginExtension;
   String get otzariaOpenFailedHint;
   String otzariaOpenFailed(String error);
@@ -1488,6 +1553,10 @@ abstract class PluginsDomainStrings {
   String syncScreenshotFailed(String name, String error);
   String syncPluginFileFailed(String name, String error);
   String get downloadedFileNotPlugin;
+  String get downloadedFileNotImage;
+  String get downloadedFileHashMismatch;
+  String get downloadedFileWrongBuild;
+  String get siteClosedForShabbat;
 
   String get whatPluginList;
   String get whatStoreStructure;
@@ -1762,6 +1831,13 @@ abstract class CustomAppsStrings {
 
   String installedSnack(String name);
 
+  String get trustDialogTitle;
+  String trustDialogContent(String name, String source);
+  String get trustDialogConfirm;
+  String get unverifiedDialogTitle;
+  String unverifiedDialogContent(String fileName);
+  String get unverifiedDialogConfirm;
+
   /// מוצג כל זמן שממתינים לרישום ההסרה אחרי ההתקנה. חייב להיות שם: הסקירה
   /// החוזרת יכולה להימשך עד דקה, ובלי הודעה זה נראה כתקיעה.
   String get learningLabel;
@@ -1813,6 +1889,13 @@ abstract class CustomAppsDomainStrings {
   String installerElevatedRetryDeclined(int firstExitCode);
   String get installerElevationDeclined;
   String get installerDigestMismatch;
+
+  /// קובץ התקנה בלי sha256 שמור אינו מורץ עד שמישהו מאשר אותו כאן.
+  String get installerUnverified;
+
+  /// רשומה שהגיעה ממחשב אחר אינה מותקנת לפני אישור במחשב הזה.
+  String get appNotTrustedHere;
+  String get appNotTrustedForLaunch;
   String fileCopyFailed(String error);
   String portableFileInUse(String fileName, String error);
   String launchFileMissing(String launchPath);
@@ -1855,6 +1938,8 @@ abstract class ErrorReportsStrings {
 
   String get collectOtzariaOpenSnack;
 
+  String get legacyReportsDialogTitle;
+  String get legacyReportsDialogContent;
   String get introDialogTitle;
   String get introDialogContent;
   String get introDialogContentReadOnly;
@@ -1890,6 +1975,7 @@ abstract class ErrorReportsDomainStrings {
   String get someNotCollected;
 
   String uploadHttpStatus(int statusCode);
+  String get uploadShabbat;
   String get uploadTimedOut;
   String uploadNetworkError(String error);
   String outboxUnreadable(String error);

@@ -280,8 +280,13 @@ void main() {
 
     // המשימה מוגדרת `unchecked` ב-iss של אוצריא, ולכן בלי הדגל הזה התקנה
     // שקטה לא יוצרת קיצור-דרך בשולחן העבודה.
-    test('משימת קיצור-הדרך בשולחן העבודה נדלקת במפורש', () {
-      expect(args, contains('/MERGETASKS=desktopicon'));
+    test('עדכון אינו יוצר מחדש קיצור-דרך שהמשתמש מחק', () {
+      expect(args.where((a) => a.startsWith('/MERGETASKS')), isEmpty);
+    });
+
+    test('התקנה למשתמש הנוכחי נשארת כזו גם מתהליך מורם', () {
+      expect(args, contains('/CURRENTUSER'));
+      expect(args, isNot(contains('/ALLUSERS')));
     });
 
     // ב-`otzaria.iss` יש רשומת `[Run]` שרצה **רק** בהתקנה שקטה, ובלי הדגל
@@ -347,7 +352,9 @@ void main() {
         scope: OtzariaWindowsInstallScope.allUsers,
       );
 
-      expect(args, containsAll(['/ALLUSERS', '/MERGETASKS=desktopicon']));
+      expect(args, contains('/ALLUSERS'));
+      expect(args.where((a) => a.startsWith('/MERGETASKS')), isEmpty);
+      expect(args, isNot(contains('/CURRENTUSER')));
       expect(args, isNot(contains('/PORTABLE')));
     });
   });
@@ -781,9 +788,28 @@ void main() {
     );
 
     test(
-      'same-base hotfix with the exe untouched remains installable',
+      'an older hotfix left on disk after exit 0 is not the new install',
       () async {
         await File(exe).writeAsString('0.9.97+99701');
+        final fakeInstaller = await _writeExitScript(tempDir.path, exitCode: 0);
+
+        await expectLater(
+          installer.installWithWizard(
+            release: _release(tag: '0.9.97.2+800'),
+            installerPath: fakeInstaller,
+            installDir: installDir,
+            locateInstalled: (_) async => installedAt(exe),
+            detectTimeout: Duration.zero,
+          ),
+          throwsA(isA<OtzariaWizardStillOpen>()),
+        );
+      },
+    );
+
+    test(
+      'an exe without a version code keeps the three-part comparison',
+      () async {
+        await File(exe).writeAsString('0.9.97+740');
         final fakeInstaller = await _writeExitScript(tempDir.path, exitCode: 0);
 
         final state = await installer.installWithWizard(

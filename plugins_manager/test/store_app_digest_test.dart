@@ -27,6 +27,7 @@ StoreAppRelease _v7({String? sha256}) => StoreAppRelease(
     );
 
 void main() {
+  sandboxRealDataRoot();
   late Directory temp;
   late String mirrorDir;
 

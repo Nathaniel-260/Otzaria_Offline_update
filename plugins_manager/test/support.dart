@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'package:plugins_manager/plugins_manager.dart';
 
 /// בונה קובץ `.otzplugin` אמיתי (ZIP) — `PluginManifestReader` קורא ארכיון
 /// ממש, ולכן בדיקה עם מחרוזת מדומה לא הייתה בודקת כלום.
@@ -23,6 +24,14 @@ String writePluginFile(Directory dir, String name, String manifestText) {
   File(path).writeAsBytesSync(pluginBytes(manifestText));
   return path;
 }
+
+/// כל בדיקה שעלולה לגעת בתיקיית התוספים של ברירת המחדל קוראת לזה ב-main.
+void sandboxRealDataRoot() {
+  _sandbox ??= Directory.systemTemp.createTempSync('plugins-test-sandbox-');
+  InstalledPluginsScanner.sandboxForTests(_sandbox!.path);
+}
+
+Directory? _sandbox;
 
 /// תשובת JSON כמו של האתר — בייטים ב-UTF-8, כי כל הטקסטים בעברית.
 http.Response jsonResponse(Object body, {int status = 200}) =>

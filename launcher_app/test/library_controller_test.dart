@@ -32,7 +32,14 @@ void main() {
     HttpOverrides.global = NoNetworkHttpOverrides();
     AppLogger.resetForTest();
     await AppLogger.init(tempDir.path);
-    controller = LibraryModuleController(dataDir: tempDir.path);
+    controller = LibraryModuleController(
+      dataDir: tempDir.path,
+      manager: LibraryManager(
+        dataDir: tempDir.path,
+        operatingSystem: 'linux',
+        environment: {'HOME': p.join(tempDir.path, 'home')},
+      ),
+    );
   });
 
   tearDown(() async {
@@ -68,6 +75,8 @@ void main() {
         dataDir: tempDir.path,
         manager: LibraryManager(
           dataDir: tempDir.path,
+          operatingSystem: 'linux',
+          environment: {'HOME': p.join(tempDir.path, 'home')},
           versionReader: const LocalDbVersionReader(
             busyTimeout: Duration(milliseconds: 50),
           ),
@@ -156,8 +165,8 @@ void main() {
       _setReadOnly(crashed, true);
       try {
         final fromHealthCheck = thrownBy(
-          () =>
-              const LibraryDbRecoveryService().checkDbHealthAfterCrash(crashed),
+          () => const OfflineLibraryDbRecoveryService()
+              .checkDbHealthAfterCrash(crashed),
         );
         expect(
           fromHealthCheck,
@@ -249,6 +258,38 @@ void main() {
 
       expect(notifications, 0);
       expect(controller.status, LibraryModuleStatus.idle);
+    });
+  });
+
+  group('ספרייה שדורשת אוצריא חדשה יותר', () {
+    Future<String?> blockedMessage(String? mirroredOtzaria) async {
+      controller.dispose();
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        mirroredOtzariaUpdate: () async => mirroredOtzaria,
+        manager: _NeedsNewerOtzariaManager(tempDir.path),
+      );
+      await controller.checkForUpdate();
+      expect(controller.status, LibraryModuleStatus.error);
+      return controller.errorMessage;
+    }
+
+    test('אוצריא חדשה בכונן שקוראת את הספרייה — מוצע הסדר הנכון', () async {
+      expect(
+        await blockedMessage('0.9.98'),
+        AppL10n.strings.libraryDomain.libraryNeedsOtzariaUpdateFromDrive(
+          '0.9.98',
+        ),
+      );
+    });
+
+    test('בלי אוצריא מתאימה בכונן — נשאר ההסבר של התוכנית', () async {
+      final reason = AppL10n.strings.libraryDomain.planOtzariaTooOldForLibrary(
+        5,
+        31,
+      );
+      expect(await blockedMessage(null), reason);
+      expect(await blockedMessage('0.9.97+800'), reason);
     });
   });
 
@@ -838,6 +879,36 @@ void main() {
     });
   });
 
+  test('"מה חדש" של העדכון המוצע, ואחרי ההחלה של מה שהותקן', () async {
+    controller.dispose();
+    final manager = _ChangesNotesManager(tempDir.path);
+    controller = LibraryModuleController(
+      dataDir: tempDir.path,
+      manager: manager,
+    );
+
+    await controller.checkForUpdate();
+    expect(controller.changesNotes.map((n) => n.releaseTag), ['v33', 'v32']);
+    expect(controller.changesNotesApplied, isFalse);
+    expect(controller.changesNotesVersion, 33);
+
+    await controller.update();
+
+    expect(controller.status, LibraryModuleStatus.upToDate);
+    expect(manager.between, [(31, 33)]);
+    expect(controller.changesNotes.map((n) => n.releaseTag), ['v33', 'v32']);
+    expect(controller.changesNotesApplied, isTrue);
+    expect(controller.changesNotesVersion, 33);
+    expect(controller.changesNotesRange, 2);
+    expect(controller.changesNotesPartial, isFalse);
+
+    // החלה חוזרת שלא העלתה גרסה (נלווים בלבד) אינה מציגה שוב "מה חדש".
+    await controller.update();
+
+    expect(controller.changesNotesApplied, isFalse);
+    expect(controller.changesNotes, isEmpty);
+  });
+
   group('החלה שרצה', () {
     late _ApplyManager manager;
 
@@ -909,6 +980,19 @@ void main() {
       expect(controller.status, LibraryModuleStatus.error);
       expect(seen, isNotEmpty);
       expect(seen.last, isFalse);
+    });
+
+    test('בזמן החלה בקשת האינדקס הממתינה אינה נמחקת', () async {
+      const pending = ExternalUpdateNoticeData(route: 'full');
+      final gate = manager.applyGate = Completer<void>();
+      final apply = controller.update();
+      controller.pendingReindex = pending;
+
+      await controller.markReindexRequestDelivered();
+      expect(controller.pendingReindex, same(pending));
+
+      gate.complete();
+      await apply;
     });
 
     test('ניסיון המסד המלא מנקה את השגיאה הקודמת כשהוא מתחיל', () async {
@@ -999,6 +1083,32 @@ class _ApplyManager extends LibraryManager {
     if (applyError case final error?) throw error;
     return const {};
   }
+}
+
+class _NeedsNewerOtzariaManager extends LibraryManager {
+  _NeedsNewerOtzariaManager(String dataDir) : super(dataDir: dataDir);
+
+  @override
+  Future<LibraryUpdateCheckResult> checkForUpdate() async =>
+      LibraryUpdateCheckResult(
+        dbPath: 'seforim.db',
+        localVersion: const LocalDbVersion(
+          dbVersion: 30,
+          schemaVersion: 5,
+          hasVersionMeta: true,
+        ),
+        latestVersion: 31,
+        readableDbSchemaVersion: 5,
+        needsNewerOtzaria: true,
+        plan: LibraryUpdatePlan.blocked(
+          localVersion: 30,
+          targetVersion: 31,
+          reason: AppL10n.strings.libraryDomain.planOtzariaTooOldForLibrary(
+            5,
+            31,
+          ),
+        ),
+      );
 }
 
 class _DownloadManager extends LibraryManager {
@@ -1096,6 +1206,7 @@ void _writeMirror(Directory tempDir, {required List<_MirrorRelease> releases}) {
           'toVersion': patch.to,
           'fromSchemaVersion': patch.fromSchema,
           'toSchemaVersion': patch.toSchema,
+          if (patch.toSchema >= 4) 'patchFormatVersion': 4,
           'fromContentHash': 'from${patch.from}',
           'toContentHash': 'to${patch.to}',
           'patchFiles': [
@@ -1190,4 +1301,65 @@ void _setReadOnly(String path, bool readOnly) {
       ? Process.runSync('attrib', [readOnly ? '+R' : '-R', path])
       : Process.runSync('chmod', [readOnly ? '444' : '644', path]);
   expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+}
+
+class _ChangesNotesManager extends LibraryManager {
+  _ChangesNotesManager(String dataDir) : super(dataDir: dataDir);
+
+  int _version = 31;
+  final between = <(int, int)>[];
+
+  static const _notes = [
+    LibraryChangesNote(releaseTag: 'v33', path: 'v33.md'),
+    LibraryChangesNote(releaseTag: 'v32', path: 'v32.md'),
+  ];
+
+  @override
+  Future<LibraryUpdateCheckResult> checkForUpdate() async =>
+      LibraryUpdateCheckResult(
+        dbPath: '/db/seforim.db',
+        localVersion: LocalDbVersion(
+          dbVersion: _version,
+          schemaVersion: 6,
+          hasVersionMeta: true,
+        ),
+        latestVersion: 33,
+        plan: _version < 33
+            ? LibraryUpdatePlan.delta(
+                localVersion: _version,
+                targetVersion: 33,
+                steps: const [],
+              )
+            : LibraryUpdatePlan.none(localVersion: 33),
+      );
+
+  @override
+  Future<List<LibraryChangesNote>> pendingChangesNotes(
+    LibraryUpdateCheckResult check,
+  ) async =>
+      check.dbUpdateAvailable ? _notes : const [];
+
+  @override
+  Future<List<LibraryChangesNote>> changesNotesBetween(
+    int fromVersion,
+    int toVersion,
+  ) async {
+    between.add((fromVersion, toVersion));
+    return _notes;
+  }
+
+  @override
+  Future<Set<int>> applyUpdate(
+    LibraryUpdateCheckResult check, {
+    void Function(LibraryApplyProgress progress)? onProgress,
+    void Function(String assetName, Object error)? onCompanionWarning,
+    void Function(Object error)? onStateWarning,
+    void Function(String dbPath)? onLibraryLocationNotSet,
+    void Function(String reason)? onLibraryLocationFailure,
+    bool Function()? isCancelled,
+    bool useFullDownloadFallback = false,
+  }) async {
+    _version = 33;
+    return const {};
+  }
 }

@@ -2,6 +2,22 @@ import 'package:plugins_manager/plugins_manager.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('גרסת פיתוח מותקנת אינה מוצעת לעדכון', () {
+    final plugin = StorePlugin.fromApi(
+      {'id': 'a', 'name': 'א', 'version': '2.0.0', 'pluginUid': 'uid'},
+      'https://otzaria.test',
+    );
+
+    expect(
+      plugin.statusAgainst({'uid': '0.1.0'}),
+      PluginInstallStatus.updateAvailable,
+    );
+    expect(
+      plugin.statusAgainst({'uid': '0.1.0'}, development: {'uid'}),
+      PluginInstallStatus.upToDate,
+    );
+  });
+
   group('StorePlugin.statusAgainst', () {
     StorePlugin plugin({String? manifestId, String version = '2.0.0'}) =>
         StorePlugin.fromJson({

@@ -190,8 +190,10 @@ class HomeScreen extends StatelessWidget {
         needsDownload: c.currentVersion == null
             ? t.appNoInstallFound
             : t.appNothingDownloaded,
+        installStage: c.installStage,
       ),
       primaryActionText: switch (c.status) {
+        _ when c.libraryApplyActive => t.libraryApplyActive,
         OtzariaModuleStatus.updateAvailable => common.install,
         _ => c.canLaunch ? common.launch : null,
       },
@@ -202,6 +204,7 @@ class HomeScreen extends StatelessWidget {
       },
       primaryActionLoading: isBusy,
       onPrimaryAction: switch (c.status) {
+        _ when c.libraryApplyActive => null,
         OtzariaModuleStatus.updateAvailable => () => _confirmAppInstall(
               context,
             ),
@@ -259,6 +262,7 @@ class HomeScreen extends StatelessWidget {
     if (library.status != LibraryModuleStatus.updateAvailable) return;
 
     await applyLibraryAndReport(
+      context,
       library,
       library.update,
       onRequestReindex: onRequestReindex,

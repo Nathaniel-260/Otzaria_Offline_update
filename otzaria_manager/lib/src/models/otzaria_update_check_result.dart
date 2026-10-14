@@ -15,6 +15,7 @@ class OtzariaUpdateCheckResult {
     this.preferPrerelease = false,
     this.isOtzariaRunning = false,
     this.hasStaleFullPackage = false,
+    this.mirrorLacksArchitectures = false,
   });
 
   /// הגרסה היציבה שבמראה, או null אם לא הורדה כזו.
@@ -38,6 +39,8 @@ class OtzariaUpdateCheckResult {
   /// אינה נתמכת יותר, וההורדה הבאה מוחקת אותה — ראו
   /// `OtzariaAppMirror.staleFullPackages`.
   final bool hasStaleFullPackage;
+
+  final bool mirrorLacksArchitectures;
 
   /// הגרסה שתותקן בפועל — לפי הערוץ שנבחר, עם נפילה לערוץ השני כשהנבחר
   /// ריק. null אם עדיין לא הורדה שום גרסה. ראו [needsDownload].
@@ -103,6 +106,11 @@ class OtzariaUpdateCheckResult {
 
     final installedBase = _baseVersion(installed);
     final tagBase = _baseVersion(tag);
+    if (installed == installedBase &&
+        tag == tagBase &&
+        compareBases(installedVersion, tagName) == 0) {
+      return true;
+    }
     if (installedBase != tagBase) return false;
     return installedBase == installed && tagBase != tag;
   }
@@ -121,16 +129,8 @@ class OtzariaUpdateCheckResult {
     final leftBase = _baseVersion(left);
     final rightBase = _baseVersion(right);
 
-    final leftParts = _numericParts(leftBase);
-    final rightParts = _numericParts(rightBase);
-    final count = leftParts.length > rightParts.length
-        ? leftParts.length
-        : rightParts.length;
-    for (var i = 0; i < count; i++) {
-      final leftPart = i < leftParts.length ? leftParts[i] : 0;
-      final rightPart = i < rightParts.length ? rightParts[i] : 0;
-      if (leftPart != rightPart) return leftPart < rightPart ? -1 : 1;
-    }
+    final bases = compareBases(a, b);
+    if (bases != 0) return bases;
 
     final leftHasSuffix = left != leftBase;
     final rightHasSuffix = right != rightBase;
@@ -187,6 +187,47 @@ class OtzariaUpdateCheckResult {
     final separator = version.indexOf('-');
     return separator >= 0 ? version.substring(0, separator) : version;
   }
+
+  static bool carriesVersionCode(String raw) => _hotfixOf(raw) != null;
+
+  static int compareBases(String a, String b, {bool? leftCarriesHotfix}) {
+    var left = _numericParts(_baseVersion(normalizeVersion(a)));
+    var right = _numericParts(_baseVersion(normalizeVersion(b)));
+    if (!((leftCarriesHotfix ?? _carriesHotfix(a)) && _carriesHotfix(b))) {
+      left = left.take(3).toList();
+      right = right.take(3).toList();
+    }
+    final count = left.length > right.length ? left.length : right.length;
+    for (var i = 0; i < count; i++) {
+      final leftPart = i < left.length ? left[i] : 0;
+      final rightPart = i < right.length ? right[i] : 0;
+      if (leftPart != rightPart) return leftPart < rightPart ? -1 : 1;
+    }
+    return 0;
+  }
+
+  static bool _carriesHotfix(String raw) =>
+      _numericParts(_baseVersion(normalizeVersion(raw))).length >= 4 ||
+      _buildSuffix(raw) == null;
+
+  static String versionFromDisk(String raw) {
+    final version = normalizeVersion(raw);
+    final hotfix = _hotfixOf(raw);
+    return hotfix == null || hotfix == 0 ? version : '$version.$hotfix';
+  }
+
+  static int? _hotfixOf(String raw) {
+    final build = buildNumberOf(raw);
+    final parts = normalizeVersion(raw).split('.').map(int.tryParse).toList();
+    if (build == null || build < 10000 || parts.length != 3) return null;
+    if (parts.any((part) => part == null || part < 0 || part > 99)) return null;
+    final [major!, minor!, patch!] = parts;
+    if (build ~/ 100 != major * 10000 + minor * 100 + patch) return null;
+    return build % 100;
+  }
+
+  static int? buildNumberOf(String raw) =>
+      int.tryParse(_buildSuffix(raw) ?? '');
 
   /// מנרמל תג/גרסה להשוואה: מוריד `v` מוביל ואת סיומת ה-build שאחרי `+`.
   ///

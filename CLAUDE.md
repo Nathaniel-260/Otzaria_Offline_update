@@ -15,8 +15,8 @@ The three rules that apply to *every* change:
    sub-packages, so analyzing from the root does not cover them.
 2. **Push only to `main`**, unless the maintainer explicitly asks for another
    branch. No feature branches on your own initiative.
-3. **No comments in code.** Put the explanation in the commit message summary
-   instead. Whenever you find a comment in code you touch, delete it.
+3. **Comments are rare and short** (≤2 lines, a non-obvious why or a trap,
+   never history). Everything else goes in the commit message — AGENTS.md §4.
 4. **QA before calling it done.** When a feature or PR is finished, a separate
    read-only QA agent reviews it: bugs, races, security, this repo's rules, and
    test gaps. Fix what it finds, then run another QA pass on the fixes until it

@@ -1,96 +1,40 @@
 import 'dart:io';
 
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart'
+    show RunningOtzariaLocator;
 
-/// בודק אם תהליך אוצריא רץ כרגע — כדי לא לגעת ב-`seforim.db` בזמן
-/// שאוצריא מחזיקה בו handle פתוח. ה-orchestrator שבתוך אוצריא סוגר את
-/// חיבור ה-SQLite שלו לפני שינוי חיצוני ולוקח אותו בחזרה אחר כך —
-/// אנחנו, כתהליך נפרד, לא יכולים לעשות את זה בשבילה, ולכן פשוט חוסמים
-/// ומבקשים מהמשתמש לסגור ידנית.
-///
-/// מומש דרך כלי מערכת (`tasklist` בווינדוס, `pgrep` ב-macOS/לינוקס) ולא
-/// FFI — פשוט ומספיק לצורך הזה.
 class OtzariaProcessGuard {
-  const OtzariaProcessGuard();
+  const OtzariaProcessGuard({
+    RunningOtzariaLocator locator = const RunningOtzariaLocator(),
+  }) : _locator = locator;
 
-  /// שמות התהליך של אוצריא בכל פלטפורמה.
-  ///
-  /// ב-macOS שם התהליך הוא ה-`CFBundleExecutable` של החבילה, שהוא **בעברית**
-  /// (`אוצריא`) — אומת מול `otzaria-macos.zip` אמיתי. `pgrep` מתמודד עם
-  /// UTF-8 בשם התהליך (נבדק). `otzaria` נשאר ברשימה כגיבוי, למקרה שהשם
-  /// באנגלית בבנייה מסוימת.
-  static List<String> processNamesFor(String operatingSystem) {
-    return switch (operatingSystem) {
-      'windows' => const ['otzaria.exe'],
-      'macos' => const ['אוצריא', 'otzaria'],
-      _ => const ['otzaria'],
-    };
-  }
+  final RunningOtzariaLocator _locator;
 
-  /// האם רץ תהליך שתואם לאחד מ-[processNames].
-  ///
-  /// [processNames] הם שמות תהליך בלבד (למשל "otzaria.exe" או "אוצריא"), לא
-  /// נתיבים מלאים — כך שההתאמה אינה תלויה במיקום ההתקנה.
+  static List<String> processNamesFor(String operatingSystem) =>
+      RunningOtzariaLocator.processNamesFor(operatingSystem);
+
   Future<bool> isAnyRunning(List<String> processNames) async {
-    for (final name in processNames) {
-      if (await isRunning(name)) return true;
+    if (!Platform.isWindows) {
+      for (final name in processNames) {
+        if (await isRunning(name)) return true;
+      }
+      return false;
     }
-    return false;
+    final probe = await _locator.probe();
+    return probe.isRunning || RunningOtzariaLocator.lastProbeFailure != null;
   }
 
   Future<bool> isRunning(String processName) async {
-    if (Platform.isWindows) {
-      return _isRunningWindows(processName);
-    }
-    if (Platform.isMacOS || Platform.isLinux) {
-      return _isRunningPosix(processName);
-    }
-    // פלטפורמה שאין לנו בה דרך לבדוק — אין מה לחסום.
-    return false;
-  }
-
-  Future<bool> _isRunningWindows(String processImageName) async {
-    final ProcessResult result;
-    try {
-      result = await Process.run('tasklist', [
-        '/FI',
-        'IMAGENAME eq $processImageName',
-        '/NH',
-      ]);
-    } on ProcessException {
-      return true;
-    }
-
-    if (result.exitCode != 0) {
-      return true;
-    }
-
-    final output = result.stdout.toString();
-    return output.toLowerCase().contains(processImageName.toLowerCase());
-  }
-
-  /// `pgrep -x` מתאים את **שם התהליך במלואו**, לא תת-מחרוזת — חשוב, כי
-  /// התאמה חלקית (`pgrep` בלי `-x`, או `-f` על שורת הפקודה המלאה) הייתה
-  /// נתפסת גם על הלאנצ'ר עצמו: הנתיב שלו מכיל את המילה otzaria, והיינו
-  /// חוסמים את העדכון בגלל התהליך שמריץ אותו.
-  ///
-  /// קודי היציאה של pgrep: 0 = נמצא, 1 = לא נמצא, ≥2 = שגיאה אמיתית.
-  Future<bool> _isRunningPosix(String processName) async {
+    if (Platform.isWindows) return isAnyRunning([processName]);
+    if (!Platform.isMacOS && !Platform.isLinux) return false;
     final ProcessResult result;
     try {
       result = await Process.run('/usr/bin/pgrep', ['-x', processName]);
     } on ProcessException {
-      // הכלי עצמו חסר או חסום. כמו כשל בהרצתו — חוסמים, ולא מפילים את
-      // הבדיקה בחריג שבורח אל הקורא (`RunningOtzariaLocator` נוהג כך גם הוא).
       return true;
     }
-
-    return switch (result.exitCode) {
-      0 => true,
-      1 => false,
-      // כמו בווינדוס: אם הבדיקה עצמה נכשלה, חוסמים ליתר ביטחון.
-      _ => true,
-    };
+    return result.exitCode != 1;
   }
 }
 

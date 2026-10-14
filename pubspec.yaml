@@ -1,7 +1,8 @@
-name: seforim_library_updater
+name: otzaria_offline_update
 description: >-
-  חבילת Flutter לצריכת הפצות הדלתא של Otzaria/SeforimLibrary — גילוי, תכנון
-  מסלול, הורדה, אימות hash לוגי, והחלה אטומית של הפרשי DB.
+  כלי המאגר שבשורש: כיסוי הבדיקות (tool/coverage.dart) וכלי מדידה של ה-hash
+  הלוגי. מנוע העדכון עצמו הוא החבילה seforim_library_updater של
+  Otzaria/otzaria_library_updater.
 version: 0.1.0
 publish_to: none
 
@@ -12,27 +13,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # כל המלל שמוצג למשתמש — כולל הודעות החריגים כאן — יושב שם, בשתי השפות.
-  otzaria_l10n:
-    path: otzaria_l10n
-  equatable: ^2.0.8
-  crypto: ^3.0.7
-  # להקצאת חוצצי native ב-`FastSha256` (SHA-256 של ספריית המערכת).
-  ffi: ^2.1.0
-  meta: ^1.18.0
-  path: ^1.9.1
-  http: ^1.6.0
+  # TODO: לעבור לתג של Otzaria/otzaria_library_updater אחרי מיזוג #27.
+  seforim_library_updater:
+    git:
+      url: https://github.com/palmoni5/otzaria_library_updater.git
+      ref: 2e16a4cd170cac4b8d1bf86e90cbfe980c0f5c7b
   sqlite3: ^3.3.3
-  # מספק את ספריות ה-native של sqlite3 עבור Android/iOS/macOS/Windows/Linux,
-  # כך שלא צריך להסתמך על ספריית מערכת מותקנת מראש (נדרש בהקשר של Flutter).
-  sqlite3_flutter_libs: ^0.5.24
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   test: ^1.30.1
   flutter_lints: ^4.0.0
-
-flutter:
-  # אין assets/פונטים משלה — זו חבילת לוגיקה טהורה (ללא widgets).
-  # הסעיף קיים כדי לסמן את החבילה כ-Flutter package לכלי ה-pub/IDE.

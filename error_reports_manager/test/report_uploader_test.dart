@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:test/test.dart';
 
 import 'support.dart';
@@ -107,6 +108,131 @@ void main() {
     expect(result.remaining, 0);
     expect(result.rejections.first.reason, startsWith('400'));
     expect(outbox.reports, isEmpty);
+  });
+
+  group('409 — תוכן שלא נקלט תחת המזהה נשלח שוב במזהה חדש, כמו באוצריא', () {
+    Map<String, dynamic> withBody(
+      String id,
+      Map<String, dynamic> body, {
+      String endpoint = OutboxReport.reportingEndpoint,
+    }) =>
+        OutboxReport.fileJson(
+          reportId: id,
+          bookTitle: 'ספר',
+          createdAt: '2026-10-01T10:00:00Z',
+          endpoint: endpoint,
+          body: body,
+        );
+
+    test('דיווח ספר: report_id חדש, נשלח ונספר כנשלח', () async {
+      final outbox = MemoryOutbox(const []);
+      outbox.add(withBody('old', {'report_id': 'old', 'x': 1}),
+          filePath: 'old.json');
+      final bodies = <Map<String, dynamic>>[];
+      final result = await uploader((req) async {
+        bodies.add(jsonDecode(req.body) as Map<String, dynamic>);
+        return http.Response(
+          bodies.length == 1 ? '{"error":"conflict"}' : _ok,
+          bodies.length == 1 ? 409 : 200,
+        );
+      }).upload(outbox);
+
+      expect(result.sent, 1);
+      expect(result.rejected, 0);
+      expect(bodies, hasLength(2));
+      expect(bodies.last['report_id'], isNot('old'));
+      expect(bodies.last['x'], 1);
+      expect(outbox.reports, isEmpty);
+    });
+
+    test('דיווח תוכנה: reportId חדש בפורמט UUID', () async {
+      final outbox = MemoryOutbox(const []);
+      outbox.add(
+        withBody('a1', {'reportId': 'a1'},
+            endpoint: OutboxReport.appReportingEndpoint),
+        filePath: 'a1.json',
+      );
+      final ids = <String>[];
+      await uploader((req) async {
+        ids.add((jsonDecode(req.body) as Map)['reportId'] as String);
+        return http.Response(_ok, ids.length == 1 ? 409 : 200);
+      }).upload(outbox);
+
+      expect(ids.first, 'a1');
+      expect(
+        ids.last,
+        matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-')),
+      );
+    });
+
+    test('409 שני על המזהה החדש — נדחה סופית', () async {
+      final outbox = MemoryOutbox(const []);
+      outbox.add(withBody('old', {'report_id': 'old'}), filePath: 'old.json');
+      var requests = 0;
+      final result = await uploader((_) async {
+        requests++;
+        return http.Response('{}', 409);
+      }).upload(outbox);
+
+      expect(requests, 2);
+      expect(result.rejected, 1);
+      expect(outbox.reports, isEmpty);
+    });
+
+    test('דיווח תוכנה שהוחלף לו המזהה נשמר בתיבה עם הקידומת app-', () async {
+      final dir = Directory.systemTemp.createTempSync('outbox_409_app_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final outbox = DirectoryReportOutbox(dir.path);
+      await outbox.write(
+        'app-a1',
+        OutboxReport.encodeFile(withBody('app-a1', {'reportId': 'a1'},
+            endpoint: OutboxReport.appReportingEndpoint)),
+      );
+      var requests = 0;
+      await uploader((_) async {
+        requests++;
+        return http.Response('', requests == 1 ? 409 : 500);
+      }).upload(outbox);
+
+      final left = (await outbox.list()).single;
+      expect(left.reportId, startsWith('app-'));
+      final body = jsonDecode(utf8.decode(await outbox.requestBody(left)));
+      expect('app-${body['reportId']}', left.reportId);
+    });
+
+    test('כשל זמני אחרי החלפת המזהה — הקובץ נשמר במזהה החדש', () async {
+      final dir = Directory.systemTemp.createTempSync('outbox_409_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final outbox = DirectoryReportOutbox(dir.path);
+      await outbox.write(
+        'old',
+        OutboxReport.encodeFile(withBody('old', {'report_id': 'old'})),
+      );
+      var requests = 0;
+      final result = await uploader((_) async {
+        requests++;
+        return http.Response('', requests == 1 ? 409 : 500);
+      }).upload(outbox);
+
+      expect(result.remaining, 1);
+      final left = await outbox.list();
+      expect(left.single.reportId, isNot('old'));
+      final body =
+          jsonDecode(utf8.decode(await outbox.requestBody(left.single)));
+      expect(body['report_id'], left.single.reportId);
+    });
+  });
+
+  test('503 של שבת — הודעה ייעודית והדיווחים נשארים', () async {
+    final outbox = MemoryOutbox(['a', 'b']);
+    final result = await uploader(
+      (_) async => http.Response('{"error":"shabbat","message":"x"}', 503),
+    ).upload(outbox);
+
+    expect(result.sent, 0);
+    expect(result.remaining, 2);
+    expect(result.error, AppL10n.strings.errorReportsDomain.uploadShabbat);
+    expect(outbox.reports, hasLength(2));
   });
 
   test('דיווחי תוכנה ותוספים נשלחים ליעדם עם הגוף והצרופות', () async {

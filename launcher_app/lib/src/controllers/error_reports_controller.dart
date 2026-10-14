@@ -1,10 +1,8 @@
-import 'dart:io';
-
 import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
-import 'package:path/path.dart' as p;
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 
 import '../services/app_logger.dart';
 import '../services/offer_decline.dart';
@@ -17,8 +15,10 @@ class ErrorReportsController extends ChangeNotifier
   ErrorReportsController({
     required this.outbox,
     required Future<OtzariaReportQueue?> Function() resolveQueue,
+    Future<List<String>> Function()? findUnmigratedLegacy,
     ErrorReportUploader? uploader,
   })  : _resolveQueue = resolveQueue,
+        _findUnmigratedLegacy = findUnmigratedLegacy,
         _uploader = uploader ?? ErrorReportUploader();
 
   factory ErrorReportsController.forDrive({
@@ -27,6 +27,11 @@ class ErrorReportsController extends ChangeNotifier
     String? stateFilesDir,
     required Future<String?> Function() launchPath,
   }) {
+    LibraryDbLocator locatorFor(String launch) => LibraryDbLocator.forLaunch(
+          stateDir: stateFilesDir ?? stateDir,
+          launchPath: launch,
+          dataDir: dataDir ?? stateDir,
+        );
     return ErrorReportsController(
       outbox: DirectoryReportOutbox(
         DirectoryReportOutbox.dirIn(stateDir),
@@ -38,45 +43,66 @@ class ErrorReportsController extends ChangeNotifier
         if (launch == null) return null;
         return resolveOtzariaReportQueue(
           launchPath: launch,
-          locator: LibraryDbLocator.forLaunch(
-            stateDir: stateFilesDir ?? stateDir,
-            launchPath: launch,
-            dataDir: dataDir ?? stateDir,
-          ),
+          locator: locatorFor(launch),
+        );
+      },
+      findUnmigratedLegacy: () async {
+        final launch = await launchPath();
+        if (launch == null) return const [];
+        return unmigratedLegacyReports(
+          launchPath: launch,
+          locator: locatorFor(launch),
         );
       },
     );
   }
 
   /// `user_state.db` של ההתקנה הזו, או `null` כשאין מה לגעת בו.
-  /// קופסת דיווחים שעוד לא הועברה פירושה שהתור עדיין ב-Hive.
   static Future<OtzariaReportQueue?> resolveOtzariaReportQueue({
     required String launchPath,
     required LibraryDbLocator locator,
   }) async {
     final dataRoot = await locator.otzariaSettingsRoot(launchPath);
     if (dataRoot == null) return null;
-    for (final box in [
-      'error_reports_queue',
-      'app_reports_queue',
-      'plugin_reports_queue',
-    ]) {
-      if (await File(p.join(dataRoot, '$box.hive')).exists()) return null;
-    }
+    final db = await _userStateDb(dataRoot, locator);
+    if (db == null) return null;
+    final capabilities = await OtzariaCapabilities.read(dataRoot);
+    return UserStateReportQueue(
+      db,
+      reportsQueueFormat: capabilities?.reportsQueueFormat,
+    );
+  }
+
+  static Future<List<String>> unmigratedLegacyReports({
+    required String launchPath,
+    required LibraryDbLocator locator,
+  }) async {
+    final dataRoot = await locator.otzariaSettingsRoot(launchPath);
+    if (dataRoot == null) return const [];
+    return findUnmigratedReportBoxes(
+      dataRoot: dataRoot,
+      userStateDb: await _userStateDb(dataRoot, locator),
+    );
+  }
+
+  static Future<String?> _userStateDb(
+    String dataRoot,
+    LibraryDbLocator locator,
+  ) async {
     final settings = await locator.settingsReader.read(dataRoot);
-    final db = await locateUserStateDb(
+    return locateUserStateDb(
       dataRoot: dataRoot,
       databasesPathSetting: settings?.databasesPath,
       libraryPathSetting: settings?.libraryPath,
     );
-    return db == null ? null : UserStateReportQueue(db);
   }
 
   final ReportOutbox outbox;
   final Future<OtzariaReportQueue?> Function() _resolveQueue;
-  final ErrorReportUploader _uploader;
+  final Future<List<String>> Function()? _findUnmigratedLegacy;
 
-  OtzariaReportQueue? _queue;
+  List<String> unmigratedLegacy = const [];
+  final ErrorReportUploader _uploader;
 
   final OfferDecline _decline = OfferDecline();
 
@@ -98,7 +124,7 @@ class ErrorReportsController extends ChangeNotifier
 
   Future<void> refreshOutbox() async {
     try {
-      outboxCount = (await outbox.list()).length;
+      outboxCount = await outbox.count();
     } catch (e) {
       AppLogger.maybeInstance?.warn('קריאת תיבת הדיווחים נכשלה: $e');
       outboxCount = 0;
@@ -109,7 +135,17 @@ class ErrorReportsController extends ChangeNotifier
   Future<int> pendingToOffer() async {
     if (isUploading || isCollecting) return 0;
     try {
-      final queue = _queue = await _resolveQueue();
+      unmigratedLegacy = await _findUnmigratedLegacy?.call() ?? const [];
+    } catch (e) {
+      AppLogger.maybeInstance?.warn('בדיקת תורי Hive ישנים נכשלה: $e');
+    }
+    if (unmigratedLegacy.isNotEmpty) {
+      AppLogger.maybeInstance?.info(
+        'תורי דיווחים ישנים שלא הועברו: ${unmigratedLegacy.join(', ')}',
+      );
+    }
+    try {
+      final queue = await _resolveQueue();
       if (queue == null) return 0;
       final count = await queue.countSendable();
       return _decline.filter(count);
@@ -126,7 +162,7 @@ class ErrorReportsController extends ChangeNotifier
     isCollecting = true;
     notifyListeners();
     try {
-      final queue = _queue ?? await _resolveQueue();
+      final queue = await _resolveQueue();
       if (queue == null) return (collected: 0, error: null);
       final result = await queue.collectTo(outbox);
       final error = result.error;

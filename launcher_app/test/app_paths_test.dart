@@ -239,6 +239,93 @@ void main() {
     });
   });
 
+  test('macOS: EPERM על כונן נשלף מסביר איפה לאשר גישה (TCC)', () {
+    const eperm = FileSystemException('x', '/Volumes/USB', OSError('x', 1));
+    expect(
+      AppPaths.writeFailureMessage(eperm, isMacOS: true),
+      AppL10n.strings.setupError.macVolumeAccessDenied,
+    );
+    expect(
+      AppPaths.writeFailureMessage(eperm, isMacOS: false),
+      AppL10n.strings.setupError.cannotWriteToDataDir('x'),
+    );
+  });
+
+  group('הפעלה מתוך zip או מתיקייה זמנית', () {
+    const temp = [r'C:\Users\u\AppData\Local\Temp'];
+
+    test('תיקייה תחת %TEMP% — גם בלי הבחנה בין אותיות גדולות', () {
+      expect(
+        AppPaths.isTemporaryLocation(
+          r'c:\users\U\appdata\local\temp\7zO1234\app-files',
+          tempDirs: temp,
+        ),
+        isTrue,
+      );
+      expect(
+        AppPaths.isTemporaryLocation(
+          r'C:\Users\u\AppData\Local\Temp',
+          tempDirs: temp,
+        ),
+        isTrue,
+      );
+    });
+
+    test('תיקייה בשם .zip מחוץ ל-%TEMP% אינה זמנית', () {
+      expect(
+        AppPaths.isTemporaryLocation(
+          r'E:\archive.zip\app-files',
+          tempDirs: temp,
+        ),
+        isFalse,
+      );
+    });
+
+    test('TMP שמצביע על שורש כונן אינו הופך את כל הכונן לזמני', () {
+      expect(
+        AppPaths.isTemporaryLocation(r'E:\app-files', tempDirs: [r'E:\']),
+        isFalse,
+      );
+      expect(
+        AppPaths.isTemporaryLocation(r'E:\app-files', tempDirs: ['E:']),
+        isFalse,
+      );
+    });
+
+    test('כונן נייד ותיקייה ששמה רק מזכיר temp — אינם זמניים', () {
+      for (final dir in const [
+        r'E:\app-files',
+        r'C:\Users\u\AppData\Local\TempStuff\app-files',
+        r'D:\backup.zipx\app-files',
+      ]) {
+        expect(AppPaths.isTemporaryLocation(dir, tempDirs: temp), isFalse,
+            reason: dir);
+      }
+    });
+
+    test('resolve מסרב עם הודעה ייעודית, לפני שנוגע בדיסק', () async {
+      final overrides = _RedirectingIOOverrides(Directory.systemTemp.path);
+      await expectLater(
+        IOOverrides.runWithIOOverrides(
+          () => AppPaths.resolve(
+            resolvedExecutable:
+                r'C:\Users\u\AppData\Local\Temp\Temp1_a.zip\app-files\l.exe',
+            isMacOS: false,
+            isWindows: true,
+            tempDirs: temp,
+          ),
+          overrides,
+        ),
+        throwsA(isA<AppPathsException>()
+            .having((e) => e.kind, 'kind', AppPathsFailure.runningFromTemp)
+            .having((e) => e.message, 'message',
+                AppL10n.strings.setupError.runningFromTemp)),
+      );
+      expect(overrides.createdDirs, isEmpty);
+      expect(overrides.createdFiles, isEmpty);
+    });
+  });
+
   group('כונן מוגן-כתיבה (בעיה #25)', () {
     late Directory sandbox;
     late Directory drive;

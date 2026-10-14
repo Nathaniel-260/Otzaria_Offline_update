@@ -1,12 +1,13 @@
 import 'dart:io';
 
+import 'package:otzaria_downloads/otzaria_downloads.dart'
+    show ElevatedProcess, WindowsElevation;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
 import '../models/app_descriptor.dart';
 import '../models/custom_install_outcome.dart';
 import '../models/custom_installer_kind.dart';
-import 'elevated_process.dart';
 import 'installer_kind_sniffer.dart';
 
 typedef CustomProcessRunner = Future<ProcessResult> Function(
@@ -92,7 +93,7 @@ class CustomAppInstaller {
     if (command == null) return CustomInstallOutcome(kind: kind);
 
     if (command.rawLastArgument &&
-        ElevatedProcess.needsQuoting(command.arguments.last)) {
+        WindowsElevation.needsQuoting(command.arguments.last)) {
       return _installViaShell(kind, command, elevate: false);
     }
 

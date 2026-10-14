@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/outbox_report.dart';
 import '../models/upload_result.dart';
+import '../port/app_report.dart';
 import 'report_outbox.dart';
 
 typedef ReportDelay = Future<void> Function(Duration duration);
@@ -94,7 +97,7 @@ class ErrorReportUploader {
           waitRemaining: wait,
         ));
 
-    for (final item in reports) {
+    for (var item in reports) {
       if ((_unconfirmed[item.reportId] ?? 0) >= maxUnconfirmedAnswers &&
           _clock().isBefore(_unconfirmedUntil[item.reportId]!)) {
         stuckStatus = _unconfirmedStatus[item.reportId];
@@ -132,6 +135,7 @@ class ErrorReportUploader {
       }
 
       var retries = 0;
+      var renewedId = false;
       while (true) {
         if (!await _waitForWindow(report, cancellation)) {
           return stop(cancelled: true);
@@ -167,10 +171,42 @@ class ErrorReportUploader {
           continue;
         }
         if (_minidumpRejection(attempt)) {
-          final withoutMinidump = _withoutMinidump(body);
-          if (withoutMinidump != null) {
-            strippedBody = withoutMinidump;
-            body = Uint8List.fromList(utf8.encode(jsonEncode(withoutMinidump)));
+          final sentBody = body;
+          final stripped = await Isolate.run(() {
+            final withoutMinidump = _withoutMinidump(sentBody);
+            return withoutMinidump == null
+                ? null
+                : (
+                    body: withoutMinidump,
+                    bytes: Uint8List.fromList(
+                      utf8.encode(jsonEncode(withoutMinidump)),
+                    ),
+                  );
+          });
+          if (stripped != null) {
+            strippedBody = stripped.body;
+            body = stripped.bytes;
+            continue;
+          }
+        }
+        if (status == 409 && !renewedId) {
+          final sentBody = body;
+          final conflicted = item;
+          final renewed =
+              await Isolate.run(() => _withNewReportId(conflicted, sentBody));
+          if (renewed != null) {
+            try {
+              await outbox.write(renewed.report.reportId, renewed.fileBytes);
+            } on Object catch (e) {
+              return stop(
+                error:
+                    AppL10n.strings.errorReportsDomain.outboxUnreadable('$e'),
+              );
+            }
+            await _removeQuietly(outbox, item);
+            renewedId = true;
+            item = renewed.report;
+            body = renewed.bodyBytes;
             continue;
           }
         }
@@ -198,7 +234,9 @@ class ErrorReportUploader {
           stuckStatus = status;
         } else {
           return stop(
-            error: AppL10n.strings.errorReportsDomain.uploadHttpStatus(status),
+            error: attempt.shabbat
+                ? AppL10n.strings.errorReportsDomain.uploadShabbat
+                : AppL10n.strings.errorReportsDomain.uploadHttpStatus(status),
           );
         }
         break;
@@ -276,6 +314,7 @@ class ErrorReportUploader {
       responseBody.length > 200 ? responseBody.substring(0, 200) : responseBody,
       accepted: _isProtocolSuccess(responseBody),
       rejectedField: status == 422 ? _rejectedField(responseBody) : null,
+      shabbat: status == 503 && _isShabbat(responseBody),
     );
   }
 
@@ -283,6 +322,15 @@ class ErrorReportUploader {
     try {
       final json = jsonDecode(body);
       return json is Map && json['success'] == true;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  static bool _isShabbat(String body) {
+    try {
+      final json = jsonDecode(body);
+      return json is Map && json['error'] == 'shabbat';
     } on FormatException {
       return false;
     }
@@ -340,6 +388,42 @@ class ErrorReportUploader {
     }
   }
 
+  static ({OutboxReport report, Uint8List fileBytes, Uint8List bodyBytes})?
+      _withNewReportId(OutboxReport item, Uint8List bytes) {
+    final decoded = jsonDecode(utf8.decode(bytes));
+    if (decoded is! Map<String, dynamic>) return null;
+    final isBookReport = decoded.containsKey('report_id');
+    final key = isBookReport ? 'report_id' : 'reportId';
+    if (decoded[key] is! String) return null;
+    final newId = isBookReport
+        ? '${DateTime.now().microsecondsSinceEpoch}-${item.reportId.hashCode.abs()}'
+        : AppReport.generateReportId();
+    final body = Map<String, dynamic>.of(decoded)..[key] = newId;
+    final outboxId = '${OutboxReport.idPrefixFor(item.endpoint)}$newId';
+    return (
+      report: OutboxReport(
+        reportId: outboxId,
+        endpoint: item.endpoint,
+        bookTitle: item.bookTitle,
+        createdAt: item.createdAt,
+        filePath: p.join(
+          p.dirname(item.filePath),
+          DirectoryReportOutbox.fileNameFor(outboxId),
+        ),
+        hasImages: item.hasImages,
+        hasMinidump: item.hasMinidump,
+      ),
+      fileBytes: OutboxReport.encodeFile(OutboxReport.fileJson(
+        reportId: outboxId,
+        bookTitle: item.bookTitle,
+        createdAt: item.createdAt?.toUtc().toIso8601String() ?? '',
+        endpoint: item.endpoint.toString(),
+        body: body,
+      )),
+      bodyBytes: Uint8List.fromList(utf8.encode(jsonEncode(body))),
+    );
+  }
+
   static Future<void> _removeQuietly(
     ReportOutbox outbox,
     OutboxReport report,
@@ -361,10 +445,11 @@ class ErrorReportUploader {
 
 class _Attempt {
   const _Attempt(this.statusCode, this.excerpt,
-      {required this.accepted, this.rejectedField});
+      {required this.accepted, this.rejectedField, this.shabbat = false});
 
   final int statusCode;
   final String excerpt;
   final bool accepted;
   final String? rejectedField;
+  final bool shabbat;
 }

@@ -14,7 +14,9 @@ dependencies:
     path: ../otzaria_downloads
   otzaria_l10n:
     path: ../otzaria_l10n
-  equatable: ^2.0.8
+  otzaria_manager:
+    path: ../otzaria_manager
+  equatable: ^3.0.0
   path: ^1.9.1
   http: ^1.6.0
   crypto: ^3.0.7
