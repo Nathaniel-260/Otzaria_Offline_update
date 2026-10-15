@@ -1929,6 +1929,7 @@ abstract class ErrorReportsStrings {
   // ── איסוף, במחשב הלא-מקוון ──
   String get collectDialogTitle;
   String collectDialogContent(int count);
+  String get collectAllDialogTitle;
   String get collectConfirm;
   String get collectLater;
   String collectedSnack(int count);

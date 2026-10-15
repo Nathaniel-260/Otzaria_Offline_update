@@ -497,6 +497,373 @@ void main() {
   });
 
   group('איסוף בעלייה', () {
+    testWidgets('unmounting during the pending read never collects',
+        (tester) async {
+      final pending = Completer<OtzariaReportQueue?>();
+      final queue = _QaQueue(2);
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () => pending.future,
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+      final offerFuture = offer(ctx, c);
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+      pending.complete(queue);
+      expect(await offerFuture, ReportOfferOutcome.notOffered);
+      expect(queue.collections, 0);
+      expect(outbox.reports, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('empty sources never offer collection', (tester) async {
+      final c = controller();
+      final transport = _CollectionFeedback()..pendingEvents = 0;
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => 'source',
+      );
+      addTearDown(c.dispose);
+      addTearDown(feedback.dispose);
+      final ctx = await host(tester);
+      final result = await offerErrorReportCollection(ctx, c,
+          searchFeedback: feedback, isOtzariaRunning: () async => false);
+      expect(result, ReportOfferOutcome.notOffered);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(transport.collections, 0);
+    });
+
+    for (final newFeedback in [false, true]) {
+      testWidgets(
+          'declining new data preserves the other decline ($newFeedback)',
+          (tester) async {
+        final queue = _QaQueue(2);
+        final c = ErrorReportsController(
+          outbox: outbox,
+          resolveQueue: () async => queue,
+        );
+        final transport = _CollectionFeedback();
+        final feedback = SearchFeedbackController(
+          transport: transport,
+          resolveSource: () async => 'source',
+        );
+        addTearDown(c.dispose);
+        addTearDown(feedback.dispose);
+        final ctx = await host(tester);
+        Future<void> decline() async {
+          unawaited(offerErrorReportCollection(ctx, c,
+              searchFeedback: feedback, isOtzariaRunning: () async => false));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(t.collectLater));
+          await tester.pumpAndSettle();
+        }
+
+        await decline();
+        if (newFeedback) {
+          transport.pendingEvents++;
+        } else {
+          queue.pending++;
+        }
+        await decline();
+        expect(await c.pendingToOffer(), 0);
+        expect(await feedback.pendingToOffer(), 0);
+        expect(outbox.reports, isEmpty);
+        expect(transport.carried, 0);
+      });
+    }
+
+    for (final reportFailure in [false, true]) {
+      for (final feedbackFailure in [false, true]) {
+        testWidgets(
+            'combined summary preserves partial results ($reportFailure, $feedbackFailure)',
+            (tester) async {
+          final queue = _QaQueue(2, partial: reportFailure);
+          final c = ErrorReportsController(
+            outbox: outbox,
+            resolveQueue: () async => queue,
+          );
+          final transport = _CollectionFeedback()
+            ..failCollection = feedbackFailure;
+          final feedback = SearchFeedbackController(
+            transport: transport,
+            resolveSource: () async => 'source',
+          );
+          addTearDown(c.dispose);
+          addTearDown(feedback.dispose);
+          final messages = <String>[];
+          final previousPrint = debugPrint;
+          debugPrint = (String? message, {int? wrapWidth}) {
+            if (message?.startsWith('UiSnack') ?? false) messages.add(message!);
+          };
+          addTearDown(() => debugPrint = previousPrint);
+          final ctx = await host(tester);
+          unawaited(offerErrorReportCollection(ctx, c,
+              searchFeedback: feedback, isOtzariaRunning: () async => running));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(t.collectConfirm));
+          await tester.pumpAndSettle();
+          debugPrint = previousPrint;
+          expect(queue.pending, reportFailure ? 1 : 0);
+          expect(outbox.reports.length, reportFailure ? 1 : 2);
+          expect(transport.carried, feedbackFailure ? 0 : 3);
+          expect(transport.pendingEvents, feedbackFailure ? 3 : 0);
+          expect(c.isCollecting, isFalse);
+          expect(feedback.isCollecting, isFalse);
+          expect(messages, hasLength(1));
+          expect(
+              messages.single,
+              contains(feedbackFailure
+                  ? stringsOf().libraryDomain.semanticFeedbackFailed
+                  : stringsOf().libraryDomain.semanticFeedbackCollected(3)));
+          expect(
+              messages.single,
+              contains(reportFailure
+                  ? t.collectPartialSnack(
+                      1, stringsOf().errorReportsDomain.someNotCollected)
+                  : t.collectedSnack(2)));
+          if (feedbackFailure) {
+            transport.failCollection = false;
+            unawaited(offerErrorReportCollection(ctx, c,
+                searchFeedback: feedback,
+                isOtzariaRunning: () async => running));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text(t.collectConfirm));
+            await tester.pumpAndSettle();
+            expect(transport.carried, 3);
+          }
+        });
+      }
+    }
+
+    testWidgets('Otzaria reopening between stages preserves feedback for retry',
+        (tester) async {
+      final messages = <String>[];
+      final previousPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message?.startsWith('UiSnack') ?? false) messages.add(message!);
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      final queue = _QaQueue(2, onCollect: () => running = true);
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => queue,
+      );
+      final transport = _CollectionFeedback();
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => 'source',
+      );
+      addTearDown(c.dispose);
+      addTearDown(feedback.dispose);
+      final ctx = await host(tester);
+      unawaited(offerErrorReportCollection(ctx, c,
+          searchFeedback: feedback, isOtzariaRunning: () async => running));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(t.collectConfirm));
+      await tester.pumpAndSettle();
+      debugPrint = previousPrint;
+      expect(messages, hasLength(1));
+      expect(messages.single, contains(t.collectedSnack(2)));
+      expect(messages.single,
+          contains(stringsOf().libraryDomain.semanticFeedbackNotCollected));
+      expect(outbox.reports.length, 2);
+      expect(transport.collections, 0);
+      expect(transport.pendingEvents, 3);
+      running = false;
+      unawaited(offerErrorReportCollection(ctx, c,
+          searchFeedback: feedback, isOtzariaRunning: () async => running));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(t.collectConfirm));
+      await tester.pumpAndSettle();
+      expect(transport.carried, 3);
+      expect(queue.collections, 1);
+    });
+
+    testWidgets(
+        'revoking feedback consent during approval preserves its source',
+        (tester) async {
+      var consent = true;
+      final c = controller(pending: 2);
+      final transport = _CollectionFeedback();
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => consent ? 'source' : null,
+      );
+      addTearDown(c.dispose);
+      addTearDown(feedback.dispose);
+      final ctx = await host(tester);
+      unawaited(offerErrorReportCollection(ctx, c,
+          searchFeedback: feedback, isOtzariaRunning: () async => running));
+      await tester.pumpAndSettle();
+      consent = false;
+      await tester.tap(find.text(t.collectConfirm));
+      await tester.pumpAndSettle();
+      expect(outbox.reports.length, 2);
+      expect(transport.pendingEvents, 3);
+      expect(transport.carried, 0);
+    });
+
+    for (final language in AppLanguage.values) {
+      for (final scale in [1.0, 2.0, 3.0]) {
+        testWidgets('combined offer remains usable at $language / $scale',
+            (tester) async {
+          useViewSize(tester, const Size(800, 600));
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          AppL10n.use(language);
+          addTearDown(() => AppL10n.use(AppLanguage.hebrew));
+          late BuildContext ctx;
+          await tester.pumpWidget(wrap(
+            Scaffold(body: Builder(builder: (value) {
+              ctx = value;
+              return const SizedBox.shrink();
+            })),
+            language: language,
+          ));
+          final c = controller(pending: 9999);
+          final transport = _CollectionFeedback()..pendingEvents = 9999;
+          final feedback = SearchFeedbackController(
+            transport: transport,
+            resolveSource: () async => 'source',
+          );
+          addTearDown(c.dispose);
+          addTearDown(feedback.dispose);
+          unawaited(offerErrorReportCollection(ctx, c,
+              searchFeedback: feedback, isOtzariaRunning: () async => false));
+          await tester.pumpAndSettle();
+          final strings = stringsOf(language);
+          expect(tester.takeException(), isNull);
+          final body = tester.widget<Text>(find.textContaining(
+              strings.libraryDomain.semanticFeedbackCollectBody(9999)));
+          expect(body.data,
+              contains(strings.errorReports.collectDialogContent(9999)));
+          final cancel = find.text(strings.errorReports.collectLater);
+          expect(cancel.hitTestable(), findsOneWidget);
+          expect(find.text(strings.errorReports.collectConfirm).hitTestable(),
+              findsOneWidget);
+          await tester.tap(cancel);
+          await tester.pumpAndSettle();
+          expect(outbox.reports, isEmpty);
+          expect(transport.carried, 0);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets('Otzaria reopening during counting prevents the offer',
+        (tester) async {
+      final queue = _QaQueue(2, onCount: () => running = true);
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => queue,
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+      unawaited(offer(ctx, c));
+      await tester.pumpAndSettle();
+      expect(find.text(t.collectDialogTitle), findsNothing);
+      expect(queue.collections, 0);
+    });
+
+    for (final reports in [0, 2]) {
+      testWidgets('one approval collects reports ($reports) and feedback',
+          (tester) async {
+        final c = controller(pending: reports);
+        final transport = _CollectionFeedback();
+        final feedback = SearchFeedbackController(
+          transport: transport,
+          resolveSource: () async => 'source',
+        );
+        addTearDown(c.dispose);
+        addTearDown(feedback.dispose);
+        final ctx = await host(tester);
+        unawaited(offerErrorReportCollection(ctx, c,
+            searchFeedback: feedback, isOtzariaRunning: () async => running));
+        await tester.pumpAndSettle();
+        expect(find.text(t.collectAllDialogTitle), findsOneWidget);
+        expect(find.text(t.collectConfirm), findsOneWidget);
+        await tester.tap(find.text(t.collectConfirm));
+        await tester.pumpAndSettle();
+        expect(outbox.reports.length, reports);
+        expect(transport.carried, 3);
+        expect(find.text(t.collectAllDialogTitle), findsNothing);
+        expect(
+            find.text(stringsOf().libraryDomain.semanticFeedbackCollectTitle),
+            findsNothing);
+      });
+    }
+
+    for (final readOnly in [false, true]) {
+      testWidgets(
+          'collection preserves consent and read-only guards ($readOnly)',
+          (tester) async {
+        final c = controller(pending: 2);
+        final transport = _CollectionFeedback();
+        final feedback = SearchFeedbackController(
+          transport: transport,
+          resolveSource: () async => null,
+        );
+        addTearDown(c.dispose);
+        addTearDown(feedback.dispose);
+        final ctx = await host(tester);
+        unawaited(offerErrorReportCollection(ctx, c,
+            readOnly: readOnly,
+            searchFeedback: feedback,
+            isOtzariaRunning: () async => running));
+        await tester.pumpAndSettle();
+        if (!readOnly) {
+          expect(find.text(t.collectDialogTitle), findsOneWidget);
+          await tester.tap(find.text(t.collectConfirm));
+          await tester.pumpAndSettle();
+        }
+        expect(outbox.reports.length, readOnly ? 0 : 2);
+        expect(transport.carried, 0);
+        expect(transport.pendingEvents, 3);
+      });
+    }
+
+    testWidgets('one decline suppresses both offers', (tester) async {
+      final c = controller(pending: 2);
+      final transport = _CollectionFeedback();
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => 'source',
+      );
+      addTearDown(c.dispose);
+      addTearDown(feedback.dispose);
+      final ctx = await host(tester);
+      unawaited(offerErrorReportCollection(ctx, c,
+          searchFeedback: feedback, isOtzariaRunning: () async => running));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(t.collectLater));
+      await tester.pumpAndSettle();
+      expect(await c.pendingToOffer(), 0);
+      expect(await feedback.pendingToOffer(), 0);
+      expect(outbox.reports, isEmpty);
+      expect(transport.carried, 0);
+    });
+
+    testWidgets('reopening Otzaria prevents both collections', (tester) async {
+      final c = controller(pending: 2);
+      final transport = _CollectionFeedback();
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => 'source',
+      );
+      addTearDown(c.dispose);
+      addTearDown(feedback.dispose);
+      final ctx = await host(tester);
+      unawaited(offerErrorReportCollection(ctx, c,
+          searchFeedback: feedback, isOtzariaRunning: () async => running));
+      await tester.pumpAndSettle();
+      running = true;
+      await tester.tap(find.text(t.collectConfirm));
+      await tester.pumpAndSettle();
+      expect(outbox.reports, isEmpty);
+      expect(transport.carried, 0);
+    });
+
     testWidgets('אוצריא פתוחה → אין דיאלוג, וההצעה לא "נוצלה"', (tester) async {
       final c = controller(pending: 2);
       final ctx = await host(tester);
@@ -1268,6 +1635,64 @@ class _BrokenOutbox implements ReportOutbox {
 
   @override
   Future<void> discard(String reportId) async {}
+}
+
+class _CollectionFeedback extends SearchFeedbackTransport {
+  _CollectionFeedback()
+      : super('unused',
+            client: MockClient((_) async => http.Response('{}', 200)));
+
+  int pendingEvents = 3;
+  int carried = 0;
+  int collections = 0;
+  bool failCollection = false;
+
+  @override
+  Future<int> pendingForCollection(String sourceDirectory) async =>
+      pendingEvents;
+
+  @override
+  Future<int> count() async => carried;
+
+  @override
+  Future<int> collect(String sourceDirectory,
+      {required Future<bool> Function() mayCollect}) async {
+    collections++;
+    if (failCollection) throw StateError('feedback disk failure');
+    if (!await mayCollect()) return 0;
+    final result = pendingEvents;
+    carried += result;
+    pendingEvents = 0;
+    return result;
+  }
+}
+
+class _QaQueue implements OtzariaReportQueue {
+  _QaQueue(this.pending, {this.onCount, this.onCollect, this.partial = false});
+
+  int pending;
+  int collections = 0;
+  final void Function()? onCount;
+  final void Function()? onCollect;
+  final bool partial;
+
+  @override
+  Future<int> countSendable() async {
+    onCount?.call();
+    return pending;
+  }
+
+  @override
+  Future<QueueCollectResult> collectTo(ReportOutbox outbox) async {
+    collections++;
+    onCollect?.call();
+    final moved = partial ? pending - 1 : pending;
+    for (var i = 0; i < moved; i++) {
+      await outbox.write('qa$i', OutboxReport.encodeFile(_report('qa$i')));
+    }
+    pending -= moved;
+    return (collected: moved, error: partial ? 'report disk failure' : null);
+  }
 }
 
 class _CountFeedback extends SearchFeedbackTransport {

@@ -3555,6 +3555,8 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String get collectDialogTitle => 'Unsent reports';
   @override
+  String get collectAllDialogTitle => 'Collect data from Otzaria';
+  @override
   String collectDialogContent(int count) =>
       'Otzaria has $count ${_reports(count)} about books, the app and plugins '
       'that have not been '

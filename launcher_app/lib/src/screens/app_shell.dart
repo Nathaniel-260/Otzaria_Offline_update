@@ -49,7 +49,6 @@ import 'library_screen.dart';
 import 'otzaria_screen.dart';
 import 'plugins/plugins_screen.dart';
 import 'reports_upload_flow.dart';
-import 'search_feedback_flow.dart';
 import 'settings_screen.dart';
 
 /// המסך הפעיל בסרגל הניווט. "תוכנה" קודם ל"ספרייה" — ראו [_NavRail].
@@ -600,12 +599,7 @@ class _AppShellState extends State<AppShell> {
       readOnly: widget.readOnly,
       isOtzariaRunning: refreshProcessState,
       notices: _notices,
-    );
-    if (!mounted) return;
-    await offerSearchFeedbackCollection(
-      context,
-      _searchFeedback,
-      readOnly: widget.readOnly,
+      searchFeedback: _searchFeedback,
     );
   }
 

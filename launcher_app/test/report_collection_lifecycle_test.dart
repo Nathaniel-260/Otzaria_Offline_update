@@ -138,4 +138,7 @@ class _CollectionLocator extends RunningOtzariaLocator {
   @override
   Future<RunningOtzariaProbe> probe() async =>
       (isRunning: isRunning, launchPath: null);
+
+  @override
+  Future<bool?> waitForExit(Duration timeout) async => null;
 }

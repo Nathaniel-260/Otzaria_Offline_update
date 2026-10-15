@@ -3307,6 +3307,8 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String get collectDialogTitle => 'דיווחים שלא נשלחו';
   @override
+  String get collectAllDialogTitle => 'איסוף נתונים מאוצריא';
+  @override
   String collectDialogContent(int count) =>
       'נמצאו באוצריא ${_reports(count)} על ספרים, התוכנה ותוספים שעדיין לא נשלחו.\n\n'
       'לאסוף אותם לכונן, כדי לשלוח אותם לאוצריא מהמחשב המחובר לרשת?\n\n'
