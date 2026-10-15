@@ -958,6 +958,44 @@ void main() {
   });
 
   group('סגירת החלון בזמן פעולה ארוכה', () {
+    for (final language in AppLanguage.values) {
+      for (final installingLibrary in [true, false]) {
+        testWidgets(
+            '$language: אישור וביטול סגירה בזמן '
+            '${installingLibrary ? 'עדכון ספרייה' : 'התקנת אוצריא'}',
+            (tester) async {
+          await pumpShell(tester, language: language, readOnly: true);
+          addTearDown(LauncherCrashSession.resetForTest);
+          final home = tester.widget<HomeScreen>(screen(HomeScreen));
+          if (installingLibrary) {
+            home.library.status = LibraryModuleStatus.updating;
+          } else {
+            home.otzaria.status = OtzariaModuleStatus.installing;
+          }
+          final t = AppL10n.stringsFor(language).shell;
+          for (final approved in [false, true]) {
+            bool? result;
+            final pending = LauncherCrashSession.closeGuard!()
+                .then((allowed) => result = allowed);
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 300));
+
+            expect(find.text(t.closeWhileBusyTitle), findsOneWidget);
+            expect(find.text(t.closeWhileInstallingPrompt), findsOneWidget);
+            expect(result, isNull);
+
+            await tester.tap(find.text(approved
+                ? t.closeWhileInstallingConfirm
+                : t.closeWhileBusyKeepGoing));
+            await tester.pump(const Duration(milliseconds: 300));
+
+            expect(await pending, approved);
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
     testWidgets('המסגרת רושמת שומר סגירה שמאשר כשאין פעולה, ומסירה בפירוק', (
       tester,
     ) async {

@@ -633,7 +633,9 @@ personalUpdateMode`) הוא מה שנקרא בכל מקום, ולא `syncLibrary
 
 `LauncherCrashSession` מחזיק את נעילת ההפעלה (`logs/session.lock`) ומוחק אותה
 בכל יציאה מסודרת: סגירת החלון (`setPreventClose` + `onWindowClose`, ואז
-`destroy` ו-`exit(0)` מיידי, כדי שהסגירה לא תמתין לעבודות רקע), `onExitRequested` (Cmd+Q במק) ו-`exit(0)` של ההרמה ושל העדכון העצמי.
+הסתרת החלון ב-Windows (`hide`, כדי לא לעצור את לולאת ההודעות לפני היציאה),
+`destroy` במערכות האחרות ו-`exit(0)` אחרי שטיפת הלוג), `onExitRequested`
+(Cmd+Q במק) ו-`exit(0)` של ההרמה ושל העדכון העצמי.
 שגיאות שלא נתפסו נרשמות ביומן בכותרות של `LauncherLogFormat` (כולל
 `PlatformDispatcher.onError`), ואזהרת "אף פריים לא הוצג" נושאת `Startup stall:` —
 אלה הראיות לקריסה (`FlutterError` לבדו אינו ראיה). בחירת תמונות בודקת את הגודל לפני הקריאה ואת הסוג לפי הבייטים. גרירת תמונות והדבקה מהלוח (שיש באוצריא) לא פורטו: שתיהן

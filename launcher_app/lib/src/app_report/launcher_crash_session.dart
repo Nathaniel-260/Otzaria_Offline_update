@@ -28,6 +28,7 @@ abstract final class LauncherCrashSession {
 
   static Future<bool> Function()? closeGuard;
   static bool _closeGuardRunning = false;
+  static bool _windowClosing = false;
 
   static bool get isSupported =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
@@ -136,6 +137,7 @@ abstract final class LauncherCrashSession {
   }
 
   static Future<bool> _guardAllowsClose() async {
+    if (_windowClosing) return false;
     final guard = closeGuard;
     if (guard == null) return true;
     if (_closeGuardRunning) return false;
@@ -154,13 +156,17 @@ abstract final class LauncherCrashSession {
     Future<void> Function()? destroy,
     void Function(int code)? exitProcess,
   }) async {
+    if (_windowClosing) return;
+    _windowClosing = true;
     try {
       markCleanExitSync();
     } catch (error) {
       AppLogger.maybeInstance?.warn('מחיקת נעילת ההפעלה נכשלה: $error');
     }
     try {
-      await (destroy ?? windowManager.destroy)();
+      // ב-Windows destroy מפסיק את לולאת ההודעות לפני ש-Dart מספיק לצאת.
+      await (destroy ??
+          (Platform.isWindows ? windowManager.hide : windowManager.destroy))();
     } catch (error) {
       AppLogger.maybeInstance?.warn('סגירת החלון נכשלה: $error');
     }
@@ -202,6 +208,7 @@ abstract final class LauncherCrashSession {
     _cleanExitRequested = false;
     closeGuard = null;
     _closeGuardRunning = false;
+    _windowClosing = false;
     _lifecycle?.dispose();
     _lifecycle = null;
     final listener = _listener;

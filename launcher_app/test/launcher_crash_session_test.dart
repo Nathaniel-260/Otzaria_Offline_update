@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
+import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
@@ -26,8 +27,10 @@ void main() {
     expect(File(lockPath).existsSync(), isTrue);
   });
 
-  tearDown(() {
+  tearDown(() async {
     LauncherCrashSession.resetForTest();
+    await AppLogger.maybeInstance?.flush();
+    AppLogger.resetForTest();
     tmp.deleteSync(recursive: true);
   });
 
@@ -196,7 +199,7 @@ void main() {
       );
     }
 
-    test('preventClose נדלק, ואירוע close מוחק את הנעילה ומשמיד', () async {
+    test('preventClose נדלק, ואירוע close מוחק את הנעילה וסוגר', () async {
       if (!LauncherCrashSession.isSupported) return;
       final codes = <int>[];
       await LauncherCrashSession.installCloseHooks(exitProcess: codes.add);
@@ -205,8 +208,149 @@ void main() {
       await nativeClose();
       await pumpEventQueue();
       expect(File(lockPath).existsSync(), isFalse);
-      expect(calls, contains('destroy'));
+      expect(calls, contains(Platform.isWindows ? 'hide' : 'destroy'));
       expect(codes, [0]);
+    });
+
+    test('Windows: יוצאים בלי להתחיל את כיבוי מנוע Flutter', () async {
+      if (!Platform.isWindows) return;
+      final codes = <int>[];
+      await LauncherCrashSession.installCloseHooks(exitProcess: codes.add);
+
+      await nativeClose();
+      await pumpEventQueue();
+
+      expect(calls, contains('hide'));
+      expect(calls, isNot(contains('destroy')));
+      expect(File(lockPath).existsSync(), isFalse);
+      expect(codes, [0]);
+    });
+
+    test('Windows: כשל בהסתרה נרשם והיציאה עדיין משלימה', () async {
+      if (!Platform.isWindows) return;
+      final logger = await AppLogger.init(tmp.path);
+      final exited = Completer<int>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        if (call.method == 'hide') throw PlatformException(code: 'hide-failed');
+        return null;
+      });
+      await LauncherCrashSession.installCloseHooks(
+        exitProcess: exited.complete,
+      );
+
+      await nativeClose();
+
+      expect(await exited.future, 0);
+      expect(File(lockPath).existsSync(), isFalse);
+      expect(calls, isNot(contains('destroy')));
+      expect(File(logger.filePath).readAsStringSync(), contains('hide-failed'));
+    });
+
+    test('Windows: 25 בקשות אחרי אישור מתחילות סגירה אחת בלבד', () async {
+      if (!Platform.isWindows) return;
+      final hidden = Completer<void>();
+      final codes = <int>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        if (call.method == 'hide') await hidden.future;
+        return null;
+      });
+      await LauncherCrashSession.installCloseHooks(exitProcess: codes.add);
+
+      for (var i = 0; i < 25; i++) {
+        await nativeClose();
+      }
+      final lifecycleResponse =
+          await WidgetsBinding.instance.handleRequestAppExit();
+      final hideCalls = calls.where((call) => call == 'hide').length;
+      hidden.complete();
+      await pumpEventQueue();
+
+      expect(hideCalls, 1);
+      expect(lifecycleResponse, AppExitResponse.cancel);
+      expect(codes, [0]);
+      expect(File(lockPath).existsSync(), isFalse);
+    });
+
+    test('Windows: אישור יציאה של Flutter מאפשר את אירוע סגירת החלון שאחריו',
+        () async {
+      if (!Platform.isWindows) return;
+      final codes = <int>[];
+      await LauncherCrashSession.installCloseHooks(exitProcess: codes.add);
+
+      final response = await WidgetsBinding.instance.handleRequestAppExit();
+      expect(response, AppExitResponse.exit);
+      await nativeClose();
+      await pumpEventQueue();
+
+      expect(calls.where((call) => call == 'hide'), hasLength(1));
+      expect(codes, [0]);
+      expect(File(lockPath).existsSync(), isFalse);
+    });
+
+    test('Windows: כל תור הלוג נכתב לפני היציאה, גם שורה שנוספת בהסתרה',
+        () async {
+      if (!Platform.isWindows) return;
+      final logger = await AppLogger.init(tmp.path);
+      for (var i = 0; i < 400; i++) {
+        logger.info('close-stress-$i');
+      }
+      final exited = Completer<int>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        if (call.method == 'hide') {
+          logger.info('last-line-during-hide');
+        }
+        return null;
+      });
+      await LauncherCrashSession.installCloseHooks(exitProcess: (code) {
+        final content = File(logger.filePath).readAsStringSync();
+        for (var i = 0; i < 400; i++) {
+          expect(content, contains('close-stress-$i\n'));
+        }
+        expect(content, contains('last-line-during-hide'));
+        expect(File(lockPath).existsSync(), isFalse);
+        exited.complete(code);
+      });
+
+      await nativeClose();
+
+      expect(await exited.future, 0);
+      expect(calls, isNot(contains('destroy')));
+    });
+
+    test('25 בקשות סגירה בזמן אישור ממתין שואלות פעם אחת ומחכות לתשובה',
+        () async {
+      if (!LauncherCrashSession.isSupported) return;
+      final approval = Completer<bool>();
+      final exited = Completer<int>();
+      var asked = 0;
+      LauncherCrashSession.closeGuard = () {
+        asked++;
+        return approval.future;
+      };
+      await LauncherCrashSession.installCloseHooks(
+          exitProcess: exited.complete);
+
+      for (var i = 0; i < 25; i++) {
+        await nativeClose();
+      }
+      expect(asked, 1);
+      expect(exited.isCompleted, isFalse);
+      expect(File(lockPath).existsSync(), isTrue);
+      expect(calls, isNot(contains('hide')));
+      expect(calls, isNot(contains('destroy')));
+
+      approval.complete(true);
+
+      expect(await exited.future, 0);
+      expect(File(lockPath).existsSync(), isFalse);
+      expect(calls.where((call) => call == 'hide' || call == 'destroy'),
+          hasLength(1));
     });
 
     test('אירוע close עובר דרך השומר: סירוב משאיר את החלון', () async {
@@ -223,8 +367,36 @@ void main() {
       await pumpEventQueue();
       expect(asked, 1);
       expect(calls, isNot(contains('destroy')));
+      expect(calls, isNot(contains('hide')));
       expect(codes, isEmpty);
       expect(File(lockPath).existsSync(), isTrue);
+    });
+
+    test('ביטול סגירה מאפשר ניסיון נוסף עם אישור', () async {
+      if (!LauncherCrashSession.isSupported) return;
+      final codes = <int>[];
+      var approved = false;
+      var asked = 0;
+      LauncherCrashSession.closeGuard = () async {
+        asked++;
+        return approved;
+      };
+      await LauncherCrashSession.installCloseHooks(exitProcess: codes.add);
+
+      await nativeClose();
+      await pumpEventQueue();
+      expect(codes, isEmpty);
+      expect(File(lockPath).existsSync(), isTrue);
+
+      approved = true;
+      await nativeClose();
+      await pumpEventQueue();
+
+      expect(asked, 2);
+      expect(codes, [0]);
+      expect(calls.where((call) => call == 'hide' || call == 'destroy'),
+          hasLength(1));
+      expect(File(lockPath).existsSync(), isFalse);
     });
 
     test('בקשת יציאה (Cmd+Q) עוברת דרך השומר: סירוב מבטל', () async {
