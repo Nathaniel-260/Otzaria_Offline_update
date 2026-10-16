@@ -114,6 +114,108 @@ void main() {
     expect(await File(p.join(source, 'queue-state.json')).exists(), true);
   });
 
+  test('local-only segments stay in source and do not enter collection counts',
+      () async {
+    await queue.append({'type': 'search', 'query': 'private debug'},
+        {'app': 'otzaria', 'localOnly': true});
+    final privateName = (await queue.sealAndList()).last;
+    final privateFile = File(p.join(source, privateName));
+    await privateFile.writeAsString((await privateFile.readAsString())
+        .replaceAll('"localOnly":true', '"localOnly" : true'));
+    final privateBytes = await privateFile.readAsBytes();
+    final transport = SearchFeedbackTransport(destination);
+    addTearDown(transport.close);
+    expect(await transport.pendingForCollection(source), 1);
+    expect(await transport.collect(source, mayCollect: () async => true), 1);
+    expect(await privateFile.readAsBytes(), privateBytes);
+    expect(await transport.pendingForCollection(source), 0);
+    expect(await transport.count(), 1);
+    final carried = SearchFeedbackQueue(
+        () async => Directory(p.join(destination, identity.keyId)),
+        clock: DateTime.now);
+    await carried
+        .append({'type': 'search'}, {'app': 'otzaria', 'localOnly': true});
+    expect(await transport.count(), 1);
+  });
+
+  test('only local data does not carry a signing identity', () async {
+    await queue.purge();
+    await queue.resume();
+    await queue.append({'type': 'search', 'query': 'private debug'},
+        {'app': 'otzaria', 'localOnly': true});
+    final transport = SearchFeedbackTransport(destination);
+    addTearDown(transport.close);
+    expect(await transport.pendingForCollection(source), 0);
+    expect(await transport.collect(source, mayCollect: () async => true), 0);
+    expect(await transport.pending(source), 1);
+    expect(
+        await SearchFeedbackIdentityStore(
+            () async => Directory(p.join(destination, identity.keyId))).load(),
+        isNull);
+    expect(await transport.count(), 0);
+  });
+
+  for (final onDrive in [false, true]) {
+    test(
+        'legacy query redacted before ${onDrive ? 'upload' : 'collection'} with valid signature',
+        () async {
+      identity.registeredKeyId = identity.keyId;
+      await SearchFeedbackIdentityStore(() async => Directory(source))
+          .save(identity);
+      final name = (await queue.sealAndList()).single;
+      final file = File(p.join(source, name));
+      final lines = const LineSplitter().convert(await file.readAsString());
+      final event = jsonDecode(lines[1]) as Map<String, dynamic>;
+      event.addAll({
+        'query': 'שו"ת person+private@example.com תורה',
+        'queryLength': 500,
+        'queryWordCount': 99,
+        'result': {'passageText': 'אמר דוד תורה person@example.com'},
+      });
+      final raw = '${lines.first}\n${jsonEncode(event)}\n';
+      await file.writeAsString(raw);
+      final carriedDirectory = p.join(destination, identity.keyId);
+      if (onDrive) {
+        await Directory(carriedDirectory).create(recursive: true);
+        await SearchFeedbackIdentityStore(
+            () async => Directory(carriedDirectory)).save(identity);
+        await File(p.join(carriedDirectory, name)).writeAsString(raw);
+      }
+      Map? sent;
+      final transport = SearchFeedbackTransport(destination,
+          client: MockClient((request) async {
+        expect(
+            ed.VerifyKey(identity.publicKey).verify(
+              signature: ed.Signature(
+                  base64Decode(request.headers['X-Otzaria-Signature']!)),
+              message: request.bodyBytes,
+            ),
+            isTrue);
+        sent =
+            ((jsonDecode(request.body) as Map)['events'] as List).single as Map;
+        return http.Response('{"accepted":1}', 200);
+      }));
+      addTearDown(transport.close);
+      if (!onDrive) {
+        expect(
+            await transport.collect(source, mayCollect: () async => true), 1);
+        final carried = SearchFeedbackQueue(
+            () async => Directory(carriedDirectory),
+            clock: DateTime.now);
+        final carriedFile = File(
+            p.join(carriedDirectory, (await carried.sealAndList()).single));
+        expect(await carriedFile.readAsString(),
+            isNot(contains('person+private@example.com')));
+      }
+      expect(await transport.upload(), (sent: 1, rejected: 0, remaining: 0));
+      expect(sent!['query'], 'שו"ת <email> תורה');
+      expect(sent!['queryLength'], 'שו"ת <email> תורה'.length);
+      expect(sent!['queryWordCount'], 3);
+      expect(sent!['eventId'], event['eventId']);
+      expect(sent!['result'], event['result']);
+    });
+  }
+
   test('consent denial leaves queue and drive untouched', () async {
     final transport = SearchFeedbackTransport(destination);
     addTearDown(transport.close);

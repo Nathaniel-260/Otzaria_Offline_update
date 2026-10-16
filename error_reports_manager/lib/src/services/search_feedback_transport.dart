@@ -55,13 +55,19 @@ class SearchFeedbackTransport {
       () async => Directory(p.join(directory, identity.keyId)),
     ).load();
     if (carried?.blocked == true) return 0;
+    return _pendingSendable(sourceDirectory);
+  }
+
+  Future<int> _pendingSendable(String sourceDirectory) async {
     if (!await Directory(sourceDirectory).exists()) return 0;
     final queue = _queue(sourceDirectory);
     var count = 0;
     await for (final file in Directory(sourceDirectory).list()) {
       if (file is! File) continue;
       final batch = await queue.read(p.basename(file.path));
-      count += batch?.eventLines.length ?? 0;
+      if (batch != null && !_isLocalOnly(batch)) {
+        count += batch.eventLines.length;
+      }
     }
     return count;
   }
@@ -88,7 +94,7 @@ class SearchFeedbackTransport {
     if (!await Directory(directory).exists()) return count;
     await for (final entity in Directory(directory).list()) {
       if (entity is! Directory) continue;
-      count += await pending(entity.path);
+      count += await _pendingSendable(entity.path);
     }
     return count;
   }
@@ -118,6 +124,8 @@ class SearchFeedbackTransport {
       var collected = 0;
       for (final name in await source.sealAndList()) {
         if (!await mayCollect()) break;
+        final candidate = await source.read(name);
+        if (candidate == null || _isLocalOnly(candidate)) continue;
         final claimed = await source.claim(name);
         if (claimed == null) continue;
         final batch = await source.read(claimed);
@@ -147,6 +155,9 @@ class SearchFeedbackTransport {
       await transportLock.release();
     }
   }
+
+  static bool _isLocalOnly(SearchFeedbackStoredBatch batch) =>
+      (jsonDecode(batch.contextJson) as Map)['localOnly'] == true;
 
   void stop() {
     _stopped = true;
