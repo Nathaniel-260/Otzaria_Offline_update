@@ -9,6 +9,13 @@ void main() {
     expect(AppL10n.strings, isA<HebrewStrings>());
   });
 
+  test('נוסח החיפוש מבהיר את גבולות הסתרת המידע האישי', () {
+    expect(const HebrewStrings().libraryDomain.semanticConsentText,
+        contains('פרטים אישיים אחרים עלולים להישלח'));
+    expect(const EnglishStrings().libraryDomain.semanticConsentText,
+        contains('other personal details may still be sent'));
+  });
+
   test('AppL10n.use מחליף את כל המחרוזות', () {
     AppL10n.use(AppLanguage.english);
     expect(AppL10n.strings.shell.appTitle, 'Otzaria Updates');
