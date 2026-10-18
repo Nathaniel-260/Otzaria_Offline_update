@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 
 import 'atomic_file.dart' show writeStringAtomically;
+import 'download_connections.dart';
 import 'github_fetch.dart';
 
 typedef SemanticAsset = ({String name, int size, String sha256});
@@ -329,11 +330,7 @@ class SemanticSearchAssets {
       slots.add(progress.slot(existingBytes: existing));
     }
     progress.announce();
-    final downloader = PatchDownloader(
-      httpClient: _client,
-      decompress: (_) async => null,
-      stallTimeout: stallTimeout,
-    );
+    final downloader = newDownloader();
     try {
       _cancel(isCancelled);
       await Directory(p.join(generation, modelFolder)).create(recursive: true);
@@ -380,6 +377,14 @@ class SemanticSearchAssets {
       downloader.dispose();
     }
   }
+
+  @visibleForTesting
+  PatchDownloader newDownloader() => PatchDownloader(
+    httpClient: _client,
+    decompress: (_) async => null,
+    stallTimeout: stallTimeout,
+    maxConnections: connectionsPerFile(_scheduler),
+  );
 
   Future<int> _completeLength(String path, int expectedSize) async {
     try {
@@ -449,7 +454,7 @@ class SemanticSearchAssets {
           continue;
         }
         try {
-          await entry.delete(recursive: true);
+          await _pruneGeneration(entry);
         } on FileSystemException {
           continue;
         }
@@ -457,6 +462,18 @@ class SemanticSearchAssets {
     } on FileSystemException {
       return;
     }
+  }
+
+  // Retain lock inodes even after their generation leaves the manifest.
+  Future<void> _pruneGeneration(Directory dir) async {
+    await for (final entry in dir.list(followLinks: false)) {
+      if (entry is Directory) {
+        await _pruneGeneration(entry);
+      } else if (p.extension(entry.path).toLowerCase() != '.lock') {
+        await entry.delete();
+      }
+    }
+    if (await dir.list(followLinks: false).isEmpty) await dir.delete();
   }
 
   List<SemanticAsset> _vectors(Object? manifest, String tag, int version) {

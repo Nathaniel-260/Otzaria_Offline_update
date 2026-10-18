@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -79,9 +80,13 @@ class MirrorDownloadUndo {
     return (MirrorDownloadUndo._(roots, files, dirs, untouched), notes);
   }
 
-  /// קובצי הצד של ההורדה (`<נכס>.resume`) קטנים כמו מניפסט, וההורדה כותבת
-  /// אותם מחדש — חיתוך לאורך הישן היה מותיר JSON קטוע ומאבד את החידוש.
-  static const Set<String> _rememberedExtensions = {'.json', '.resume'};
+  /// קובצי הצד של ההורדה (`.resume`, ומצב הטווחים `.segments`) נכתבים מחדש
+  /// בכל ריצה — חיתוך לאורך הישן היה מותיר אותם קטועים ומאבד את החידוש.
+  static const Set<String> _rememberedExtensions = {
+    '.json',
+    '.resume',
+    '.segments',
+  };
 
   static bool _remembersContent(String path, int length) =>
       _rememberedExtensions.contains(p.extension(path).toLowerCase()) &&
@@ -95,32 +100,78 @@ class MirrorDownloadUndo {
 
   List<String> _revert() {
     final notes = <String>[];
+    final retainedAssets = _consumedSegmentAssets();
     for (final root in _roots) {
       final dir = Directory(root.path);
       if (!dir.existsSync()) continue;
       if (!root.existed) {
-        if (_keepsFileUnder(root.path)) {
-          _revertInto(dir, notes);
-        } else {
-          _quietly(() => dir.deleteSync(recursive: true), root.path, notes);
-        }
+        _revertInto(dir, notes, retainedAssets);
+        _quietly(() {
+          if (dir.listSync(followLinks: false).isEmpty) dir.deleteSync();
+        }, root.path, notes);
         continue;
       }
-      if (_lostFileUnder(root.path) case final lost?) {
+      if (_lostFileUnder(root.path, retainedAssets) case final lost?) {
         notes.add('Cancel keeps ${root.path}: $lost was pruned');
         continue;
       }
-      _revertInto(dir, notes);
+      _revertInto(dir, notes, retainedAssets);
     }
     return notes;
   }
 
-  String? _lostFileUnder(String rootPath) {
+  static final RegExp _segmentSuffix = RegExp(r'\.seg-\d+$');
+
+  // טווח שנמחק כבר נמצא בתוך הנכס; חיתוך הנכס יאבד גם בתים קודמים.
+  // שומרים את כל משפחתו יחד, כולל מצב ההורדה העדכני, בלי להעתיק נכסים.
+  Set<String> _consumedSegmentAssets() {
+    final retained = <String>{};
     for (final path in _files.keys) {
+      if (!_segmentSuffix.hasMatch(path) || File(path).existsSync()) continue;
+      final asset = path.replaceFirst(_segmentSuffix, '');
+      if (retained.contains(asset)) continue;
+      final sidecar = '$asset.resume';
+      final oldContent = _files[sidecar]?.content;
+      if (oldContent == null || !File(asset).existsSync()) continue;
+      try {
+        final oldToken = utf8.decode(oldContent).split('\n').first;
+        final current = File(sidecar);
+        if (oldToken.isNotEmpty &&
+            current.lengthSync() <= _rememberedContentLimit &&
+            current.readAsLinesSync().first == oldToken) {
+          retained.add(asset);
+        }
+      } catch (_) {
+        // בלי זהות ניתנת לאימות, השורש נשמר כולו ולא מוחזר מניפסט ישן.
+      }
+    }
+    return retained;
+  }
+
+  static bool _belongsToAsset(String path, Set<String> assets) {
+    if (assets.contains(path)) return true;
+    if (path.endsWith('.resume')) {
+      return assets.contains(path.substring(0, path.length - '.resume'.length));
+    }
+    final suffix = _downloadSideFile.firstMatch(path);
+    return suffix != null && assets.contains(path.substring(0, suffix.start));
+  }
+
+  String? _lostFileUnder(String rootPath, Set<String> retainedAssets) {
+    for (final path in _files.keys) {
+      if (_belongsToAsset(path, retainedAssets)) continue;
+      if (_isDownloadSideFile(path) && !_segmentSuffix.hasMatch(path)) continue;
       if (p.isWithin(rootPath, path) && !File(path).existsSync()) return path;
     }
     return null;
   }
+
+  /// קובצי הצד של נכס: טווחים, מצב הטווחים ונעילה.
+  static final RegExp _downloadSideFile =
+      RegExp(r'\.(seg-\d+|segments|segments\.tmp|lock)$', caseSensitive: false);
+
+  static bool _isDownloadSideFile(String path) =>
+      _downloadSideFile.hasMatch(p.basename(path));
 
   static const Set<String> _keptFileNames = {
     LibraryMirrorExporter.rejectedSplitsFileName,
@@ -130,10 +181,8 @@ class MirrorDownloadUndo {
       p.equals(p.dirname(path), root.path) &&
       _keptFileNames.contains(p.basename(path));
 
-  bool _keepsFileUnder(String rootPath) =>
-      _keptFileNames.any((name) => File(p.join(rootPath, name)).existsSync());
-
-  void _revertInto(Directory root, List<String> notes) {
+  void _revertInto(
+      Directory root, List<String> notes, Set<String> retainedAssets) {
     final files = <File>[];
     final newDirs = <String>[];
     for (final entity in root.listSync(recursive: true, followLinks: false)) {
@@ -145,7 +194,13 @@ class MirrorDownloadUndo {
     }
 
     for (final file in files) {
-      if (_untouched.contains(file.path) || _isKept(root, file.path)) continue;
+      // A lock's inode must outlive every downloader holding it.
+      if (p.extension(file.path).toLowerCase() == '.lock' ||
+          _untouched.contains(file.path) ||
+          _isKept(root, file.path) ||
+          _belongsToAsset(file.path, retainedAssets)) {
+        continue;
+      }
       final before = _files[file.path];
       if (before == null) {
         _quietly(() => file.deleteSync(), file.path, notes);
@@ -154,9 +209,30 @@ class MirrorDownloadUndo {
       _quietly(() => before.restoreInto(file), file.path, notes);
     }
 
+    for (final MapEntry(key: path, value: before) in _files.entries) {
+      final content = before.content;
+      if (_belongsToAsset(path, retainedAssets) ||
+          content == null ||
+          !_isDownloadSideFile(path) ||
+          !p.isWithin(root.path, path) ||
+          File(path).existsSync()) {
+        continue;
+      }
+      _quietly(
+        () => File(path).writeAsBytesSync(content, flush: true),
+        path,
+        notes,
+      );
+    }
+
     newDirs.sort((a, b) => b.length.compareTo(a.length));
     for (final dir in newDirs) {
-      _quietly(() => Directory(dir).deleteSync(recursive: true), dir, notes);
+      _quietly(() {
+        final directory = Directory(dir);
+        if (directory.listSync(followLinks: false).isEmpty) {
+          directory.deleteSync();
+        }
+      }, dir, notes);
     }
   }
 

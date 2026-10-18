@@ -431,6 +431,21 @@ void main() {
     );
   });
 
+  test(
+    'pruning retains persistent locks and their parent directories',
+    () async {
+      final old = p.join(mirror, 'v29-20260920000000', 'models', 'nested');
+      final lock = File(p.join(old, 'model.onnx.lock'));
+      await lock.parent.create(recursive: true);
+      await lock.writeAsString('lock inode');
+      final junk = File(p.join(old, 'model.onnx'));
+      await junk.writeAsString('old model');
+      await assets.pruneOldGenerations(mirror, tag);
+      expect(await lock.readAsString(), 'lock inode');
+      expect(await junk.exists(), isFalse);
+    },
+  );
+
   test('pruning keeps only the current generation', () async {
     for (final name in ['v29-20260920000000', tag, 'v31-20261004170255']) {
       final file = File(p.join(mirror, name, 'vectors', 'x'));

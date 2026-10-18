@@ -12,11 +12,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # TODO: לעבור לתג של Otzaria/otzaria_library_updater אחרי מיזוג #27.
   seforim_library_updater:
     git:
-      url: https://github.com/palmoni5/otzaria_library_updater.git
-      ref: 2e16a4cd170cac4b8d1bf86e90cbfe980c0f5c7b
+      url: https://github.com/Otzaria/otzaria_library_updater.git
+      ref: 445744d354d40bde3c042f898c6f93c8f455ff40
   sqlite3_flutter_libs: ^0.5.24
   otzaria_l10n:
     path: ../otzaria_l10n

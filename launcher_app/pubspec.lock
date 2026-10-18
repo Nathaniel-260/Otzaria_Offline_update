@@ -594,9 +594,9 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "2e16a4cd170cac4b8d1bf86e90cbfe980c0f5c7b"
-      resolved-ref: "2e16a4cd170cac4b8d1bf86e90cbfe980c0f5c7b"
-      url: "https://github.com/palmoni5/otzaria_library_updater.git"
+      ref: "445744d354d40bde3c042f898c6f93c8f455ff40"
+      resolved-ref: "445744d354d40bde3c042f898c6f93c8f455ff40"
+      url: "https://github.com/Otzaria/otzaria_library_updater.git"
     source: git
     version: "0.8.1"
   sky_engine:
