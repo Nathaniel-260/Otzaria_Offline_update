@@ -454,7 +454,7 @@ class SemanticSearchAssets {
           continue;
         }
         try {
-          await entry.delete(recursive: true);
+          await _pruneGeneration(entry);
         } on FileSystemException {
           continue;
         }
@@ -462,6 +462,18 @@ class SemanticSearchAssets {
     } on FileSystemException {
       return;
     }
+  }
+
+  // Retain lock inodes even after their generation leaves the manifest.
+  Future<void> _pruneGeneration(Directory dir) async {
+    await for (final entry in dir.list(followLinks: false)) {
+      if (entry is Directory) {
+        await _pruneGeneration(entry);
+      } else if (p.extension(entry.path).toLowerCase() != '.lock') {
+        await entry.delete();
+      }
+    }
+    if (await dir.list(followLinks: false).isEmpty) await dir.delete();
   }
 
   List<SemanticAsset> _vectors(Object? manifest, String tag, int version) {

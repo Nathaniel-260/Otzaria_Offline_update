@@ -41,14 +41,17 @@ class MirrorJunkSweeper {
     for (final item in await find()) {
       try {
         final dir = Directory(item.path);
-        if (await dir.exists()) {
-          await dir.delete(recursive: true);
-          freed += item.bytes;
+        if (await FileSystemEntity.type(item.path, followLinks: false) ==
+            FileSystemEntityType.directory) {
+          freed += await _deleteJunkDirectory(dir);
           continue;
         }
-        final file = File(item.path);
-        if (await file.exists()) {
-          await file.delete();
+        if (p.extension(item.path).toLowerCase() == '.lock') continue;
+        final type = await FileSystemEntity.type(item.path, followLinks: false);
+        if (type == FileSystemEntityType.link) {
+          await Link(item.path).delete();
+        } else if (type == FileSystemEntityType.file) {
+          await File(item.path).delete();
           freed += item.bytes;
         }
       } catch (_) {
@@ -70,7 +73,9 @@ class MirrorJunkSweeper {
     } catch (_) {
       // כונן שנשלף באמצע סריקה — מוחקים את מה שכבר זוהה, ולא נופלים.
     }
-    return out;
+    return out
+        .where((item) => p.extension(item.path).toLowerCase() != '.lock')
+        .toList();
   }
 
   // ── ספרייה ────────────────────────────────────────────────────────────────
@@ -288,6 +293,22 @@ class MirrorJunkSweeper {
     for (final entity in unkept) {
       out.add(await _junkOf(entity));
     }
+  }
+
+  // Persistent download locks must keep the same inode even outside manifests.
+  Future<int> _deleteJunkDirectory(Directory dir) async {
+    var freed = 0;
+    await for (final entity in dir.list(followLinks: false)) {
+      if (entity is Directory) {
+        freed += await _deleteJunkDirectory(entity);
+      } else if (p.extension(entity.path).toLowerCase() != '.lock') {
+        final size = entity is File ? await entity.length() : 0;
+        await entity.delete();
+        freed += size;
+      }
+    }
+    if (await dir.list(followLinks: false).isEmpty) await dir.delete();
+    return freed;
   }
 
   Future<MirrorJunk> _junkOf(FileSystemEntity entity) async =>

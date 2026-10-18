@@ -105,11 +105,10 @@ class MirrorDownloadUndo {
       final dir = Directory(root.path);
       if (!dir.existsSync()) continue;
       if (!root.existed) {
-        if (_keepsFileUnder(root.path)) {
-          _revertInto(dir, notes, retainedAssets);
-        } else {
-          _quietly(() => dir.deleteSync(recursive: true), root.path, notes);
-        }
+        _revertInto(dir, notes, retainedAssets);
+        _quietly(() {
+          if (dir.listSync(followLinks: false).isEmpty) dir.deleteSync();
+        }, root.path, notes);
         continue;
       }
       if (_lostFileUnder(root.path, retainedAssets) case final lost?) {
@@ -182,9 +181,6 @@ class MirrorDownloadUndo {
       p.equals(p.dirname(path), root.path) &&
       _keptFileNames.contains(p.basename(path));
 
-  bool _keepsFileUnder(String rootPath) =>
-      _keptFileNames.any((name) => File(p.join(rootPath, name)).existsSync());
-
   void _revertInto(
       Directory root, List<String> notes, Set<String> retainedAssets) {
     final files = <File>[];
@@ -198,7 +194,9 @@ class MirrorDownloadUndo {
     }
 
     for (final file in files) {
-      if (_untouched.contains(file.path) ||
+      // A lock's inode must outlive every downloader holding it.
+      if (p.extension(file.path).toLowerCase() == '.lock' ||
+          _untouched.contains(file.path) ||
           _isKept(root, file.path) ||
           _belongsToAsset(file.path, retainedAssets)) {
         continue;
@@ -229,7 +227,12 @@ class MirrorDownloadUndo {
 
     newDirs.sort((a, b) => b.length.compareTo(a.length));
     for (final dir in newDirs) {
-      _quietly(() => Directory(dir).deleteSync(recursive: true), dir, notes);
+      _quietly(() {
+        final directory = Directory(dir);
+        if (directory.listSync(followLinks: false).isEmpty) {
+          directory.deleteSync();
+        }
+      }, dir, notes);
     }
   }
 
