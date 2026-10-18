@@ -149,6 +149,7 @@ void main() {
     write('assets/v1/seforim.db.zst.seg-1', 'abc');
     write('assets/v1/seforim.db.zst.segments', state);
     write('assets/v1/seforim.db.zst.lock', '');
+    write('assets/v1/seforim.db.zst.resume', '111\n"etag"');
 
     final undo = await MirrorDownloadUndo.capture([mirrorDir]);
     // ההורדה הושלמה: הטווחים צורפו ונמחקו, וגם מצבם והנעילה.
@@ -163,8 +164,9 @@ void main() {
 
     expect(file('assets/v2/patch-v1-v2.zst').existsSync(), isFalse);
     expect(file('releases.json').readAsStringSync(), '{"releases":["v1"]}');
-    expect(file('assets/v1/seforim.db.zst').readAsStringSync(), '01234');
-    expect(file('assets/v1/seforim.db.zst.segments').readAsStringSync(), state);
+    expect(file('assets/v1/seforim.db.zst').readAsStringSync(),
+        '0123456789abcdefghij');
+    expect(file('assets/v1/seforim.db.zst.segments').existsSync(), isFalse);
     expect(file('assets/v1/seforim.db.zst.seg-1').existsSync(), isFalse);
   });
 
