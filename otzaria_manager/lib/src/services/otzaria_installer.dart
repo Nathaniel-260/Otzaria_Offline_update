@@ -314,7 +314,14 @@ class OtzariaInstaller {
       '/LOG=$logPath',
     ]);
 
-    final outcome = wizardOutcomeFor(result.exitCode);
+    var outcome = wizardOutcomeFor(result.exitCode);
+    // מעבר בין "רק בשבילי" ל"לכל המשתמשים" משגר את האשף מחדש וסוגר את הנוכחי בקוד 2.
+    if (result.exitCode == 2 &&
+        await _waitForRelaunchedSetup(
+                installerPath, Duration.zero, () => true) !=
+            null) {
+      outcome = OtzariaWizardOutcome.relaunched;
+    }
     switch (outcome) {
       case OtzariaWizardOutcome.cancelled:
         _deleteQuietly(logPath);

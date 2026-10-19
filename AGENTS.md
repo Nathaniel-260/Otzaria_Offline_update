@@ -1181,6 +1181,8 @@ up to `relaunchedSetupTimeout`, stoppable from the app screen; matched by image 
 so another user's elevated setup still counts) and shows `setupContinuesElsewhere`; it used to give
 up after 20s while the silent upgrade was still running. Older installers do not
 forward `/NOLAUNCH`, so Otzaria may open afterwards — the following recheck sees it.
+Switching mode on the wizard's "how to install" page relaunches and closes the wizard
+with exit **2**, like a cancel; so exit 2 with a setup still running is a relaunch (#2677).
 
 **An elevated launcher must not run Otzaria elevated or turn a per-user install
 into an all-users one.** Elevated, `otzaria.iss` relaunches an upgrade with
