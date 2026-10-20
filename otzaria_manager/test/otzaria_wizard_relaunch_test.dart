@@ -110,6 +110,52 @@ void main() {
     );
   });
 
+  test('exit 2 כשהאשף שוגר מחדש לכל המשתמשים: ממתינים לו (#2677)', () async {
+    final relaunched = await _exitScript(
+      temp.path,
+      exitCode: 2,
+      name: 'mode-change',
+    );
+    var announced = false;
+    final installer = installerWith((_, timeout, __) async {
+      if (timeout == Duration.zero) return false;
+      File(exe).writeAsStringSync('0.9.98+99800');
+      return true;
+    });
+
+    final state = await installer.installWithWizard(
+      release: _release(),
+      installerPath: relaunched,
+      installDir: installDir,
+      locateInstalled: (_) async => null,
+      detectTimeout: Duration.zero,
+      onSetupContinuesElsewhere: () => announced = true,
+    );
+
+    expect(announced, isTrue);
+    expect(state.launchPath, exe);
+  });
+
+  test('exit 2 בלי אשף שרץ עדיין — ביטול', () async {
+    final cancelled = await _exitScript(
+      temp.path,
+      exitCode: 2,
+      name: 'cancelled',
+    );
+    final installer = installerWith((_, __, ___) async => null);
+
+    await expectLater(
+      installer.installWithWizard(
+        release: _release(),
+        installerPath: cancelled,
+        installDir: installDir,
+        locateInstalled: (_) async => null,
+        detectTimeout: Duration.zero,
+      ),
+      throwsA(isA<OtzariaInstallCancelled>()),
+    );
+  });
+
   test('exit 0 אינו ממתין למתקין נוסף', () async {
     var waited = false;
     final finished = await _exitScript(
