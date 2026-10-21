@@ -16,7 +16,7 @@ dependencies:
   seforim_library_updater:
     git:
       url: https://github.com/Otzaria/otzaria_library_updater.git
-      ref: 445744d354d40bde3c042f898c6f93c8f455ff40
+      ref: a9257039324cf98c8be0648b35675b3be9ba3494
   sqlite3: ^3.3.3
 
 dev_dependencies:

@@ -4,7 +4,7 @@
 import 'dart:io';
 
 import 'package:seforim_library_updater/seforim_library_updater.dart'
-    show LogicalContentHasher, kHashTableOrder;
+    show LogicalContentHasher, kHashRowOrder, kHashTableOrder;
 import 'package:sqlite3/sqlite3.dart';
 
 void main(List<String> args) {
@@ -24,8 +24,9 @@ void main(List<String> args) {
   var reports = 0;
   var last = 0;
   final sw = Stopwatch()..start();
-  final hash = const LogicalContentHasher()
-      .compute(db, tableOrder: kHashTableOrder, onProgress: (bytes) {
+  final hash = const LogicalContentHasher().compute(db,
+      tableOrder: kHashTableOrder,
+      rowOrder: kHashRowOrder, onProgress: (bytes) {
     reports++;
     last = bytes;
     if (reports % 20 == 0) {
