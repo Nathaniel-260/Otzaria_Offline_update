@@ -51,6 +51,65 @@ void main() {
     expect(resolve(p.join(temp.path, 'other', 'otzaria.exe')), isNull);
   });
 
+  test('משפחות הוקטורים נקראות בזהירות', () async {
+    write('{"semanticVectorFamilies":["vectors-windows",3,"","vectors"]}');
+    final caps = await OtzariaCapabilities.read(temp.path);
+    expect(caps?.semanticVectorFamilies, ['vectors-windows', 'vectors']);
+    expect(
+      OtzariaCapabilities.supportsWindowsVectors(capabilities: caps),
+      isTrue,
+    );
+
+    write('{"semanticVectorFamilies":"vectors-windows"}');
+    final wrongType = await OtzariaCapabilities.read(temp.path);
+    expect(wrongType?.semanticVectorFamilies, isNull);
+    expect(
+      OtzariaCapabilities.supportsWindowsVectors(capabilities: wrongType),
+      isFalse,
+    );
+
+    write('{"semanticVectorFamilies":["vectors"]}');
+    expect(
+      OtzariaCapabilities.supportsWindowsVectors(
+        capabilities: await OtzariaCapabilities.read(temp.path),
+      ),
+      isFalse,
+    );
+    expect(OtzariaCapabilities.supportsWindowsVectors(), isFalse);
+  });
+
+  test('תמיכה בחלונות מ-exe אחר אינה נחשבת', () {
+    final exe = p.join(temp.path, 'otzaria.exe');
+    bool supports(String? exePath) =>
+        OtzariaCapabilities.supportsWindowsVectors(
+          capabilities: OtzariaCapabilities(
+            exePath: exePath,
+            semanticVectorFamilies: const ['vectors-windows', 'vectors'],
+          ),
+          launchPath: exe,
+        );
+
+    expect(supports(exe), isTrue);
+    expect(supports(null), isTrue);
+    expect(supports(p.join(temp.path, 'other', 'otzaria.exe')), isFalse);
+  });
+
+  test('אוצריא ישנה מכותבת הקובץ אינה תומכת בחלונות', () {
+    bool supports(String? installed) =>
+        OtzariaCapabilities.supportsWindowsVectors(
+          capabilities: const OtzariaCapabilities(
+            appVersion: '0.9.99',
+            semanticVectorFamilies: ['vectors-windows', 'vectors'],
+          ),
+          installedVersion: installed,
+        );
+
+    expect(supports('0.9.98+900'), isFalse);
+    expect(supports('0.9.99+901'), isTrue);
+    expect(supports('1.0.0'), isTrue);
+    expect(supports(null), isTrue);
+  });
+
   test('מחרוזת ריקה וסכמה לא חיובית הן לא ידוע', () async {
     write('{"appVersion":"","exePath":"","readableDbSchemaVersion":0}');
 

@@ -2410,6 +2410,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get semanticConsentRequired =>
       'קובצי החיפוש החכם נמצאים בכונן. לפני התקנתם יש לאשר איסוף נתוני אימון. אפשר לאשר כאן כשאוצריא סגורה, או להפעיל את ההסכמה בהגדרות אוצריא ולבדוק שוב.';
   @override
+  String get semanticFullDownloadNeeded =>
+      'החיפוש החכם במחשב זה אינו בגרסה שהעדכון החלקי שבכונן ממשיך ממנה, ולכן לא הותקן. בהורדה הבאה במחשב המקוון תירד חבילת החיפוש החכם המלאה.';
+  @override
   String companionChecking(String name) => 'בודק $name...';
   @override
   String companionDownloading(String name) => 'מוריד $name...';

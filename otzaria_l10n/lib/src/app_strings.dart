@@ -1382,6 +1382,7 @@ abstract class LibraryDomainStrings {
   String get semanticInstalling;
   String get semanticDownloadPrompt;
   String get semanticConsentRequired;
+  String get semanticFullDownloadNeeded;
   String get semanticConsentTitle;
   String get semanticConsentText;
   String get semanticConsentConfirm;

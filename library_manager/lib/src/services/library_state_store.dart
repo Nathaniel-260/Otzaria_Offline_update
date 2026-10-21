@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:win32/win32.dart';
 
 import 'atomic_file.dart';
+import 'semantic_vectors_plan.dart';
 
 /// מאיזה release הגיע תוכן המסד שעל המחשב הזה, ובאיזו גרסה הוא היה אז.
 /// שני השדות יחד — גרסה בלי tag אינה מזהה פרסום-מחדש, ו-tag בלי הגרסה
@@ -447,6 +448,82 @@ class LibraryStateStore {
     json['knownDbVersions'] = versions;
     json[_seenField] = seen;
     json[_localTimeField] = localTime;
+    await _writeAll(json);
+  }
+
+  static const _semanticField = 'semanticMachines';
+
+  static Map<String, Map> _semanticRecords(Map<String, dynamic> json) {
+    final raw = json[_semanticField];
+    final records = <String, Map>{};
+    if (raw is! Map) return records;
+    raw.forEach((key, value) {
+      if (key is String && value is Map) records[key] = value;
+    });
+    return records;
+  }
+
+  static DateTime? _stampOf(Map record, String field) {
+    final value = record[field];
+    return value is String ? DateTime.tryParse(value)?.toUtc() : null;
+  }
+
+  /// The smart-search state of every machine whose record has not expired,
+  /// by the same logical clock as [lowestKnownDbVersion].
+  Future<List<SemanticMachineState>> liveSemanticStates({
+    bool excludeOwn = false,
+  }) async {
+    final records = _semanticRecords(await _readAll());
+    final clock = _newest(records.values.map((r) => _stampOf(r, 'seen')));
+    if (excludeOwn) {
+      records
+        ..remove(await currentMachineKey())
+        ..remove(legacyMachineKey());
+    }
+    return [
+      for (final MapEntry(:key, :value) in records.entries)
+        if (clock == null || !_isStale(key, _stampOf(value, 'seen'), clock))
+          ?SemanticMachineState.fromJson(value),
+    ];
+  }
+
+  Future<SemanticMachineState?> loadOwnSemanticState() async =>
+      SemanticMachineState.fromJson(
+        await _ownRecord(_semanticRecords(await _readAll())),
+      );
+
+  /// Records this machine's state; `null` removes it, so a machine that
+  /// stopped using smart search no longer shapes the download.
+  Future<void> recordOwnSemanticState(SemanticMachineState? state) =>
+      _exclusively(() => _recordOwnSemanticState(state));
+
+  Future<void> _recordOwnSemanticState(SemanticMachineState? state) async {
+    final json = await _readAll(forWrite: true);
+    final records = _semanticRecords(json);
+    final key = await currentMachineKey();
+    final legacy = legacyMachineKey();
+    final previous = records[key] ?? records[legacy];
+    records
+      ..remove(key)
+      ..remove(legacy);
+    final now = DateTime.now().toUtc();
+    final logicalNow = _logicalNow(
+      clock: _newest(records.values.map((r) => _stampOf(r, 'seen'))),
+      ownSeen: previous == null ? null : _stampOf(previous, 'seen'),
+      ownLocalTime: previous == null ? null : _stampOf(previous, 'localTime'),
+      now: now,
+    );
+    records.removeWhere(
+      (k, r) => _isStale(k, _stampOf(r, 'seen') ?? logicalNow, logicalNow),
+    );
+    if (state != null) {
+      records[key] = {
+        ...state.toJson(),
+        'seen': logicalNow.toIso8601String(),
+        'localTime': now.toIso8601String(),
+      };
+    }
+    json[_semanticField] = records;
     await _writeAll(json);
   }
 

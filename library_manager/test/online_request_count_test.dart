@@ -454,6 +454,83 @@ void main() {
         );
       });
     });
+
+    List<String> vectorTags() => [
+      for (final url in github.requests)
+        if (url.path.startsWith('$_libraryReleasesPath/tags/'))
+          url.pathSegments.last,
+    ];
+
+    test('without a recorded machine only the legacy vectors are asked '
+        'for', () async {
+      await online(() async {
+        final manager = LibraryManager(dataDir: dataDir);
+        addTearDown(manager.dispose);
+
+        await manager.downloadToMirror(
+          includeSemanticSearch: true,
+          onCompanionWarning: (_, _) {},
+        );
+
+        expect(vectorTags(), ['vectors-v2-20261011']);
+        expect(github.count(_libraryReleasesPath), 1);
+      });
+    });
+
+    test(
+      'the online machine\'s own record does not shape the download',
+      () async {
+        await online(() async {
+          await LibraryStateStore(
+            p.join(dataDir, LibraryStateStore.fileName),
+          ).recordOwnSemanticState(
+            const SemanticMachineState(supportsWindows: true, family: null),
+          );
+          final manager = LibraryManager(dataDir: dataDir);
+          addTearDown(manager.dispose);
+
+          await manager.downloadToMirror(
+            includeSemanticSearch: true,
+            onCompanionWarning: (_, _) {},
+          );
+
+          expect(vectorTags(), ['vectors-v2-20261011']);
+        });
+      },
+    );
+
+    test('machines that all support windows vectors cost one more call, and '
+        'only while that family is unpublished', () async {
+      await online(() async {
+        await File(p.join(dataDir, LibraryStateStore.fileName)).writeAsString(
+          jsonEncode({
+            'semanticMachines': {
+              'offline-pc|user': const SemanticMachineState(
+                supportsWindows: true,
+                family: null,
+              ).toJson(),
+            },
+          }),
+        );
+        final manager = LibraryManager(dataDir: dataDir);
+        addTearDown(manager.dispose);
+
+        expect(await manager.peekLatestOnlineVersion(), 2);
+        expect(await manager.peekPendingSemanticSearch(), isFalse);
+        await manager.downloadToMirror(
+          includeSemanticSearch: true,
+          onCompanionWarning: (_, _) {},
+        );
+
+        expect(vectorTags(), [
+          'vectors-windows-v2-20261011',
+          'vectors-v2-20261011',
+          'vectors-windows-v2-20261011',
+          'vectors-v2-20261011',
+        ]);
+        expect(github.count(_libraryReleasesPath), 1);
+      });
+    });
   });
 }
 
