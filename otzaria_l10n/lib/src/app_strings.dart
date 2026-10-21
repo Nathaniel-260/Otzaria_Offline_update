@@ -1390,15 +1390,7 @@ abstract class LibraryDomainStrings {
   String get semanticConsentTitle;
   String get semanticConsentText;
   String get semanticConsentConfirm;
-  String get semanticFeedbackCollectTitle;
-  String semanticFeedbackCollectBody(int count);
-  String get semanticFeedbackUploadTitle;
-  String semanticFeedbackUploadBody(int count);
-  String semanticFeedbackCollected(int count);
-  String semanticFeedbackUploaded(int sent, int remaining);
   String get semanticFeedbackFailed;
-  String get semanticFeedbackNotCollected;
-  String get semanticFeedbackUploadAction;
   String companionChecking(String name);
   String companionDownloading(String name);
   String companionInstalling(String name);
@@ -1938,7 +1930,6 @@ abstract class ErrorReportsStrings {
   // ── איסוף, במחשב הלא-מקוון ──
   String get collectDialogTitle;
   String collectDialogContent(int count);
-  String get collectAllDialogTitle;
   String get collectConfirm;
   String get collectLater;
   String collectedSnack(int count);
@@ -1964,7 +1955,6 @@ abstract class ErrorReportsStrings {
   String uploadingStage(int done, int total);
   String uploadWaitingStage(int seconds);
   String get uploadStopButton;
-  String get uploadingFeedbackStage;
   String uploadPendingOffline(int count);
   String uploadPendingUnchecked(int count);
   String get uploadCollectingBusy;
