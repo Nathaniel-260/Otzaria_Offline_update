@@ -1076,7 +1076,11 @@ void main() {
     String hashOf(String path) {
       final db = sqlite3.sqlite3.open(path, mode: sqlite3.OpenMode.readOnly);
       try {
-        return hasher.compute(db, tableOrder: kHashTableOrderSchema2);
+        return hasher.compute(
+          db,
+          tableOrder: kHashTableOrderSchema2,
+          rowOrder: null,
+        );
       } finally {
         db.close();
       }

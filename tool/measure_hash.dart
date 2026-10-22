@@ -5,7 +5,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:seforim_library_updater/seforim_library_updater.dart'
-    show kHashTableOrder;
+    show hashOrderByClause, kHashRowOrder, kHashTableOrder;
 import 'package:sqlite3/sqlite3.dart';
 
 void main(List<String> args) {
@@ -89,7 +89,6 @@ String _buildSql(String table, List<String> cols) {
       .map((c) => 'typeof("$c"),CASE WHEN typeof("$c")=\'text\' '
           'THEN CAST("$c" AS BLOB) ELSE "$c" END')
       .join(',');
-  final orderBy =
-      cols.contains('id') ? 'id' : cols.map((c) => '"$c"').join(',');
+  final orderBy = hashOrderByClause(table, cols, kHashRowOrder);
   return 'SELECT $selectCols FROM "$table" ORDER BY $orderBy';
 }
