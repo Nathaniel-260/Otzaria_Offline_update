@@ -30,6 +30,7 @@ import 'package:launcher_app/src/services/sleep_inhibitor.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/shell_navigator.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
@@ -39,9 +40,20 @@ import 'package:plugins_manager/plugins_manager.dart';
 import 'test_harness.dart';
 import 'test_support.dart';
 
-String _appShellSource() => File(
-      'lib/src/screens/app_shell.dart',
-    ).readAsStringSync().replaceAll('\r\n', '\n');
+String _source(String path) =>
+    File(path).readAsStringSync().replaceAll('\r\n', '\n');
+
+String _appShellSource() => _source('lib/src/screens/app_shell.dart');
+
+/// הזרימות והדגלים יושבים ב-[AppSession]; המסגרת מממשת רק את הדיאלוגים.
+String _appSessionSource() => _source('lib/src/shell/app_session.dart');
+
+/// גוף מתודה: מהחתימה עד הסוגר שבהזחה של מתודת מחלקה.
+String _methodBody(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, greaterThan(-1), reason: signature);
+  return source.substring(start, source.indexOf('\n  }\n', start));
+}
 
 void main() {
   late Directory tempDir;
@@ -452,17 +464,15 @@ void main() {
   });
 
   test('כל סיום של משימה ארוכה מעיר את ההצעה שנדחתה', () {
-    final source = _appShellSource();
-    String body(String signature) {
-      final start = source.indexOf(signature);
-      expect(start, greaterThan(-1), reason: signature);
-      return source.substring(start, source.indexOf('\n  }\n', start));
-    }
+    final source = _appSessionSource();
 
-    expect(body('void _rebuild() {'), contains('_offers.resume()'));
+    expect(
+      _methodBody(source, 'void _rebuild() {'),
+      contains('_offers.resume()'),
+    );
     expect(
       source,
-      contains('setState(() => _elevationPending = false);\n'
+      contains('_update(() => _elevationPending = false);\n'
           '        _offers.resume();'),
     );
     expect(source, contains('Future<bool> closeOtzaria() => _offers.holdFor('));
@@ -544,7 +554,7 @@ void main() {
     await pumpShell(tester);
 
     final dynamic state = tester.state(find.byType(AppShell));
-    final dirs = List<String>.from(state.downloadMirrorDirs as List);
+    final dirs = List<String>.from(state.session.downloadMirrorDirs as List);
     final mirrorRoot = p.join(tempDir.path, 'mirror');
     final pluginDirs = PluginsManager.mirrorDirsIn(mirrorRoot);
 
@@ -573,16 +583,20 @@ void main() {
     final source = _appShellSource();
     expect(source, contains('LogicalKeyboardKey.keyR, control: true'));
     expect(source, contains('LogicalKeyboardKey.f5'));
-    final body = source.substring(
-      source.indexOf('Future<void> _refreshFromKeyboard()'),
-      source.indexOf('Widget build(BuildContext context)',
-          source.indexOf('Future<void> _refreshFromKeyboard()')),
+    expect(
+      '_session.refreshFromKeyboard()'.allMatches(source).length,
+      2,
     );
-    expect(body, contains('if (_longTaskRunning) return;'));
+    final body = _methodBody(
+      _appSessionSource(),
+      'Future<void> refreshFromKeyboard()',
+    );
+    expect(body, contains('if (longTaskRunning) return;'));
   });
 
   group('חיווט הזרימות שהוצאו מהמסגרת', () {
-    final source = _appShellSource();
+    final source = _appSessionSource();
+    final shellSource = _appShellSource();
 
     String bodyOf(String signature, String until) {
       final start = source.indexOf(signature);
@@ -595,12 +609,12 @@ void main() {
     test('ההתקנה האוטומטית נשענת על בדיקת תהליך טרייה ועל חסימת היציאה', () {
       final wiring = bodyOf(
         'late final AutoInstallFlow _autoInstall',
-        'late final DialogQueue _dialogs',
+        'late final ReportOfferCoordinator _offers',
       );
       expect(wiring, contains('isOtzariaRunning: refreshProcessState,'));
       expect(wiring, contains('isDownloading: () => _downloads.isDownloading'));
-      expect(wiring, contains('exitPending: () => _exitPending'));
-      expect(wiring, isNot(contains('_otzariaIsRunning')));
+      expect(wiring, contains('exitPending: () => exitPending'));
+      expect(wiring, isNot(contains('otzariaIsRunning')));
     });
 
     test('דילוג בגלל אוצריא פתוחה מדווח בדיאלוג', () {
@@ -609,16 +623,19 @@ void main() {
         'downloadMirrorDirs',
       );
       expect(body, contains('_autoInstall.run('));
-      expect(body, contains('widget.settings.settings.autoInstall'));
-      expect(body, contains('showSingleActionDialog'));
-      expect(body, contains('autoInstallSkippedTitle'));
+      expect(body, contains('settings.settings.autoInstall'));
+      expect(body, contains('prompts.showAutoInstallSkipped()'));
       expect(body, isNot(contains('useWizard: true')));
+      final dialog =
+          _methodBody(shellSource, 'Future<void> showAutoInstallSkipped()');
+      expect(dialog, contains('showSingleActionDialog'));
+      expect(dialog, contains('autoInstallSkippedTitle'));
     });
 
     test('הבדיקה המקוונת שלפני ההורדה מרעננת רק את מה שהתיישן', () {
       final body = bodyOf(
         'Future<void> _refreshStaleOnlineChecks(AppSettings s)',
-        'Future<bool> _confirmSemanticSearch()',
+        'Future<DownloadRollback> _captureDownloadRollback()',
       );
       expect(body, contains('StaleOnlineChecks.of('));
       expect(body, contains('if (stale.app) _otzaria.checkOnline()'));
@@ -630,34 +647,34 @@ void main() {
 
     test("ההורדה נחסמת בפעולה ארוכה ובהורדת הלאנצ'ר, והניקוי נדחה בה", () {
       final host = bodyOf(
-        'class _ShellDownloadHost implements MirrorDownloadHost',
-        'class _ShellLauncherHost',
+        'class _SessionDownloadHost implements MirrorDownloadHost',
+        'class _SessionLauncherHost',
       );
       expect(
         host,
         contains(
-          '_shell._longTaskRunning || _shell._launcherUpdate.isDownloading',
+          '_session.longTaskRunning || _session._launcherUpdate.isDownloading',
         ),
       );
       expect(
         host,
         contains(
-          'bool get launcherDownloading => _shell._launcherUpdate.isDownloading',
+          'bool get launcherDownloading => '
+          '_session._launcherUpdate.isDownloading',
         ),
       );
-      expect(host, contains('_shell._refreshStaleOnlineChecks(s)'));
-      expect(host, contains('_shell._sweepMirrorJunk()'));
+      expect(host, contains('_session._refreshStaleOnlineChecks(s)'));
+      expect(host, contains('_session._sweepMirrorJunk()'));
     });
 
     test('ההחלפה של קובץ ההרצה נחסמת בכל פעולה שיציאה קוטעת', () {
-      final host = bodyOf(
-        'class _ShellLauncherHost implements LauncherUpdateHost',
-        'class _NavRail',
-      );
-      expect(host, contains('wouldInterrupt => _shell._exitWouldInterrupt'));
-      expect(host, contains('_shell._searchFeedback.stopAndWait()'));
-      expect(host, contains('_shell._blockedByReadOnly()'));
-      expect(host, contains('isReadOnly => _shell.widget.readOnly'));
+      final start = source
+          .indexOf('class _SessionLauncherHost implements LauncherUpdateHost');
+      expect(start, greaterThan(-1));
+      final host = source.substring(start);
+      expect(host, contains('wouldInterrupt => _session.exitWouldInterrupt'));
+      expect(host, contains('_session._blockedByReadOnly()'));
+      expect(host, contains('isReadOnly => _session.readOnly'));
       final flow = bodyOf(
         'late final LauncherUpdateFlow _launcherFlow',
         'late final AutoInstallFlow _autoInstall',
@@ -1038,8 +1055,8 @@ void main() {
   });
 
   group('פעולות שיציאה מהתהליך קוטעת', () {
-    final source = _appShellSource();
-    final start = source.indexOf('bool get _longTaskRunning');
+    final source = _appSessionSource();
+    final start = source.indexOf('bool get longTaskRunning');
     final getters = source.substring(
       start,
       source.indexOf('Future<void> installLauncherUpdate()', start),
@@ -1047,7 +1064,7 @@ void main() {
 
     test('הגטרים נמצאים', () {
       expect(start, greaterThan(-1));
-      expect(getters, contains('bool get _exitWouldInterrupt'));
+      expect(getters, contains('bool get exitWouldInterrupt'));
     });
 
     test('כוללות התקנה, למידה והורדה של תוכנות מותאמות וייצוא החנות', () {
@@ -1061,13 +1078,16 @@ void main() {
       expect(
         getters,
         contains(
-          'bool get _exitPending =>'
+          'bool get exitPending =>'
           ' _elevationPending || _launcherUpdate.isInstalling;',
         ),
       );
       expect(
-        getters.substring(0, getters.indexOf('bool get _exitWouldInterrupt')),
-        contains('_exitPending'),
+        getters.substring(
+          0,
+          getters.indexOf('bool get pluginSyncBlockedElsewhere'),
+        ),
+        contains('exitPending;'),
       );
     });
 
@@ -1082,11 +1102,11 @@ void main() {
   });
 
   group('חסימת הסנכרון והייצוא בזמן פעולה אחרת', () {
-    final source = _appShellSource();
-    final start = source.indexOf('bool get _pluginSyncBlockedElsewhere');
+    final source = _appSessionSource();
+    final start = source.indexOf('bool get pluginSyncBlockedElsewhere');
     final getter = source.substring(
       start,
-      source.indexOf('bool get _exitPending', start),
+      source.indexOf('bool get exitPending', start),
     );
 
     test('הגטר כולל הורדה, החלפת מסד, התקנת אוצריא ותוכנות מותאמות', () {
@@ -1099,15 +1119,18 @@ void main() {
     });
 
     test('מסך התוספים מקבל אותו', () {
-      final screen = source.substring(source.indexOf('PluginsScreen('));
+      final shellSource = _appShellSource();
+      final screen =
+          shellSource.substring(shellSource.indexOf('PluginsScreen('));
       final args =
           screen.substring(0, screen.indexOf('LauncherScreen.settings'));
-      expect(args, contains('busyElsewhere: _pluginSyncBlockedElsewhere'));
+      expect(args, contains('busyElsewhere: s.pluginSyncBlockedElsewhere'));
     });
   });
 
   group('_maybeOfferElevation', () {
-    final source = _appShellSource();
+    final source = _appSessionSource();
+    final shellSource = _appShellSource();
     final start = source.indexOf('Future<void> _maybeOfferElevation()');
     final body = source.substring(
       start,
@@ -1120,10 +1143,15 @@ void main() {
     });
 
     test('נדחית בזמן פעולה ארוכה, לפני הדיאלוג ואחריו', () {
-      final dialog = body.indexOf('showTwoActionsDialog');
+      final dialog = body.indexOf('prompts.offerElevation()');
       final restart = body.indexOf('Elevation.restartElevated()');
-      expect(body.indexOf('_exitWouldInterrupt'), lessThan(dialog));
-      final afterDialog = body.indexOf('_exitWouldInterrupt', dialog);
+      expect(dialog, greaterThan(-1));
+      expect(
+        _methodBody(shellSource, 'Future<bool?> offerElevation()'),
+        contains('showTwoActionsDialog'),
+      );
+      expect(body.indexOf('exitWouldInterrupt'), lessThan(dialog));
+      final afterDialog = body.indexOf('exitWouldInterrupt', dialog);
       expect(afterDialog, greaterThan(dialog));
       expect(afterDialog, lessThan(restart));
       expect(
@@ -1140,7 +1168,7 @@ void main() {
     });
 
     test('מסמנת המתנה ל-UAC סביב restartElevated ומאפסת בכשל', () {
-      final pending = body.indexOf('setState(() => _elevationPending = true)');
+      final pending = body.indexOf('_update(() => _elevationPending = true)');
       final restart = body.indexOf('Elevation.restartElevated()');
       expect(pending, greaterThan(-1));
       expect(pending, lessThan(restart));
@@ -1152,27 +1180,28 @@ void main() {
     test(
       'ממשק המסגרת וההורדה חסומים בזמן ההמתנה ל-UAC או החלפת קובץ ההרצה',
       () {
-        expect(source, contains('absorbing: _exitPending'));
-        expect(source, contains('excluding: _exitPending'));
+        expect(shellSource, contains('absorbing: _session.exitPending'));
+        expect(shellSource, contains('excluding: _session.exitPending'));
         final guard = source.substring(
-          source.indexOf('bool get _longTaskRunning'),
-          source.indexOf('bool get _exitPending'),
+          source.indexOf('bool get longTaskRunning'),
+          source.indexOf('bool get exitPending'),
         );
-        expect(guard, contains('_exitPending'));
+        expect(guard, contains('exitPending'));
         final host = source.substring(
-          source.indexOf('class _ShellDownloadHost'),
-          source.indexOf('class _ShellLauncherHost'),
+          source.indexOf('class _SessionDownloadHost'),
+          source.indexOf('class _SessionLauncherHost'),
         );
         expect(host, contains('bool get isBlocked =>'));
-        expect(host, contains('_shell._longTaskRunning'));
-        final wait = source.substring(
-          source.indexOf('late final DialogQueue _dialogs'),
-          source.indexOf('void initState()'),
+        expect(host, contains('_session.longTaskRunning'));
+        final wait = shellSource.substring(
+          shellSource.indexOf('late final DialogQueue _dialogs'),
+          shellSource.indexOf('void initState()'),
         );
         expect(
           wait,
           contains(
-            '_exitPending || !(ModalRoute.of(context)?.isCurrent ?? true)',
+            '_session.exitPending || '
+            '!(ModalRoute.of(context)?.isCurrent ?? true)',
           ),
         );
       },
@@ -1186,13 +1215,14 @@ void main() {
         source.indexOf('Future<void> _maybeAnnouncePlugins()'),
       );
       expect(listener, contains('_maybeOfferElevation()'));
-      expect(listener, isNot(contains('setState')));
+      expect(listener, isNot(contains('notifyListeners')));
+      expect(listener, isNot(contains('_update(')));
     });
 
     test('מוצעת שוב בסוף ההורדה', () {
       final host = source.substring(
-        source.indexOf('class _ShellDownloadHost'),
-        source.indexOf('class _ShellLauncherHost'),
+        source.indexOf('class _SessionDownloadHost'),
+        source.indexOf('class _SessionLauncherHost'),
       );
       final cancelled = host.substring(
         host.indexOf('void downloadCancelled('),
@@ -1202,8 +1232,8 @@ void main() {
         host.indexOf('void downloadEnded()'),
         host.indexOf('void downloadFinished('),
       );
-      expect(cancelled, contains('_shell._maybeOfferElevation()'));
-      expect(ended, contains('_shell._maybeOfferElevation()'));
+      expect(cancelled, contains('_session._maybeOfferElevation()'));
+      expect(ended, contains('_session._maybeOfferElevation()'));
     });
   });
 
@@ -1245,6 +1275,24 @@ void main() {
 
       expect(screen(SettingsScreen), findsNothing);
       expect(screen(HomeScreen), findsOneWidget);
+    });
+
+    testWidgets('ניהול התוכנות דרך הנווט עובר באותו שער', (tester) async {
+      await lockSettings(tester);
+      await pumpShell(tester);
+      final dynamic state = tester.state(find.byType(AppShell));
+      final nav = state.navigator as ShellNavigator;
+
+      final entered = nav.push(const CustomAppsManageRoute());
+      await tester.pump();
+      expect(find.text(stringsOf().saferMode.verifyTitle), findsOneWidget);
+      expect(nav.section, ShellSection.home);
+
+      await tester.tap(find.text(stringsOf().common.cancel));
+      await tester.pump();
+      expect(await entered, isFalse);
+      expect(nav.section, ShellSection.home);
+      expect(screen(SettingsScreen), findsNothing);
     });
 
     testWidgets('סיסמה שגויה אינה פותחת את המסך', (tester) async {
@@ -1329,7 +1377,7 @@ void main() {
       expect(await statusAfterStart(tester), LauncherUpdateStatus.idle);
     });
 
-    final source = _appShellSource();
+    final source = _appSessionSource();
 
     test('הבדיקה הידנית ברשת קוראת גם את המראה, לפני ההצצה', () {
       final start = source.indexOf('Future<void> checkOnline() async {');
@@ -1393,15 +1441,22 @@ void main() {
       expect(LauncherCrashSession.closeGuard, isNull);
     });
 
-    final source = _appShellSource();
-    final start = source.indexOf('Future<bool> _confirmClose() async {');
+    final source = _appSessionSource();
+    final start = source.indexOf('Future<bool> confirmClose() async {');
     final body = source.substring(start, source.indexOf('\n  }\n', start));
 
     test('גוף השומר נמצא', () => expect(start, greaterThan(-1)));
 
     test('שואל רק בזמן פעולה ארוכה', () {
-      expect(body, contains('!_longTaskRunning) return true'));
-      expect(body, contains('showWarningDialog'));
+      expect(body, contains('!longTaskRunning) return true'));
+      expect(body, contains('prompts.confirmClose('));
+      expect(
+        _methodBody(
+          _appShellSource(),
+          'Future<bool> confirmClose({required bool downloading})',
+        ),
+        contains('showWarningDialog'),
+      );
     });
 
     test('הורדה מבוטלת ומחכים לשחזור לפני הסגירה', () {

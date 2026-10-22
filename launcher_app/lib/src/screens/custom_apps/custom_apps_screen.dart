@@ -105,7 +105,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
   }
 
   /// **המסך הוא התנאי.** הוא נבנה רק כשנכנסים ללשונית (ראו
-  /// `AppShell._builtScreens`), ולכן מי שלא נכנס אליה אינו רואה את ההודעה.
+  /// `ShellNavigator.isBuilt`), ולכן מי שלא נכנס אליה אינו רואה את ההודעה.
   void _announcePendingIfNeeded() {
     // מסך הניהול נפתח כדי לערוך, לא כדי להתקין.
     if (widget.manage || _pendingDialogShown) return;

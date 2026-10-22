@@ -171,7 +171,7 @@ class LibraryModuleController extends ChangeNotifier
   /// שאינו מתאים למסד שלו נשאר תקוע לנצח (issue #19).
   bool canRetryWithFullDownload = false;
 
-  /// הכשל האחרון היה "אין הרשאה" — ראו [Elevation]. `AppShell` מציע על סמך
+  /// הכשל האחרון היה "אין הרשאה" — ראו [Elevation]. `AppSession` מציע על סמך
   /// זה להפעיל מחדש כמנהל, ולכן זה נדלק בכשל ונכבה בכל ניסיון חדש.
   bool needsElevation = false;
 

@@ -36,7 +36,7 @@ class LibraryScreen extends StatelessWidget {
   /// האזהרה, שמסיר את מה שחוסם את עדכון המסד.
   final Future<bool> Function() onCloseOtzaria;
 
-  /// מוסרת לאוצריא את בקשת עדכון אינדקס החיפוש. יושבת ב-`AppShell` כי
+  /// מוסרת לאוצריא את בקשת עדכון אינדקס החיפוש. יושבת ב-`AppSession` כי
   /// המסירה עוברת דרך קובץ ההרצה של אוצריא, שמודול האפליקציה מכיר.
   final Future<void> Function() onRequestReindex;
 

@@ -100,7 +100,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onControllerChange);
-    // הטעינה עצמה נעשית ב-AppShell, כמו לשאר המודולים; כאן רק מגיבים לה.
+    // הטעינה עצמה נעשית ב-AppSession, כמו לשאר המודולים; כאן רק מגיבים לה.
     _announceUpdatesIfNeeded();
     _announceNewIfNeeded();
   }

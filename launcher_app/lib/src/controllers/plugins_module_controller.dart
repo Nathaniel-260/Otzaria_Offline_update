@@ -364,7 +364,7 @@ class PluginsModuleController extends ChangeNotifier
   final Map<String, _PendingInstall> _pendingInstalls = {};
   Timer? _installWatch;
 
-  /// שמות התוספים שאוצריא סיימה להתקין. `AppShell` מאזין ומציג הודעה —
+  /// שמות התוספים שאוצריא סיימה להתקין. `AppSession` מאזין ומציג הודעה —
   /// גם כשהמשתמש כבר עבר ממסך החנות למסך אחר.
   final StreamController<String> _installDone =
       StreamController<String>.broadcast();

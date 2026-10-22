@@ -60,7 +60,7 @@ class HomeScreen extends StatelessWidget {
   final bool isCheckingOnline;
 
   /// רצה כרגע הורדה או התקנה. החלפת קובץ ההרצה של הלאנצ'ר מסתיימת ב-`exit(0)`
-  /// ולכן אינה מוצעת אז — ראו `AppShell._longTaskRunning`.
+  /// ולכן אינה מוצעת אז — ראו `AppSession.longTaskRunning`.
   final bool longTaskRunning;
 
   /// בודקת מחדש אם אוצריא פתוחה ומחזירה את התוצאה הטרייה — [otzariaIsRunning]
@@ -68,7 +68,7 @@ class HomeScreen extends StatelessWidget {
   final Future<bool> Function() onProcessStateChanged;
 
   /// מבקשת מאוצריא הפתוחה להיסגר ומחזירה אם היא אכן נסגרה — הכפתור שלצד
-  /// האזהרה. יושבת ב-`AppShell` כי היא נוגעת בתהליך שמודול האפליקציה מכיר.
+  /// האזהרה. יושבת ב-`AppSession` כי היא נוגעת בתהליך שמודול האפליקציה מכיר.
   final Future<bool> Function() onCloseOtzaria;
   final Future<void> Function() onCheckOnline;
   final Future<void> Function() onDownloadAll;
@@ -76,13 +76,13 @@ class HomeScreen extends StatelessWidget {
   /// מבטל את ההורדה שרצה ומוחק את מה שהיא הביאה — מאשר קודם בדיאלוג.
   final Future<void> Function() onCancelDownload;
 
-  /// שתי הפעולות של עדכון הלאנצ'ר עצמו. מיושמות ב-`AppShell` (הדיאלוגים
+  /// שתי הפעולות של עדכון הלאנצ'ר עצמו. מיושמות ב-`AppSession` (הדיאלוגים
   /// שלהן קופצים גם מהבדיקה האוטומטית בעלייה), וכאן רק נקראות.
   final Future<void> Function() onDownloadLauncherUpdate;
   final Future<void> Function() onInstallLauncherUpdate;
 
   /// מציעה ומוסרת לאוצריא את בקשת עדכון אינדקס החיפוש, כשעדכון מסד השאיר
-  /// אותה ממתינה. גם היא מיושמת ב-`AppShell`, מאותו טעם.
+  /// אותה ממתינה. גם היא מיושמת ב-`AppSession`, מאותו טעם.
   final Future<void> Function() onRequestReindex;
 
   final VoidCallback onGoToOtzaria;

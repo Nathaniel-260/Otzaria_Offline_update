@@ -551,7 +551,7 @@ void main() {
         expect(await t.controller.requestLibraryReindex(), isTrue);
 
         expect(t.launcher.uris, [OtzariaDeepLinks.libraryReindex]);
-        // הסימון עצמו נמחק ב-`AppShell`, אחרי ה-true הזה.
+        // הסימון עצמו נמחק ב-`AppSession`, אחרי ה-true הזה.
         expect(t.delivered, isEmpty);
       },
       testOn: 'windows',
@@ -767,7 +767,7 @@ void main() {
       final c = controllerFor();
       await c.checkForUpdate();
 
-      // זה מה שמבטל את הדילוג על מודול התוכנה ב-`AppShell.downloadAll`,
+      // זה מה שמבטל את הדילוג על מודול התוכנה ב-`DownloadPlan.shouldSkipApp`,
       // ולכן מה שגורם ל-2GB באמת להימחק.
       expect(c.hasStaleFullPackage, isTrue);
     });

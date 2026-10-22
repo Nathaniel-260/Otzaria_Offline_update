@@ -1,0 +1,61 @@
+import 'package:error_reports_manager/error_reports_manager.dart';
+import 'package:plugins_manager/plugins_manager.dart';
+
+import '../controllers/app_reports_controller.dart';
+import '../controllers/download_plan.dart';
+import '../controllers/launcher_update_flow.dart';
+import '../self_update/launcher_release.dart';
+
+/// כל מה ש-[AppSession] צריך מהממשק: דיאלוגים, הודעות וזרימות שתלויות
+/// ב-`BuildContext`. המסגרת מממשת, והסשן עצמו אינו מחזיק `BuildContext`.
+abstract interface class SessionPrompts {
+  /// מריץ דיאלוג בתור המשותף — ראו `DialogQueue.run`.
+  Future<T?> runDialog<T>(Future<T> Function() body, {bool forever});
+
+  Future<void> showErrorReportsIntro();
+
+  /// `null` כשהדיאלוג לא הוצג בכלל.
+  Future<bool?> showCrashPrompt(
+    AppReportsController reports,
+    CrashCandidate candidate,
+  );
+
+  Future<void> announcePlugins({
+    required List<StorePlugin> fresh,
+    required bool hasUpdates,
+  });
+
+  /// `null` כשהדיאלוג לא הוצג (התור לא התפנה).
+  Future<bool?> offerElevation();
+
+  Future<bool?> offerLauncherUpdate(LauncherRelease release, String? whatsNew);
+
+  Future<bool> confirmLauncherInstall(String version, {String? whatsNew});
+
+  void notifyLauncherUpdate(LauncherUpdateNotice notice, String detail);
+
+  Future<void> showAutoInstallSkipped();
+
+  Future<bool> confirmCancelDownload();
+
+  Future<bool> confirmClose({required bool downloading});
+
+  Future<bool> confirmSemanticSearch();
+
+  Future<bool> confirmSemanticConsent();
+
+  Future<bool> confirmLibraryReindex();
+
+  void reportDownload({
+    required List<MirrorComponent> failed,
+    required List<MirrorComponent> skipped,
+  });
+
+  Future<void> performReportOffer();
+
+  Future<void> uploadReports({
+    required bool Function() isCancelled,
+    required void Function(bool active) onActiveChanged,
+    required void Function(bool uploading) onUploadingChanged,
+  });
+}

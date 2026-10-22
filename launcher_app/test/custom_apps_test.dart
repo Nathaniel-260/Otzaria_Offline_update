@@ -1048,7 +1048,7 @@ void main() {
       );
     });
 
-    // המסך נבנה רק בכניסה ללשונית (`AppShell._builtScreens`) — ולכן מי
+    // המסך נבנה רק בכניסה ללשונית (`ShellNavigator.isBuilt`) — ולכן מי
     // שאינו נכנס אליה אינו רואה דבר, גם כשיש מה להתקין.
     testWidgets('בלי כניסה למסך אין הודעה', (tester) async {
       await addApp(

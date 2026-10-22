@@ -108,7 +108,7 @@ and the smart-search feedback the drive carries (§5.10).
 | Collect + upload smart-search feedback | `SearchFeedbackController.synchronize()` | **yes**, light — background, see §5.10 |
 
 The "peek" calls exist only for the optional, one-shot, on-launch "is there
-anything new online?" nudge (`AppShell.checkOnline()`,
+anything new online?" nudge (`AppSession.checkOnline()`,
 `AppSettings.autoCheckUpdates`) — metadata only, never an asset, and a failure
 (no network) is a normal silent outcome. **All four modules must be in that
 call**: the plugin store was missing from it for its whole life, so a new plugin
@@ -534,7 +534,7 @@ run all three every time, so two new plugins also re-ran the app and library
 downloads — minutes of progress bars for nothing. A component is skipped when
 `provenUpToDateOnline` (`controllers/online_check.dart`) says the light check
 *proved* there is nothing new: checked, no error, no update. Before deciding,
-`AppShell._refreshStaleOnlineChecks` re-runs, in parallel, the check of every
+`AppSession._refreshStaleOnlineChecks` re-runs, in parallel, the check of every
 selected component that `onlineCheckNeedsRefresh` calls stale (never ran, failed,
 or older than `onlineCheckMaxAge`, 15 minutes): a morning check must not skip an
 app released at noon. A check that never ran
@@ -704,7 +704,7 @@ deleted (`_pruneStaleAssets`); the `.resume` sidecars of assets that *are* in it
 survive, since they let a re-run skip a completed download.
 
 **Every successful download ends with one sweep of the whole mirror**
-(`MirrorJunkSweeper`, called from `AppShell.downloadAll`). Each component already
+(`MirrorJunkSweeper`, called from `AppSession.downloadAll`). Each component already
 prunes itself, but only inside a download that brought it something: a skipped
 component, or an `export` that returned `false`, prunes nothing — which is how a
 drive ended up carrying full DBs of v20 *and* v21, and 5GB after a version bump.
@@ -787,7 +787,7 @@ load-bearing consequences:
 
 Deliberately *not* parallelised: `OtzariaAppMirror.sync` (two installers, ~6% of the
 bytes, and its `onChannelStart` UI assumes one channel at a time) and the module
-ordering in `AppShell.downloadAll`.
+ordering in `AppSession.downloadAll`.
 
 ### 5.3 State that travels on the drive
 
@@ -947,7 +947,7 @@ saying the user must point Otzaria's own library-location setting at it.
 
 **Portable Otzaria moves everything.** A `portable.marker` next to Otzaria's
 executable puts its whole data root in `otzaria_data` beside it. Detecting that needs
-Otzaria's launch path, which is why `AppShell.checkAll()` runs the app module's check
+Otzaria's launch path, which is why `AppSession.checkAll()` runs the app module's check
 **before** the library module's, sequentially.
 
 **Never install a DB schema the installed Otzaria cannot read.** Otzaria reads
@@ -1481,7 +1481,7 @@ timeout.
   Otzaria is installed" failure. Without a known path the OS handler is the fallback.
 
 Because the launch path is known only after `OtzariaManager.checkForUpdate`,
-`AppShell.checkAll()` re-scans installed plugins right after it
+`AppSession.checkAll()` re-scans installed plugins right after it
 (`refreshInstalled`), and so does the manual "pick the install folder" flow. Dropping
 those calls leaves the store showing a scan of the wrong folder until the next launch.
 
@@ -1540,7 +1540,7 @@ the home-screen dialog has mentioned — one list would let the dialog swallow t
 toast. The first *non-empty* load only records the catalog as known; recording
 on an empty one would make the first sync announce the whole store. Updates, unlike
 new plugins, are announced once per run. `PluginsModuleController.newPlugins`,
-`newPluginsForHome`, `AppShell._maybeAnnouncePlugins`, `PluginNewToast`.
+`newPluginsForHome`, `AppSession._maybeAnnouncePlugins`, `PluginNewToast`.
 
 ### 5.7 Custom apps
 
@@ -1841,16 +1841,16 @@ exe into `mirror/launcher/`, copies it over the stub (two renames, rollback on f
 - **Replacing the exe is refused while a long task runs.** `LauncherSelfInstaller` ends
   in `exit(0)`, so an install pressed during a mirror download killed the process
   mid-asset: `MirrorDownloadUndo` never ran and partial assets stayed next to an
-  already-rewritten manifest. `AppShell._longTaskRunning` (download, library `updating`,
+  already-rewritten manifest. `AppSession.longTaskRunning` (download, library `updating`,
   Otzaria `installing`, a custom-app install/learning/download, the store-app export)
-  disables the card's button, and `AppShell._exitWouldInterrupt` (that plus error-report
+  disables the card's button, and `AppSession.exitWouldInterrupt` (that plus error-report
   collect/upload; background search feedback is stopped first via
   `settleBackgroundWork`, §5.10) guards `installLauncherUpdate` itself — the button
   is not enough, since `downloadLauncherUpdate` offers the install straight after a
   download. The guard runs again **after** the confirmation dialog, because the startup
   auto-install can begin while it is open. While the exe is being copied from the drive
-  or the UAC answer is awaited (`AppShell._exitPending`: `isInstalling` or
-  `_elevationPending`, part of `_longTaskRunning`) the shell is wrapped in
+  or the UAC answer is awaited (`AppSession.exitPending`: `isInstalling` or
+  `_elevationPending`, part of `longTaskRunning`) the shell is wrapped in
   `AbsorbPointer`/`ExcludeFocus`, `downloadAll` refuses, queued dialogs wait and the
   auto-install skips, since `exit(0)` follows. "Restart as administrator" obeys the same
   guard: the offer is deferred during such a task (and re-offered when a download ends),
@@ -1859,7 +1859,7 @@ exe into `mirror/launcher/`, copies it over the stub (two renames, rollback on f
   declined UAC leaves the launcher running. Dart FFI clobbers `GetLastError`
   after a non-leaf call, so a decline is read from `hInstApp`
   (`shellExecuteFailureCode`: access denied under runas = 1223).
-- **Closing the window during a long task asks first.** AppShell._confirmClose is
+- **Closing the window during a long task asks first.** `AppSession.confirmClose` is
   `LauncherCrashSession.closeGuard`, consulted by `onWindowClose` and by the
   `AppLifecycleListener.onExitRequested` that macOS Cmd+Q / Dock > Quit reach
   (a refusal there returns `AppExitResponse.cancel`): a download is
@@ -1919,13 +1919,13 @@ user refused UAC"). `Elevation` recognises that by **OS error code** (5 / `EACCE
 never by message text: a Hebrew Windows says "הגישה נדחתה". A file merely *in use*
 (error 32, Otzaria open on the DB) is deliberately **not** counted — elevating fixes
 nothing. The sqlite path has no `OSError` at all, so a read-only DB is matched on
-sqlite's own untranslated `readonly database`. `AppShell` offers the restart once per
+sqlite's own untranslated `readonly database`. `AppSession` offers the restart once per
 run, from the shared listener, so the offer lives in one place.
 
 **`Elevation` has two pieces of advice, and only one is actionable per platform.**
 macOS has no "run as administrator" — an app cannot elevate itself (`osascript … with
 administrator privileges` runs a *shell command* as root, not the app, behind a prompt
-indistinguishable from phishing). So `restartElevated` refuses there, `AppShell` never
+indistinguishable from phishing). So `restartElevated` refuses there, `AppSession` never
 offers it, and `describe` appends `macHint` (pick a writable location, or grant Full
 Disk Access). Detection differs too: macOS returns `EPERM` (1) as well as `EACCES` (13)
 for a protected directory, while Windows counts only 5. A removable volume the user never
@@ -1954,7 +1954,7 @@ or it freezes until the next state change.
 
 **`AppShell` builds screens lazily.** `IndexedStack` builds every child, so the plugin
 store — a card grid with one `Image.file` per plugin — was built and decoded at launch,
-before the user opened that tab. Screens are created on first visit (`_builtScreens`)
+before the user opened that tab. Screens are created on first visit (`ShellNavigator.isBuilt`)
 and kept after. Consequence: the "plugin updates available" dialog fires on first visit
 to the plugins tab, not at launch. `IndexedStack` does not disable tickers, so each
 built screen is wrapped in `TickerMode(enabled: screen == _screen)`; otherwise a hidden
@@ -2079,7 +2079,7 @@ Writing under its open `user_state.db` can break its transactions (2026-10-13).
 collection brings reports (else new ones stay hidden); retry only above it.
 Offers also run with auto-check off, never on read-only drives, and
 wait for dialogs and tasks, including 3s after launcher-initiated closure.
-`ReportOfferCoordinator`, `AppShell._onChange`, `offerErrorReportCollection`;
+`ReportOfferCoordinator`, `AppSession._onChange`, `offerErrorReportCollection`;
 task-ending paths must call `resume()` (on `_feedbackSync` too).
 See `launcher_app/README.md` for the collection and upload flow.
 

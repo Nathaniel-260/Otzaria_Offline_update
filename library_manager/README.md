@@ -97,7 +97,7 @@
 - **התקנה ניידת של אוצריא** (`portable.marker` ליד ה-executable) מזיזה את
   שורש הנתונים כולו אל `otzaria_data` שלידו. הלאנצ'ר מזהה זאת דרך נתיב
   ההפעלה שמודול התוכנה מצא (`LibraryDbLocator.otzariaLaunchPath`), ולכן
-  `AppShell.checkAll()` בודק את מודול התוכנה **לפני** מודול הספרייה.
+  `AppSession.checkAll()` בודק את מודול התוכנה **לפני** מודול הספרייה.
 - **בדיקת "האם אוצריא רצה"** (`OtzariaProcessGuard`) פעילה דרך
   `LibraryUpdateApplier.applyDelta` / `.applyFullDownload` — רלוונטית כי
   ה-manager כן כותב

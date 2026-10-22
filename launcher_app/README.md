@@ -248,8 +248,8 @@ ZSTD_ROOT="C:/pub-cache/hosted/pub.dev/zstandard_native-1.5.0/src/zstd" \
 הגרסה שהייתה מותקנת **באותו רגע**. משם רץ `Timer.periodic` בקצב
 `installWatchInterval` שמריץ `refreshInstalled`, ו-`_settleInstallWatch`
 סוגר כל רשומה שהגרסה שלה על הדיסק השתנתה. אז — ורק אז — נשלח שמו של
-התוסף ב-`installCompletions`, ו-`AppShell` מציג "התוסף X הותקן בהצלחה".
-ההאזנה יושבת ב-`AppShell` ולא במסך החנות בכוונה: המשתמש עשוי לעבור מסך
+התוסף ב-`installCompletions`, ו-`AppSession` מציג "התוסף X הותקן בהצלחה".
+ההאזנה יושבת ב-`AppSession` ולא במסך החנות בכוונה: המשתמש עשוי לעבור מסך
 בזמן שאוצריא מתקינה, וההודעה צריכה למצוא אותו גם שם.
 
 שלושה דברים ששומרים על זה שפוי: הטיימר נכבה ברגע שאין למה לחכות; רשומה
@@ -363,7 +363,7 @@ fallback הוחלף באייקון `puzzle_piece` על רקע `primaryContainer`
 לתוספים, במסך התוכנות הנוספות. ארבעה דברים בה אינם מקריים:
 
 - **היא נפתחת מהמסך עצמו, ולכן רק למי שנכנס ללשונית.** `AppShell` בונה
-  מסך רק בכניסה הראשונה אליו (`_builtScreens`), ולכן `initState` של
+  מסך רק בכניסה הראשונה אליו (`ShellNavigator.isBuilt`), ולכן `initState` של
   `CustomAppsScreen` הוא בדיוק "המשתמש נכנס". הבדיקה חוזרת גם
   ב-`didUpdateWidget`, כי הרשימה נטענת מהדיסק ועשויה להגיע אחרי הבנייה
   הראשונה; `_pendingDialogShown` מוודא שההודעה נאמרת פעם אחת בכל הרצה.
@@ -532,14 +532,14 @@ fallback הוחלף באייקון `puzzle_piece` על רקע `primaryContainer`
 היא "הגישה נדחתה". קובץ **בשימוש** (קוד 32 — אוצריא פתוחה על המסד) אינו
 נספר, כי הרמה אינה פותרת אותו. מסד לקריאה בלבד נכשל ב-sqlite ובלי `OSError`,
 ולכן שם ההשוואה היא לטקסט של sqlite עצמו (`readonly database`), שאינו
-מתורגם. `AppShell._maybeOfferElevation` מציע להפעיל מחדש כמנהל **פעם אחת
+מתורגם. `AppSession._maybeOfferElevation` מציע להפעיל מחדש כמנהל **פעם אחת
 בהרצה**, מתוך ה-listener המשותף — ולכן ההצעה יושבת במקום אחד ולא בכל מסך.
 המתקין של אוצריא עצמו אינו נזקק לזה: Inno מרים את עצמו, ולכן קוד יציאה
 1223 מטופל כסירוב ל-UAC.
 
 ## הרשת נדרשת רק להורדה
 
-`AppShell.downloadAll()` היא הפעולה היחידה בכל האפליקציה שנוגעת ברשת. היא
+`AppSession.downloadAll()` היא הפעולה היחידה בכל האפליקציה שנוגעת ברשת. היא
 מורידה לתיקייה המקומית רק את הרכיבים שסומנו (`syncApp`/`syncLibrary`/
 `syncPlugins`), בטור ולא במקביל — הם חולקים רוחב פס והמסד לבדו ~1GB.
 שלושתם נבחרים בשורת סימון אחת בהגדרות ("בחר מה ברצונך להוריד מהרשת":
@@ -579,7 +579,7 @@ personalUpdateMode`) הוא מה שנקרא בכל מקום, ולא `syncLibrary
 התקנה מהתיקייה דורשת לחיצה מפורשת, ועדכון ה-DB דורש אישור בדיאלוג. הדלקת
 **התקנה אוטומטית** (`autoInstall` — מתג אחד לתוכנה ולספרייה, כבוי בברירת
 מחדל) דורשת אישור באזהרה — `_confirmAutoInstall` — ומחווטת ב-
-`AppShell._autoInstallIfEnabled`, שמדלג על עדכון מסד כשאוצריא פתוחה.
+`AppSession._autoInstallIfEnabled`, שמדלג על עדכון מסד כשאוצריא פתוחה.
 **הסדר שם הוא ספרייה לפני תוכנה**, ולפני כל אחת משתי הפעולות רצה
 `refreshProcessState()`: המתקין של אוצריא משיק אותה בסוף התקנה שקטה, ואוצריא
 פתוחה נועלת את המסד — כלומר בסדר ההפוך העדכון האוטומטי חסם את עצמו. ראו
@@ -624,7 +624,7 @@ personalUpdateMode`) הוא מה שנקרא בכל מקום, ולא `syncLibrary
 צילומי מסך מבחירת קובץ, ותצוגה מקדימה של בדיוק מה שנשלח), מצב הדיווח אחרי סגירה
 לא צפויה (`reports.crashMode`: שאל / שלח אוטומטית / לעולם לא), וחלון ניהול של
 התור וההיסטוריה עם קישור ל-issue (`ReportsManagementDialog`). אחרי הפריים
-הראשון `AppShell._startReports` (דרך `AppReportsController.runCrashCheck`) בודק אם ההפעלה הקודמת קרסה ומציג את
+הראשון `AppSession._startReports` (דרך `AppReportsController.runCrashCheck`) בודק אם ההפעלה הקודמת קרסה ומציג את
 `CrashPromptDialog` (לא מעל דיאלוג אחר). זה פורט של "דיווח על התוכנה" של
 אוצריא, **כולל הרשת ברקע**: שליחה מיידית, ושליחת התור בעלייה ואחת ל-5 דקות
 (`AppReportsController.startBackground`). `main.dart` יוצר את הבקר; בבדיקות
@@ -824,7 +824,7 @@ BOM ומכילים עברית, ולכן חייבים `pwsh` (7+) ולא Windows 
 | הגרסה נצרבת מ-`pubspec.yaml` בלבד | ממנה נגזרים `launcherVersion`, המרקר `.ready` ומשאב הגרסה של ה-exe. תג שאינו תואם לה היה מייצר לאנצ'ר שמציע לעצמו את אותו עדכון לנצח — ולכן אף אחד לא מציב אותה ביד, אלא `tool/set_launcher_version.sh` באותה ריצה שמתייגת |
 | ב-macOS מוחלפת החבילה ואין הפעלה מחדש | `ditto` (לא `unzip`) כדי לא לשבור את החתימה, ו-`open` על חבילה שהוחלפה תחת אפליקציה שרצה אינו אמין — לכן מוצגת בקשה לפתוח מחדש |
 | הקובץ שהורד נשאר במראה | ~עשרות MB, בתמורה ליכולת לנסות התקנה שוב בלי רשת. `sync` מוחק את הגרסאות הקודמות |
-| ההחלפה נחסמת בזמן הורדה או התקנה | היא מסתיימת ב-`exit(0)`. לחיצה באמצע הורדת מסד של ~1.5GB הרגה את התהליך, `MirrorDownloadUndo` לא רץ, ונשארו נכסים חלקיים לצד מניפסט שכבר נכתב מחדש. `AppShell._longTaskRunning` מנטרל את הכפתור **וגם** שומר על `installLauncherUpdate` עצמה — `downloadLauncherUpdate` מציע התקנה מיד אחרי הורדה, בלי כפתור לנטרל |
+| ההחלפה נחסמת בזמן הורדה או התקנה | היא מסתיימת ב-`exit(0)`. לחיצה באמצע הורדת מסד של ~1.5GB הרגה את התהליך, `MirrorDownloadUndo` לא רץ, ונשארו נכסים חלקיים לצד מניפסט שכבר נכתב מחדש. `AppSession.longTaskRunning` מנטרל את הכפתור **וגם** שומר על `installLauncherUpdate` עצמה — `downloadLauncherUpdate` מציע התקנה מיד אחרי הורדה, בלי כפתור לנטרל |
 | אין נתיב לקובץ ההרצה? הכרטיס אומר זאת | `canInstall == false` השאיר כרטיס שמכריז "מוכן להתקנה" בלי אף כפתור: ההתקנה מוסתרת, וההורדה כבר נעלמה כי הקובץ הורד |
 
 ## ⚠️ מה אומת בפועל ומה לא
@@ -940,8 +940,15 @@ lib/
     │   ├── report_offer_coordinator.dart, report_offer_trigger.dart, offer_decline.dart — מתי להציע איסוף
     │   ├── search_feedback_auto_sync.dart — איסוף והעלאה של משוב החיפוש ברקע
     │   └── hebrew_date.dart           — המרה לתאריך עברי + גימטריה
+    ├── shell/
+    │   ├── app_session.dart           — המודולים, הבדיקות, ההורדה והדגלים של ההרצה (בלי UI)
+    │   ├── session_prompts.dart       — הדיאלוגים שהסשן מבקש מהמסגרת
+    │   ├── shell_navigator.dart       — מקטעי הגוף ומחסנית היעדים, בנייה עצלה
+    │   ├── home_guidance.dart         — הכוונת דף הבית: פונקציה טהורה מעובדות לפעולה
+    │   ├── home_guidance_session.dart — העובדות מתוך הסשן
+    │   └── shell_tasks.dart           — מכונת המצבים של מסכי המשימה
     └── screens/
-        ├── app_shell.dart             — סרגל ניווט, סרגל מצב, IndexedStack מדורג
+        ├── app_shell.dart             — שורת כותרת, סרגל ניווט, IndexedStack מדורג; מממש SessionPrompts
         ├── home_screen.dart, otzaria_screen.dart, library_screen.dart, settings_screen.dart
         ├── error_reports_flow.dart    — הצעת האיסוף
         ├── reports_upload_flow.dart, reports_upload_section.dart — כפתור ההעלאה האחד
@@ -979,7 +986,7 @@ lib/
 
 ## ביצועים — שלוש החלטות שאין לבטל בטעות
 
-- **`AppShell` בונה מסך רק בכניסה הראשונה אליו** (`_builtScreens`).
+- **`AppShell` בונה מסך רק בכניסה הראשונה אליו** (`ShellNavigator.isBuilt`).
   `IndexedStack` בונה את *כל* ילדיו, ולכן חנות התוספים — רשת כרטיסים עם
   `Image.file` לכל תוסף — נבנתה ופענחה את כל התמונות בעלייה, לפני שהמשתמש פתח
   את הלשונית. תוצאה נלווית מכוונת: הודעת "יש עדכונים לתוספים" מוצגת בכניסה
