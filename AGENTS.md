@@ -316,15 +316,18 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
 - Do not create Markdown files for plans, progress logs or summaries — report those
   in the conversation or the PR. Durable references go into an existing document.
 
-**UI in `launcher_app` follows Otzaria's design system, not its own.**
-`launcher_app/lib/src/theme/` and `lib/src/widgets/` are ports of
-`otzaria/lib/theme/` and `otzaria/lib/widgets/`. Use the ported components
-(`ActionButton`, `SettingsCard`/`SettingsActionTile`, `AppCard`, `UiSnack`, the
-`show*Dialog` helpers, `AppSegmentedControl`, `RtlIcon`, `RtlTextField`,
-`StatusChip`, `ColorPickerTile`) instead of raw Material widgets, and keep
-alpha/hover overrides inside `lib/src/theme/`. The full rule table — including what
-deliberately was *not* ported — is in `launcher_app/README.md`; the upstream
-contract is `otzaria/AGENTS.md` § "MANDATORY UI Components".
+**UI in `launcher_app` follows the design language of Otzaria's download
+assistant.** One fixed light theme (seed `#2C1B02`, `Segoe UI`, radius 8, no
+shadows); there is no dark mode and no colour choice. The `ColorScheme` roles plus
+the `AppPalette` theme extension carry every colour, `AppTokens`/`AppTextStyles`
+every size. Use the shared components (`ActionButton` with its sizes,
+`SettingsCard`/`SettingsActionTile`, `AppCard`/`RowsCard`/`AppRow`, `UiSnack`, the
+`show*Dialog` helpers, `AppSegmentedControl`, `StatusChip`, `IconTile`,
+`SectionLabel`, `AdvancedSection`, `OptionCard`, `ResultBadge`, `AppProgressBar`,
+`TaskFrame`/`StageRow`, `SubPageHeader`, `EmptyState`, `NoticeBanner`, `PathText`,
+`RtlIcon`, `RtlTextField`) instead of raw Material widgets, and keep alpha/hover
+overrides inside `lib/src/theme/`. The full rule table is in
+`launcher_app/README.md`.
 
 **All user-visible text lives in `otzaria_l10n`, never inline.** The launcher ships
 in Hebrew and English, defaulting to the system language
@@ -348,10 +351,9 @@ Hebrew is the source, English a free translation of it.
   home texts) is **never** translated — only the chrome around it, plus the
   store-title fallback for an empty field.
 - Direction comes from the locale alone (`GlobalWidgetsLocalizations`); never set
-  `Directionality` by hand. Exactly two exceptions, pinned by an allowlist in
+  `Directionality` by hand. Exactly one exception, pinned by an allowlist in
   `launcher_app/test/widgets_test.dart`: `UiSnack` (lives in an `Overlay`, reads
-  `AppL10n.language.isRtl`) and `SeedColorPalette` (forces RTL so the swatch order
-  does not mirror). A third is a bug, not a precedent. For back/forward arrows use
+  `AppL10n.language.isRtl`). A second is a bug, not a precedent. For back/forward arrows use
   `context.backArrowIcon` / `context.forwardArrowIcon`: `RtlIcon` mirrors arrows
   under RTL, so those helpers hand it the *opposite* glyph and the result is
   identical in both languages. On a `Text`, pass `textDirection: TextDirection.ltr`
@@ -1894,23 +1896,36 @@ overwrites them. **The launcher's macOS process name must not be `אוצריא`*
 `PRODUCT_NAME` is `Otzaria Launcher` for exactly that reason (table in
 `launcher_app/README.md`).
 
-**`launcher_app/windows/runner/` is tracked too, with two non-default edits.**
-`main.cpp` sets a Hebrew window title and sizes the window to the monitor's work area;
-`win32_window.cpp`'s `Show()` uses `SW_SHOWMAXIMIZED`. Doing it in the runner rather
-than from Dart is deliberate: the runner shows the window only once the first frame is
-ready, so a `windowManager.maximize()` before `runApp` reveals an empty window early
-and is then undone by the runner's own `Show()`. `flutter create --platforms=windows .`
-— which CI still runs — only fills in missing files and leaves these alone (verified
+**`launcher_app/windows/runner/` is tracked too, with non-default edits.**
+`main.cpp` sets a Hebrew window title and asks for a 1000×720 (logical) **client area**;
+`win32_window.cpp`'s `Show()` reads the margins between the window and its client area
+(window_manager sets them: with the caption hidden, a fixed 8 physical pixels at the sides and bottom and 0–1 at the top),
+adds them, and centres the client area in the primary monitor's work area. When it does
+not fit (e.g. 1920×1080 at 150%) it is capped at the work area as a normal window; it is
+never maximized because of size, only when the shortcut asked, and even then it is placed
+first so that Restore returns to the centred rect (rules in `window_fit.h`). The runner
+calls no Windows 10-only API (`GetDpiForWindow` and the like), since Windows 8 is
+supported. `main.dart` sets the minimum to 760×560; `FitMinTrackSize` adds
+the margins and caps it at the monitor's work area, maximized too. Sizing in the runner rather than from
+Dart is deliberate: the runner shows the window only once the first frame is ready, so
+resizing or maximizing before `runApp` reveals an empty window early. The runner does
+not apply the system dark mode to the frame: it is hidden, and the app is light only.
+`flutter create --platforms=windows .` — which CI still runs — only fills in missing files and leaves these alone (verified
 2026-08-12), but it drops the `macos` entry from `.metadata`; check `git diff` after.
 
 **The custom title bar is Windows-shaped, and macOS needs the other half.**
-`WindowCaption` is, by its own documentation, "a widget to simulate the title bar of
-windows 11". So on macOS `main.dart` passes `windowButtonVisibility: true` and lets the
-system draw its three round buttons, `AppTitleBar` renders no `WindowCaption`, and the
-row reserves `_kMacTrafficLightsWidth` on the **physical** left
-(`EdgeInsets.only(left:)`, never `EdgeInsetsDirectional` — under Hebrew RTL the logical
-start is the right edge). Matching it, `MainFlutterWindow` sizes the window to the
-screen's `visibleFrame`, the macOS counterpart of the Windows work-area sizing.
+`AppTitleBar` (36 high) paints its own Windows 11 caption buttons
+(`WindowCaptionButtons`, 46×36, close hover `#C42B1C`); close goes through
+`windowManager.close()` and therefore through `LauncherCrashSession.closeGuard`. The
+bar is drawn through an `OverlayPortal` into the overlay `TitleBarHost` puts above the
+Navigator (`MaterialApp.builder`), so a dialog's barrier never covers it: caption
+buttons and dragging keep working with a dialog open, the tools are disabled. On
+macOS `main.dart` passes `windowButtonVisibility: true` and lets the system draw its
+three round buttons, `AppTitleBar` paints none, and the row reserves
+`_kMacTrafficLightsWidth` (dropped in full screen) on the **physical** left (`EdgeInsets.only(left:)`, never
+`EdgeInsetsDirectional` — under Hebrew RTL the logical start is the right edge).
+Matching the Windows runner, `MainFlutterWindow` centres a 1000×720 window in the
+screen's `visibleFrame` and forces the `aqua` appearance.
 
 **Permission failures are diagnosed, not just printed.** Otzaria under `Program Files`
 means the launcher's *own* writes fail — the DB apply, the companion assets — while the

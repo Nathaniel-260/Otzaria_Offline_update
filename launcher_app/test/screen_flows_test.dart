@@ -90,12 +90,7 @@ Future<void> _pump(WidgetTester tester, Widget screen) async {
       ],
       supportedLocales: const [Locale('he', 'IL'), Locale('en')],
       locale: const Locale('he', 'IL'),
-      theme: AppThemeData.light(
-        AppThemeData.createColorScheme(
-          AppSeedColors.defaultLight,
-          Brightness.light,
-        ),
-      ),
+      theme: AppThemeData.light(),
       builder: (context, navigator) => AppStringsScope(
         strings: AppL10n.stringsFor(AppLanguage.hebrew),
         child: navigator ?? const SizedBox.shrink(),

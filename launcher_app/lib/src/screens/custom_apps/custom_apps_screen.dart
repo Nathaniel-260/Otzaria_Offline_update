@@ -563,7 +563,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
           onDragEnd: (_) => setState(() => _draggingId = null),
           feedback: Material(
             color: Colors.transparent,
-            elevation: 8,
+            elevation: 0,
             borderRadius: AppTokens.borderRadiusAll,
             child: SizedBox(
               width: constraints.maxWidth,

@@ -485,9 +485,6 @@ class _PluginsScreenState extends State<PluginsScreen> {
                         controller: _search,
                         onSubmitted: _submitHeroSearch,
                         decoration: InputDecoration(
-                          border: const OutlineInputBorder(
-                            borderRadius: AppTokens.borderRadiusAll,
-                          ),
                           prefixIcon: const Icon(FluentIcons.search_24_regular),
                           hintText: t.heroSearchHint,
                           isDense: true,

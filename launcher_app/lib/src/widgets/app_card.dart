@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme_exports.dart';
+import 'focus_ring.dart';
 
-/// כרטיס תוכן מרכזי עם צבע ופינות מעוגלות אחידים — פורט מאוצריא.
+/// כרטיס תוכן שטוח: surface, רדיוס 8, בלי מסגרת ובלי צל (`.card`).
 ///
-/// - [AppCard] — כרטיס עם ילד יחיד; תומך ב-[onTap] וב-[selected].
-/// - [AppCard.section] — מקטע עם מספר שורות; רווח 1.5px ביניהן.
+/// - [AppCard] — ילד יחיד; [onTap] הופך אותו ללחיץ (ריחוף 8%, לחיצה 12%).
+/// - [AppCard.section] — שורות עם רצועה של 2 בצבע הדף ביניהן ו-4 בקצוות
+///   (`.rows`).
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -25,8 +27,8 @@ class AppCard extends StatelessWidget {
   })  : child = null,
         onTap = null;
 
-  /// הרווח הקבוע בין שורות במקטע כרטיס.
-  static const double sectionSpacing = 1.5;
+  /// הרצועה בין שורות במקטע כרטיס.
+  static const double sectionSpacing = 2;
 
   final Widget? child;
   final List<Widget>? children;
@@ -37,86 +39,76 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget card = _withShadow(
-      context,
-      children != null ? _buildSection(context) : _buildSingle(context),
-    );
-
+    Widget card =
+        children != null ? _buildSection(context) : _buildSingle(context);
     if (margin != null) card = Padding(padding: margin!, child: card);
     return card;
   }
 
-  /// הצל יושב מחוץ למשטח הכרטיס ולא בתוכו, כדי שלא ייחתך ב-clip של הפינות.
-  Widget _withShadow(BuildContext context, Widget card) {
-    final shadow = AppSurfaces.cardShadow(context);
-    if (shadow.isEmpty) return card;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: AppTokens.borderRadiusAll,
-        boxShadow: shadow,
-      ),
-      child: card,
-    );
-  }
+  Color _color(BuildContext context) =>
+      selected ? AppSurfaces.cardSelected(context) : AppSurfaces.card(context);
 
   Widget _buildSingle(BuildContext context) {
     Widget content = child!;
     if (padding != null) content = Padding(padding: padding!, child: content);
-    if (selected) content = _withSelected(context, content);
 
-    if (onTap != null) {
-      return Material(
-        color: AppSurfaces.card(context),
-        surfaceTintColor: Colors.transparent,
-        borderRadius: AppTokens.borderRadiusAll,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          mouseCursor: SystemMouseCursors.click,
-          hoverDuration: Durations.medium1,
-          child: content,
-        ),
-      );
-    }
-
-    return Material(
-      color: AppSurfaces.card(context),
+    final card = Material(
+      color: _color(context),
       borderRadius: AppTokens.borderRadiusAll,
       clipBehavior: Clip.antiAlias,
-      child: content,
+      child: onTap == null
+          ? content
+          : InkWell(
+              onTap: onTap,
+              mouseCursor: SystemMouseCursors.click,
+              overlayColor: AppSurfaces.stateLayer(
+                Theme.of(context).colorScheme.primary,
+              ),
+              child: content,
+            ),
     );
+    return onTap == null ? card : FocusRing(child: card);
   }
 
   Widget _buildSection(BuildContext context) {
-    final cardColor = AppSurfaces.card(context);
+    final cardColor = _color(context);
 
-    // Material לכל שורה כדי ש-ink/hover של ListTile ייצבעו נכון, והרווח
-    // השקוף ביניהן חושף את רקע המסך מאחורי הכרטיס.
-    Widget wrapChild(Widget w) {
+    // Material לכל שורה כדי ש-ink/hover של ListTile ייצבעו נכון. הרצועה ביניהן
+    // בצבע הדף גם בתוך דו-שיח.
+    final last = children!.length - 1;
+    Widget wrapChild(int i) {
+      var w = children![i];
       if (padding != null) w = Padding(padding: padding!, child: w);
+      if (i == 0 || i == last) {
+        w = Padding(
+          padding: EdgeInsets.only(
+            top: i == 0 ? 4 : 0,
+            bottom: i == last ? 4 : 0,
+          ),
+          child: w,
+        );
+      }
       return Material(color: cardColor, child: w);
     }
 
-    Widget content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (int i = 0; i < children!.length; i++) ...[
-          wrapChild(children![i]),
-          if (i < children!.length - 1) const SizedBox(height: sectionSpacing),
-        ],
-      ],
-    );
-
-    if (selected) content = _withSelected(context, content);
-
     return ClipRRect(
       borderRadius: AppTokens.borderRadiusAll,
-      child: content,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < children!.length; i++) ...[
+            wrapChild(i),
+            if (i < last)
+              ColoredBox(
+                color: AppSurfaces.cardRowDivider(context),
+                child: const SizedBox(
+                  height: sectionSpacing,
+                  width: double.infinity,
+                ),
+              ),
+          ],
+        ],
+      ),
     );
   }
-
-  Widget _withSelected(BuildContext context, Widget w) => ColoredBox(
-        color: AppSurfaces.cardSelectionOverlay(context),
-        child: w,
-      );
 }

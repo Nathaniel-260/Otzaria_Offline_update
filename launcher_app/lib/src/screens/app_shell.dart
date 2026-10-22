@@ -29,7 +29,7 @@ import '../widgets/widgets_exports.dart';
 import 'app_report/crash_prompt_dialog.dart';
 import 'custom_apps/custom_apps_screen.dart';
 import 'error_reports_flow.dart';
-import 'faq/faq_floating_button.dart';
+import 'faq/faq_dialog.dart';
 import 'home_screen.dart';
 import 'library_screen.dart';
 import 'otzaria_screen.dart';
@@ -42,7 +42,7 @@ import 'settings_screen.dart';
 enum LauncherScreen { home, otzaria, library, plugins, customApps, settings }
 
 /// מסגרת האפליקציה: שורת כותרת מותאמת למעלה, סרגל ניווט קבוע בצד, וחמשת
-/// המסכים. שלושתם נצבעים באותו רקע לוח — בלי תפר ביניהם.
+/// המסכים.
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -509,40 +509,32 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   Widget _scaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: AppSurfaces.panelBackground(context),
-      // שורת הכותרת נפרסת על כל הרוחב — מעל סרגל הניווט ולא לצידו — כך שגרירת
-      // החלון אפשרית לכל רוחב החלון (כמו באוצריא).
+      // שורת הכותרת נפרסת על כל הרוחב, מעל סרגל הניווט, כך שגרירת החלון
+      // אפשרית לכל רוחבו. כפתורי החלון נשארים פעילים גם כשהיציאה ממתינה.
       body: Column(
         children: [
           AppTitleBar(
-            screenTitle: _screenLabel(context, _screen),
+            onHelp: () => unawaited(
+              showFaqDialog(
+                context,
+                faq: _session.faq,
+                saferMode: _session.saferMode,
+              ),
+            ),
+            onSettings: () => unawaited(_goTo(LauncherScreen.settings)),
+            activeTool: _screen == LauncherScreen.settings
+                ? TitleBarTool.settings
+                : null,
+            toolsEnabled: !_session.exitPending,
             showWindowButtons: widget.showWindowButtons,
           ),
           Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                AbsorbPointer(
-                  absorbing: _session.exitPending,
-                  child: ExcludeFocus(
-                    excluding: _session.exitPending,
-                    child: _shellRow(context),
-                  ),
-                ),
-                if (widget.settings.settings.showFaqButton)
-                  PositionedDirectional(
-                    end: AppTokens.spaceMD,
-                    bottom: AppTokens.spaceMD,
-                    // `Offstage` ולא בנייה מותנית: ההבהוב והבועה החד-פעמיים
-                    // חייבים לשרוד ניווט.
-                    child: Offstage(
-                      offstage: _screen != LauncherScreen.home,
-                      child: FaqFloatingButton(
-                        faq: _session.faq,
-                        saferMode: _session.saferMode,
-                      ),
-                    ),
-                  ),
-              ],
+            child: AbsorbPointer(
+              absorbing: _session.exitPending,
+              child: ExcludeFocus(
+                excluding: _session.exitPending,
+                child: _shellRow(context),
+              ),
             ),
           ),
         ],
@@ -602,8 +594,7 @@ LauncherScreen _screenOf(ShellSection section) => switch (section) {
 
 // ── סרגל הניווט ───────────────────────────────────────────────────────────────
 
-/// שם המסך — אותה תווית בסרגל הניווט ובשורת הכותרת, כך שהשניים מדברים באותה
-/// שפה. מקור אחד בכוונה: שני העתקים נטו להיפרד.
+/// שם המסך בסרגל הניווט.
 String _screenLabel(BuildContext context, LauncherScreen screen) {
   final s = context.strings.shell;
   return switch (screen) {

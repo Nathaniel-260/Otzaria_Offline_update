@@ -16,7 +16,7 @@ import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/search_feedback_controller.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
-import 'package:launcher_app/src/screens/faq/faq_floating_button.dart';
+import 'package:launcher_app/src/screens/faq/faq_dialog.dart';
 import 'package:launcher_app/src/screens/home_screen.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
 import 'package:launcher_app/src/screens/otzaria_screen.dart';
@@ -197,51 +197,44 @@ void main() {
     expect(screen(SettingsScreen), findsNothing);
   });
 
-  testWidgets('כפתור השאלות הנפוצות צף בפינה השמאלית התחתונה של דף הבית', (
+  testWidgets('"?" בשורת הכותרת פותח את השאלות הנפוצות, ואין כפתור צף', (
     tester,
   ) async {
     await pumpShell(tester);
 
-    Rect buttonRect() => tester.getRect(find.byType(FaqFloatingButton));
-    final windowSize = tester.view.physicalSize / tester.view.devicePixelRatio;
+    expect(find.byType(FaqBody, skipOffstage: false), findsNothing);
+    await tester.tap(find.byTooltip(shell.helpTooltip));
+    // בדיקות הרקע של המסגרת מסובבות מחוונים, ולכן לא pumpAndSettle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.byType(FaqFloatingButton), findsOneWidget);
-    // בעברית סרגל הניווט מימין, ולכן הכפתור פיזית שמאל-למטה.
-    expect(buttonRect().left, lessThan(windowSize.width / 2));
-    expect(buttonRect().bottom, greaterThan(windowSize.height / 2));
-
-    // במסך אחר הוא מוסתר — אבל נשאר בעץ, אחרת ההבהוב והבועה החד-פעמיים היו
-    // חוזרים בכל חזרה לדף הבית.
-    await tapNav(tester, shell.navSettings);
-    expect(find.byType(FaqFloatingButton), findsNothing);
-    expect(find.byType(FaqFloatingButton, skipOffstage: false), findsOneWidget);
-
-    await tapNav(tester, shell.navHome);
-    expect(find.byType(FaqFloatingButton), findsOneWidget);
-  });
-
-  testWidgets('באנגלית הכפתור עובר לימין — הוא כיסה את סרגל הניווט שמשמאל', (
-    tester,
-  ) async {
-    await pumpShell(tester, language: AppLanguage.english);
-
-    final rect = tester.getRect(find.byType(FaqFloatingButton));
-    final windowSize = tester.view.physicalSize / tester.view.devicePixelRatio;
-    expect(rect.right, greaterThan(windowSize.width / 2));
-    expect(rect.bottom, greaterThan(windowSize.height / 2));
-  });
-
-  testWidgets('כיבוי בהגדרות מוציא את הכפתור מהעץ לגמרי', (tester) async {
-    // `runAsync` ולא `await` ישר: השמירה כותבת לדיסק, וקריאת `dart:io` אינה
-    // מסתיימת בתוך ה-fake-async של `testWidgets` — ראו AGENTS §3.
-    await tester.runAsync(
-      () => settings.update(
-        const AppSettings(autoCheckUpdates: false, showFaqButton: false),
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(FaqBody),
       ),
+      findsOneWidget,
     );
+  });
+
+  testWidgets('גלגל השיניים בשורת הכותרת פותח את ההגדרות ומסומן', (
+    tester,
+  ) async {
     await pumpShell(tester);
 
-    expect(find.byType(FaqFloatingButton, skipOffstage: false), findsNothing);
+    await tester.tap(find.byTooltip(shell.settingsTooltip));
+    await tester.pump();
+
+    expect(screen(SettingsScreen), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppTitleBar),
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.selected == true,
+        ),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('מסך שנכנסים אליו נבנה, ונשאר בעץ גם אחרי מעבר משם', (
@@ -1331,6 +1324,17 @@ void main() {
 
       expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
       expect(screen(SettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('גם גלגל השיניים שבשורת הכותרת עובר בשער', (tester) async {
+      await lockSettings(tester);
+      await pumpShell(tester);
+
+      await tester.tap(find.byTooltip(shell.settingsTooltip));
+      await tester.pump();
+
+      expect(find.text(stringsOf().saferMode.verifyTitle), findsOneWidget);
+      expect(screen(SettingsScreen), findsNothing);
     });
 
     testWidgets('בלי סיסמה שמורה המתג אינו נועל כלום', (tester) async {

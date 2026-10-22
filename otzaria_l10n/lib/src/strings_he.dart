@@ -150,6 +150,22 @@ class _Shell extends ShellStrings {
   String get closeWhileInstallingConfirm => 'סגור בכל זאת';
   @override
   String get closeWhileBusyKeepGoing => 'המשך';
+  @override
+  String get helpTooltip => 'עזרה ושאלות נפוצות';
+  @override
+  String get settingsTooltip => 'הגדרות';
+  @override
+  String get windowMinimize => 'מזער';
+  @override
+  String get windowMaximize => 'הגדל';
+  @override
+  String get windowRestore => 'שחזר';
+  @override
+  String get windowClose => 'סגור';
+  @override
+  String get backTooltip => 'חזרה (Esc)';
+  @override
+  String get breadcrumbHome => 'בית';
 }
 
 class _Home extends HomeStrings {
@@ -731,7 +747,7 @@ class _Settings extends SettingsScreenStrings {
   String get personalModeDialogConfirm => 'הפעל עדכון אישי';
 
   @override
-  String get appearanceCardTitle => 'שפה ומראה';
+  String get appearanceCardTitle => 'שפה';
   @override
   String get languageTitle => 'שפת הממשק';
   @override
@@ -743,56 +759,6 @@ class _Settings extends SettingsScreenStrings {
   String get languageHebrew => 'עברית';
   @override
   String get languageEnglish => 'English';
-  @override
-  String get themeTitle => 'ערכת נושא';
-  @override
-  String get themeSystem => 'מערכת';
-  @override
-  String get themeLight => 'בהיר';
-  @override
-  String get themeDark => 'כהה';
-  @override
-  String get showFaqTitle => 'כפתור שאלות נפוצות';
-  @override
-  String get showFaqSubtitle =>
-      'הכפתור העגול בפינה השמאלית התחתונה של דף הבית, שפותח את ההדרכה.';
-
-  @override
-  String get seedColorTitle => 'צבע בסיס';
-  @override
-  String get seedColorButton => 'שינוי צבע';
-  @override
-  String get seedColorDialogTitle => 'בחר צבע בסיס';
-  @override
-  String get seedColorResetButton => 'איפוס';
-  @override
-  String get seedColorCustom => 'צבע מותאם אישית';
-  @override
-  String get colorRed => 'אדום';
-  @override
-  String get colorOrange => 'כתום';
-  @override
-  String get colorAmber => 'ענבר';
-  @override
-  String get colorGreen => 'ירוק';
-  @override
-  String get colorTeal => 'טורקיז';
-  @override
-  String get colorBlue => 'כחול';
-  @override
-  String get colorBlueGrey => 'אפור גרפיט';
-  @override
-  String get colorNavy => 'כחול כהה';
-  @override
-  String get colorPurple => 'סגול';
-  @override
-  String get colorBrown => 'חום';
-  @override
-  String get colorParchment => 'פרגמנט / בז\'';
-  @override
-  String get colorGrey => 'אפור';
-  @override
-  String get colorDarkBrown => 'חום זהבהב';
 
   @override
   String get supportCardTitle => 'תמיכה';

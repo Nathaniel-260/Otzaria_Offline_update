@@ -3,8 +3,10 @@
 // כיווניות שנגזרת מה-locale בלבד, והתנהגות הרכיבים בהגדלת טקסט.
 
 import 'dart:io';
+import 'dart:ui' show SemanticsAction, Tristate;
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -38,12 +40,7 @@ Widget wrap(
       locale: language == AppLanguage.hebrew
           ? const Locale('he', 'IL')
           : const Locale('en'),
-      theme: AppThemeData.light(
-        AppThemeData.createColorScheme(
-          AppSeedColors.defaultLight,
-          Brightness.light,
-        ),
-      ),
+      theme: AppThemeData.light(),
       builder: (context, navigator) => AppStringsScope(
         strings: AppL10n.stringsFor(language),
         child: MediaQuery.withClampedTextScaling(
@@ -301,9 +298,8 @@ void main() {
       expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
     });
 
-    // הכיווניות מגיעה מה-locale. שני חריגים: `UiSnack` שיושב ב-Overlay, ופלטת
-    // הצבעים — עיגולי צבע אינם טקסט, וסדרם אינו אמור להתהפך באנגלית.
-    test('אין Directionality ידני ברכיבים — חוץ מ-UiSnack ומהפלטה', () {
+    // הכיווניות מגיעה מה-locale. החריג היחיד: `UiSnack`, שיושב ב-Overlay.
+    test('אין Directionality ידני ברכיבים — חוץ מ-UiSnack', () {
       final offenders = [
         for (final file in Directory('lib/src/widgets').listSync())
           if (file is File &&
@@ -312,7 +308,7 @@ void main() {
             file.uri.pathSegments.last,
       ];
 
-      expect(offenders..sort(), ['color_picker_tile.dart', 'ui_snack.dart']);
+      expect(offenders, ['ui_snack.dart']);
     });
   });
 
@@ -531,28 +527,18 @@ void main() {
       expect(gap, AppCard.sectionSpacing);
     });
 
-    testWidgets('כרטיס נבחר מקבל את שכבת הבחירה משכבת העיצוב', (tester) async {
-      late Color expected;
+    testWidgets('כרטיס נבחר מקבל את צבע הבחירה משכבת העיצוב', (tester) async {
       await tester.pumpWidget(
-        wrap(
-          Builder(
-            builder: (context) {
-              expected = AppSurfaces.cardSelectionOverlay(context);
-              return const AppCard(selected: true, child: SizedBox(height: 20));
-            },
-          ),
-        ),
+        wrap(const AppCard(selected: true, child: SizedBox(height: 20))),
       );
 
-      final colors = tester
-          .widgetList<ColoredBox>(
-            find.descendant(
-              of: find.byType(AppCard),
-              matching: find.byType(ColoredBox),
-            ),
-          )
-          .map((box) => box.color);
-      expect(colors, contains(expected));
+      final material = tester.widget<Material>(
+        find.descendant(
+          of: find.byType(AppCard),
+          matching: find.byType(Material),
+        ),
+      );
+      expect(material.color, AppPalette.light.cardSelected);
     });
   });
 
@@ -740,12 +726,14 @@ void main() {
           SettingsCard(
             children: [
               SettingsActionTile.segmentedTile<String>(
-                title: he.settings.themeTitle,
+                title: he.settings.languageTitle,
                 currentValue: 'light',
                 onChanged: (v) => picked = v,
                 options: [
-                  SegmentOption(value: 'light', label: he.settings.themeLight),
-                  SegmentOption(value: 'dark', label: he.settings.themeDark),
+                  SegmentOption(
+                      value: 'light', label: he.settings.languageHebrew),
+                  SegmentOption(
+                      value: 'dark', label: he.settings.languageEnglish),
                 ],
               ),
             ],
@@ -753,7 +741,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text(he.settings.themeDark));
+      await tester.tap(find.text(he.settings.languageEnglish));
       await tester.pumpAndSettle();
       expect(picked, 'dark');
     });
@@ -770,16 +758,16 @@ void main() {
             currentValue: 0,
             onChanged: (v) => picked = v,
             options: [
-              SegmentOption(value: 0, label: he.settings.themeSystem),
-              SegmentOption(value: 1, label: he.settings.themeLight),
-              SegmentOption(value: 2, label: he.settings.themeDark),
+              SegmentOption(value: 0, label: he.settings.languageSystem),
+              SegmentOption(value: 1, label: he.settings.languageHebrew),
+              SegmentOption(value: 2, label: he.settings.languageEnglish),
             ],
           ),
         ),
       );
 
-      expect(find.text(he.settings.themeSystem), findsOneWidget);
-      await tester.tap(find.text(he.settings.themeDark));
+      expect(find.text(he.settings.languageSystem), findsOneWidget);
+      await tester.tap(find.text(he.settings.languageEnglish));
       await tester.pumpAndSettle();
       expect(picked, 2);
     });
@@ -1118,9 +1106,15 @@ void main() {
 
       expect(find.text(he.settings.title), findsOneWidget);
       expect(find.text(he.settings.appearanceCardTitle), findsOneWidget);
+      // רוחב התוכן הוא 720; הריפוד של הדף יושב בתוך הרשימה.
       expect(
         tester.getSize(find.byType(ListView)).width,
-        LayoutConstraints.panelContentMaxWidth,
+        LayoutConstraints.panelContentMaxWidth +
+            LayoutConstraints.pagePadding.horizontal,
+      );
+      expect(
+        tester.getSize(find.text(he.settings.title)).width,
+        lessThanOrEqualTo(LayoutConstraints.panelContentMaxWidth),
       );
     });
   });
@@ -1511,13 +1505,13 @@ void main() {
           children: [
             SettingsActionTile.segmentedTile<int>(
               icon: FluentIcons.dark_theme_24_regular,
-              title: he.settings.themeTitle,
+              title: he.settings.languageTitle,
               currentValue: 1,
               onChanged: (_) {},
               options: [
-                SegmentOption(value: 0, label: he.settings.themeSystem),
-                SegmentOption(value: 1, label: he.settings.themeLight),
-                SegmentOption(value: 2, label: he.settings.themeDark),
+                SegmentOption(value: 0, label: he.settings.languageSystem),
+                SegmentOption(value: 1, label: he.settings.languageHebrew),
+                SegmentOption(value: 2, label: he.settings.languageEnglish),
               ],
             ),
           ],
@@ -1720,20 +1714,41 @@ void main() {
     });
   });
 
-  // `WindowCaption` של window_manager הוא, לפי התיעוד שלו, "סימולציה של
-  // שורת הכותרת של Windows 11". ב-macOS מערכת ההפעלה מציירת את שלושת
-  // הכפתורים העגולים בפינה השמאלית בעצמה, ולכן ציור שלנו בצד השני נותן
-  // שתי שלישיות בשורה אחת — וגם חוסם את מה שיושב תחתיו.
+  // ב-macOS מערכת ההפעלה מציירת את שלושת הכפתורים העגולים בפינה השמאלית
+  // בעצמה, ולכן ציור שלנו היה נותן שתי שלישיות בשורה אחת.
   group('AppTitleBar — שתי הפריסות', () {
+    // כפתורי החלון שואלים את החלון אם הוא מוגדל, כבר בבנייה.
+    const channel = MethodChannel('window_manager');
+    final calls = <String>[];
+    var maximized = false;
+
+    setUp(() {
+      calls.clear();
+      maximized = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        return switch (call.method) {
+          'isMaximized' => maximized,
+          _ => null,
+        };
+      });
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
     testWidgets('macOS: בלי כפתורים משלנו, ועם מקום לכפתורי המערכת', (
       tester,
     ) async {
       await tester.pumpWidget(
-        wrap(const AppTitleBar(screenTitle: 'מסך', isMacOS: true)),
+        wrap(const AppTitleBar(isMacOS: true, showWindowButtons: true)),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(WindowCaption), findsNothing);
+      expect(find.byType(WindowCaptionButtons), findsNothing);
 
       // הריווח הוא **פיזי** ולא לוגי: ב-RTL הוא היה עובר לצד הלא נכון.
       final container = tester.widget<Container>(
@@ -1745,43 +1760,245 @@ void main() {
             .first,
       );
       final padding = container.padding!.resolve(TextDirection.rtl);
-      expect(padding.left, greaterThan(0));
+      expect(padding.left, 78);
       expect(padding.right, 0);
     });
 
-    testWidgets('ווינדוס: הכפתורים שלנו מצוירים', (tester) async {
+    testWidgets('ווינדוס: שלושה כפתורים מצוירים של 46×36', (tester) async {
+      await tester.pumpWidget(
+        wrap(const AppTitleBar(isMacOS: false, showWindowButtons: true)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(WindowCaptionButtons), findsOneWidget);
+      expect(tester.getSize(find.byType(AppTitleBar)).height, 36);
+      final shell = he.shell;
+      for (final label in [
+        shell.windowMinimize,
+        shell.windowMaximize,
+        shell.windowClose,
+      ]) {
+        expect(
+          tester.getSize(find.bySemanticsLabel(label)),
+          const Size(46, 36),
+          reason: label,
+        );
+      }
+      // בעברית הסגירה בקצה השמאלי.
+      expect(
+        tester.getTopLeft(find.bySemanticsLabel(shell.windowClose)).dx,
+        0,
+      );
+    });
+
+    testWidgets('ריחוף על הסגירה צובע אדום של Windows', (tester) async {
+      await tester.pumpWidget(
+        wrap(const AppTitleBar(isMacOS: false, showWindowButtons: true)),
+      );
+      final close = find.bySemanticsLabel(he.shell.windowClose);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: tester.getCenter(close));
+      addTearDown(mouse.removePointer);
+      await tester.pump();
+
+      final box = tester.widget<Container>(
+        find.descendant(of: close, matching: find.byType(Container)),
+      );
+      expect(box.color, AppPalette.light.closeHover);
+    });
+
+    testWidgets('השם בלבד, הכלים לפי הקריאות, והכלי הפעיל מסומן', (
+      tester,
+    ) async {
+      var help = 0;
+      var settings = 0;
       await tester.pumpWidget(
         wrap(
-          const AppTitleBar(
-            screenTitle: 'מסך',
+          AppTitleBar(
+            showWindowButtons: false,
+            onHelp: () => help++,
+            onSettings: () => settings++,
+            activeTool: TitleBarTool.settings,
+          ),
+        ),
+      );
+      final shell = he.shell;
+
+      expect(find.text(shell.appTitle), findsOneWidget);
+      await tester.tap(find.byTooltip(shell.helpTooltip));
+      await tester.tap(find.byTooltip(shell.settingsTooltip));
+      expect((help, settings), (1, 1));
+      expect(
+        tester.getSize(find.bySemanticsLabel(shell.helpTooltip)),
+        const Size(36, 28),
+      );
+    });
+
+    testWidgets('מסך עצירה: לוגו בלבד, בלי שם ובלי כלים', (tester) async {
+      await tester.pumpWidget(
+        wrap(const AppTitleBar(showTitle: false, showWindowButtons: false)),
+      );
+      final shell = he.shell;
+      expect(find.text(shell.appTitle), findsNothing);
+      expect(find.byTooltip(shell.helpTooltip), findsNothing);
+      expect(find.byTooltip(shell.settingsTooltip), findsNothing);
+    });
+
+    testWidgets('חלון שנפתח מוגדל: הכפתור הוא "שחזר", ולחיצה משחזרת', (
+      tester,
+    ) async {
+      maximized = true;
+      await tester.pumpWidget(
+        wrap(const AppTitleBar(isMacOS: false, showWindowButtons: true)),
+      );
+      await tester.pumpAndSettle();
+      final shell = he.shell;
+
+      expect(find.bySemanticsLabel(shell.windowRestore), findsOneWidget);
+      expect(find.bySemanticsLabel(shell.windowMaximize), findsNothing);
+
+      await tester.tap(find.bySemanticsLabel(shell.windowRestore));
+      await tester.pumpAndSettle();
+      expect(calls, contains('unmaximize'));
+      expect(calls, isNot(contains('maximize')));
+    });
+
+    testWidgets('קורא מסך: לכלים ולכפתורי החלון יש פעולת הקשה, בלי מלל כפול', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      var help = 0;
+      await tester.pumpWidget(
+        wrap(
+          AppTitleBar(
             isMacOS: false,
             showWindowButtons: true,
+            onHelp: () => help++,
+            onSettings: () {},
           ),
         ),
       );
       await tester.pumpAndSettle();
+      final shell = he.shell;
 
-      expect(find.byType(WindowCaption), findsOneWidget);
+      for (final label in [
+        shell.helpTooltip,
+        shell.settingsTooltip,
+        shell.windowMinimize,
+        shell.windowMaximize,
+        shell.windowClose,
+      ]) {
+        final data = tester
+            .getSemantics(find.bySemanticsLabel(label))
+            .getSemanticsData();
+        expect(data.hasAction(SemanticsAction.tap), isTrue, reason: label);
+        expect(data.label, label, reason: label);
+        expect(data.tooltip, isEmpty, reason: label);
+      }
+
+      tester.semantics.tap(find.semantics.byLabel(shell.helpTooltip));
+      await tester.pump();
+      expect(help, 1);
+      tester.semantics.tap(find.semantics.byLabel(shell.windowClose));
+      await tester.pump();
+      expect(calls, contains('close'));
+
+      // כלים מושבתים (היציאה ממתינה): מוכרזים כמושבתים ובלי הקשה.
+      await tester.pumpWidget(
+        wrap(
+          AppTitleBar(
+            showWindowButtons: false,
+            toolsEnabled: false,
+            onHelp: () => help++,
+          ),
+        ),
+      );
+      await tester.pump();
+      final disabled = tester
+          .getSemantics(find.bySemanticsLabel(shell.helpTooltip))
+          .getSemanticsData();
+      expect(disabled.hasAction(SemanticsAction.tap), isFalse);
+      expect(disabled.flagsCollection.isEnabled, Tristate.isFalse);
+      semantics.dispose();
+    });
+
+    testWidgets('דו-שיח פתוח: כפתורי החלון פעילים מעל השכבה, והכלים מושבתים', (
+      tester,
+    ) async {
+      var help = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppThemeData.light(),
+          locale: const Locale('he', 'IL'),
+          supportedLocales: const [Locale('he', 'IL')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          builder: (context, navigator) => AppStringsScope(
+            strings: he,
+            child: TitleBarHost(child: navigator!),
+          ),
+          home: Scaffold(
+            body: Column(
+              children: [
+                AppTitleBar(
+                  isMacOS: false,
+                  showWindowButtons: true,
+                  onHelp: () => help++,
+                ),
+                Expanded(
+                  child: Builder(
+                    builder: (context) => TextButton(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => const AlertDialog(content: Text('d')),
+                      ),
+                      child: const Text('open'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final shell = he.shell;
+
+      await tester.tap(find.bySemanticsLabel(shell.helpTooltip));
+      expect(help, 1);
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text('d'), findsOneWidget);
+
+      // לחיצה על השכבה הייתה סוגרת את הדו-שיח — כאן היא מגיעה לכפתורים.
+      await tester.tap(find.bySemanticsLabel(shell.windowMinimize));
+      await tester.tap(find.bySemanticsLabel(shell.windowClose));
+      await tester.pump();
+      expect(calls, containsAll(['minimize', 'close']));
+      expect(find.text('d'), findsOneWidget);
+
+      await tester.tap(
+        find.bySemanticsLabel(shell.helpTooltip),
+        warnIfMissed: false,
+      );
+      await tester.pump();
+      expect(help, 1);
+      expect(find.text('d'), findsOneWidget);
     });
 
     testWidgets('macOS: גם כשמזריקים showWindowButtons אין ריווח בצד הסיום', (
       tester,
     ) async {
-      // הזרקת `false` היא מה שכל בדיקות המסכים עושות; הריווח אינו תלוי בה.
       await tester.pumpWidget(
         wrap(
-          const AppTitleBar(
-            screenTitle: 'מסך',
-            isMacOS: true,
-            showWindowButtons: false,
-          ),
+          const AppTitleBar(isMacOS: true, showWindowButtons: false),
           language: AppLanguage.english,
         ),
       );
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(WindowCaption), findsNothing);
+      expect(find.byType(WindowCaptionButtons), findsNothing);
     });
   });
 }

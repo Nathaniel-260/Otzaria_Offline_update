@@ -1,12 +1,8 @@
-import 'dart:ui' show Color, PlatformDispatcher;
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:error_reports_manager/error_reports_manager.dart'
     show AppCrashReportMode;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
-
-import '../theme/app_seed_colors.dart';
-
-enum AppThemeMode { system, light, dark }
 
 /// בחירת שפת הממשק. [system] — לפי שפת מערכת ההפעלה, וזו ברירת המחדל:
 /// התקנה חדשה מדברת בשפה שהמחשב כבר מדבר, בלי שאיש יגדיר דבר.
@@ -67,7 +63,12 @@ class AppSettings {
   /// 11: `automation` — שני דגלים במקום ארבעה: בדיקה והתקנה, כל אחד
   ///     לתוכנה ולספרייה גם יחד.
   /// 12: `reports` — מצב הדיווח אחרי קריסה וכתובת הדואר שנזכרת בטופס.
-  static const int schemaVersion = 12;
+  /// 13: `ui.themeMode`, `ui.seedColor`, `ui.darkSeedColor` ו-`ui.showFaq`
+  ///     הוסרו — ערכת נושא בהירה וקבועה. קובץ ישן נקרא, והם נמחקים בשמירה.
+  ///
+  /// הגרסה נכתבת ואינה נבדקת בקריאה: מפתח חסר מקבל ברירת מחדל, ומפתח לא מוכר
+  /// נמחק בשמירה הבאה.
+  static const int schemaVersion = 13;
 
   /// בדיקת עדכונים בפתיחה — גם מקומית (התיקייה שלצד התוכנה) וגם קלה מול
   /// GitHub כשיש רשת: מטא-דאטה בלבד, בלי הורדה, וכשל (אין רשת) נבלע בשקט.
@@ -99,17 +100,7 @@ class AppSettings {
   /// *הבחירה* בהגדרות — כולל "אוטומטי", שהיא ברירת המחדל. השפה שמוצגת
   /// בפועל היא [language].
   final AppLanguagePreference languagePreference;
-  final AppThemeMode themeMode;
   final double textScale;
-
-  /// צבעי ה-seed שמהם נבנית ערכת הצבעים — אחד לכל בהירות, כמו באוצריא:
-  /// הבחירה בהגדרות חלה על הערכה המוצגת באותו רגע.
-  final Color seedColor;
-  final Color darkSeedColor;
-
-  /// הכפתור הצף של השאלות הנפוצות בדף הבית. דלוק כברירת מחדל — הוא ההדרכה
-  /// היחידה בתוכנה — וכיבוי מסתיר אותו לגמרי, כולל ההבהוב שבעלייה.
-  final bool showFaqButton;
 
   // ── מצב סייפר ───────────────────────────────────────────────────────────
   /// `true` = ההגדרות ועריכת ההדרכה נעולות בסיסמה. אין לזה משמעות בלי
@@ -141,11 +132,7 @@ class AppSettings {
     this.autoInstall = false,
     this.preferAppPrerelease = false,
     this.languagePreference = AppLanguagePreference.system,
-    this.themeMode = AppThemeMode.system,
     this.textScale = 1.0,
-    this.seedColor = AppSeedColors.defaultLight,
-    this.darkSeedColor = AppSeedColors.defaultDark,
-    this.showFaqButton = true,
     this.saferModeEnabled = false,
     this.saferModePassword = '',
     this.crashReportMode = AppCrashReportMode.ask,
@@ -182,11 +169,7 @@ class AppSettings {
     bool? autoInstall,
     bool? preferAppPrerelease,
     AppLanguagePreference? languagePreference,
-    AppThemeMode? themeMode,
     double? textScale,
-    Color? seedColor,
-    Color? darkSeedColor,
-    bool? showFaqButton,
     bool? saferModeEnabled,
     String? saferModePassword,
     AppCrashReportMode? crashReportMode,
@@ -201,11 +184,7 @@ class AppSettings {
       autoInstall: autoInstall ?? this.autoInstall,
       preferAppPrerelease: preferAppPrerelease ?? this.preferAppPrerelease,
       languagePreference: languagePreference ?? this.languagePreference,
-      themeMode: themeMode ?? this.themeMode,
       textScale: textScale ?? this.textScale,
-      seedColor: seedColor ?? this.seedColor,
-      darkSeedColor: darkSeedColor ?? this.darkSeedColor,
-      showFaqButton: showFaqButton ?? this.showFaqButton,
       saferModeEnabled: saferModeEnabled ?? this.saferModeEnabled,
       saferModePassword: saferModePassword ?? this.saferModePassword,
       crashReportMode: crashReportMode ?? this.crashReportMode,
@@ -230,12 +209,7 @@ class AppSettings {
         },
         'ui': {
           'language': languagePreference.code,
-          'themeMode': themeMode.name,
           'textScale': textScale,
-          // ARGB שלם, כמו ש-`key-swatch-color` נשמר באוצריא.
-          'seedColor': seedColor.toARGB32(),
-          'darkSeedColor': darkSeedColor.toARGB32(),
-          'showFaq': showFaqButton,
         },
         'protection': {
           'enabled': saferModeEnabled,
@@ -267,11 +241,6 @@ class AppSettings {
     bool flag(Map<String, dynamic> from, String key, bool fallback) {
       final value = from[key];
       return value is bool ? value : fallback;
-    }
-
-    Color color(String key, Color fallback) {
-      final value = ui[key];
-      return value is int ? Color(value) : fallback;
     }
 
     // ערך פגום היה מגיע ישר ל-`MediaQuery.withClampedTextScaling` (ראו
@@ -317,14 +286,7 @@ class AppSettings {
       preferAppPrerelease:
           flag(channels, 'appPrerelease', defaults.preferAppPrerelease),
       languagePreference: AppLanguagePreference.fromCode(ui['language']),
-      themeMode: AppThemeMode.values.firstWhere(
-        (m) => m.name == ui['themeMode'],
-        orElse: () => defaults.themeMode,
-      ),
       textScale: textScale(defaults.textScale),
-      seedColor: color('seedColor', defaults.seedColor),
-      darkSeedColor: color('darkSeedColor', defaults.darkSeedColor),
-      showFaqButton: flag(ui, 'showFaq', defaults.showFaqButton),
       saferModeEnabled: flag(
         protection,
         'enabled',

@@ -30,7 +30,7 @@ const Duration _contactSaveDelay = Duration(milliseconds: 500);
 double _listHeight(BuildContext context) =>
     math.min(_listMaxHeight, MediaQuery.sizeOf(context).height / 2);
 
-/// ההדרכה עצמה — נפתחת מהכפתור הצף שבפינה.
+/// ההדרכה עצמה — נפתחת מהכלי "?" שבשורת הכותרת.
 Future<void> showFaqDialog(
   BuildContext context, {
   required FaqController faq,

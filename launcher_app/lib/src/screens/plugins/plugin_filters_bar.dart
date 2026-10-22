@@ -99,9 +99,6 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
           controller: widget.searchController,
           onChanged: widget.controller.setSearch,
           decoration: InputDecoration(
-            border: const OutlineInputBorder(
-              borderRadius: AppTokens.borderRadiusAll,
-            ),
             prefixIcon: const Icon(FluentIcons.search_24_regular),
             hintText: t.filterSearchHint,
             isDense: true,
@@ -163,7 +160,6 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
           isDense: true,
           isExpanded: true,
           decoration: const InputDecoration(
-            border: OutlineInputBorder(borderRadius: AppTokens.borderRadiusAll),
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             isDense: true,
           ),

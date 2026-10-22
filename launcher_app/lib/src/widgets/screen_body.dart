@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../theme/theme_exports.dart';
 
-/// גוף מסך אחיד: כותרת ורשימת כרטיסים — ברוחב תוכן מוגבל וממורכז, כדי
-/// שהכרטיסים לא יתמשכו לרוחב מסך שלם (תכנון §14). אין כאן פסקת הסבר:
-/// ההסברים עברו לסימני שאלה שליד הכותרות שהם באמת נוגעות להן.
+/// גוף דף (`.page`): כותרת 20/600 ורשימת כרטיסים, ברוחב תוכן של עד 720
+/// וממורכז, עם ריפוד 28/24/40.
 class ScreenBody extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -17,29 +16,22 @@ class ScreenBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
+    const padding = LayoutConstraints.pagePadding;
 
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: LayoutConstraints.panelContentMaxWidth,
+        constraints: BoxConstraints(
+          maxWidth: LayoutConstraints.panelContentMaxWidth + padding.horizontal,
         ),
         child: ListView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTokens.spaceLG,
-            vertical: AppTokens.spaceMD,
-          ),
+          padding: padding,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                right: AppTokens.spaceMD,
-                left: AppTokens.spaceMD,
-                top: AppTokens.spaceSM,
-              ),
-              child: Text(title, style: theme.textTheme.headlineSmall),
+            Text(
+              title,
+              style: AppTextStyles.pageTitle.copyWith(color: cs.onSurface),
             ),
             ...children,
-            const SizedBox(height: AppTokens.spaceXL),
           ],
         ),
       ),

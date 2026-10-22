@@ -273,9 +273,10 @@ class _PasswordField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        border: const OutlineInputBorder(),
         prefixIcon: Icon(icon),
         suffixIcon: IconButton(
+          // 40 ולא 48 של יעד המגע, כדי שהשדה יישאר 44.
+          visualDensity: VisualDensity.compact,
           tooltip: obscured ? t.showPasswordTooltip : t.hidePasswordTooltip,
           icon: Icon(
             obscured

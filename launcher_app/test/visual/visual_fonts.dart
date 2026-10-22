@@ -7,9 +7,9 @@ import 'package:flutter/services.dart';
 
 const _windowsFonts = r'C:\Windows\Fonts';
 
-/// 'Roboto' של ה-theme אינו מותקן ב-Windows ונופל שם ל-Segoe UI. מלכוד: סגנון
-/// בלי `fontFamily` שאינו יורש מה-theme יוצא כאן במשבצות של גופן הבדיקות.
-const _uiFamilies = ['Segoe UI', 'Roboto'];
+/// מלכוד: סגנון בלי `fontFamily` שאינו יורש מה-theme יוצא כאן במשבצות של גופן
+/// הבדיקות, אף שב-Windows הוא נופל ל-Segoe UI.
+const _uiFamilies = ['Segoe UI'];
 const _uiFiles = ['segoeui.ttf', 'seguisb.ttf', 'segoeuib.ttf'];
 
 const _monoFamilies = ['Consolas', 'monospace'];

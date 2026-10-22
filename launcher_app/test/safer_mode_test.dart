@@ -215,6 +215,8 @@ void main() {
         find.text('הזן את הסיסמה הנוכחית כדי לשנות אותה.'),
         findsOneWidget,
       );
+      // כפתור "הצג" שבשדה לא מגביה אותו מעל גובה השדה.
+      expect(tester.getSize(find.byType(TextField)).height, 44);
     });
 
     testWidgets('איפוס ההגדרות אינו פותח את הנעילה', (tester) async {
@@ -224,7 +226,7 @@ void main() {
           AppSettings(
             saferModeEnabled: true,
             saferModePassword: stored,
-            showFaqButton: false,
+            autoCheckUpdates: false,
           ),
         ),
       );
@@ -236,7 +238,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // שאר ההגדרות חזרו לברירת המחדל, הנעילה נשארה.
-      expect(settings.settings.showFaqButton, isTrue);
+      expect(settings.settings.autoCheckUpdates, isTrue);
       expect(settings.settings.saferModeEnabled, isTrue);
       expect(settings.settings.saferModePassword, stored);
     });

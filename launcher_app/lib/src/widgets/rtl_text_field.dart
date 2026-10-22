@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/theme_exports.dart';
+
 /// שדה הטקסט היחיד שמותר להשתמש בו לקלט.
 ///
 /// זו גרסה מצומצמת של `RtlTextField` של אוצריא: תיקוני מקשי החיצים,
@@ -52,6 +54,8 @@ class RtlTextField extends StatelessWidget {
       controller: controller,
       focusNode: focusNode,
       decoration: decoration,
+      // 14 כמו `.field input`; ברירת המחדל של M3 היא 16.
+      style: AppTextStyles.field,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
       enabled: enabled,

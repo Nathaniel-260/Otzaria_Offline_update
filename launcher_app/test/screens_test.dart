@@ -27,7 +27,6 @@ import 'package:launcher_app/src/services/timestamps.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
-import 'package:launcher_app/src/theme/theme_exports.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -1699,11 +1698,11 @@ void main() {
 
     expect(find.text('אוטומציה'), findsOneWidget);
     expect(find.text('הורדה'), findsOneWidget);
-    expect(find.text('שפה ומראה'), findsOneWidget);
+    expect(find.text('שפה'), findsOneWidget);
     expect(find.text('תמיכה'), findsOneWidget);
-    // שפה ומראה הם הכרטיס הראשון, לפני האוטומציה.
+    // השפה היא הכרטיס הראשון, לפני האוטומציה.
     expect(
-      tester.getTopLeft(find.text('שפה ומראה')).dy,
+      tester.getTopLeft(find.text('שפה')).dy,
       lessThan(tester.getTopLeft(find.text('אוטומציה')).dy),
     );
     // ההגדרה "timeout להורדה" הוסרה — הזמן הקצוב נקבע בלקוחות עצמם.
@@ -1815,85 +1814,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(settings.settings.languagePreference, AppLanguagePreference.system);
-  });
-
-  testWidgets('פלטת הצבעים בוחרת, מאפסת ונשמרת', (tester) async {
-    final t = stringsOf().settings;
-
-    await pumpScreen(
-      tester,
-      SettingsScreen(
-        controller: settings,
-        onOpenLog: () {},
-        launcherVersion: launcherVersion,
-      ),
-    );
-
-    // ברירת המחדל היא הגוון הבהיר של אוצריא, והשורה מציגה את שמו.
-    expect(find.text(t.seedColorTitle), findsOneWidget);
-    expect(find.text(t.colorDarkBrown), findsOneWidget);
-
-    await tester.tap(find.text(t.seedColorButton));
-    await tester.pumpAndSettle();
-
-    expect(find.text(t.seedColorDialogTitle), findsOneWidget);
-    // כל צבע בפלטה מוצג עם שמו — זה מה שמכריח מלל מתורגם לכולם.
-    for (final option in AppSeedColors.options) {
-      expect(
-        find.byTooltip(seedColorName(t, option.color)),
-        findsOneWidget,
-        reason: '${option.label}',
-      );
-    }
-
-    await tester.tap(find.byTooltip(t.colorBlue));
-    await tester.pumpAndSettle();
-
-    expect(settings.settings.seedColor, AppSeedColors.blue);
-    // הערכה הכהה לא נגעה — כל בהירות והצבע שלה.
-    expect(settings.settings.darkSeedColor, AppSeedColors.defaultDark);
-
-    // "איפוס" מופיע גם בכרטיס התמיכה, ולכן דווקא זה שבתוך הפלטה.
-    await tester.tap(
-      find.descendant(
-        of: find.byType(SeedColorPalette),
-        matching: find.text(t.seedColorResetButton),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(settings.settings.seedColor, AppSeedColors.defaultLight);
-  });
-
-  testWidgets('בערכה כהה הפלטה משנה את הצבע הכהה בלבד', (tester) async {
-    final t = stringsOf().settings;
-
-    await pumpScreen(
-      tester,
-      Theme(
-        data: AppThemeData.dark(
-          AppThemeData.createColorScheme(
-            AppSeedColors.defaultDark,
-            Brightness.dark,
-          ),
-        ),
-        child: SettingsScreen(
-          controller: settings,
-          onOpenLog: () {},
-          launcherVersion: launcherVersion,
-        ),
-      ),
-    );
-
-    expect(find.text(t.colorPurple), findsOneWidget);
-
-    await tester.tap(find.text(t.seedColorButton));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip(t.colorTeal));
-    await tester.pumpAndSettle();
-
-    expect(settings.settings.darkSeedColor, AppSeedColors.teal);
-    expect(settings.settings.seedColor, AppSeedColors.defaultLight);
   });
 
   testWidgets('הפעלת התקנה אוטומטית דורשת אישור באזהרה', (tester) async {

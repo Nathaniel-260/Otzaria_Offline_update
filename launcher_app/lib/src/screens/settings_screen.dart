@@ -10,13 +10,12 @@ import '../services/app_paths.dart';
 import '../settings/app_settings.dart';
 import '../settings/safer_mode.dart';
 import '../settings/settings_controller.dart';
-import '../theme/theme_exports.dart';
 import '../widgets/screen_body.dart';
 import '../widgets/widgets_exports.dart';
 import 'app_report/app_reports_settings_card.dart';
 import 'custom_apps/custom_apps_settings_card.dart';
 
-/// מסך ההגדרות — שפה ומראה, אוטומציה, הורדה ותמיכה.
+/// מסך ההגדרות — שפה, אוטומציה, הורדה ותמיכה.
 ///
 /// **אין כאן הגדרות רשת בכוונה.** הזמן הקצוב לכל פנייה נקבע בלקוחות עצמם
 /// (ראו `OtzariaReleaseClient`, `GithubLibraryReleaseClient`) — ערך שהמשתמש
@@ -231,11 +230,7 @@ class SettingsScreen extends StatelessWidget {
     await _set(_s.copyWith(personalUpdateMode: true));
   }
 
-  // ── שפה ומראה ─────────────────────────────────────────────────────────────
-
-  /// רוחב קבוע לשורות הכרטיס — כך שתיבת ערכת הנושא, שהתווית הארוכה שבה
-  /// הייתה מגדילה אותה, יושבת באותו גודל בדיוק כמו בורר השפה.
-  static const double _uiSegmentWidth = 300;
+  // ── שפה ─────────────────────────────────────────────────────────────
 
   Widget _appearanceCard(BuildContext context) {
     final t = context.strings.settings;
@@ -265,46 +260,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ],
         ),
-        SettingsActionTile.segmentedTile<AppThemeMode>(
-          icon: FluentIcons.dark_theme_24_regular,
-          title: t.themeTitle,
-          currentValue: _s.themeMode,
-          onChanged: (v) => _set(_s.copyWith(themeMode: v)),
-          width: _uiSegmentWidth,
-          options: [
-            SegmentOption(value: AppThemeMode.system, label: t.themeSystem),
-            SegmentOption(value: AppThemeMode.light, label: t.themeLight),
-            SegmentOption(value: AppThemeMode.dark, label: t.themeDark),
-          ],
-        ),
-        _colorPickerTile(context),
-        SettingsActionTile.switchTile(
-          icon: FluentIcons.question_circle_24_regular,
-          title: t.showFaqTitle,
-          subtitle: t.showFaqSubtitle,
-          value: _s.showFaqButton,
-          onChanged: (v) => _set(_s.copyWith(showFaqButton: v)),
-        ),
       ],
-    );
-  }
-
-  /// בורר צבע הבסיס. כמו באוצריא, הבחירה חלה על הערכה שמוצגת כרגע — ולכן
-  /// המפתח מכריח בנייה מחדש כשהבהירות מתחלפת, אחרת הצבע של הערכה הקודמת
-  /// היה נשאר על המסך.
-  Widget _colorPickerTile(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return ColorPickerTile(
-      key: ValueKey('seed-color-${isDark ? 'dark' : 'light'}'),
-      currentColor: isDark ? _s.darkSeedColor : _s.seedColor,
-      defaultColor:
-          isDark ? AppSeedColors.defaultDark : AppSeedColors.defaultLight,
-      onChanged: (color) => _set(
-        isDark
-            ? _s.copyWith(darkSeedColor: color)
-            : _s.copyWith(seedColor: color),
-      ),
     );
   }
 

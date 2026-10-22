@@ -152,6 +152,22 @@ class _Shell extends ShellStrings {
   String get closeWhileInstallingConfirm => 'Close anyway';
   @override
   String get closeWhileBusyKeepGoing => 'Keep going';
+  @override
+  String get helpTooltip => 'Help and FAQ';
+  @override
+  String get settingsTooltip => 'Settings';
+  @override
+  String get windowMinimize => 'Minimize';
+  @override
+  String get windowMaximize => 'Maximize';
+  @override
+  String get windowRestore => 'Restore';
+  @override
+  String get windowClose => 'Close';
+  @override
+  String get backTooltip => 'Back (Esc)';
+  @override
+  String get breadcrumbHome => 'Home';
 }
 
 class _Home extends HomeStrings {
@@ -782,7 +798,7 @@ class _Settings extends SettingsScreenStrings {
   String get personalModeDialogConfirm => 'Turn on personal update';
 
   @override
-  String get appearanceCardTitle => 'Language and Appearance';
+  String get appearanceCardTitle => 'Language';
   @override
   String get languageTitle => 'Interface Language';
   @override
@@ -795,57 +811,6 @@ class _Settings extends SettingsScreenStrings {
   String get languageHebrew => 'עברית';
   @override
   String get languageEnglish => 'English';
-  @override
-  String get themeTitle => 'Theme';
-  @override
-  String get themeSystem => 'System';
-  @override
-  String get themeLight => 'Light';
-  @override
-  String get themeDark => 'Dark';
-  @override
-  String get showFaqTitle => 'Common-questions button';
-  @override
-  String get showFaqSubtitle =>
-      'The round button in the bottom corner of the home screen that opens the '
-      'guide.';
-
-  @override
-  String get seedColorTitle => 'Base color';
-  @override
-  String get seedColorButton => 'Change color';
-  @override
-  String get seedColorDialogTitle => 'Pick a base color';
-  @override
-  String get seedColorResetButton => 'Reset';
-  @override
-  String get seedColorCustom => 'Custom color';
-  @override
-  String get colorRed => 'Red';
-  @override
-  String get colorOrange => 'Orange';
-  @override
-  String get colorAmber => 'Amber';
-  @override
-  String get colorGreen => 'Green';
-  @override
-  String get colorTeal => 'Teal';
-  @override
-  String get colorBlue => 'Blue';
-  @override
-  String get colorBlueGrey => 'Graphite grey';
-  @override
-  String get colorNavy => 'Navy';
-  @override
-  String get colorPurple => 'Purple';
-  @override
-  String get colorBrown => 'Brown';
-  @override
-  String get colorParchment => 'Parchment / beige';
-  @override
-  String get colorGrey => 'Grey';
-  @override
-  String get colorDarkBrown => 'Golden brown';
 
   @override
   String get supportCardTitle => 'Support';

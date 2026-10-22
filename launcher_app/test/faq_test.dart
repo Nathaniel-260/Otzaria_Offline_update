@@ -1,5 +1,5 @@
-// בדיקות להדרכת "שאלות נפוצות" — הכפתור הצף, הבועה שבעלייה, האקורדיון,
-// וההתאמה האישית שנפתחת בגלגל השיניים.
+// בדיקות להדרכת "שאלות נפוצות" — הדיאלוג שנפתח מ-"?" בשורת הכותרת,
+// האקורדיון, וההתאמה האישית שנפתחת בגלגל השיניים.
 //
 // הבדיקה האחרונה כאן היא השומר החשוב: שדה שאלה/תשובה שנוסף לחוזה המלל ולא
 // נכנס ל-`faqGroups` פשוט לא היה מוצג, בלי שדבר ייפול.
@@ -13,7 +13,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/faq_controller.dart';
 import 'package:launcher_app/src/screens/faq/faq_content.dart';
 import 'package:launcher_app/src/screens/faq/faq_dialog.dart';
-import 'package:launcher_app/src/screens/faq/faq_floating_button.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/settings/faq_customization.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -39,14 +38,6 @@ void main() {
     await deleteTempDir(tempDir);
   });
 
-  /// הבועה שמעל הכפתור — ה-`AnimatedOpacity` היחיד בתת-העץ שלו.
-  double bubbleOpacity(WidgetTester tester) => tester
-      .widget<AnimatedOpacity>(find.descendant(
-        of: find.byType(FaqFloatingButton),
-        matching: find.byType(AnimatedOpacity),
-      ))
-      .opacity;
-
   Future<void> pumpBody(WidgetTester tester) =>
       pumpScreen(tester, Scaffold(body: FaqBody(faq: faq)));
 
@@ -70,45 +61,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  group('הכפתור הצף', () {
-    testWidgets('הבועה נפתחת בעלייה, נסגרת מעצמה, וההבהוב מסתיים',
-        (tester) async {
-      await tester.pumpWidget(
-        wrap(Center(child: FaqFloatingButton(faq: faq))),
-      );
-
-      // לפני ההשהיה הבועה סגורה — היא לא אמורה לקדום את הצביעה הראשונה.
-      expect(bubbleOpacity(tester), 0);
-
-      await tester.pump(const Duration(milliseconds: 600));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(bubbleOpacity(tester), 1);
-      expect(find.text(t.title), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 2));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(bubbleOpacity(tester), 0);
-
-      // ההבהוב סופי ואינו `repeat()` — אחרת זה לא היה מתייצב לעולם.
-      await tester.pumpAndSettle();
-    });
-
-    testWidgets('showIntro=false — בלי בועה ובלי הבהוב', (tester) async {
-      await tester.pumpWidget(
-        wrap(Center(child: FaqFloatingButton(faq: faq, showIntro: false))),
-      );
-      await tester.pumpAndSettle();
-      expect(bubbleOpacity(tester), 0);
-    });
-
+  group('הדיאלוג', () {
     testWidgets('לחיצה פותחת את ההדרכה עם כל הקבוצות', (tester) async {
       await tester.pumpWidget(
-        wrap(Center(child: FaqFloatingButton(faq: faq, showIntro: false))),
+        wrap(
+          Builder(
+            builder: (context) => Center(
+              child: TextButton(
+                key: const Key('open'),
+                onPressed: () => showFaqDialog(context, faq: faq),
+                child: const SizedBox(width: 40, height: 20),
+              ),
+            ),
+          ),
+        ),
       );
-      await tester.tap(find.byType(FaqFloatingButton));
+      await tester.tap(find.byKey(const Key('open')));
       await tester.pumpAndSettle();
 
-      // הבועה נשארת בעץ בשקיפות 0, ולכן הכותרת נחפשת בתוך הדיאלוג עצמו.
       expect(
         find.descendant(
           of: find.byType(AlertDialog),

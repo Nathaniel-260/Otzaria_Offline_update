@@ -36,7 +36,7 @@ class PayloadMismatchScreen extends StatelessWidget {
       backgroundColor: AppSurfaces.panelBackground(context),
       body: Column(
         children: [
-          AppTitleBar(screenTitle: '', showWindowButtons: showWindowButtons),
+          AppTitleBar(showTitle: false, showWindowButtons: showWindowButtons),
           Expanded(
             child: Center(
               child: ConstrainedBox(

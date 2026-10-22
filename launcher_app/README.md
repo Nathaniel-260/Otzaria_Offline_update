@@ -27,27 +27,38 @@
 | תוכנה | `screens/otzaria_screen.dart` | מצב ההתקנה, "מה התחדש" (release notes מ-GitHub), בחירת מיקום ידנית |
 | ספרייה | `screens/library_screen.dart` | מצב ה-DB, יעד ההתקנה (כשעוד אין מסד) והחלת העדכון מהתיקייה המקומית |
 | תוספים | `screens/plugins/` | חנות התוספים: רשת כרטיסים, עמוד פרטים, הורדה |
-| הגדרות | `screens/settings_screen.dart` | שפה ומראה, אוטומציה, מה לסנכרן, מצב סייפר, תמיכה |
+| הגדרות | `screens/settings_screen.dart` | שפה, אוטומציה, מה לסנכרן, מצב סייפר, תמיכה |
 
-מעליהם **שורת הכותרת של החלון עצמו** (`widgets/app_title_bar.dart`, פורט של
-`otzaria/lib/navigation/view/custom_title_bar.dart`): סמל אוצריא
-(`assets/images/otzaria_logo.png`) ושם התוכנה בהתחלה, שם המסך הפתוח באמצע,
-וכפתורי החלון בסוף. מסגרת החלון של המערכת מוסתרת ב-`main.dart`
+מעליהם **שורת הכותרת של החלון עצמו** (`widgets/app_title_bar.dart`, גובה 36):
+סמל אוצריא (`assets/images/otzaria_logo.png`, 16) והשם "עדכוני אוצריא" בהתחלה,
+ובסוף שני כלים — "?" (השאלות הנפוצות) וגלגל השיניים (ההגדרות, דרך שער מצב
+הסייפר) — ואחריהם כפתורי החלון שהשורה מציירת בעצמה (46×36, ריחוף על הסגירה
+באדום של Windows). מסגרת החלון של המערכת מוסתרת ב-`main.dart`
 (`window_manager`, `TitleBarStyle.hidden`), ולכן השורה הזו היא גם מה שגורר
 את החלון — ו**כל** מסך שמוצג במקום `AppShell` חייב לכלול אותה, אחרת החלון
-נשאר בלי סגירה ובלי גרירה (ראו `SetupErrorScreen`). מחווני המצב שהיו בסרגל
+נשאר בלי סגירה ובלי גרירה (ראו `SetupErrorScreen`). במקומה בעץ נשאר רווח של
+36, והשורה עצמה מצוירת ב-Overlay ש-`TitleBarHost` פורש מעל ה-Navigator
+(`MaterialApp.builder`): השכבה של דו-שיח אינה מכסה אותה, כפתורי החלון וגרירה
+עובדים גם כשדו-שיח פתוח, והכלים מושבתים כל עוד מסלול אחר מעל המסך. מחווני המצב שהיו בסרגל
 הקודם (רשת, תיקיית הנתונים, "נבדק ב־", אזהרה כשאוצריא פתוחה) הוסרו — כולם
 מופיעים ממילא בדף הבית ובמסכי הרכיבים, ליד הפעולה שהם מתארים; בדיקה מחדש
 יושבת במסכי "תוכנה"/"ספרייה" ויומן הפעילות בהגדרות.
 
-בבדיקות widget יש להזריק `showWindowButtons: false`: `WindowCaption` מדבר
-עם ערוץ פלטפורמה שאינו קיים שם.
+בבדיקות widget מזריקים `showWindowButtons: false` (ברירת המחדל לפי הפלטפורמה).
+הכפתורים עצמם פונים לערוץ של `window_manager` רק בלחיצה, ולכן בדיקה שמציירת
+אותם (`true`) אפשרית — רק לא ללחוץ עליהם.
 
-**החלון נפתח מוגדל, וההגדלה נעשית ב-runner של Windows ולא ב-Dart.**
-`Win32Window::Show` מציג ב-`SW_SHOWMAXIMIZED`, ו-`main.cpp` יוצר את החלון
-מלכתחילה במידות שטח העבודה של הצג. הסיבה: הרנר מציג את החלון רק כשהפריים
-הראשון מוכן, ולכן `windowManager.maximize()` לפני `runApp` היה חושף חלון ריק
-(הבהוב) — ואז ה-`Show()` של הרנר, שהיה `SW_SHOWNORMAL`, ביטל את ההגדלה.
+**החלון בינוני — אזור תוכן של 1000×720, ממורכז בשטח העבודה — והגודל נקבע ב-runner
+ולא ב-Dart.** `Win32Window::Show` קורא את השוליים שבין החלון לאזור התוכן (`window_manager`
+קובע אותם: כשהכותרת מוסתרת: 8 פיזיים קבועים בצדדים ובתחתית, ו-0 או 1 למעלה) ומוסיף אותם, כך שאזור התוכן של Flutter
+הוא בדיוק 1000×720 לוגיים. אם הוא לא נכנס בשטח העבודה (למשל 1920×1080 ב-150%), הוא נחסם
+בגבולות שטח העבודה ונשאר חלון רגיל — **לעולם לא מוגדל בגלל הגודל**. מוגדל רק כשקיצור הדרך
+ביקש "מוגדל", וגם אז המיקום הממורכז נקבע לפני ההצגה, כדי ש"שחזר" יחזיר לשם. החישוב עצמו
+ב-`window_fit.h`. המינימום 760×560 נקבע ב-`main.dart`, וה-runner מוסיף לו את השוליים ו**חוסם
+אותו בשטח העבודה** של הצג
+(`FitMinTrackSize`), גם כשהחלון מוגדל, כך שבמסך קטן הוא אינו חורג מהמסך. הסיבה לרנר: הוא מציג את
+החלון רק כשהפריים הראשון מוכן, ולכן שינוי גודל לפני `runApp` היה חושף חלון
+ריק (הבהוב). ב-macOS ‏`MainFlutterWindow` עושה אותו דבר.
 
 יש גם מסך שישי שאינו בניווט: `screens/setup_error_screen.dart`, שמוצג
 במקום האפליקציה כשלא ניתן לכתוב לתיקייה שלצד קובץ ההרצה.
@@ -68,34 +79,43 @@ ZSTD_ROOT="C:/pub-cache/hosted/pub.dev/zstandard_native-1.5.0/src/zstd" \
 זו בעיה בסביבת הפיתוח בלבד — ב-CI המשתנה אינו מוגדר וההיתר נופל
 לפתרון מ-`package_config.json`, ששם הנתיב כבר עם forward slashes.
 
-## עיצוב — מועתק מאוצריא
+## עיצוב — שפת מסייע ההורדות של אוצריא
 
-שכבת העיצוב אינה מקורית: היא **פורט מ-`otzaria/lib/theme/` ומ-
-`otzaria/lib/widgets/`**, כדי ששתי האפליקציות ייראו זהות. אותו
-`ColorScheme.fromSeed` (seed ברירת מחדל: `#2C1B02` בהיר, `#9C27B0` כהה),
-אותו רדיוס 8 לכל הפינות, אותו hover בצבע `primary` ואותם טוקני מרווח.
+ערכת נושא אחת, **בהירה וקבועה**: `AppThemeData.light()` בונה את ה-
+`ColorScheme` מה-seed הקבוע `#2C1B02`, בגופן `Segoe UI`. אין מצב כהה ואין
+בחירת צבע (שדות `ui.themeMode` / `ui.seedColor` / `ui.darkSeedColor` /
+`ui.showFaq` מקובץ ישן נקראים ונמחקים בשמירה הבאה, סכימה 13). הצבעים שאינם
+תפקידי `ColorScheme` (רקע הדף, קו שורת הכותרת, כפתורי החלון, כרטיס נבחר,
+מושבת, הדירוג ועוד) יושבים ב-`AppPalette` — ערכי ה-`:root` של המוקאפ, ש-
+`test/theme_test.dart` משווה אליהם hex מול hex. רדיוס 8 לכל דבר, **בלי
+צללים**, ריחוף 8% ולחיצה 12% (`AppSurfaces.stateLayer`). **מיקוד אינו צובע**
+את הפקד: כמו `:focus-visible`, טבעת של 2 ב-primary במרחק 2 מופיעה רק כשהמיקוד
+הגיע מהמקלדת (`FocusVisibility`; בכפתורים `AppSurfaces.focusRingSide`, וסביב
+`InkWell` הרכיב `FocusRing`). כך כפתור ברירת המחדל של דו-שיח, שממוקד מעצמו,
+נשאר בצבע הרגיל. שדות קלט מקבלים את המראה מ-`inputDecorationTheme` (44, מסגרת
+outline, רקע לבן, בפוקוס primary ב-2) — בלי `border` מקומי. מידות וסגנונות
+טקסט ב-`AppTokens` / `AppTextStyles`; רוחב תוכן של דף 720, ודף רחב 960.
 
-ה-seed אינו קבוע: `ColorPickerTile` מציג את **אותה פלטה** של אוצריא
-(שלושה־עשר גוונים ב-`AppSeedColors.options`), והבחירה נשמרת ב-
-`ui.seedColor` / `ui.darkSeedColor` — צבע לכל בהירות, והשורה בהגדרות
-עורכת את זה של הערכה המוצגת באותו רגע. שמות הגוונים יושבים ב-
-`otzaria_l10n` ולא ברשימה עצמה (שם הם מזוהים ב-`SeedColorLabel`), כדי
-שהפלטה תדבר גם אנגלית.
-
-מה מותר להשתמש בו — בדיוק כמו ב-`otzaria/AGENTS.md`:
+מה מותר להשתמש בו:
 
 | צורך | הרכיב היחיד המותר |
 | --- | --- |
 | אייקונים | `fluentui_system_icons`; `RtlIcon` לאייקון כיווני, `Icon` לשאר |
-| כפתורי פעולה | `ActionButton.recommended` / `.neutral` / `.ghost` / `.warning` |
+| כפתורי פעולה | `ActionButton.recommended` / `.neutral` / `.ghost` / `.warning`, בגודל `sm`/`md`/`lg` (32/40/44) ו-`expand` |
 | הודעות למשתמש | `UiSnack.show` / `.showSuccess` / `.showError` |
 | דיאלוגים | `showSingleActionDialog` / `showTwoActionsDialog` / `showWarningDialog` |
 | כרטיסי הגדרות | `SettingsCard` + `SettingsActionTile` (`.text` / `.path` / `switchTile` / `segmentedTile` / `dropdownTile`) |
 | כפתורי הפעולה של כרטיס | `SettingsCard(actions: …)` — נפרסים מתחת לכרטיס, לא כשורה בתוכו |
 | רשימת אפשרויות ארוכה | `AppDropdownField` + `AppMenuEntry` — פורט מצומצם (בלי חיפוש/צ'יפים/תת-תפריטים) |
 | נתיב בשורת הגדרה | `CopyPathButton` — הנתיב מועתק ואינו מוצג; `SettingsActionTile.path` רק כשהנתיב עצמו הוא המסר (מסך השגיאה) |
-| בחירת צבע בסיס | `ColorPickerTile` — פלטת `AppSeedColors`, לא בורר צבעים חופשי |
-| כרטיס תוכן | `AppCard` / `AppCard.section` |
+| כרטיס תוכן | `AppCard` / `AppCard.section` / `RowsCard` + `AppRow` |
+| כותרת מקטע, מקטע מקופל | `SectionLabel`, `AdvancedSection` |
+| אריח סמל | `IconTile` (32/40/56; tonal / quiet / error) |
+| בחירה בכרטיסים גדולים | `OptionCard` |
+| הודעה קבועה בדף | `NoticeBanner` (notice / warning / banner) |
+| מסך משימה ותוצאה | `TaskFrame`, `StageRow`, `ResultBadge`, `AppProgressBar` |
+| ראש דף משנה, מצב ריק | `SubPageHeader`, `EmptyState` |
+| נתיב מוצג | `PathText` (Consolas, LTR, מקוצר) |
 | 2–4 אפשרויות | `AppSegmentedControl` (לא RadioButton) |
 | קלט טקסט | `RtlTextField` (לא `TextField`) |
 | בחירת קובץ / תיקייה | `NativeFileDialogs` (לא `FilePicker` ישירות) |
@@ -107,9 +127,9 @@ ZSTD_ROOT="C:/pub-cache/hosted/pub.dev/zstandard_native-1.5.0/src/zstd" \
 `hoverColor` / `splashColor` מחוץ ל-`lib/src/theme/` — שקיפויות וצבעי
 אינטראקציה מוגדרים ב-`AppSurfaces` ו-`AppThemeData` בלבד.
 
-מה שלא פורט (ומתועד במקום): `RtlTextField` כאן הוא עטיפה דקה — תיקוני
-מקשי החיצים של Flutter Desktop לא הועברו; ו-`UiSnack` בלי תור הודעות
-ובלי כפתורי פעולה. ⚠️ מאז שנוסף שדה החיפוש בחנות התוספים יש בלאנצ'ר
+מה שלא פורט מאוצריא (ומתועד במקום): `RtlTextField` כאן הוא עטיפה דקה — תיקוני
+מקשי החיצים של Flutter Desktop לא הועברו; ו-`UiSnack` (טוסט `inverseSurface`
+בתחתית, עד 540) בלי תור הודעות ובלי כפתורי פעולה. ⚠️ מאז שנוסף שדה החיפוש בחנות התוספים יש בלאנצ'ר
 קלט טקסט אמיתי ראשון, ולכן פורט מלא של
 `otzaria/lib/widgets/text/rtl_text_field.dart` הוא כעת חוב פתוח.
 
@@ -129,16 +149,13 @@ ZSTD_ROOT="C:/pub-cache/hosted/pub.dev/zstandard_native-1.5.0/src/zstd" \
 `AppLanguage.forLanguageCode` — עברית לעברית (כולל הקוד הישן `iw`), כל השאר
 אנגלית. בחירה מפורשת בהגדרות עוקפת אותו ונשמרת ב-`ui.language`. כל המלל יושב
 ב-`otzaria_l10n` — ראו `AGENTS.md` §4 "All user-visible text" לכללים
-המלאים. חמש נקודות שנוגעות דווקא לרכיבים כאן:
+המלאים. ארבע נקודות שנוגעות דווקא לרכיבים כאן:
 
 - `RtlTextField` **אינו** כופה עוד RTL. הוא יורש את כיוון השפה, אחרת
   חיפוש באנגלית היה נכתב מימין לשמאל.
 - `UiSnack` יושב ב-`Overlay` ולכן אינו יורש כיווניות מה-Navigator; הוא
-  קורא את השפה ישירות מ-`AppL10n`.
-- `SeedColorPalette` (ב-`color_picker_tile.dart`) כופה RTL על עיגולי
-  הצבע: הם אינם טקסט, וסדר הפלטה אינו אמור להתהפך באנגלית. אלה **שני
-  החריגים היחידים** ל-`Directionality` ידני, ובדיקה ב-`widgets_test.dart`
-  נועלת את הרשימה הזאת בדיוק (`AGENTS.md` §4 מזכיר עדיין רק את `UiSnack`).
+  קורא את השפה ישירות מ-`AppL10n`. זה **החריג היחיד** ל-`Directionality`
+  ידני, ובדיקה ב-`widgets_test.dart` נועלת אותו.
 - ⚠️ **בחירת קובץ או תיקייה תמיד דרך `NativeFileDialogs`** ולעולם לא
   ישירות דרך `FilePicker`. שתי סיבות, שתיהן באגים שהיו: שורת הכותרת של
   המערכת מוסתרת (`TitleBarStyle.hidden`), ולכן כשדיאלוג המערכת נסגר המיקוד
@@ -387,24 +404,9 @@ fallback הוחלף באייקון `puzzle_piece` על רקע `primaryContainer`
 
 ### הדרכת "שאלות נפוצות"
 
-`screens/faq/` — כפתור עגול צף בפינה **השמאלית התחתונה של דף הבית**,
-שפותח את ההדרכה בדיאלוג. מה שכדאי לדעת לפני שנוגעים בו:
+`screens/faq/` — ההדרכה בדיאלוג, שנפתח מכפתור "?" בשורת הכותרת (בכל מסך).
+מה שכדאי לדעת לפני שנוגעים בה:
 
-- **הכפתור יושב ב-`AppShell`, מעל ה-`IndexedStack`,** בתוך `Stack` שעוטף
-  את שורת התוכן, ומוסתר ב-`Offstage` בכל מסך שאינו דף הבית. `Offstage`
-  ולא בנייה מותנית **בכוונה**: ה-state שלו (ההבהוב והבועה החד-פעמיים)
-  חייב לשרוד ניווט, אחרת הם היו חוזרים בכל חזרה לדף הבית.
-  `AppSettings.showFaqButton` (ברירת מחדל דלוק, `ui.showFaq`) מוציא אותו
-  מהעץ לגמרי.
-- **הפינה היא שמאל פיזי, לא "תחילת השורה".** המיקום דרך `Positioned(left:)`
-  ולא `PositionedDirectional`, וכך גם הזנב של הבועה (`_BubbleBorder`
-  מתעלם מ-`textDirection` בכוונה) — בעברית סרגל הניווט יושב בימין, והכפתור
-  אמור להישאר בפינה הנגדית גם באנגלית.
-- **ההבהוב סופי ואינו `repeat()`.** שלושה מחזורים בעלייה, דרך מונה
-  ב-`addStatusListener`; טבעת שמהבהבת לנצח היא נדנוד, וגם הייתה משאירה
-  אנימציה תלויה לכל אורך ההרצה (ומפילה `pumpAndSettle` בבדיקות). הבועה
-  נפתחת לשתי שניות אחרי חצי שנייה של השהיה, כדי שלא תוצג לפני שהחלון נצבע.
-  `showIntro: false` מכבה את שניהם.
 - **גובה הרשימה הוא `min(420, חצי מגובה החלון)`.** `AppDialog` מעביר
   `customContent` כילד לא-גמיש בעמודה, כלומר בגובה בלתי חסום, ולכן גובה
   קבוע כאן גלש מהדיאלוג בחלון נמוך במקום לגלול (וזה גם מה שקרה בפועל).
@@ -860,7 +862,7 @@ BOM ומכילים עברית, ולכן חייבים `pwsh` (7+) ולא Windows 
 | `AppPaths` גזרה את תיקיית הנתונים מ-`Platform.resolvedExecutable` | `OtzariaData/` נוצרה **בתוך** `Contents/MacOS` שבחבילה: בלתי נראית ב-Finder, ונמחקת בכל עדכון עצמי שמחליף את החבילה. עכשיו היא ליד ה-`.app`, כמו שכל שאר התיעוד כבר הניח. |
 | `OtzariaAppLocator` פסל את ה-exe שלנו בווינדוס בלבד | `Otzaria Launcher.app` מכילה "Otzaria", ו-`/Applications` היא תיקיית זיהוי — הלאנצ'ר אימץ את עצמו כאוצריא, קרא את הגרסה של עצמו, ו"הפעל" הריץ אותו שוב. |
 | `AppTitleBar` ציירה `WindowCaption` בכל פלטפורמה | זהו רכיב שמדמה את שורת הכותרת של Windows 11. במק הוא צויר בצד הלא נכון במקום שלושת הכפתורים העגולים של המערכת. עכשיו המערכת מציירת אותם (`windowButtonVisibility`), והשורה שומרת להם מקום בפינה השמאלית הפיזית. |
-| `MainFlutterWindow` לא נגע בגודל החלון | החלון נפתח בגודל ברירת המחדל של ה-XIB, קטן מהמינימום שה-Dart מבקש. עכשיו לפי `visibleFrame`, כמו שה-runner של ווינדוס עושה. |
+| `MainFlutterWindow` לא נגע בגודל החלון | החלון נפתח בגודל ברירת המחדל של ה-XIB, קטן מהמינימום שה-Dart מבקש. עכשיו 1000×720, ממורכז ב-`visibleFrame`, כמו שה-runner של ווינדוס עושה. |
 | התקנת אוצריא לא בדקה אם היא רצה | ב-macOS `unlink` על קובץ פתוח מצליח, ולכן החלפת החבילה השאירה אוצריא רצה בלי הקבצים שלה. עכשיו מסרבים ומבקשים לסגור — אותו שיקול שבגללו עדכון המסד בודק את שומר-התהליך שוב לפני ההחלפה. |
 | `Elevation.describe` נתנה את הנוסח של ווינדוס | "קליק ימני → הפעל כמנהל" היא עצה שאי אפשר לבצע במק. יש נוסח נפרד (`macHint`). |
 
@@ -904,17 +906,22 @@ flutter run -d windows
 lib/
 ├── main.dart                          — נקודת כניסה, data dir, MaterialApp (locale he-IL)
 └── src/
-    ├── theme/                         — פורט מ-otzaria/lib/theme/
-    │   ├── app_theme_data.dart        — createColorScheme + light/dark
-    │   ├── app_tokens.dart            — מרווחים, רדיוס 8, טיפוגרפיה
+    ├── theme/                         — שפת העיצוב של מסייע ההורדות
+    │   ├── app_theme_data.dart        — הערכה הבהירה היחידה מה-seed הקבוע
+    │   ├── app_palette.dart           — הצבעים שמחוץ ל-ColorScheme (ThemeExtension)
+    │   ├── app_tokens.dart            — מרווחים, רדיוס 8, מידות, סגנונות טקסט
     │   ├── app_surfaces.dart          — רקעים ושקיפויות (נקודת ה-override היחידה)
-    │   ├── app_colors.dart / app_seed_colors.dart / layout_tokens.dart
+    │   ├── app_colors.dart / layout_tokens.dart
     │   └── theme_exports.dart
-    ├── widgets/                       — פורט מ-otzaria/lib/widgets/
+    ├── widgets/                       — הרכיבים המשותפים (ראו "עיצוב")
     │   ├── action_buttons.dart, app_card.dart, app_dialogs.dart
     │   ├── settings_card.dart, segmented_control.dart, custom_switch.dart
     │   ├── nav_rail_item.dart, rtl_icon.dart, rtl_text_field.dart
     │   ├── status_chip.dart, info_rows.dart, screen_body.dart, ui_snack.dart
+    │   ├── app_title_bar.dart — שורת הכותרת וכפתורי החלון המצוירים
+    │   ├── icon_tile, section_label, rows_card, advanced_section, option_card
+    │   ├── result_badge, app_progress_bar, task_frame, sub_page_header
+    │   ├── empty_state, notice_banner, path_text — רכיבי שפת העיצוב
     │   └── widgets_exports.dart
     ├── settings/
     │   ├── app_settings.dart          — ההגדרות כ-immutable + JSON עם schemaVersion
@@ -955,8 +962,7 @@ lib/
         ├── faq/                       — הדרכת שאלות נפוצות (ראו למטה)
         │   ├── faq_content.dart             — הזוגות שאלה/תשובה, מקובצים
         │   ├── faq_dialog.dart              — האקורדיון + מצב העריכה
-        │   ├── faq_question_form.dart       — טופס שאלה שהמשתמש מוסיף
-        │   └── faq_floating_button.dart     — הכפתור הצף, ההבהוב והבועה
+        │   └── faq_question_form.dart       — טופס שאלה שהמשתמש מוסיף
         ├── store_kit/                 — רכיבים משותפים לשני מסכי החנות
         │   ├── store_body.dart              — גוף ברוחב מלא + סרגל צד
         │   ├── store_nav.dart               — סרגל קטגוריות / שורת צ'יפים

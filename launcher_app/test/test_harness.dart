@@ -28,15 +28,10 @@ Widget wrap(Widget child, {AppLanguage language = AppLanguage.hebrew}) =>
       locale: language == AppLanguage.hebrew
           ? const Locale('he', 'IL')
           : const Locale('en'),
-      theme: AppThemeData.light(
-        AppThemeData.createColorScheme(
-          AppSeedColors.defaultLight,
-          Brightness.light,
-        ),
-      ),
+      theme: AppThemeData.light(),
       builder: (context, navigator) => AppStringsScope(
         strings: AppL10n.stringsFor(language),
-        child: navigator ?? const SizedBox.shrink(),
+        child: TitleBarHost(child: navigator ?? const SizedBox.shrink()),
       ),
       home: child,
     );

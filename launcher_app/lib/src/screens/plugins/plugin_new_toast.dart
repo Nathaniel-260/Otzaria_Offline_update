@@ -43,7 +43,7 @@ class PluginNewToast extends StatelessWidget {
           ),
           child: Material(
             color: cs.primary,
-            elevation: 8,
+            elevation: 0,
             borderRadius: AppTokens.borderRadiusAll,
             child: Padding(
               padding: const EdgeInsetsDirectional.only(

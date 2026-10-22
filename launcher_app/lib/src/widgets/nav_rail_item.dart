@@ -114,6 +114,7 @@ class NavRailItem extends StatelessWidget {
               duration: AppTokens.animNormal,
               curve: Curves.easeInOutCubicEmphasized,
               style: TextStyle(
+                fontFamily: AppThemeData.fontFamily,
                 fontSize: 11,
                 color:
                     isSelected ? cs.onSecondaryContainer : cs.onSurfaceVariant,

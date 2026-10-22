@@ -103,6 +103,20 @@ abstract class ShellStrings {
   String get closeWhileInstallingPrompt;
   String get closeWhileInstallingConfirm;
   String get closeWhileBusyKeepGoing;
+
+  /// כלי שורת הכותרת וכפתורי החלון — תוויות נגישות ו-tooltip.
+  String get helpTooltip;
+  String get settingsTooltip;
+  String get windowMinimize;
+  String get windowMaximize;
+  String get windowRestore;
+  String get windowClose;
+
+  /// כפתור החזרה בראש דף משנה.
+  String get backTooltip;
+
+  /// "בית" בפירור הלחם של דף משנה.
+  String get breadcrumbHome;
 }
 
 // ── דף הבית ───────────────────────────────────────────────────────────────────
@@ -466,39 +480,6 @@ abstract class SettingsScreenStrings {
   String get languageSystem;
   String get languageHebrew;
   String get languageEnglish;
-  String get themeTitle;
-  String get themeSystem;
-  String get themeLight;
-  String get themeDark;
-
-  /// הכפתור הצף של השאלות הנפוצות בדף הבית.
-  String get showFaqTitle;
-  String get showFaqSubtitle;
-
-  // ── פלטת צבע הבסיס ──
-  // הבחירה חלה על הערכה המוצגת כרגע — בהירה או כהה — כמו באוצריא.
-  String get seedColorTitle;
-  String get seedColorButton;
-  String get seedColorDialogTitle;
-  String get seedColorResetButton;
-
-  /// כשהצבע השמור אינו אחד מצבעי הפלטה (קובץ הגדרות שנערך ביד).
-  String get seedColorCustom;
-
-  /// שמות הצבעים, בסדר שבו הם מוצגים בבורר.
-  String get colorRed;
-  String get colorOrange;
-  String get colorAmber;
-  String get colorGreen;
-  String get colorTeal;
-  String get colorBlue;
-  String get colorBlueGrey;
-  String get colorNavy;
-  String get colorPurple;
-  String get colorBrown;
-  String get colorParchment;
-  String get colorGrey;
-  String get colorDarkBrown;
 
   String get supportCardTitle;
   String get logTitle;
