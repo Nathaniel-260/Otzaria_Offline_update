@@ -1155,6 +1155,14 @@ class _Plugins extends PluginsStrings {
   @override
   String get filterStatusLabel => 'Status';
   @override
+  String get filterSortLabel => 'Sort';
+  @override
+  String get sortRecommended => 'Recommended';
+  @override
+  String get sortNewest => 'Newest';
+  @override
+  String get sortUpdated => 'Recently updated';
+  @override
   String get filterTagsLabel => 'Tags';
   @override
   String get filterAllTags => 'All tags';

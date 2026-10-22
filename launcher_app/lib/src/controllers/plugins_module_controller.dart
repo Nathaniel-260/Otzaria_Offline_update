@@ -32,6 +32,10 @@ typedef StoreAppOnlineAnswers = ({
 /// סינון לפי סטטוס התוסף בחנות (`stable` / `beta` / `experimental`).
 enum PluginStatusFilter { all, stable, beta, experimental }
 
+/// סדר "כל התוספים", כמו באתר: [recommended] הוא סדר הקטלוג (הנבחרים ואחריהם
+/// מהחדש לישן), [newest] לפי הפרסום הראשון ו-[updated] לפי תאריך ה"עודכן".
+enum PluginSortMode { recommended, newest, updated }
+
 /// שלושת המסכים של החנות באתר, במקום שלושת ה-routes שלה:
 /// `/plugins` (דף בית אצור), `/plugins/all` ו-`/plugins/category/<slug>`.
 enum PluginStorePage { home, all, category }
@@ -206,6 +210,7 @@ class PluginsModuleController extends ChangeNotifier
   /// החנות נפתחת על "הכול" — המשתמש בא לראות מה קיים, לא רק את היציב.
   PluginStatusFilter statusFilter = PluginStatusFilter.all;
   String? tagFilter;
+  PluginSortMode sortMode = PluginSortMode.recommended;
 
   /// הצג רק מה שלא מותקן או שיש לו עדכון — פועל כברירת מחדל, כמו בחנות
   /// המקורית: המשתמש בא לעדכן, לא לגלול על מה שכבר מותקן.
@@ -837,6 +842,13 @@ class PluginsModuleController extends ChangeNotifier
     notifyListeners();
   }
 
+  void setSortMode(PluginSortMode value) {
+    if (sortMode == value) return;
+    sortMode = value;
+    _invalidateDerived();
+    notifyListeners();
+  }
+
   void setHideInstalled(bool value) {
     if (hideInstalled == value) return;
     hideInstalled = value;
@@ -874,8 +886,10 @@ class PluginsModuleController extends ChangeNotifier
   bool _passesInstalledFilter(StorePlugin plugin) =>
       !hideInstalled || statusOf(plugin) != PluginInstallStatus.upToDate;
 
-  /// "כל התוספים" — חיפוש, סטטוס ותגית, מעל מתג ההתקנה.
-  List<StorePlugin> get filtered => _filtered ??= plugins.where((plugin) {
+  /// "כל התוספים" — חיפוש, סטטוס ותגית, מעל מתג ההתקנה, בסדר של [sortMode].
+  List<StorePlugin> get filtered => _filtered ??= _sorted(_matching());
+
+  List<StorePlugin> _matching() => plugins.where((plugin) {
         if (!plugin.matchesQuery(search)) return false;
         if (statusFilter != PluginStatusFilter.all &&
             plugin.status != statusFilter.name) {
@@ -884,6 +898,23 @@ class PluginsModuleController extends ChangeNotifier
         if (tagFilter != null && !plugin.tags.contains(tagFilter)) return false;
         return _passesInstalledFilter(plugin);
       }).toList(growable: false);
+
+  /// מיון יורד לפי תאריך; תוסף בלי תאריך (קטלוג ישן) בסוף. שוויון שומר על
+  /// סדר הקטלוג — `sort` של Dart אינו יציב, ולכן האינדקס משמש שובר שוויון.
+  List<StorePlugin> _sorted(List<StorePlugin> list) {
+    final String Function(StorePlugin)? key = switch (sortMode) {
+      PluginSortMode.recommended => null,
+      PluginSortMode.newest => (p) => p.publishedAt,
+      PluginSortMode.updated => (p) => p.displayUpdatedDate,
+    };
+    if (key == null) return list;
+    final indexed = [for (var i = 0; i < list.length; i++) (i, list[i])]
+      ..sort((a, b) {
+        final byDate = key(b.$2).compareTo(key(a.$2));
+        return byDate != 0 ? byDate : a.$1.compareTo(b.$1);
+      });
+    return [for (final entry in indexed) entry.$2];
+  }
 
   Map<String, StorePlugin> get _pluginsById =>
       _byId ??= {for (final plugin in plugins.reversed) plugin.id: plugin};

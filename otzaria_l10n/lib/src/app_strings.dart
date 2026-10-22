@@ -666,6 +666,10 @@ abstract class PluginsStrings {
   String get filterSearchLabel;
   String get filterSearchHint;
   String get filterStatusLabel;
+  String get filterSortLabel;
+  String get sortRecommended;
+  String get sortNewest;
+  String get sortUpdated;
   String get filterTagsLabel;
   String get filterAllTags;
   String get filterStatusAll;
