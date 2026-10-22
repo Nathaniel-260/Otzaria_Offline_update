@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import 'package:http/http.dart' as http;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
@@ -99,6 +101,7 @@ class LibraryManager {
     OtzariaProcessGuard processGuard = const OtzariaProcessGuard(),
     RecentLibraryReleasesClient? releaseClient,
     LibraryUpdateApplier? applier,
+    this.semanticEngineFactory,
   }) : _stateStore = LibraryStateStore(
          p.join(stateDir ?? dataDir, LibraryStateStore.fileName),
          dataDir: dataDir,
@@ -164,6 +167,9 @@ class LibraryManager {
   final RecentLibraryReleasesClient _cloudClient;
 
   final LibraryUpdateApplier _applier;
+
+  /// Replaces the native engine of the smart-search install, for tests.
+  final SemanticEngineFactory? semanticEngineFactory;
 
   /// הקבצים הנלווים לספרייה (תלמוד, קטלוג, מילון). אוצריא מרעננת אותם
   /// **מהרשת** בכל עדכון ספרייה; כאן הם נוסעים במראה ומותקנים אופליין.
@@ -400,9 +406,15 @@ class LibraryManager {
             AppL10n.strings.libraryDomain.companionsMirrorMissing,
           );
         }
+        final releases = _cloudClient.lastFetchedReleases ?? const [];
         await semantic.sync(
           mirrorDir: semanticMirrorDir,
           libraryTag: tag,
+          // The online machine's Otzaria fetches its vectors itself.
+          fleet: SemanticFleet(
+            await _stateStore.liveSemanticStates(excludeOwn: true),
+          ),
+          libraryTagFor: (version) => _libraryTagFor(releases, version),
           onStage: onStage,
           onBytesProgress: semanticBytes.report,
           isCancelled: isCancelled,
@@ -542,10 +554,27 @@ class LibraryManager {
       return await semantic.peekPending(
         mirrorDir: semanticMirrorDir,
         libraryTag: tag,
+        // The online machine's Otzaria fetches its vectors itself.
+        fleet: SemanticFleet(
+          await _stateStore.liveSemanticStates(excludeOwn: true),
+        ),
       );
     } finally {
       semantic.dispose();
     }
+  }
+
+  static final _libraryTagPattern = RegExp(r'^v(\d+)-');
+
+  static String? _libraryTagFor(List<LibraryRelease> releases, int version) {
+    for (final release in releases) {
+      if (release.isDraft) continue;
+      final match = _libraryTagPattern.firstMatch(release.tag);
+      if (match != null && int.parse(match.group(1)!) == version) {
+        return release.tag;
+      }
+    }
+    return null;
   }
 
   Future<int?> peekLatestOnlineVersion() async {
@@ -670,6 +699,7 @@ class LibraryManager {
         : limitedPlan;
 
     final settings = await _semanticSettings(locator);
+    final supportsWindows = await _supportsWindowsVectors(locator);
     final semantic = SemanticSearchAssets();
     final bool semanticPending;
     try {
@@ -681,9 +711,18 @@ class LibraryManager {
             : plan.finalTargetVersion ?? local.dbVersion,
         vectorsRootPath: _semanticVectorsRoot(settings, dbPath),
         preferencesReady: settings?.semanticSearchReadyPreferences ?? false,
+        supportsWindows: supportsWindows,
+        needsBase: await _ownNeedsBase(),
       );
     } finally {
       semantic.dispose();
+    }
+    if (!isFreshInstall) {
+      await _recordSemanticState(
+        dbPath: dbPath,
+        settings: settings,
+        supportsWindows: supportsWindows,
+      );
     }
     return LibraryUpdateCheckResult(
       dbPath: dbPath,
@@ -701,6 +740,82 @@ class LibraryManager {
       readableDbSchemaVersion: readableSchema,
       needsNewerOtzaria: !identical(plan, limitedPlan),
     );
+  }
+
+  /// A failed chain sets it; only a base install or a changed set clears it.
+  @visibleForTesting
+  static bool nextNeedsBase({
+    required SemanticMachineState? previous,
+    required int libraryVersion,
+    required String identityDigest,
+    bool chainFailed = false,
+    bool baseInstalled = false,
+  }) =>
+      chainFailed ||
+      (!baseInstalled &&
+          previous != null &&
+          previous.needsBase &&
+          previous.libraryVersion == libraryVersion &&
+          previous.identityDigest == identityDigest);
+
+  Future<bool> _ownNeedsBase() async =>
+      (await _stateStore.loadOwnSemanticState())?.needsBase ?? false;
+
+  Future<bool> _supportsWindowsVectors(LibraryDbLocator locator) async {
+    final launch = await locator.otzariaLaunchPath?.call();
+    final root = await locator.otzariaSettingsRoot(launch);
+    return OtzariaCapabilities.supportsWindowsVectors(
+      capabilities: root == null ? null : await OtzariaCapabilities.read(root),
+      launchPath: launch,
+      installedVersion: await _otzariaAppVersion?.call(),
+    );
+  }
+
+  /// Records this machine's smart-search set for the next download's plan;
+  /// only a machine that installs it from the drive (consent given) counts.
+  Future<void> _recordSemanticState({
+    required String dbPath,
+    required OtzariaSettings? settings,
+    required bool supportsWindows,
+    bool chainFailed = false,
+    bool baseInstalled = false,
+  }) async {
+    try {
+      if (settings == null) return;
+      if (!settings.searchFeedbackGranted) {
+        await _stateStore.recordOwnSemanticState(null);
+        return;
+      }
+      final live = (await SemanticSearchAssets.readInstalledSets(
+        p.join(_semanticVectorsRoot(settings, dbPath), 'vectors'),
+      )).firstOrNull;
+      final family = live == null
+          ? null
+          : live.windows
+          ? SemanticVectorsFamily.windows
+          : SemanticVectorsFamily.legacy;
+      final version = live?.libraryVersion ?? 0;
+      final identity = live?.identityDigest ?? '';
+      final previous = await _stateStore.loadOwnSemanticState();
+      final needsBase = nextNeedsBase(
+        previous: previous,
+        libraryVersion: version,
+        identityDigest: identity,
+        chainFailed: chainFailed,
+        baseInstalled: baseInstalled,
+      );
+      await _stateStore.recordOwnSemanticState(
+        SemanticMachineState(
+          supportsWindows: supportsWindows,
+          family: family,
+          libraryVersion: version,
+          identityDigest: identity,
+          needsBase: needsBase,
+        ),
+      );
+    } on Exception {
+      // Best effort: a failed record must not fail the check or the install.
+    }
   }
 
   Future<int?> _readableDbSchema(LibraryDbLocator locator) async {
@@ -1007,23 +1122,42 @@ class LibraryManager {
           );
         }
         await _throwIfOtzariaRunning();
-        final semantic = SemanticSearchAssets();
+        final semantic = SemanticSearchAssets(
+          engineFactory: semanticEngineFactory,
+        );
+        final supportsWindows = await _supportsWindowsVectors(_locator);
+        var chainFailed = false;
+        var baseInstalled = false;
         try {
           final version = await _versionReader.readInIsolate(dbPath);
-          await semantic.install(
-            mirrorDir: semanticMirrorDir,
-            dbPath: dbPath,
-            libraryVersion: version.dbVersion,
-            vectorsRootPath: _semanticVectorsRoot(settings, dbPath),
-            beforeActivate: _throwIfOtzariaRunning,
-            onStage: (stage) => onProgress?.call(
-              LibraryApplyProgress(
-                stage: LibraryApplyStage.installingCompanions,
-                statusText: stage,
+          try {
+            baseInstalled = await semantic.install(
+              mirrorDir: semanticMirrorDir,
+              dbPath: dbPath,
+              libraryVersion: version.dbVersion,
+              vectorsRootPath: _semanticVectorsRoot(settings, dbPath),
+              supportsWindows: supportsWindows,
+              beforeActivate: _throwIfOtzariaRunning,
+              onStage: (stage) => onProgress?.call(
+                LibraryApplyProgress(
+                  stage: LibraryApplyStage.installingCompanions,
+                  statusText: stage,
+                ),
               ),
-            ),
-            isCancelled: isCancelled,
-          );
+              isCancelled: isCancelled,
+            );
+          } on SemanticChainNotApplicableException {
+            chainFailed = true;
+            rethrow;
+          } finally {
+            await _recordSemanticState(
+              dbPath: dbPath,
+              settings: settings,
+              supportsWindows: supportsWindows,
+              chainFailed: chainFailed,
+              baseInstalled: baseInstalled,
+            );
+          }
           await _throwIfOtzariaRunning();
           final launch = await _locator.otzariaLaunchPath?.call();
           final root = await _locator.otzariaSettingsRoot(launch);

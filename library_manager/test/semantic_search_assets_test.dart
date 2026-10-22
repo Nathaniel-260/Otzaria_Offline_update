@@ -10,6 +10,8 @@ import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 import 'package:test/test.dart';
 
+import 'support/native_engine.dart';
+
 const tag = 'v30-20260930165019';
 const manifestName = 'otzaria-vectors-test-v30-base.manifest.json';
 
@@ -646,7 +648,7 @@ void main() {
       );
       final direct = SemanticSearchAssets(
         nativeLibrary: ExternalLibrary.open(
-          p.join(modelFixture!, 'search_engine.dll'),
+          hookEngineLibrary() ?? p.join(modelFixture!, 'search_engine.dll'),
         ),
       );
       try {
@@ -738,7 +740,7 @@ void main() {
       );
       final direct = SemanticSearchAssets(
         nativeLibrary: ExternalLibrary.open(
-          p.join(modelFixture!, 'search_engine.dll'),
+          hookEngineLibrary() ?? p.join(modelFixture!, 'search_engine.dll'),
         ),
       );
       var activationChecks = 0;
@@ -1661,7 +1663,7 @@ void main() {
       var vectorChecks = 0;
       final installer = SemanticSearchAssets(
         nativeLibrary: ExternalLibrary.open(
-          p.join(modelFixture!, 'search_engine.dll'),
+          hookEngineLibrary() ?? p.join(modelFixture!, 'search_engine.dll'),
         ),
         freeBytesFor: (path) {
           if (path != vectorsDir) return 1 << 40;

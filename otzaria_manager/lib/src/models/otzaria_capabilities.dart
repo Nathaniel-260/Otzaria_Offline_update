@@ -18,6 +18,7 @@ class OtzariaCapabilities {
     this.libraryDbPath,
     this.reportsQueueFormat,
     this.pluginInstallResults,
+    this.semanticVectorFamilies,
     this.writtenAt,
   });
 
@@ -44,6 +45,9 @@ class OtzariaCapabilities {
   final String? libraryDbPath;
   final int? reportsQueueFormat;
   final int? pluginInstallResults;
+
+  /// Vector release-tag prefixes Otzaria installs, preferred first.
+  final List<String>? semanticVectorFamilies;
   final DateTime? writtenAt;
 
   static OtzariaCapabilities? fromJson(Object? json) {
@@ -71,8 +75,42 @@ class OtzariaCapabilities {
       libraryDbPath: text('libraryDbPath'),
       reportsQueueFormat: field<int>('reportsQueueFormat'),
       pluginInstallResults: field<int>('pluginInstallResults'),
+      semanticVectorFamilies: _strings(json['semanticVectorFamilies']),
       writtenAt: writtenAt == null ? null : DateTime.tryParse(writtenAt),
     );
+  }
+
+  static List<String>? _strings(Object? value) => value is List
+      ? [
+          for (final item in value)
+            if (item is String && item.isNotEmpty) item,
+        ]
+      : null;
+
+  static const String windowsVectorFamily = 'vectors-windows';
+
+  /// Whether the Otzaria at [launchPath] installs windows-family vectors.
+  /// A record written by another exe proves nothing, as for the DB schema.
+  static bool supportsWindowsVectors({
+    OtzariaCapabilities? capabilities,
+    String? launchPath,
+    String? installedVersion,
+  }) {
+    if (capabilities == null) return false;
+    final writtenBy = capabilities.appVersion;
+    // A downgrade into the same folder leaves the newer app's file behind.
+    if (writtenBy != null &&
+        installedVersion != null &&
+        compareAppVersions(installedVersion, writtenBy) < 0) {
+      return false;
+    }
+    if (capabilities.exePath != null &&
+        launchPath != null &&
+        !capabilities.describesExe(launchPath)) {
+      return false;
+    }
+    return capabilities.semanticVectorFamilies?.contains(windowsVectorFamily) ??
+        false;
   }
 
   static OtzariaCapabilities? _parse(List<int> bytes) =>

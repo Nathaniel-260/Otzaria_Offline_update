@@ -7,12 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:library_manager/library_manager.dart';
+import 'package:library_manager/src/services/semantic_search_assets.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'support/db_fixtures.dart';
+import 'support/semantic_fixtures.dart';
 import 'support/zstd_fixtures.dart';
 
 /// ה-landmine המרכזי של החבילה: **אין נפילה לרשת**. `checkForUpdate` ו-
@@ -1398,6 +1401,106 @@ void main() {
       );
       expect(reader.reads, isNotEmpty);
       expect(reader.reads.values, everyElement(1));
+    });
+
+    test('a set off the drive\'s delta chain is left alone, reported and '
+        'recorded as needing a base', () async {
+      if (await const OtzariaProcessGuard().isAnyRunning(
+        OtzariaProcessGuard.processNamesFor(Platform.operatingSystem),
+      )) {
+        markTestSkipped('אוצריא פתוחה — ההחלה נחסמת בכוונה');
+        return;
+      }
+      final dbPath = await installExistingDb(30, appliedTag: 'v30');
+      final semanticMirror = p.join(dataDir, 'mirror', 'semantic');
+      final github = FakeVectorsGithub()
+        ..windowsBase(30)
+        ..delta(28, 29)
+        ..delta(29, 30);
+      addTearDown(github.client.close);
+      final online = SemanticSearchAssets(
+        httpClient: github.client,
+        models: fakeModels,
+      );
+      addTearDown(online.dispose);
+      await online.sync(
+        mirrorDir: semanticMirror,
+        libraryTag: libraryTagOf(30),
+        fleet: const SemanticFleet([
+          SemanticMachineState(
+            supportsWindows: true,
+            family: SemanticVectorsFamily.windows,
+            libraryVersion: 28,
+            identityDigest: identityA,
+          ),
+        ]),
+        libraryTagFor: libraryTagOf,
+      );
+      for (final model in SemanticSearchAssets.modelFiles) {
+        final file = File(
+          p.join(
+            semanticMirror,
+            libraryTagOf(30),
+            SemanticSearchAssets.modelFolder,
+            model.name,
+          ),
+        );
+        final handle = await file.open(mode: FileMode.write);
+        await handle.truncate(model.size);
+        await handle.close();
+      }
+      final capabilities = File(
+        p.join(
+          hermeticEnvironment()['HOME']!,
+          '.local',
+          'share',
+          'otzaria',
+          OtzariaCapabilities.fileName,
+        ),
+      );
+      await capabilities.parent.create(recursive: true);
+      await capabilities.writeAsString(
+        '{"semanticVectorFamilies":["vectors-windows","vectors"]}',
+      );
+      final vectors = p.join(tempDir.path, 'vectors');
+      await writeInstalledSet(vectors, version: 26);
+      final engine = FakeVectorsEngine(version: 26);
+      final warnings = <Object>[];
+
+      await _withoutNetwork((_) async {
+        final manager = LibraryManager(
+          dataDir: dataDir,
+          operatingSystem: 'linux',
+          environment: hermeticEnvironment(),
+          settingsReader: _CountingSettingsReader(
+            settings: const OtzariaSettings(
+              searchFeedbackConsent: 'granted',
+              searchFeedbackConsentVersion: 1,
+            ),
+          ),
+          semanticEngineFactory: (_) async => engine,
+        );
+        addTearDown(manager.dispose);
+        await manager.applyUpdate(
+          LibraryUpdateCheckResult(
+            dbPath: dbPath,
+            semanticPending: true,
+            semanticConsentGranted: true,
+          ),
+          onCompanionWarning: (_, error) => warnings.add(error),
+        );
+      });
+
+      expect(warnings, [isA<SemanticChainNotApplicableException>()]);
+      expect(engine.installs, isEmpty);
+      final state = await LibraryStateStore(
+        p.join(dataDir, LibraryStateStore.fileName),
+      ).loadOwnSemanticState();
+      expect(state?.needsBase, isTrue);
+      expect(state?.supportsWindows, isTrue);
+      expect(state?.family, SemanticVectorsFamily.windows);
+      expect(state?.libraryVersion, 26);
+      expect(state?.identityDigest, identityA);
     });
   });
 
