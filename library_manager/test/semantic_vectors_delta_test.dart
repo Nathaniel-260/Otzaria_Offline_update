@@ -151,6 +151,84 @@ void main() {
   });
 
   group('online plan', () {
+    test(
+      'a mixed fleet mirrors a legacy base and a windows chain independently',
+      () async {
+        github
+          ..legacyBase(30)
+          ..windowsBase(30)
+          ..delta(29, 30);
+        final fleet = SemanticFleet([
+          windowsAt(29),
+          const SemanticMachineState(
+            supportsWindows: false,
+            family: SemanticVectorsFamily.legacy,
+            libraryVersion: 20,
+          ),
+        ]);
+        await sync(fleet);
+        final meta = await metadata();
+        expect(meta['manifestName'], legacyManifestName(30));
+        expect(meta['windows']['kind'], 'chain');
+        expect(meta['windows']['steps'], hasLength(1));
+        expect(await mirroredVectors(), {
+          legacyManifestName(30),
+          'legacy-v30.oxv.zst',
+          deltaManifestName(29, 30),
+          deltaSegmentName(29, 30),
+        });
+        final assets = SemanticSearchAssets(
+          httpClient: github.client,
+          models: fakeModels,
+        );
+        addTearDown(assets.dispose);
+        Future<bool> peek() => assets.peekPending(
+          mirrorDir: mirror,
+          libraryTag: libraryTagOf(30),
+          fleet: fleet,
+        );
+        expect(await peek(), isFalse);
+        await File(
+          p.join(mirror, libraryTagOf(30), 'vectors', deltaSegmentName(29, 30)),
+        ).delete();
+        expect(await peek(), isTrue);
+        await sync(fleet);
+        expect(await peek(), isFalse);
+        await File(
+          p.join(mirror, libraryTagOf(30), 'vectors', 'legacy-v30.oxv.zst'),
+        ).delete();
+        expect(await peek(), isTrue);
+      },
+    );
+
+    test(
+      'a mixed mirror prunes only the family that leaves the fleet',
+      () async {
+        github
+          ..legacyBase(30)
+          ..windowsBase(30)
+          ..delta(29, 30);
+        final fleet = SemanticFleet([
+          windowsAt(29),
+          const SemanticMachineState(supportsWindows: false, family: null),
+        ]);
+        await sync(fleet);
+        await sync(SemanticFleet([windowsAt(29)]));
+        expect((await metadata())['family'], 'windows');
+        expect(await mirroredVectors(), {
+          deltaManifestName(29, 30),
+          deltaSegmentName(29, 30),
+        });
+        await sync(fleet);
+        await sync(const SemanticFleet());
+        expect((await metadata()).containsKey('windows'), isFalse);
+        expect(await mirroredVectors(), {
+          legacyManifestName(30),
+          'legacy-v30.oxv.zst',
+        });
+      },
+    );
+
     test('a found chain puts only the deltas in the mirror', () async {
       github
         ..windowsBase(30)
@@ -551,6 +629,66 @@ void main() {
           (jsonDecode(input.manifestJson) as Map)['toLibraryVersion'] as int,
         ),
     ];
+
+    test(
+      'cancellation before compaction leaves the applied steps and stops',
+      () async {
+        await chainMirror();
+        await writeInstalledSet(vectors, version: 29);
+        engine = FakeVectorsEngine(version: 29);
+        final assets = offline();
+        addTearDown(assets.dispose);
+        var cancelled = false;
+        await expectLater(
+          assets.install(
+            mirrorDir: mirror,
+            dbPath: db,
+            libraryVersion: 30,
+            supportsWindows: true,
+            beforeActivate: () async {
+              if (engine.installs.isNotEmpty) cancelled = true;
+            },
+            isCancelled: () => cancelled,
+          ),
+          throwsA(isA<PatchDownloadCancelled>()),
+        );
+        expect(engine.version, 30);
+        expect(engine.compactions, isEmpty);
+        expect(engine.disposed, isTrue);
+      },
+    );
+
+    test('a chain compacts once after its last step', () async {
+      await chainMirror();
+      await writeInstalledSet(vectors, version: 27);
+      engine = FakeVectorsEngine(version: 27);
+      await install();
+      expect(engine.compactions, [vectors]);
+      expect(engine.compactedVersion, 30);
+      expect(engine.disposed, isTrue);
+    });
+
+    test('a retried chain also compacts an already updated set', () async {
+      await chainMirror();
+      await writeInstalledSet(vectors, version: 30);
+      engine = FakeVectorsEngine(version: 30);
+      await install();
+      expect(engine.installs, isEmpty);
+      expect(engine.compactions, [vectors]);
+    });
+
+    test('a compaction failure is reported and disposes the engine', () async {
+      await chainMirror();
+      await writeInstalledSet(vectors, version: 29);
+      const error = SemanticError(
+        kind: SemanticErrorKind.insufficientDiskSpace,
+        message: 'compaction needs space',
+      );
+      engine = FakeVectorsEngine(version: 29)..compactionError = error;
+      await expectLater(install(), throwsA(same(error)));
+      expect(engine.version, 30);
+      expect(engine.disposed, isTrue);
+    });
 
     for (final (installed, expected) in [
       (27, [(27, 28), (28, 29), (29, 30)]),

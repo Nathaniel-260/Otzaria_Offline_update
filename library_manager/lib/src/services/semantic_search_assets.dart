@@ -61,6 +61,8 @@ abstract interface class SemanticVectorsEngine {
     bool Function()? isCancelled,
   });
 
+  Future<void> compact(String vectorsDir, {bool Function()? isCancelled});
+
   void dispose();
 }
 
@@ -688,6 +690,17 @@ class SemanticSearchAssets {
     required String libraryTag,
     SemanticFleet fleet = const SemanticFleet(),
   }) async {
+    for (final group in fleet.groups) {
+      if (await _peekPending(mirrorDir, libraryTag, group)) return true;
+    }
+    return false;
+  }
+
+  Future<bool> _peekPending(
+    String mirrorDir,
+    String libraryTag,
+    SemanticFleet fleet,
+  ) async {
     final version = _version(libraryTag);
     if (fleet.family == SemanticVectorsFamily.windows) {
       final release = await _windowsRelease(libraryTag);
@@ -735,7 +748,7 @@ class SemanticSearchAssets {
     _Release release,
     SemanticFleet fleet,
   ) async {
-    final local = await _load(mirrorDir, version);
+    final local = await _load(mirrorDir, version, preferWindows: true);
     final meta = local?.meta;
     if (local == null ||
         meta == null ||
@@ -768,16 +781,27 @@ class SemanticSearchAssets {
     _cancel(isCancelled);
     final version = _version(libraryTag);
     onStage?.call(AppL10n.strings.libraryDomain.semanticDownloading);
-    final plan = await _plan(
-      libraryTag,
-      version,
-      fleet,
-      libraryTagFor ?? (_) => null,
-      isCancelled,
-    );
-    _cancel(isCancelled);
-    if (plan == null) {
-      _httpFailure(HttpStatus.notFound);
+    final plans = <SemanticVectorsFamily, _Meta>{};
+    final remotes = <String, _Remote>{};
+    for (final group in fleet.groups) {
+      final plan = await _plan(
+        libraryTag,
+        version,
+        group,
+        libraryTagFor ?? (_) => null,
+        isCancelled,
+      );
+      _cancel(isCancelled);
+      if (plan == null) _httpFailure(HttpStatus.notFound);
+      plans[plan.meta.family] = plan.meta;
+      for (final remote in plan.remotes) {
+        remotes[remote.releaseTag] = remote;
+      }
+    }
+    final metadata = plans.values.first.toJson();
+    // Older launchers must still find the legacy fields at the top level.
+    if (plans.length > 1) {
+      metadata['windows'] = plans[SemanticVectorsFamily.windows]!.toJson();
     }
     final generation = p.join(mirrorDir, libraryTag);
     final reused = <String, String>{};
@@ -796,7 +820,7 @@ class SemanticSearchAssets {
           file.name == 'tokenizer.json' ? tokenizerZip : file,
     ];
     final vectorFiles = [
-      for (final remote in plan.remotes)
+      for (final remote in remotes.values)
         for (final file in remote.files)
           (file: file, url: remote.urls[file.name]!),
     ];
@@ -860,7 +884,7 @@ class SemanticSearchAssets {
             }
           },
       ]);
-      for (final remote in plan.remotes) {
+      for (final remote in remotes.values) {
         _cancel(isCancelled);
         await File(
           p.join(generation, 'vectors', remote.manifestName),
@@ -869,11 +893,11 @@ class SemanticSearchAssets {
       _cancel(isCancelled);
       await writeStringAtomically(
         p.join(mirrorDir, manifestFileName),
-        jsonEncode(plan.meta.toJson()),
+        jsonEncode(metadata),
       );
       await pruneOldGenerations(mirrorDir, libraryTag);
       await _pruneUnplanned(p.join(generation, 'vectors'), {
-        for (final remote in plan.remotes) ...[
+        for (final remote in remotes.values) ...[
           remote.manifestName,
           for (final file in remote.files) file.name,
         ],
@@ -1108,15 +1132,28 @@ class SemanticSearchAssets {
       ? int.tryParse(_libraryTag.firstMatch(tag)?.group(1) ?? '')
       : null;
 
-  Future<_Meta?> _metadata(String mirrorDir) async {
+  Future<_Meta?> _metadata(
+    String mirrorDir, {
+    bool preferWindows = false,
+  }) async {
     try {
-      final value = jsonDecode(
+      var value = jsonDecode(
         await File(p.join(mirrorDir, manifestFileName)).readAsString(),
       );
       if (value is! Map<String, dynamic> ||
           value['libraryVersion'] is! int ||
           _tagVersion(value['libraryTag']) != value['libraryVersion']) {
         return null;
+      }
+      if (preferWindows && value.containsKey('windows')) {
+        final windows = value['windows'];
+        if (windows is! Map<String, dynamic> ||
+            windows['family'] != SemanticVectorsFamily.windows.id ||
+            windows['libraryTag'] != value['libraryTag'] ||
+            windows['libraryVersion'] != value['libraryVersion']) {
+          return null;
+        }
+        value = windows;
       }
       final tag = value['libraryTag'] as String;
       final version = value['libraryVersion'] as int;
@@ -1248,9 +1285,10 @@ class SemanticSearchAssets {
 
   Future<({_Meta meta, List<_LoadedUnit> units})?> _load(
     String mirrorDir,
-    int version,
-  ) async {
-    final meta = await _metadata(mirrorDir);
+    int version, {
+    bool preferWindows = false,
+  }) async {
+    final meta = await _metadata(mirrorDir, preferWindows: preferWindows);
     if (meta == null || meta.libraryVersion != version) return null;
     final generation = p.join(mirrorDir, meta.libraryTag);
     try {
@@ -1306,7 +1344,11 @@ class SemanticSearchAssets {
     bool supportsWindows = false,
     bool needsBase = false,
   }) async {
-    final data = await _load(mirrorDir, libraryVersion);
+    final data = await _load(
+      mirrorDir,
+      libraryVersion,
+      preferWindows: supportsWindows,
+    );
     if (data == null) return false;
     final meta = data.meta;
     if (meta.windows && !supportsWindows) return false;
@@ -1548,7 +1590,11 @@ class SemanticSearchAssets {
     bool Function()? isCancelled,
   }) async {
     _cancel(isCancelled);
-    final data = await _load(mirrorDir, libraryVersion);
+    final data = await _load(
+      mirrorDir,
+      libraryVersion,
+      preferWindows: supportsWindows,
+    );
     if (data == null || (data.meta.windows && !supportsWindows)) {
       _invalid();
     }
@@ -1687,6 +1733,11 @@ class SemanticSearchAssets {
           _invalid();
         }
       }
+      if (meta.chain) {
+        await beforeActivate?.call();
+        _cancel(isCancelled);
+        await engine.compact(vectorsDir, isCancelled: isCancelled);
+      }
       return !meta.chain;
     } finally {
       engine?.dispose();
@@ -1740,11 +1791,7 @@ class _NativeVectorsEngine implements SemanticVectorsEngine {
     SemanticVectorsInstallInput input, {
     bool Function()? isCancelled,
   }) async {
-    final token = SemanticCancellationToken();
-    final poll = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (isCancelled?.call() ?? false) token.cancel();
-    });
-    try {
+    return _withCancellation(isCancelled, (token) async {
       final report = await _engine.installSemanticVectors(
         input: input,
         cancellation: token,
@@ -1753,6 +1800,29 @@ class _NativeVectorsEngine implements SemanticVectorsEngine {
         libraryVersion: report.libraryVersion,
         alreadyApplied: report.alreadyApplied,
       );
+    });
+  }
+
+  @override
+  Future<void> compact(String vectorsDir, {bool Function()? isCancelled}) =>
+      _withCancellation(isCancelled, (token) async {
+        await _engine.compactSemanticVectors(
+          vectorsDir: vectorsDir,
+          cancellation: token,
+        );
+      });
+
+  Future<T> _withCancellation<T>(
+    bool Function()? isCancelled,
+    Future<T> Function(SemanticCancellationToken) operation,
+  ) async {
+    final token = SemanticCancellationToken();
+    final poll = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (isCancelled?.call() ?? false) token.cancel();
+    });
+    try {
+      if (isCancelled?.call() ?? false) token.cancel();
+      return await operation(token);
     } on SemanticError catch (error) {
       if (error.kind == SemanticErrorKind.cancelled) {
         throw const PatchDownloadCancelled();

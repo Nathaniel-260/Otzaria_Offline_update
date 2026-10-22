@@ -781,7 +781,8 @@ class LibraryManager {
     bool baseInstalled = false,
   }) async {
     try {
-      if (!(settings?.searchFeedbackGranted ?? false)) {
+      if (settings == null) return;
+      if (!settings.searchFeedbackGranted) {
         await _stateStore.recordOwnSemanticState(null);
         return;
       }

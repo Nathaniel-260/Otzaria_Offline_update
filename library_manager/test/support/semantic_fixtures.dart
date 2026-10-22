@@ -308,6 +308,23 @@ class FakeVectorsEngine implements SemanticVectorsEngine {
   final void Function(SemanticVectorsInstallInput input)? onInstall;
   final installs = <SemanticVectorsInstallInput>[];
   bool disposed = false;
+  final compactions = <String>[];
+  int? compactedVersion;
+  Object? compactionError;
+
+  @override
+  Future<void> compact(
+    String vectorsDir, {
+    bool Function()? isCancelled,
+  }) async {
+    if (isCancelled?.call() ?? false) {
+      throw StateError('compaction called after cancellation');
+    }
+    compactions.add(vectorsDir);
+    compactedVersion = version;
+    final failure = compactionError;
+    if (failure != null) throw failure;
+  }
 
   @override
   Future<SemanticEngineInfo> info(String vectorsDir) async {

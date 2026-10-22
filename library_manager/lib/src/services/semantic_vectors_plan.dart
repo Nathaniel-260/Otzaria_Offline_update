@@ -110,6 +110,18 @@ class SemanticFleet {
       ? SemanticVectorsFamily.windows
       : SemanticVectorsFamily.legacy;
 
+  /// Each family serves its own machines; an unknown fleet keeps legacy.
+  List<SemanticFleet> get groups {
+    if (machines.isEmpty || machines.every((m) => m.supportsWindows)) {
+      return [this];
+    }
+    return [
+      SemanticFleet(machines.where((m) => !m.supportsWindows).toList()),
+      if (machines.any((m) => m.supportsWindows))
+        SemanticFleet(machines.where((m) => m.supportsWindows).toList()),
+    ];
+  }
+
   /// The lowest installed version when every machine holds a windows set of
   /// [identityDigest] that a chain may continue; otherwise `null` (base).
   int? chainStartFor(String identityDigest) {
