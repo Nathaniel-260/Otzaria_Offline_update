@@ -33,6 +33,7 @@ class HomeActions {
     this.onDismissElevation = _noop,
     this.onReviewLauncherUpdate = _noop,
     this.onInstallLauncherUpdate = _noop,
+    this.onShowProgress = _noop,
   });
 
   final VoidCallback onInstallHere;
@@ -51,6 +52,9 @@ class HomeActions {
   final VoidCallback onDismissElevation;
   final VoidCallback onReviewLauncherUpdate;
   final VoidCallback onInstallLauncherUpdate;
+
+  /// "הצג התקדמות" בגיבור של משימה רצה — מסך המשימה או הדף שבו היא רצה.
+  final VoidCallback onShowProgress;
 }
 
 /// דף הבית: הודעות, הגיבור ("מה לעשות עכשיו"), אריחים ושורת תחתית. בכונן
@@ -623,6 +627,11 @@ class _Hero extends StatelessWidget {
           notes: const [],
         );
       case GuidancePrimary.taskInProgress:
+        Widget showProgress() => ActionButton.recommended(
+              key: ShellKeys.heroShowProgress,
+              text: context.strings.task.showProgress,
+              onPressed: actions.onShowProgress,
+            );
         return switch (m.task) {
           HomeTask.downloading => (
               title: g.taskDownloadingTitle,
@@ -630,6 +639,7 @@ class _Hero extends StatelessWidget {
               pills: _downloadPills(context),
               // הביטול עצמו נשאל בדו-שיח (`confirmCancelDownload`).
               actions: [
+                showProgress(),
                 ActionButton.neutral(
                   key: ShellKeys.heroCancel,
                   text: m.cancellingDownload
@@ -645,14 +655,14 @@ class _Hero extends StatelessWidget {
               title: g.taskInstallingAppTitle,
               body: null,
               pills: const [],
-              actions: const [],
+              actions: [showProgress()],
               notes: const [],
             ),
           HomeTask.updatingLibrary => (
               title: g.taskUpdatingLibraryTitle,
               body: null,
               pills: const [],
-              actions: const [],
+              actions: [showProgress()],
               notes: const [],
             ),
           HomeTask.other => (

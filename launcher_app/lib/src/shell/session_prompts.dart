@@ -28,12 +28,14 @@ abstract interface class SessionPrompts {
 
   Future<bool> confirmClose({required bool downloading});
 
-  Future<bool> confirmSemanticSearch();
-
   Future<bool> confirmSemanticConsent();
 
   Future<bool> confirmLibraryReindex();
 
+  /// מסך המשימה מוצג — סוף ההורדה נאמר בו, ולא בהודעה צפה.
+  bool get taskScreenShown;
+
+  /// הודעה צפה על סוף ההורדה — רק כשמסך המשימה אינו מוצג.
   void reportDownload({
     required List<MirrorComponent> failed,
     required List<MirrorComponent> skipped,

@@ -24,6 +24,7 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
 import '../home_fixtures.dart';
+import '../task_fixtures.dart';
 import '../test_harness.dart';
 import '../test_support.dart';
 import 'visual_fonts.dart';
@@ -115,6 +116,8 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase2a2': _phase2aStates,
   // סבב 3: הגילוי שבדף הדיווחים — ראו `reports_<variant>`.
   'phase2a3': _phase2aStates,
+  // מסכי המשימה מצולמים מהמודל — ראו `task_<scenario>`.
+  'phase2b': _phase2aStates,
 };
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
@@ -262,6 +265,52 @@ void main() {
               'visual_review',
               _phase,
               'home_$scenario$suffix.png',
+            ),
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          WidgetsApp.debugAllowBannerOverride = true;
+        }
+      });
+    }
+  }
+
+  for (final scenario in taskScenarioNames) {
+    for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
+      testWidgets('$_phase/task_$scenario$suffix',
+          skip: !_enabled || _phase != 'phase2b', (tester) async {
+        await tester.runAsync(loadVisualFonts);
+        WidgetsApp.debugAllowBannerOverride = false;
+        try {
+          useViewSize(tester, size);
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: boundary,
+              child: wrap(
+                Scaffold(
+                  backgroundColor: const Color(0xFFF6EDE5),
+                  body: Column(
+                    children: [
+                      AppTitleBar(
+                        onHelp: () {},
+                        onSettings: () {},
+                        showWindowButtons: true,
+                      ),
+                      Expanded(child: taskScenario(scenario)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+          await settle(tester);
+          await capture(
+            tester,
+            p.join(
+              'build',
+              'visual_review',
+              _phase,
+              'task_$scenario$suffix.png',
             ),
           );
           await tester.pumpWidget(const SizedBox.shrink());

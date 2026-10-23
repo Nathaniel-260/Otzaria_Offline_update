@@ -12,6 +12,7 @@ import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/app_session.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_navigator.dart';
+import 'package:launcher_app/src/widgets/widgets_exports.dart' show AppDialog;
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
@@ -114,14 +115,13 @@ void main() {
     final reportsTile = find.byKey(ShellKeys.tile(ShellSection.reports));
     await finishIo(until: () => home.otzaria.launchPath != null);
     expect(home.otzaria.launchPath, launch.path);
-    final t = stringsOf().errorReports;
     expect(reportsTile, findsNothing);
     locator.isRunning = false;
     await tester.pump(const Duration(seconds: 4));
     await finishIo(until: () => home.reportsToCollect > 0);
     // אין דיאלוג בעלייה: רק מונה באריח הדיווחים.
     expect(home.reportsToCollect, 1);
-    expect(find.text(t.collectDialogTitle), findsNothing);
+    expect(find.byType(AppDialog), findsNothing);
     expect(reportsTile, findsOneWidget);
     expect(
       find.text(stringsOf().guide.chipReportsToCollect(1)),
@@ -133,7 +133,7 @@ void main() {
     // הלחיצה על "איסוף" היא האישור: אין דו-שיח "לאסוף?" שני.
     await tester.tap(find.byKey(ShellKeys.reportsCollect));
     await finishIo(until: () => home.reportsToCollect == 0);
-    expect(find.text(t.collectDialogTitle), findsNothing);
+    expect(find.byType(AppDialog), findsNothing);
     expect(home.reportsToCollect, 0);
     expect(
       await tester.runAsync(() => UserStateReportQueue(dbPath).countSendable()),
@@ -148,7 +148,7 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await finishIo();
     expect(home.reportsToCollect, 0);
-    expect(find.text(t.collectDialogTitle), findsNothing);
+    expect(find.byType(AppDialog), findsNothing);
   });
 }
 

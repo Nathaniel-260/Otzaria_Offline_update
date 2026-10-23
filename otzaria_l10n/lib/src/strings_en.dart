@@ -18,6 +18,8 @@ class EnglishStrings extends AppStrings {
   @override
   GuidanceStrings get guide => const _Guide();
   @override
+  TaskStrings get task => const _Task();
+  @override
   AppScreenStrings get appScreen => const _AppScreen();
   @override
   LibraryScreenStrings get libraryScreen => const _LibraryScreen();
@@ -178,26 +180,6 @@ class _Home extends HomeStrings {
       'Otzaria was updated to version $version';
 
   @override
-  String get firstInstallDialogTitle => 'Otzaria is not installed here';
-  @override
-  String firstInstallPrompt(String appVersion, String libraryVersion) =>
-      'No Otzaria installation and no book database were found on this '
-      'computer. One click installs both from the drive, with no internet: '
-      'the Otzaria program $appVersion, and then the book library, version '
-      '$libraryVersion.\n\n'
-      'The Otzaria installer opens first, where you choose where to install '
-      'and whether to create a shortcut. The library install starts right '
-      'after it and takes many minutes.';
-  @override
-  String get firstInstallConfirm => 'Full install';
-  @override
-  String get closeOtzariaForLibraryDialogTitle => 'Please close Otzaria';
-  @override
-  String get closeOtzariaForLibraryPrompt =>
-      'Otzaria opened when the installation finished, and it locks the '
-      'library file. Close it and press "Try again" to continue installing '
-      'the library.';
-  @override
   String get closeOtzariaForAppInstallDialogTitle => 'Otzaria is open';
   @override
   String get closeOtzariaForAppInstallPrompt =>
@@ -205,12 +187,6 @@ class _Home extends HomeStrings {
       'continue with the installation?';
   @override
   String get closeOtzariaAndInstallConfirm => 'Close and install';
-  @override
-  String get closeOtzariaForUpdatePrompt =>
-      'Otzaria must be closed to update. Your open books will wait for you. '
-      'Close it now and continue with the update?';
-  @override
-  String get closeOtzariaAndUpdateConfirm => 'Close and update';
   @override
   String get elevatedAsOtherUserWarning =>
       'This program runs as administrator under a different user name — a '
@@ -220,8 +196,6 @@ class _Home extends HomeStrings {
   @override
   String get otzariaOpenSnack =>
       'Otzaria is open — please close it and try again.';
-  @override
-  String get libraryUpdateDialogTitle => 'Update the Library';
   @override
   String libraryFreshInstallPrompt(String targetVersion) =>
       'The library (version $targetVersion) will be installed for the first '
@@ -246,8 +220,6 @@ class _Home extends HomeStrings {
   String get doNotRemoveDriveWarning =>
       'Note! Do not remove the USB drive until the update is finished.';
 
-  @override
-  String get downloadNowButton => 'Download now';
   @override
   String get cancelDownloadButton => 'Cancel download';
   @override
@@ -301,6 +273,301 @@ class _Home extends HomeStrings {
   String get libraryNeedsManualPath => 'Choose the database file';
   @override
   String get libraryPersonalOtherMachine => 'Targets another computer';
+}
+
+class _Task extends TaskStrings {
+  const _Task();
+
+  @override
+  String get semanticTitle => 'Download smart search too?';
+  @override
+  String get semanticBody =>
+      'Smart search finds sources by meaning, even when the words differ from what you searched for.';
+  @override
+  String get semanticHint => 'You can change this later on the library page.';
+  @override
+  String get semanticNoTitle => 'No, regular search only (recommended)';
+  @override
+  String get semanticNoBody => 'You can add smart search in the next download.';
+  @override
+  String get semanticNoSize => 'Nothing extra';
+  @override
+  String get semanticYesTitle => 'Yes, smart search too';
+  @override
+  String get semanticYesBody =>
+      'Good when the drive has room. The download will take longer.';
+  @override
+  String get back => 'Back';
+  @override
+  String get startDownload => 'Start download';
+  @override
+  String get preparingTitle => 'Getting ready to download';
+  @override
+  String get preparingBody => 'Checking the Otzaria website for what is new.';
+  @override
+  String get downloadingTitle => 'Downloading the updates to the drive';
+  @override
+  String get downloadingBody => 'You can keep using the computer meanwhile.';
+  @override
+  String downloadingStep(String name, int index, int count) =>
+      'Downloading $name · $index of $count';
+  @override
+  String get componentApp => 'Otzaria app';
+  @override
+  String get componentLibrary => 'The library';
+  @override
+  String get componentPlugins => 'Plugins';
+  @override
+  String get stepApp => 'the Otzaria app';
+  @override
+  String get stepLibrary => 'the library';
+  @override
+  String get stepPlugins => 'the plugins';
+  @override
+  String transferRate(String perSecond) => '$perSecond per second';
+  @override
+  String minutesLeft(int minutes) =>
+      minutes == 1 ? '1 minute left' : '$minutes minutes left';
+  @override
+  String bytesLine(String name, String done, String total) =>
+      '$name: $done of $total downloaded';
+  @override
+  String stageDone(String? size) =>
+      size == null ? 'Downloaded' : 'Downloaded · $size';
+  @override
+  String get stageWaiting => 'Waiting';
+  @override
+  String get cancelling => 'Cancelling…';
+  @override
+  String get cancelledTitle => 'The download was cancelled';
+  @override
+  String get cancelledBody =>
+      'The drive is as it was before you started, and you can keep using it as usual.';
+  @override
+  String get cancelledRevertFailedBody =>
+      'Not everything that was downloaded could be removed from the drive. Downloading again will continue from it.';
+  @override
+  String get downloadAgain => 'Download again';
+  @override
+  String get backHome => 'Back to home';
+  @override
+  String get backToHomePage => 'Back to the home page';
+  @override
+  String get doneTitle => 'The drive is ready';
+  @override
+  String get doneBody =>
+      'All the updates were downloaded and saved on the drive.';
+  @override
+  String doneSkipped(String names) =>
+      '$names were not downloaded — nothing new on the website.';
+  @override
+  String doneAppValue(String version) => 'Otzaria $version';
+  @override
+  String doneLibraryValue(int version) => 'Version $version';
+  @override
+  String donePluginsValue(int count) =>
+      count == 1 ? '1 plugin on the drive' : '$count plugins on the drive';
+  @override
+  String get donePluginsUpdated => 'The plugin store was updated';
+  @override
+  String get whatNow => 'What now?';
+  @override
+  String get whatNowEject => 'Safely eject the drive';
+  @override
+  String get whatNowEjectHint => '(the drive icon next to the clock → Eject)';
+  @override
+  String get whatNowConnect =>
+      'Connect it to the computer where you study with Otzaria.';
+  @override
+  String get whatNowOpen =>
+      'Open "Otzaria Updates" from the drive there, and click "Update Otzaria on this computer".';
+  @override
+  String get updateHereToo => 'Update this computer too';
+  @override
+  String get installHereToo => 'Install Otzaria here too';
+  @override
+  String get finish => 'Done';
+  @override
+  String get networkTitle => 'No internet connection';
+  @override
+  String networkBody(String name) =>
+      'The connection dropped while downloading $name. What was already downloaded is saved on the drive. Check the connection and click "Try again".';
+  @override
+  String get shabbatTitle =>
+      'The Otzaria website is closed on Shabbat and holidays';
+  @override
+  String get shabbatBody =>
+      'You can download after Shabbat. What was already downloaded is saved on the drive.';
+  @override
+  String get spaceTitle => 'Not enough space on the drive';
+  @override
+  String spaceBody(String needed, String free) =>
+      '$needed are needed and $free are free. Free up space on the drive and click "Try again" — what was already downloaded is saved.';
+  @override
+  String get snapshotTitle => 'The download did not start';
+  @override
+  String get snapshotBody =>
+      'The drive state could not be saved before downloading, and without it the download cannot be cancelled safely. Nothing was downloaded. Check that the drive is connected and click "Try again".';
+  @override
+  String otherTitle(String name) => 'The download of $name did not finish';
+  @override
+  String get otherBody =>
+      'What was already downloaded is saved on the drive, and "Try again" continues from it. If it happens again, the technical details will help whoever assists you.';
+  @override
+  String get techDetails => 'Technical details';
+  @override
+  String get hideTechDetails => 'Hide technical details';
+  @override
+  String get copyDetails => 'Copy';
+  @override
+  String get detailsCopied => 'Details copied';
+  @override
+  String get otherUserTitle => 'Otzaria was installed by another user';
+  @override
+  String get otherUserBody =>
+      'It was installed as an administrator, in another account. If you continue from this account, the update may create a second installation instead of updating the existing one.';
+  @override
+  String get otherUserHint =>
+      'It is best to sign in to the account that installed Otzaria and update from there, or to run this tool as an administrator.';
+  @override
+  String get continueAnyway => 'Continue anyway';
+  @override
+  String get closeTitle => 'Otzaria needs to be closed';
+  @override
+  String get closeBody =>
+      'The update replaces files that Otzaria is using right now.';
+  @override
+  String closeHint({required bool plugins}) => plugins
+      ? 'Nothing is lost: open books, bookmarks and notes will wait for you exactly where you left them. At the end of the update Otzaria will open again so you can approve the plugins.'
+      : 'Nothing is lost: open books, bookmarks and notes will wait for you exactly where you left them.';
+  @override
+  String get closeAndContinue => 'Close and continue';
+  @override
+  String get closeAfterWizardBody =>
+      'The setup wizard opened Otzaria. It needs to be closed to install the library.';
+  @override
+  String get closeAfterWizardButton => 'Close Otzaria and continue';
+  @override
+  String get notNow => 'Not now';
+  @override
+  String stepOf(int index, int count) => 'Step $index of $count';
+  @override
+  String get installingApp => 'Installing Otzaria';
+  @override
+  String get updatingApp => 'Updating the Otzaria app';
+  @override
+  String get installingLibrary => 'Installing the library';
+  @override
+  String get updatingLibrary => 'Updating the library';
+  @override
+  String get sendingPlugins => 'Sending the plugins to Otzaria';
+  @override
+  String get appWizardFirstBody =>
+      'The Otzaria setup wizard opened in a separate window. Follow it to the end, and this tool will continue by itself.';
+  @override
+  String get appWizardBody =>
+      'The Otzaria setup wizard opened in a separate window. At its end Otzaria opens by itself, and this tool continues by itself.';
+  @override
+  String get libraryBody => 'A few minutes, and it is ready.';
+  @override
+  String get pluginsBody =>
+      'This tool sends the plugins to Otzaria one by one. You approve the installation in the Otzaria window.';
+  @override
+  String get keepDrive => 'Do not disconnect the drive until the end';
+  @override
+  String appVersion(String version) => 'Version $version';
+  @override
+  String appInstalled(String version) => 'Installed · version $version';
+  @override
+  String get appWizardOpen => 'The setup wizard is open — continue in it';
+  @override
+  String get appStoppedWaiting =>
+      'Stopped waiting · check on the app page whether the installation finished';
+  @override
+  String get stopWaiting => 'Stop waiting';
+  @override
+  String get libraryFull => 'The full library';
+  @override
+  String libraryVersion(int version) => 'Version $version';
+  @override
+  String libraryDone(String detail) => 'Done · $detail';
+  @override
+  String get libraryWaitingClose => 'Waiting for Otzaria to close';
+  @override
+  String get librarySkipped =>
+      'Not installed now — you can install it later from the home page';
+  @override
+  String pluginsWaiting(int count) => count == 1
+      ? '1 plugin · will be sent to Otzaria'
+      : '$count plugins · will be sent to Otzaria';
+  @override
+  String get pluginsCurrent => 'Approve each plugin in the Otzaria window';
+  @override
+  String get pluginsSent => 'Sent to Otzaria — approve each plugin there';
+  @override
+  String get pluginRowSent => 'Sent to Otzaria';
+  @override
+  String get pluginRowWaiting => 'Waiting to be sent';
+  @override
+  String get pluginRowFailed =>
+      'Not sent — you can retry from the plugins page';
+  @override
+  String get finishWithoutWaiting => 'Finish without waiting';
+  @override
+  String get installedTitle => 'Otzaria is installed';
+  @override
+  String get updatedTitle => 'Otzaria is up to date';
+  @override
+  String doneHereBody(
+          {required bool firstInstall,
+          required bool withLibrary,
+          required bool plugins}) =>
+      firstInstall
+          ? (withLibrary
+              ? 'Otzaria and the library are installed on this computer and ready for study. You can disconnect the drive.'
+              : 'Otzaria is installed on this computer. You can disconnect the drive.')
+          : plugins
+              ? 'The update was installed, and the plugins are waiting for your approval in Otzaria. You can disconnect the drive.'
+              : 'Everything in the update was installed on this computer. You can disconnect the drive.';
+  @override
+  String get reindexTitle => 'Rebuilding search is recommended';
+  @override
+  String get reindexBody =>
+      'That way the new books show up in search. Otzaria will open and rebuild it.';
+  @override
+  String get reindexButton => 'Rebuild';
+  @override
+  String get toOtzaria => 'Go to Otzaria';
+  @override
+  String get wizardClosedTitle => 'The Otzaria installation did not finish';
+  @override
+  String wizardClosedBody(
+          {required bool firstInstall, required bool libraryDone}) =>
+      firstInstall
+          ? 'The setup wizard was closed before the end, and Otzaria was not installed. You can try again any time.'
+          : libraryDone
+              ? 'The setup wizard was closed before the end. Otzaria stayed on the previous version and works as usual. The library that was already updated stays updated.'
+              : 'The setup wizard was closed before the end. Otzaria stayed on the previous version and works as usual.';
+  @override
+  String get stoppedTitle => 'The update stopped';
+  @override
+  String get stoppedBody =>
+      'Otzaria stayed open, so the rest of the update was not installed. What was already installed stays.';
+  @override
+  String get libraryFailedTitle => 'The library update failed';
+  @override
+  String get appFailedTitle => 'Installing Otzaria failed';
+  @override
+  String get libraryFailedKeep =>
+      'Otzaria keeps working with the previous library.';
+  @override
+  String get appFailedKeep => 'Otzaria stayed on the previous version.';
+  @override
+  String get toLibraryPage => 'To the library page';
+  @override
+  String get toAppPage => 'To the app page';
+  @override
+  String get showProgress => 'Show progress';
 }
 
 class _Guide extends GuidanceStrings {
@@ -637,8 +904,10 @@ class _Guide extends GuidanceStrings {
   @override
   String get reportsDisclosureReports =>
       'Reports: what you wrote, your email address if you gave it, excerpts '
-      'from the app log, screenshots and files you attached, and for a crash '
-      'report you approved — also the app memory dump.';
+      'from the app log, technical details about the computer and Otzaria '
+      '(such as versions and the operating system), screenshots and images '
+      'you attached, and for a crash report you approved — also the app '
+      'memory dump.';
   @override
   String get reportsDisclosureSearch =>
       'Smart search records, collected with your consent: search usage data, '

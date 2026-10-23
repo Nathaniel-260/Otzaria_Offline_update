@@ -98,10 +98,14 @@ class StageRow extends StatelessWidget {
     required this.title,
     required this.state,
     this.detail,
+    this.extra,
     this.compact = false,
   });
 
   final IconData icon;
+
+  /// מתחת לפירוט: פס דק, קישור או רשימת מסירות.
+  final Widget? extra;
   final String title;
   final String? detail;
   final StageState state;
@@ -176,6 +180,7 @@ class StageRow extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (extra != null) extra!,
                 ],
               ),
             ),

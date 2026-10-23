@@ -549,8 +549,8 @@ or older than `onlineCheckMaxAge`, 15 minutes): a morning check must not skip an
 app released at noon. A check that never ran
 or that failed proves nothing and never skips — "no network" is not "no update".
 The library is never skipped in personal-update mode, where the target comes from
-the recorded DB version. The skip is announced in a snackbar; a silent one produced
-the "why did it not download the plugins" confusion.
+the recorded DB version. The skip is named on the "drive is ready" task screen; a
+silent one produced the "why did it not download the plugins" confusion.
 
 **Filtered networks get their own messages and NetFree's CA.** A filter answers
 418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
@@ -569,8 +569,16 @@ never got it, and `companions=[]` on the offline machine hid it (issue #33).
 `CompanionAssetsMirror.peekPending` → `LibraryModuleController.onlinePendingCompanions`
 feeds `hasOnlineUpdate`; its failure blocks the skip via `onlineProofError`.
 
-**Cancelling a download deletes what *that* download brought.** The button appears
-next to the progress row only while a download runs, and
+**The download runs as a task screen, and its wording must match the undo.**
+`ShellTasks` (`shell/shell_tasks.dart`) is the host's UI side: the smart-search
+question (`confirmSemanticSearch` returns `null` for "back" — nothing is captured or
+downloaded), progress, "cancelled", "drive is ready" and an in-window failure
+(`classifyDownloadFailure`: network/Shabbat/no space are calm, the rest red). A
+cancel reverts the drive, so the screen says "the drive is as before", never "what
+was downloaded is kept" — that is true only after a *failure*, which keeps parts.
+
+**Cancelling a download deletes what *that* download brought.** "Cancel" (behind the
+warning dialog) appears only while a download runs, and
 `MirrorDownloadFlow.requestCancel` rides the `isCancelled` callback every layer
 already takes, so it lands mid-asset.
 `MirrorDownloadUndo` snapshots `mirror/library`, `mirror/companions`, `mirror/app`
@@ -1125,11 +1133,11 @@ and compare as 0.
 **The FULL package is gone; a first install now runs the app wizard and then the
 library.** `otzaria-<ver>-windows-full.exe` was the ordinary installer with the
 library inside — i.e. a second copy of the ~1.5GB already on the drive, for one
-saved click. `installOtzariaHere` (`flows/home_flows.dart`, the home page's
-"install here") offers both when
-`otzaria.currentVersion == null && library.isFreshInstall`, and
-`_installLibraryAfterApp` runs the second half. "Update here" (`updateHere`) keeps
-`AutoInstallFlow`'s order: library first, then the app.
+saved click. `UpdateHereFlow` (`flows/update_here_flow.dart`, the task screen behind
+the hero) installs both when `otzaria.currentVersion == null &&
+library.isFreshInstall` — never plugins. An update keeps `AutoInstallFlow`'s order:
+library, app, then plugin delivery (`PluginsModuleController.deliverUpdates`, which
+only *sends* — the screen says "sent to Otzaria, approve there").
 
 - **App first, never the library first.** Where the DB goes follows what the wizard
   chose: a portable install keeps it beside the exe, an ordinary one under
@@ -1144,8 +1152,8 @@ saved click. `installOtzariaHere` (`flows/home_flows.dart`, the home page's
   entry has no `Check:`, while `ShouldLaunchAppAfterSilentInstall` gates only the
   silent one on `WizardSilent`. A running Otzaria locks `seforim.db`, so
   `OtzariaProcessCloser` asks it to quit (`taskkill` without `/F`); safe precisely
-  here, because it opened two seconds ago with nothing to save. The manual dialog
-  appears only if it survives.
+  here, because it opened two seconds ago with nothing to save. The task's
+  "close Otzaria" step appears only if it survives.
 - **A stale FULL file on an old drive is swept.** `OtzariaAppMirror.staleFullPackages()`
   finds it, `sync()` deletes it, and `check.hasStaleFullPackage` forces the app module
   to run even when the online check proved nothing is new — otherwise "nothing to
@@ -1228,9 +1236,9 @@ skip used to be silent — which reads as a setting that does not work.
 `AutoInstallFlow.run` returns `skippedWhileRunning`, which `_autoInstallIfEnabled` keeps
 in `AppSession.autoInstallSkipped`: the lead of the home page's "Otzaria is open right
 now" banner, shown while Otzaria is open and the drive has something to install here.
-The banner has no button — the hero's "update here" asks to close Otzaria first
-(`updateHere` → `_closedForUpdate`), and declining any step stops the ones after it. A
-startup snackbar disappears before it is read.
+The banner has no button — the hero's "update here" opens the task, whose
+"close Otzaria" step closes it only on the user's click; declining stops the steps
+after it. A startup snackbar disappears before it is read.
 
 **Auto-install only ever *updates*; a first install is never automatic.** Both paths
 are gated (`!isFreshInstall` for the library, `currentVersion != null` for the app) and
@@ -1248,9 +1256,10 @@ decision belongs.
 **Cancelling the wizard is not a failure.** `OtzariaInstallCancelled` (Inno exit 2/5,
 plus 1223 = UAC refused) and `OtzariaWizardStillOpen` (the process returned before the
 install is on disk — routine when Inno elevates and hands off to an elevated child)
-surface as `OtzariaModuleController.noticeMessage`, a plain snackbar. Never route them
-through `errorMessage`: painting the user's own choice red makes people think the
-program broke.
+surface as `OtzariaModuleController.noticeMessage` (and `lastInstallResult`): a plain
+snackbar on the app page, a calm "did not finish" task screen from "update here".
+Never route them through `errorMessage`: painting the user's own choice red makes
+people think the program broke.
 
 **On macOS, refuse to install while Otzaria is running.** The install is a
 whole-bundle swap followed by deleting the previous bundle, and `unlink` succeeds on
@@ -2041,7 +2050,8 @@ Otzaria's own queue in `user_state.db` directly and builds the request body itse
 every `sqlite3` call inside `Isolate.run`, the offer after the first frame (§5.9).
 UI for *Otzaria's* reports: a "reports" tile on the home page that appears only when
 there is something to collect or send, and the reports page behind it — "collect from
-Otzaria" (`offerErrorReportCollection`, which still confirms) and **one** upload button
+Otzaria" (`collectReportsToDrive`: the disclosure above the button is the consent, so
+a category it did not show is not collected — it recounts instead) and **one** upload button
 (`ReportsUploadSection` → `uploadAllReports`, which uploads the reports and the
 smart-search feedback in sequence and reports one summary). `ReportOfferCoordinator`
 still decides *when*, but its `perform` only counts (`recountReportsToCollect`); nothing
@@ -2127,14 +2137,14 @@ folder are never created. Unsendable reports (`isSendable`, Otzaria's own export
 plus the 256KB book limit), invalid app/plugin records and oversized app requests
 stay in the queue. App attachments travel in the outbox, not the sent history.
 
-**Check Otzaria is closed before the offer and after approval; retry on closure.**
+**Check Otzaria is closed before counting and before collecting; recount on closure.**
 Writing under its open `user_state.db` can break its transactions (2026-10-13).
 `markDeclined` keeps a count threshold even when the queue shrinks, until a
 collection brings reports (else new ones stay hidden); retry only above it.
 Offers also run with auto-check off, never on read-only drives, and
 wait for dialogs and tasks, including 3s after launcher-initiated closure.
-`ReportOfferCoordinator`, `AppSession._onChange`, `offerErrorReportCollection`;
-task-ending paths must call `resume()` (on `_feedbackSync` too).
+`ReportOfferCoordinator`, `AppSession._onChange`, `collectReportsToDrive`,
+`SearchFeedbackController`; task-ending paths must call `resume()`.
 See `launcher_app/README.md` for the collection and upload flow.
 
 **Smart-search feedback has no offer, button, count or message — it syncs in

@@ -150,7 +150,7 @@ class _FakeDownloadHost implements MirrorDownloadHost {
   AppSettings settings = const AppSettings();
 
   Future<void> Function(AppSettings s)? onRefresh;
-  Future<bool> Function()? onConfirmSemantic;
+  Future<bool?> Function()? onConfirmSemantic;
   Completer<void>? sweepGate;
   int sweeps = 0;
   List<MirrorComponent>? failed;
@@ -163,9 +163,10 @@ class _FakeDownloadHost implements MirrorDownloadHost {
   }
 
   @override
-  Future<bool> confirmSemanticSearch() async {
+  Future<bool?> confirmSemanticSearch() async {
     log.add('ask semantic');
-    return await onConfirmSemantic?.call() ?? false;
+    final answer = onConfirmSemantic;
+    return answer == null ? false : await answer();
   }
 
   @override
@@ -417,6 +418,41 @@ void main() {
 
       expect(componentsRun(), contains('library'));
       expect(library.includedSemanticSearch, isTrue);
+    });
+
+    // "חזרה" במסך השאלה: ההורדה לא מתחילה, ושום דבר לא נלכד או נוקה.
+    test('backing out of the smart search question downloads nothing',
+        () async {
+      library.shouldOfferSemanticDownload = true;
+      host.onConfirmSemantic = () async => null;
+
+      await flow.downloadAll();
+
+      expect(log, ['refresh', 'ask semantic']);
+      expect(flow.isDownloading, isFalse);
+      expect(flow.isPreparing, isFalse);
+      expect(host.failed, isNull);
+    });
+
+    test('the active plan and the current component follow the run', () async {
+      plugins.catalogOnlineProof = _proven;
+      plugins.storeAppOnlineProof = _proven;
+      MirrorComponent? during;
+      List<MirrorComponent>? components;
+      app.onDownload = () async {
+        during = flow.currentComponent;
+        components = flow.activeComponents;
+        expect(flow.activePlan, isNotNull);
+      };
+
+      expect(flow.activePlan, isNull);
+      await flow.downloadAll();
+
+      expect(during, MirrorComponent.app);
+      expect(components, [MirrorComponent.app, MirrorComponent.library]);
+      expect(flow.currentComponent, isNull);
+      expect(flow.activeComponents, isEmpty);
+      expect(flow.activePlan, isNull);
     });
 
     test('smart search is not offered when the library is not selected',

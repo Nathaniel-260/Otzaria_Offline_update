@@ -22,7 +22,7 @@ import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/screens/home/home_view_model.dart';
 import 'package:launcher_app/src/screens/reports/reports_section.dart';
 import 'package:launcher_app/src/screens/reports_upload_flow.dart';
-import 'package:launcher_app/src/services/notices_seen_store.dart';
+import 'package:launcher_app/src/screens/reports_upload_section.dart';
 import 'package:launcher_app/src/services/report_offer_trigger.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
@@ -36,7 +36,6 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 import 'test_harness.dart';
-import 'test_support.dart';
 
 Map<String, dynamic> _report(String id) => OutboxReport.fileJson(
       reportId: id,
@@ -162,17 +161,6 @@ void main() {
 
   /// אוצריא "פתוחה" לפי [running], שהבדיקה יכולה להפוך באמצע.
   var running = false;
-  Future<ReportOfferOutcome> offer(
-    BuildContext ctx,
-    ErrorReportsController c, {
-    bool readOnly = false,
-  }) =>
-      offerErrorReportCollection(
-        ctx,
-        c,
-        readOnly: readOnly,
-        isOtzariaRunning: () async => running,
-      );
 
   setUp(() => running = false);
 
@@ -250,77 +238,47 @@ void main() {
   });
 
   group('הצעה מחדש אחרי סגירת אוצריא', () {
-    testWidgets('נפתחה בעלייה ונסגרה אחר כך → ההצעה מופיעה', (tester) async {
+    /// מה שהספירה מצאה בכל ריצה של הטריגר — רק כשאוצריא סגורה.
+    ReportOfferTrigger counting(ErrorReportsController c, List<int> seen) =>
+        ReportOfferTrigger(() async {
+          if (!running) seen.add(await c.pendingToOffer());
+        });
+
+    test('נפתחה בעלייה ונסגרה אחר כך → נספר', () async {
       final c = controller(pending: 2);
-      final ctx = await host(tester);
-      final trigger = ReportOfferTrigger(() async {
-        await offer(ctx, c);
-      });
+      final seen = <int>[];
+      final trigger = counting(c, seen);
 
       running = true;
       trigger.onRunningState(running: true);
       await trigger.request();
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
+      expect(seen, isEmpty);
 
       running = false;
       trigger.onRunningState(running: false);
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsOneWidget);
+      await Future<void>.delayed(Duration.zero);
+      expect(seen, [2]);
     });
 
-    testWidgets('אוצריא שנפתחה ונסגרה במהלך ההרצה → דיווחים חדשים מוצעים',
-        (tester) async {
+    test('אוצריא שנפתחה ונסגרה במהלך ההרצה → דיווחים חדשים נספרים', () async {
       var pending = 0;
       final c = ErrorReportsController(
         outbox: outbox,
         resolveQueue: () async => _FakeQueue(pending),
       );
-      final ctx = await host(tester);
-      final trigger = ReportOfferTrigger(() async {
-        await offer(ctx, c);
-      });
+      final seen = <int>[];
+      final trigger = counting(c, seen);
 
       await trigger.request();
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
+      expect(seen, [0]);
 
       running = true;
       trigger.onRunningState(running: true);
       pending = 2;
       running = false;
       trigger.onRunningState(running: false);
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogContent(2)), findsOneWidget);
-    });
-
-    testWidgets('מי שסירב לא נשאל שוב על אותם דיווחים, אבל כן על חדשים',
-        (tester) async {
-      var pending = 2;
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => _FakeQueue(pending),
-      );
-      final ctx = await host(tester);
-      final trigger = ReportOfferTrigger(() async {
-        await offer(ctx, c);
-      });
-
-      unawaited(trigger.request());
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(t.collectLater));
-      await tester.pumpAndSettle();
-
-      trigger.onRunningState(running: true);
-      trigger.onRunningState(running: false);
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
-
-      pending = 3;
-      trigger.onRunningState(running: true);
-      trigger.onRunningState(running: false);
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogContent(3)), findsOneWidget);
+      await Future<void>.delayed(Duration.zero);
+      expect(seen, [0, 2]);
     });
 
     test('בקשה שמגיעה באמצע הצעה רצה שוב אחריה, בלי להיערם', () async {
@@ -451,254 +409,288 @@ void main() {
     expect(t.uploadPendingOffline(2), startsWith('ממתינים להעלאה 2 דיווחים'));
   });
 
-  group('איסוף בעלייה', () {
-    testWidgets('unmounting during the pending read never collects',
-        (tester) async {
-      final pending = Completer<OtzariaReportQueue?>();
-      final queue = _QaQueue(2);
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () => pending.future,
-      );
-      addTearDown(c.dispose);
-      final ctx = await host(tester);
-      final offerFuture = offer(ctx, c);
-      await tester.pump();
-      await tester.pumpWidget(const SizedBox.shrink());
-      pending.complete(queue);
-      expect(await offerFuture, ReportOfferOutcome.notOffered);
-      expect(queue.collections, 0);
-      expect(outbox.reports, isEmpty);
-      expect(tester.takeException(), isNull);
-    });
+  group('איסוף לכונן מדף הדיווחים', () {
+    /// מה שהגילוי בדף הציג — כברירת מחדל, הכול.
+    Future<DriveCollectOutcome> collect(
+      ErrorReportsController c, {
+      SearchFeedbackController? feedback,
+      bool readOnly = false,
+      int disclosedReports = 1,
+      int disclosedSearchRecords = 1,
+    }) =>
+        collectReportsToDrive(
+          c,
+          readOnly: readOnly,
+          isOtzariaRunning: () async => running,
+          searchFeedback: feedback,
+          disclosedReports: disclosedReports,
+          disclosedSearchRecords: disclosedSearchRecords,
+        );
 
-    // מדף הדיווחים: הלחיצה על "איסוף" היא האישור — בלי "לאסוף?" נוסף.
-    testWidgets('confirm: false collects without a second dialog', (
-      tester,
-    ) async {
+    List<String> captureSnacks() {
+      final messages = <String>[];
+      final previousPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message?.startsWith('UiSnack') ?? false) messages.add(message!);
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      return messages;
+    }
+
+    // הלחיצה על "איסוף לכונן" היא האישור — בלי "לאסוף?" נוסף.
+    testWidgets('collects at once, without any dialog', (tester) async {
       final queue = _QaQueue(2);
       final c = ErrorReportsController(
         outbox: outbox,
         resolveQueue: () async => queue,
       );
       addTearDown(c.dispose);
-      final ctx = await host(tester);
-      final result = await offerErrorReportCollection(
-        ctx,
-        c,
-        isOtzariaRunning: () async => false,
-        confirm: false,
-      );
+      await host(tester);
+      final result = await collect(c);
       await tester.pump();
-      expect(result, ReportOfferOutcome.collected);
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(find.text(t.collectConfirm), findsNothing);
+      expect(result, DriveCollectOutcome.collected);
+      expect(find.byType(AppDialog), findsNothing);
       expect(queue.collections, 1);
       await tester.pump(const Duration(seconds: 7));
     });
 
-    testWidgets('empty sources never offer collection', (tester) async {
+    test('empty sources never collect', () async {
       final c = controller();
       addTearDown(c.dispose);
-      final ctx = await host(tester);
-      final result = await offerErrorReportCollection(ctx, c,
-          isOtzariaRunning: () async => false);
-      expect(result, ReportOfferOutcome.notOffered);
-      expect(find.byType(AlertDialog), findsNothing);
+      addTearDown(feedback.dispose);
+      expect(await collect(c, feedback: feedback), DriveCollectOutcome.nothing);
+      expect(transport.collections, 0);
     });
 
-    for (final partial in [false, true]) {
-      testWidgets('the offer and its summary cover reports only ($partial)',
-          (tester) async {
-        final queue = _QaQueue(2, partial: partial);
+    // הגילוי נבנה מהספירה הקודמת; סוג שהופיע אחריה לא נאסף בלי שורה בדף.
+    for (final stale in ['reports', 'search']) {
+      test('a category the disclosure did not show is not collected ($stale)',
+          () async {
+        final queue = _QaQueue(2);
         final c = ErrorReportsController(
           outbox: outbox,
           resolveQueue: () async => queue,
         );
         addTearDown(c.dispose);
-        final messages = <String>[];
-        final previousPrint = debugPrint;
-        debugPrint = (String? message, {int? wrapWidth}) {
-          if (message?.startsWith('UiSnack') ?? false) messages.add(message!);
-        };
-        addTearDown(() => debugPrint = previousPrint);
-        final ctx = await host(tester);
-        unawaited(offerErrorReportCollection(ctx, c,
-            isOtzariaRunning: () async => running));
-        await tester.pumpAndSettle();
-        expect(find.text(t.collectDialogTitle), findsOneWidget);
-        expect(find.text(t.collectDialogContent(2)), findsOneWidget);
-        await tester.tap(find.text(t.collectConfirm));
-        await tester.pumpAndSettle();
-        debugPrint = previousPrint;
-        expect(outbox.reports.length, partial ? 1 : 2);
-        expect(messages, hasLength(1));
+        addTearDown(feedback.dispose);
+        final result = await collect(
+          c,
+          feedback: feedback,
+          disclosedReports: stale == 'reports' ? 0 : 2,
+          disclosedSearchRecords: stale == 'search' ? 0 : 3,
+        );
+        expect(result, DriveCollectOutcome.disclosureStale);
+        expect(queue.collections, 0);
+        expect(transport.collections, 0);
+        expect(outbox.reports, isEmpty);
+
+        // אחרי שהגילוי התעדכן — הלחיצה הבאה אוספת.
         expect(
-            messages.single,
-            endsWith(partial
-                ? t.collectPartialSnack(
-                    1, stringsOf().errorReportsDomain.someNotCollected)
-                : t.collectedSnack(2)));
+          await collect(
+            c,
+            feedback: feedback,
+            disclosedReports: 2,
+            disclosedSearchRecords: 3,
+          ),
+          DriveCollectOutcome.collected,
+        );
+        expect(outbox.reports, hasLength(2));
+        expect(transport.carried, 3);
       });
     }
 
-    for (final language in AppLanguage.values) {
-      for (final scale in [1.0, 2.0, 3.0]) {
-        testWidgets('the offer remains usable at $language / $scale',
-            (tester) async {
-          useViewSize(tester, const Size(800, 600));
-          tester.platformDispatcher.textScaleFactorTestValue = scale;
-          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-          AppL10n.use(language);
-          addTearDown(() => AppL10n.use(AppLanguage.hebrew));
-          late BuildContext ctx;
-          await tester.pumpWidget(wrap(
-            Scaffold(body: Builder(builder: (value) {
-              ctx = value;
-              return const SizedBox.shrink();
-            })),
-            language: language,
-          ));
-          final c = controller(pending: 9999);
+    for (final reportFailure in [false, true]) {
+      for (final feedbackFailure in [false, true]) {
+        test(
+            'combined summary preserves partial results ($reportFailure, $feedbackFailure)',
+            () async {
+          final queue = _QaQueue(2, partial: reportFailure);
+          final c = ErrorReportsController(
+            outbox: outbox,
+            resolveQueue: () async => queue,
+          );
+          final transport = _CollectionFeedback()
+            ..failCollection = feedbackFailure;
+          final feedback = SearchFeedbackController(
+            transport: transport,
+            resolveSource: () async => 'source',
+          );
           addTearDown(c.dispose);
-          unawaited(offerErrorReportCollection(ctx, c,
-              isOtzariaRunning: () async => false));
-          await tester.pumpAndSettle();
-          final strings = stringsOf(language);
-          expect(tester.takeException(), isNull);
-          expect(find.text(strings.errorReports.collectDialogContent(9999)),
-              findsOneWidget);
-          final cancel = find.text(strings.errorReports.collectLater);
-          expect(cancel.hitTestable(), findsOneWidget);
-          expect(find.text(strings.errorReports.collectConfirm).hitTestable(),
-              findsOneWidget);
-          await tester.tap(cancel);
-          await tester.pumpAndSettle();
-          expect(outbox.reports, isEmpty);
-          expect(tester.takeException(), isNull);
+          addTearDown(feedback.dispose);
+          final messages = captureSnacks();
+          await collect(c, feedback: feedback);
+          expect(queue.pending, reportFailure ? 1 : 0);
+          expect(outbox.reports.length, reportFailure ? 1 : 2);
+          expect(transport.carried, feedbackFailure ? 0 : 3);
+          expect(transport.pendingEvents, feedbackFailure ? 3 : 0);
+          expect(c.isCollecting, isFalse);
+          expect(feedback.isCollecting, isFalse);
+          expect(messages, hasLength(1));
+          expect(
+              messages.single,
+              contains(feedbackFailure
+                  ? stringsOf().libraryDomain.semanticFeedbackFailed
+                  : stringsOf().libraryDomain.semanticFeedbackCollected(3)));
+          expect(
+              messages.single,
+              contains(reportFailure
+                  ? t.collectPartialSnack(
+                      1, stringsOf().errorReportsDomain.someNotCollected)
+                  : t.collectedSnack(2)));
+          if (feedbackFailure) {
+            transport.failCollection = false;
+            await collect(c, feedback: feedback);
+            expect(transport.carried, 3);
+          }
         });
       }
     }
 
-    testWidgets('Otzaria reopening during counting prevents the offer',
-        (tester) async {
+    test('Otzaria reopening between stages preserves feedback for retry',
+        () async {
+      final messages = captureSnacks();
+      final queue = _QaQueue(2, onCollect: () => running = true);
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => queue,
+      );
+      final transport = _CollectionFeedback();
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => 'source',
+      );
+      addTearDown(c.dispose);
+      addTearDown(feedback.dispose);
+      await collect(c, feedback: feedback);
+      expect(messages, hasLength(1));
+      expect(messages.single, contains(t.collectedSnack(2)));
+      expect(messages.single,
+          contains(stringsOf().libraryDomain.semanticFeedbackNotCollected));
+      expect(outbox.reports.length, 2);
+      expect(transport.collections, 0);
+      expect(transport.pendingEvents, 3);
+      running = false;
+      await collect(c, feedback: feedback);
+      expect(transport.carried, 3);
+      expect(queue.collections, 1);
+    });
+
+    test('revoking feedback consent mid-collection preserves its source',
+        () async {
+      var consent = true;
+      final queue = _QaQueue(2, onCollect: () => consent = false);
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => queue,
+      );
+      final transport = _CollectionFeedback();
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => consent ? 'source' : null,
+      );
+      addTearDown(c.dispose);
+      addTearDown(feedback.dispose);
+      await collect(c, feedback: feedback);
+      expect(outbox.reports.length, 2);
+      expect(transport.pendingEvents, 3);
+      expect(transport.carried, 0);
+    });
+
+    test('Otzaria reopening during counting prevents the collection', () async {
+      final messages = captureSnacks();
       final queue = _QaQueue(2, onCount: () => running = true);
       final c = ErrorReportsController(
         outbox: outbox,
         resolveQueue: () async => queue,
       );
+      final transport = _CollectionFeedback();
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => 'source',
+      );
       addTearDown(c.dispose);
-      final ctx = await host(tester);
-      unawaited(offer(ctx, c));
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
+      addTearDown(feedback.dispose);
+      expect(
+        await collect(c, feedback: feedback),
+        DriveCollectOutcome.otzariaOpen,
+      );
       expect(queue.collections, 0);
+      expect(transport.carried, 0);
+      expect(outbox.reports, isEmpty);
+      expect(messages.single, contains(t.collectOtzariaOpenSnack));
     });
 
+    for (final reports in [0, 2]) {
+      test('one click collects reports ($reports) and feedback', () async {
+        final c = controller(pending: reports);
+        final transport = _CollectionFeedback();
+        final feedback = SearchFeedbackController(
+          transport: transport,
+          resolveSource: () async => 'source',
+        );
+        addTearDown(c.dispose);
+        addTearDown(feedback.dispose);
+        await collect(c, feedback: feedback, disclosedReports: reports);
+        expect(outbox.reports.length, reports);
+        expect(transport.carried, 3);
+      });
+    }
+
     for (final readOnly in [false, true]) {
-      testWidgets('collection keeps the read-only guard ($readOnly)',
-          (tester) async {
+      test('collection preserves consent and read-only guards ($readOnly)',
+          () async {
         final c = controller(pending: 2);
         addTearDown(c.dispose);
-        final ctx = await host(tester);
-        unawaited(offerErrorReportCollection(ctx, c,
-            readOnly: readOnly, isOtzariaRunning: () async => running));
-        await tester.pumpAndSettle();
-        if (!readOnly) {
-          expect(find.text(t.collectDialogTitle), findsOneWidget);
-          await tester.tap(find.text(t.collectConfirm));
-          await tester.pumpAndSettle();
-        }
+        addTearDown(feedback.dispose);
+        final result = await collect(c, readOnly: readOnly, feedback: feedback);
+        expect(
+          result,
+          readOnly
+              ? DriveCollectOutcome.blocked
+              : DriveCollectOutcome.collected,
+        );
         expect(outbox.reports.length, readOnly ? 0 : 2);
       });
     }
 
-    testWidgets('reopening Otzaria during approval prevents collection',
-        (tester) async {
+    // הכפתור נשאר כשאוצריא פתוחה (הספירה אינה מתאפסת) — הלחיצה אומרת למה.
+    test(
+        'Otzaria open: a message, nothing collected; after closing — collected',
+        () async {
+      final messages = captureSnacks();
       final c = controller(pending: 2);
-      addTearDown(c.dispose);
-      final ctx = await host(tester);
-      unawaited(offerErrorReportCollection(ctx, c,
-          isOtzariaRunning: () async => running));
-      await tester.pumpAndSettle();
       running = true;
-      await tester.tap(find.text(t.collectConfirm));
-      await tester.pumpAndSettle();
+      expect(await collect(c), DriveCollectOutcome.otzariaOpen);
       expect(outbox.reports, isEmpty);
-    });
+      expect(messages, [contains(t.collectOtzariaOpenSnack)]);
 
-    testWidgets('אוצריא פתוחה → אין דיאלוג, וההצעה לא "נוצלה"', (tester) async {
-      final c = controller(pending: 2);
-      final ctx = await host(tester);
-      running = true;
-      unawaited(offer(ctx, c));
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
-
-      // אחרי שנסגרה — ההצעה עדיין עומדת.
       running = false;
-      unawaited(offer(ctx, c));
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsOneWidget);
+      expect(await collect(c), DriveCollectOutcome.collected);
+      expect(outbox.reports, hasLength(2));
     });
 
-    testWidgets('כונן לקריאה בלבד → אין דיאלוג', (tester) async {
-      final c = controller(pending: 2);
-      final ctx = await host(tester);
-      unawaited(offer(ctx, c, readOnly: true));
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
-    });
-
-    testWidgets('אוצריא נפתחה בזמן שהדיאלוג חיכה → לא אוספים', (tester) async {
-      final c = controller(pending: 2);
-      final ctx = await host(tester);
-      late ReportOfferOutcome outcome;
-      unawaited(offer(ctx, c).then((o) => outcome = o));
-      await tester.pumpAndSettle();
-      running = true;
-      await tester.tap(find.text(t.collectConfirm));
-      await tester.pumpAndSettle();
-      expect(outcome, ReportOfferOutcome.otzariaOpened);
-      expect(outbox.reports, isEmpty);
-    });
-
-    testWidgets('N>0 → דיאלוג, ו"איסוף" מביא את הדיווחים לתיבה',
-        (tester) async {
+    test('N>0 → the reports reach the outbox', () async {
       final c = controller(pending: 3);
-      final ctx = await host(tester);
-      unawaited(offer(ctx, c));
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.collectDialogTitle), findsOneWidget);
-      expect(find.text(t.collectDialogContent(3)), findsOneWidget);
-      await tester.tap(find.text(t.collectConfirm));
-      await tester.pumpAndSettle();
-
+      await collect(c);
       expect(outbox.reports, hasLength(3));
       expect(c.outboxCount, 3);
     });
 
-    testWidgets('0 ממתינים → אין דיאלוג', (tester) async {
-      final c = controller(pending: 0);
-      final ctx = await host(tester);
-      unawaited(offer(ctx, c));
+    // תורי Hive ישנים מוסברים בהודעה בבית — הלחיצה אינה פותחת עליהם דו-שיח.
+    testWidgets('legacy Hive queues: no dialog, and it collects at once',
+        (tester) async {
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => _FakeQueue(2),
+        findUnmigratedLegacy: () async => ['error_reports_queue'],
+      );
+      addTearDown(c.dispose);
+      await host(tester);
+      final result = collect(c);
       await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
-    });
-
-    testWidgets('"לא עכשיו" — ולא שואלים שוב באותה הרצה', (tester) async {
-      final c = controller(pending: 2);
-      final ctx = await host(tester);
-      unawaited(offer(ctx, c));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(t.collectLater));
-      await tester.pumpAndSettle();
-      expect(outbox.reports, isEmpty);
-
-      unawaited(offer(ctx, c));
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsNothing);
+      expect(find.byType(AppDialog), findsNothing);
+      expect(await result, DriveCollectOutcome.collected);
+      await tester.pump(const Duration(seconds: 7));
     });
   });
 
@@ -805,6 +797,13 @@ void main() {
             contains(he ? 'צילומי מסך' : 'screenshots'));
         expect(guide.reportsDisclosureReports,
             contains(he ? 'תמונת הזיכרון' : 'memory dump'));
+        // רק תמונות אפשר לצרף, והפרטים הטכניים נוסעים עם הדיווח.
+        expect(guide.reportsDisclosureReports,
+            contains(he ? 'תמונות שצירפתם' : 'images you attached'));
+        expect(guide.reportsDisclosureReports,
+            isNot(contains(he ? 'קבצים' : 'files')));
+        expect(guide.reportsDisclosureReports,
+            contains(he ? 'פרטים טכניים' : 'technical details'));
         expect(guide.reportsDisclosureSearch,
             contains(he ? 'מילות החיפוש' : 'search terms'));
         expect(guide.reportsDisclosureSearch,
@@ -1191,79 +1190,6 @@ void main() {
         expect(await resolve(), isNull);
         expect(Directory(dataRoot).existsSync(), isFalse);
       });
-    });
-
-    testWidgets('תורי Hive שלא הועברו — הודעה ברורה, ואחריה ההצעה לאסוף',
-        (tester) async {
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => _FakeQueue(2),
-        findUnmigratedLegacy: () async => ['error_reports_queue'],
-      );
-      addTearDown(c.dispose);
-      final ctx = await host(tester);
-      final notices = MemoryNoticesStore();
-
-      unawaited(offerErrorReportCollection(
-        ctx,
-        c,
-        isOtzariaRunning: () async => false,
-        notices: notices,
-      ));
-      await tester.pumpAndSettle();
-      expect(find.text(t.legacyReportsDialogTitle), findsOneWidget);
-      expect(find.text(t.legacyReportsDialogContent), findsOneWidget);
-
-      await tester.tap(find.text(t.introDialogConfirm));
-      await tester.pumpAndSettle();
-      expect(find.text(t.collectDialogTitle), findsOneWidget);
-      expect(notices.marked, [NoticesSeenStore.legacyReportsNotice]);
-    });
-
-    testWidgets('איסוף מהדף (בלי notices) — אין דיאלוג Hive, ואוסף מיד',
-        (tester) async {
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => _FakeQueue(2),
-        findUnmigratedLegacy: () async => ['error_reports_queue'],
-      );
-      addTearDown(c.dispose);
-      final ctx = await host(tester);
-
-      final result = offerErrorReportCollection(
-        ctx,
-        c,
-        isOtzariaRunning: () async => false,
-        confirm: false,
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.legacyReportsDialogTitle), findsNothing);
-      expect(find.byType(AppDialog), findsNothing);
-      expect(await result, ReportOfferOutcome.collected);
-      await tester.pump(const Duration(seconds: 7));
-    });
-
-    testWidgets('הודעת ה-Hive הישן — פעם אחת בלבד במחשב', (tester) async {
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => _FakeQueue(0),
-        findUnmigratedLegacy: () async => ['error_reports_queue'],
-      );
-      addTearDown(c.dispose);
-      final ctx = await host(tester);
-
-      unawaited(offerErrorReportCollection(
-        ctx,
-        c,
-        isOtzariaRunning: () async => false,
-        notices: MemoryNoticesStore(
-          seen: {NoticesSeenStore.legacyReportsNotice},
-        ),
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.legacyReportsDialogTitle), findsNothing);
     });
 
     test('כל איסוף קורא מחדש את התור ואת היכולות של אוצריא', () async {

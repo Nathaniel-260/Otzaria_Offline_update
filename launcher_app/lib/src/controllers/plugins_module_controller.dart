@@ -40,6 +40,12 @@ enum PluginSortMode { recommended, newest, updated }
 /// `/plugins` (דף בית אצור), `/plugins/all` ו-`/plugins/category/<slug>`.
 enum PluginStorePage { home, all, category }
 
+/// המרווח בין שתי מסירות רצופות של עדכוני תוספים.
+///
+/// כל מסירה היא `otzaria://plugin/install-local`. כשאוצריא סגורה, הראשונה
+/// מפעילה אותה, ושנייה מוקדמת מדי הייתה פותחת מופע נוסף.
+const Duration pluginUpdateDeliverySpacing = Duration(milliseconds: 1500);
+
 class PluginsModuleController extends ChangeNotifier
     with DisposeGuard, ProgressNotifier {
   PluginsModuleController({
@@ -772,6 +778,33 @@ class PluginsModuleController extends ChangeNotifier
     }
     return result;
   }
+
+  /// מוסר לאוצריא, אחד אחרי השני, את העדכונים שאפשר להתקין ישירות
+  /// ([plugins], וכברירת מחדל [deliverableUpdates]). מחזיר מה נשלח בהצלחה.
+  Future<List<StorePlugin>> deliverUpdates({
+    List<StorePlugin>? plugins,
+    void Function(StorePlugin plugin)? onDelivering,
+    void Function(StorePlugin plugin, PluginInstallResult result)? onDelivered,
+    bool Function()? isCancelled,
+  }) async {
+    final sent = <StorePlugin>[];
+    var first = true;
+    for (final plugin in plugins ?? deliverableUpdates) {
+      if (isDisposed || (isCancelled?.call() ?? false)) break;
+      if (!first) await Future<void>.delayed(pluginUpdateDeliverySpacing);
+      first = false;
+      if (isDisposed || (isCancelled?.call() ?? false)) break;
+      onDelivering?.call(plugin);
+      final result = await directInstall(plugin);
+      if (result.success) sent.add(plugin);
+      onDelivered?.call(plugin, result);
+    }
+    return sent;
+  }
+
+  /// עדכונים שאוצריא יכולה לקבל ישירות.
+  List<StorePlugin> get deliverableUpdates =>
+      updatablePlugins.where(canDirectInstall).toList(growable: false);
 
   void _replacePlugin(StorePlugin updated) {
     plugins = [

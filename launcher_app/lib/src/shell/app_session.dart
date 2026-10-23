@@ -23,6 +23,7 @@ import '../controllers/otzaria_module_controller.dart';
 import '../controllers/plugins_module_controller.dart';
 import '../controllers/search_feedback_controller.dart';
 import '../controllers/shell_module_ports.dart';
+import '../flows/update_here_flow.dart';
 import '../services/app_logger.dart';
 import '../services/app_paths.dart';
 import '../services/byte_size.dart';
@@ -36,7 +37,10 @@ import '../settings/app_settings.dart';
 import '../settings/safer_mode.dart';
 import '../settings/settings_controller.dart';
 import '../widgets/ui_snack.dart';
+import 'download_failure.dart';
+import 'home_guidance.dart' show GuidanceItem;
 import 'session_prompts.dart';
+import 'shell_tasks.dart';
 
 /// המצב והזרימות של הרצה אחת: המודולים, הבדיקות, ההורדה והדגלים שחוסמים
 /// יציאה. כל מה שדורש `BuildContext` עובר דרך [prompts].
@@ -178,6 +182,9 @@ class AppSession extends ChangeNotifier {
   SearchFeedbackController get searchFeedback => _searchFeedback;
   NoticesSeenStore get notices => _notices;
 
+  /// מסכי המשימה (הורדה, עדכון כאן) — המסגרת מציגה אותם בשכבה מעל הגוף.
+  final ShellTasks tasks = ShellTasks();
+
   bool _disposed = false;
   bool get isActive => !_disposed;
 
@@ -245,12 +252,20 @@ class AppSession extends ChangeNotifier {
 
   late final OtzariaModulePort _otzariaPort = OtzariaModulePort(_otzaria);
   late final LibraryModulePort _libraryPort = LibraryModulePort(_library);
+  late final PluginsModulePort _pluginsPort = PluginsModulePort(_plugins);
 
   late final MirrorDownloadFlow _downloads = MirrorDownloadFlow(
     app: _otzariaPort,
     library: _libraryPort,
-    plugins: PluginsModulePort(_plugins),
+    plugins: _pluginsPort,
     host: _SessionDownloadHost(this),
+  );
+
+  late final UpdateHereFlow _updateHere = UpdateHereFlow(
+    app: _otzariaPort,
+    library: _libraryPort,
+    plugins: _pluginsPort,
+    host: _SessionUpdateHost(this),
   );
 
   late final LauncherUpdateFlow _launcherFlow = LauncherUpdateFlow(
@@ -278,6 +293,9 @@ class AppSession extends ChangeNotifier {
 
   bool get isDownloading => _downloads.isDownloading;
   bool get isCancellingDownload => _downloads.isCancelling;
+
+  /// מה יורד עכשיו — למסך ההתקדמות.
+  MirrorComponent? get currentDownload => _downloads.currentComponent;
 
   /// העבודה שבעלייה. נפרד מהבנאי כדי שבדיקות יוכלו לבנות סשן בלי להריץ אותה.
   void start() {
@@ -342,6 +360,7 @@ class AppSession extends ChangeNotifier {
     _errorReports.dispose();
     _searchFeedback.dispose();
     _faq.dispose();
+    tasks.dispose();
     super.dispose();
   }
 
@@ -722,9 +741,18 @@ class AppSession extends ChangeNotifier {
   }
 
   Future<void> downloadAll() async {
-    if (_blockedByReadOnly()) return;
+    if (_blockedByReadOnly() || tasks.isRunning) return;
     await _downloads.downloadAll();
+    if (isActive) tasks.abandonDownload();
   }
+
+  /// "עדכון אוצריא במחשב הזה" / "התקנת אוצריא" — מסך המשימה.
+  Future<void> updateHere(List<GuidanceItem> items) async {
+    if (tasks.isRunning || exitPending || !isActive) return;
+    await _updateHere.run(items);
+  }
+
+  void stopWaitingForSetup() => _updateHere.stopWaiting();
 
   Future<void> _refreshStaleOnlineChecks(AppSettings s) async {
     final stale = StaleOnlineChecks.of(
@@ -791,7 +819,12 @@ class AppSession extends ChangeNotifier {
 
     final approved = await prompts.confirmLibraryReindex();
     if (!approved) return;
+    await deliverLibraryReindex();
+  }
 
+  /// מוסר את הבקשה בלי לשאול — הלחיצה במסך הסיום היא האישור.
+  Future<void> deliverLibraryReindex() async {
+    if (!_library.hasPendingReindex || !isActive) return;
     final t = AppL10n.strings.libraryScreen;
     if (await _otzaria.requestLibraryReindex()) {
       await _library.markReindexRequestDelivered();
@@ -869,12 +902,14 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   AppSettings get settings => _session.settings.settings;
 
   @override
-  Future<void> refreshStaleOnlineChecks(AppSettings s) =>
-      _session._refreshStaleOnlineChecks(s);
+  Future<void> refreshStaleOnlineChecks(AppSettings s) {
+    // מכאן ההורדה בטוח מתחילה (או שואלת) — מסך המשימה נפתח כבר עכשיו.
+    _session.tasks.prepareDownload();
+    return _session._refreshStaleOnlineChecks(s);
+  }
 
   @override
-  Future<bool> confirmSemanticSearch() =>
-      _session.prompts.confirmSemanticSearch();
+  Future<bool?> confirmSemanticSearch() => _session.tasks.askBeforeDownload();
 
   @override
   Future<DownloadRollback> captureRollback() =>
@@ -884,12 +919,23 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   Future<void> sweepMirror() => _session._sweepMirrorJunk();
 
   @override
-  void stateChanged() => _session._rebuild();
+  void stateChanged() {
+    final flow = _session._downloads;
+    if (flow.isDownloading) {
+      _session.tasks.downloadRunning(flow.activeComponents);
+    }
+    _session._rebuild();
+  }
 
   @override
   void downloadSnapshotFailed(Object error) {
     AppLogger.instance.info('mirror snapshot failed: $error');
-    UiSnack.show(AppL10n.strings.home.downloadSnapshotFailedSnack);
+    _session.tasks.downloadFailed(
+      DownloadFailure(DownloadFailureKind.snapshot, details: '$error'),
+    );
+    if (!_session.prompts.taskScreenShown) {
+      UiSnack.show(AppL10n.strings.home.downloadSnapshotFailedSnack);
+    }
   }
 
   @override
@@ -898,6 +944,8 @@ class _SessionDownloadHost implements MirrorDownloadHost {
       AppLogger.instance
           .info('revert after cancelled download failed: $revertError');
     }
+    _session.tasks.downloadCancelled(revertFailed: revertError != null);
+    if (_session.prompts.taskScreenShown) return;
     UiSnack.show(
       revertError == null
           ? AppL10n.strings.home.downloadCancelledSnack
@@ -912,8 +960,46 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   void downloadFinished({
     required List<MirrorComponent> failed,
     required List<MirrorComponent> skipped,
-  }) =>
-      _session.prompts.reportDownload(failed: failed, skipped: skipped);
+  }) {
+    final s = _session;
+    if (failed.isEmpty) {
+      s.tasks.downloadDone(skipped: skipped);
+    } else {
+      s.tasks.downloadFailed(classifyDownloadFailure(
+        failed: failed,
+        errors: {
+          MirrorComponent.app: s._otzaria.downloadError,
+          MirrorComponent.library: s._library.downloadError,
+          MirrorComponent.plugins:
+              s._plugins.errorMessage ?? s._plugins.shabbatNotice,
+        },
+        shabbat: s._plugins.shabbatNotice != null,
+      ));
+    }
+    s.prompts.reportDownload(failed: failed, skipped: skipped);
+  }
+}
+
+class _SessionUpdateHost implements UpdateHereHost {
+  _SessionUpdateHost(this._session);
+
+  final AppSession _session;
+
+  @override
+  bool get isActive => _session.isActive;
+
+  @override
+  ShellTasks get tasks => _session.tasks;
+
+  @override
+  Future<bool> isOtzariaRunning() => _session.refreshProcessState();
+
+  @override
+  Future<bool> closeOtzaria() => _session.closeOtzaria();
+
+  @override
+  void closeFailed() =>
+      UiSnack.showError(AppL10n.strings.common.closeOtzariaFailedSnack);
 }
 
 class _SessionLauncherHost implements LauncherUpdateHost {

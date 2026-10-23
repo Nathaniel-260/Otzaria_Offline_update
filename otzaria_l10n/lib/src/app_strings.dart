@@ -14,6 +14,7 @@ abstract class AppStrings {
   ShellStrings get shell;
   HomeStrings get home;
   GuidanceStrings get guide;
+  TaskStrings get task;
   AppScreenStrings get appScreen;
   LibraryScreenStrings get libraryScreen;
   SettingsScreenStrings get settings;
@@ -126,28 +127,14 @@ abstract class HomeStrings {
   String get appInstallConfirm;
   String appInstalledSnack(String version);
 
-  /// **התקנה ראשונה במחשב ריק** — אותה לחיצה על "התקנה" מציעה גם את
-  /// הספרייה, כי אין במחשב לא תוכנה ולא מסד. זה מה שהחליף את חבילת ה-FULL.
-  String get firstInstallDialogTitle;
-  String firstInstallPrompt(String appVersion, String libraryVersion);
-  String get firstInstallConfirm;
-
-  /// אוצריא נפתחה מדף הסיום של המתקין ונועלת את המסד, והסגירה האוטומטית לא
-  /// הצליחה — רק אז מבקשים מהמשתמש לסגור ידנית.
-  String get closeOtzariaForLibraryDialogTitle;
-  String get closeOtzariaForLibraryPrompt;
   String get closeOtzariaForAppInstallDialogTitle;
   String get closeOtzariaForAppInstallPrompt;
   String get closeOtzariaAndInstallConfirm;
 
-  /// "עדכון כאן" כשאוצריא פתוחה — לפני הספרייה, שהיא נועלת את קובץ המסד.
-  String get closeOtzariaForUpdatePrompt;
-  String get closeOtzariaAndUpdateConfirm;
   String get elevatedAsOtherUserWarning;
 
   String get otzariaOpenSnack;
 
-  String get libraryUpdateDialogTitle;
   String libraryFreshInstallPrompt(String targetVersion);
   String libraryUpdatePrompt(String localVersion, String targetVersion);
   String get libraryUpdateConfirm;
@@ -161,8 +148,6 @@ abstract class HomeStrings {
   String get doNotRemoveDriveWarning;
 
   // ── ההורדה לכונן ─────────────────────────────────────────────────────────
-
-  String get downloadNowButton;
 
   /// ביטול ההורדה שרצה — מוצג רק בזמנה. הביטול **מוחק** את מה שההורדה הזו
   /// הביאה, ולכן הוא עובר דרך דיאלוג אזהרה.
@@ -198,6 +183,137 @@ abstract class HomeStrings {
   String get libraryNothingDownloaded;
   String get libraryNeedsManualPath;
   String get libraryPersonalOtherMachine;
+}
+
+// ── מסכי המשימה ──
+
+/// מסכי המשימה: הורדה לכונן ו"עדכון אוצריא במחשב הזה". הנוסח מהמוקאפ.
+abstract class TaskStrings {
+  const TaskStrings();
+
+  String get semanticTitle;
+  String get semanticBody;
+  String get semanticHint;
+  String get semanticNoTitle;
+  String get semanticNoBody;
+  String get semanticNoSize;
+  String get semanticYesTitle;
+  String get semanticYesBody;
+  String get back;
+  String get startDownload;
+  String get preparingTitle;
+  String get preparingBody;
+  String get downloadingTitle;
+  String get downloadingBody;
+  String downloadingStep(String name, int index, int count);
+  String get componentApp;
+  String get componentLibrary;
+  String get componentPlugins;
+  String get stepApp;
+  String get stepLibrary;
+  String get stepPlugins;
+  String transferRate(String perSecond);
+  String minutesLeft(int minutes);
+  String bytesLine(String name, String done, String total);
+  String stageDone(String? size);
+  String get stageWaiting;
+  String get cancelling;
+  String get cancelledTitle;
+  String get cancelledBody;
+  String get cancelledRevertFailedBody;
+  String get downloadAgain;
+  String get backHome;
+  String get backToHomePage;
+  String get doneTitle;
+  String get doneBody;
+  String doneSkipped(String names);
+  String doneAppValue(String version);
+  String doneLibraryValue(int version);
+  String donePluginsValue(int count);
+  String get donePluginsUpdated;
+  String get whatNow;
+  String get whatNowEject;
+  String get whatNowEjectHint;
+  String get whatNowConnect;
+  String get whatNowOpen;
+  String get updateHereToo;
+  String get installHereToo;
+  String get finish;
+  String get networkTitle;
+  String networkBody(String name);
+  String get shabbatTitle;
+  String get shabbatBody;
+  String get spaceTitle;
+  String spaceBody(String needed, String free);
+  String get snapshotTitle;
+  String get snapshotBody;
+  String otherTitle(String name);
+  String get otherBody;
+  String get techDetails;
+  String get hideTechDetails;
+  String get copyDetails;
+  String get detailsCopied;
+  String get otherUserTitle;
+  String get otherUserBody;
+  String get otherUserHint;
+  String get continueAnyway;
+  String get closeTitle;
+  String get closeBody;
+  String closeHint({required bool plugins});
+  String get closeAndContinue;
+  String get closeAfterWizardBody;
+  String get closeAfterWizardButton;
+  String get notNow;
+  String stepOf(int index, int count);
+  String get installingApp;
+  String get updatingApp;
+  String get installingLibrary;
+  String get updatingLibrary;
+  String get sendingPlugins;
+  String get appWizardFirstBody;
+  String get appWizardBody;
+  String get libraryBody;
+  String get pluginsBody;
+  String get keepDrive;
+  String appVersion(String version);
+  String appInstalled(String version);
+  String get appWizardOpen;
+  String get appStoppedWaiting;
+  String get stopWaiting;
+  String get libraryFull;
+  String libraryVersion(int version);
+  String libraryDone(String detail);
+  String get libraryWaitingClose;
+  String get librarySkipped;
+  String pluginsWaiting(int count);
+  String get pluginsCurrent;
+  String get pluginsSent;
+  String get pluginRowSent;
+  String get pluginRowWaiting;
+  String get pluginRowFailed;
+  String get finishWithoutWaiting;
+  String get installedTitle;
+  String get updatedTitle;
+  String doneHereBody(
+      {required bool firstInstall,
+      required bool withLibrary,
+      required bool plugins});
+  String get reindexTitle;
+  String get reindexBody;
+  String get reindexButton;
+  String get toOtzaria;
+  String get wizardClosedTitle;
+  String wizardClosedBody(
+      {required bool firstInstall, required bool libraryDone});
+  String get stoppedTitle;
+  String get stoppedBody;
+  String get libraryFailedTitle;
+  String get appFailedTitle;
+  String get libraryFailedKeep;
+  String get appFailedKeep;
+  String get toLibraryPage;
+  String get toAppPage;
+  String get showProgress;
 }
 
 // ── דף הבית: הכוונה לפי המצב ───────────────────────────────────────────────────
@@ -1466,7 +1582,6 @@ abstract class LibraryDomainStrings {
   String get libraryChangesNotesName;
   String get semanticDownloading;
   String get semanticInstalling;
-  String get semanticDownloadPrompt;
   String get semanticConsentRequired;
   String get semanticFullDownloadNeeded;
   String get semanticConsentTitle;

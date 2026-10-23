@@ -1,4 +1,8 @@
+import 'package:plugins_manager/plugins_manager.dart' show StorePlugin;
+
+import '../flows/update_here_flow.dart';
 import '../services/mirror_download_undo.dart';
+import '../shell/shell_tasks.dart' show PluginDelivery, PluginDeliveryState;
 import 'auto_install_flow.dart';
 import 'cancelled_download_refresh.dart';
 import 'download_plan.dart';
@@ -9,7 +13,8 @@ import 'mirror_download_flow.dart';
 import 'otzaria_module_controller.dart';
 import 'plugins_module_controller.dart';
 
-class OtzariaModulePort implements AppMirrorModule, AutoInstallApp {
+class OtzariaModulePort
+    implements AppMirrorModule, AutoInstallApp, UpdateHereApp {
   OtzariaModulePort(this._otzaria);
 
   final OtzariaModuleController _otzaria;
@@ -41,9 +46,37 @@ class OtzariaModulePort implements AppMirrorModule, AutoInstallApp {
   @override
   Future<void> install({required bool useWizard}) =>
       _otzaria.install(useWizard: useWizard);
+
+  @override
+  bool get elevatedAsOtherUser => _otzaria.elevatedAsOtherUser;
+
+  @override
+  String? get versionToInstall => _otzaria.latestVersion;
+
+  @override
+  String? get errorMessage => _otzaria.errorMessage ?? _otzaria.noticeMessage;
+
+  @override
+  bool get needsElevation => _otzaria.needsElevation;
+
+  @override
+  void stopWaiting() => _otzaria.stopWaitingForSetup();
+
+  @override
+  Future<AppInstallOutcome> installWithWizard() async {
+    _otzaria.lastInstallResult = null;
+    await _otzaria.install();
+    return switch (_otzaria.lastInstallResult) {
+      OtzariaInstallResult.installed => AppInstallOutcome.installed,
+      OtzariaInstallResult.cancelled => AppInstallOutcome.cancelled,
+      OtzariaInstallResult.wizardStillOpen => AppInstallOutcome.stillOpen,
+      OtzariaInstallResult.failed || null => AppInstallOutcome.failed,
+    };
+  }
 }
 
-class LibraryModulePort implements LibraryMirrorModule, AutoInstallLibrary {
+class LibraryModulePort
+    implements LibraryMirrorModule, AutoInstallLibrary, UpdateHereLibrary {
   LibraryModulePort(this._library);
 
   final LibraryModuleController _library;
@@ -89,9 +122,25 @@ class LibraryModulePort implements LibraryMirrorModule, AutoInstallLibrary {
 
   @override
   Future<void> recheck() => _library.checkForUpdate();
+
+  @override
+  int? get targetVersion => _library.targetVersion;
+
+  @override
+  String? get errorMessage => _library.errorMessage;
+
+  @override
+  bool get needsElevation => _library.needsElevation;
+
+  @override
+  Future<bool> apply() async {
+    await _library.update();
+    return _library.status == LibraryModuleStatus.upToDate &&
+        _library.errorMessage == null;
+  }
 }
 
-class PluginsModulePort implements PluginsMirrorModule {
+class PluginsModulePort implements PluginsMirrorModule, UpdateHerePlugins {
   PluginsModulePort(this._plugins);
 
   final PluginsModuleController _plugins;
@@ -119,6 +168,31 @@ class PluginsModulePort implements PluginsMirrorModule {
 
   @override
   bool get lastSyncFailed => _plugins.lastSyncFailed;
+
+  @override
+  List<String> get deliverableUpdates =>
+      [for (final plugin in _plugins.deliverableUpdates) plugin.name];
+
+  @override
+  Future<void> deliver(void Function(List<PluginDelivery> rows) onRow) async {
+    final targets = _plugins.deliverableUpdates;
+    final states = {
+      for (final plugin in targets) plugin.id: PluginDeliveryState.waiting,
+    };
+    List<PluginDelivery> rows() => [
+          for (final StorePlugin plugin in targets)
+            PluginDelivery(plugin.name, states[plugin.id]!),
+        ];
+    await _plugins.deliverUpdates(
+      plugins: targets,
+      onDelivered: (plugin, result) {
+        states[plugin.id] = result.success
+            ? PluginDeliveryState.sent
+            : PluginDeliveryState.failed;
+        onRow(rows());
+      },
+    );
+  }
 }
 
 class LauncherUpdatePort implements LauncherUpdateTarget {

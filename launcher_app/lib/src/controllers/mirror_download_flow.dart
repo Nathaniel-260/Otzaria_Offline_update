@@ -38,7 +38,9 @@ abstract interface class MirrorDownloadHost {
   bool get launcherDownloading;
   AppSettings get settings;
   Future<void> refreshStaleOnlineChecks(AppSettings s);
-  Future<bool> confirmSemanticSearch();
+
+  /// `null` = חזרה מהשאלה: ההורדה לא מתחילה.
+  Future<bool?> confirmSemanticSearch();
   Future<DownloadRollback> captureRollback();
   Future<void> sweepMirror();
   void stateChanged();
@@ -69,8 +71,19 @@ class MirrorDownloadFlow {
   bool _isPreparing = false;
   Future<void>? _run;
   Future<void>? _sweep;
+  DownloadPlan? _plan;
+  List<MirrorComponent> _components = const [];
+  MirrorComponent? _current;
 
   bool get isDownloading => _isDownloading;
+
+  /// התוכנית של ההורדה שרצה עכשיו, ו[activeComponents] — מה ממנה ירוץ.
+  DownloadPlan? get activePlan => _isDownloading ? _plan : null;
+  List<MirrorComponent> get activeComponents =>
+      _isDownloading ? _components : const [];
+
+  /// הרכיב שיורד ברגע זה; `null` לפני הראשון ואחרי האחרון.
+  MirrorComponent? get currentComponent => _isDownloading ? _current : null;
   bool get isCancelling => _cancelRequested;
   bool get isPreparing => _isPreparing;
   Future<void>? get pendingSweep => _sweep;
@@ -115,9 +128,12 @@ class MirrorDownloadFlow {
       hasStaleFullPackage: app.hasStaleFullPackage,
       online: app.onlineProof,
     );
-    final includeSemanticSearch = s.downloadsLibrary &&
-        library.shouldOfferSemanticDownload &&
-        await host.confirmSemanticSearch();
+    var includeSemanticSearch = false;
+    if (s.downloadsLibrary && library.shouldOfferSemanticDownload) {
+      final answer = await host.confirmSemanticSearch();
+      if (answer == null) return;
+      includeSemanticSearch = answer;
+    }
     if (!host.isActive || host.isBlocked) return;
     final plan = DownloadPlan(
       skipApp: skipApp,
@@ -138,6 +154,13 @@ class MirrorDownloadFlow {
       ),
     );
 
+    _plan = plan;
+    _components = [
+      if (plan.runsApp(s)) MirrorComponent.app,
+      if (plan.runsLibrary(s)) MirrorComponent.library,
+      if (plan.runsPlugins(s) || plan.runsStoreApp(s)) MirrorComponent.plugins,
+    ];
+    _current = null;
     _isDownloading = true;
     _cancelRequested = false;
     host.stateChanged();
@@ -155,19 +178,26 @@ class MirrorDownloadFlow {
       }
       bool cancelled() => _cancelRequested;
 
-      if (plan.runsApp(s)) await app.download(isCancelled: cancelled);
+      if (plan.runsApp(s)) {
+        _current = MirrorComponent.app;
+        await app.download(isCancelled: cancelled);
+      }
       if (!cancelled() && plan.runsLibrary(s)) {
+        _current = MirrorComponent.library;
         await library.download(
           includeSemanticSearch: includeSemanticSearch,
           isCancelled: cancelled,
         );
       }
       if (!cancelled() && plan.runsPlugins(s)) {
+        _current = MirrorComponent.plugins;
         await plugins.sync(isCancelled: cancelled);
       }
       if (!cancelled() && plan.runsStoreApp(s)) {
+        _current = MirrorComponent.plugins;
         await plugins.syncStoreApp();
       }
+      _current = null;
 
       if (cancelled()) {
         Object? revertError;

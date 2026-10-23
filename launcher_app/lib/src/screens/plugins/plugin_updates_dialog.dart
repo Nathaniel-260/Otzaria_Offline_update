@@ -8,13 +8,6 @@ import '../../controllers/plugins_module_controller.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 
-/// המרווח בין שתי מסירות רצופות ב"עדכון הכל".
-///
-/// כל מסירה היא `otzaria://plugin/install-local` אל אוצריא. כשהיא סגורה,
-/// המסירה הראשונה מפעילה אותה — ומסירה שנייה שמגיעה לפני שהמופע הראשון
-/// תפס את נעילת המופע היחיד הייתה פותחת מופע נוסף.
-const Duration pluginUpdateDeliverySpacing = Duration(milliseconds: 1500);
-
 /// גובה מרבי לרשימת התוספים בדיאלוג; הכותרת, "עדכון הכל" וההערה נשארים
 /// מחוץ לגליל כדי שלא ייעלמו בגלילה.
 const double _listMaxHeight = 300;
@@ -125,9 +118,11 @@ class _PluginUpdatesListState extends State<_PluginUpdatesList> {
 
   Future<void> _install(StorePlugin plugin) async {
     setState(() => _busyId = plugin.id);
-    final result = await widget.controller.directInstall(plugin);
-    if (!mounted) return;
+    _delivered(plugin, await widget.controller.directInstall(plugin));
+  }
 
+  void _delivered(StorePlugin plugin, PluginInstallResult result) {
+    if (!mounted) return;
     setState(() {
       _busyId = null;
       if (result.success) _sent.add(plugin.id);
@@ -141,15 +136,12 @@ class _PluginUpdatesListState extends State<_PluginUpdatesList> {
 
   Future<void> _updateAll() async {
     setState(() => _updatingAll = true);
-
-    var first = true;
-    for (final plugin in _pending) {
-      if (!mounted) break;
-      if (!first) await Future<void>.delayed(pluginUpdateDeliverySpacing);
-      first = false;
-      await _install(plugin);
-    }
-
+    await widget.controller.deliverUpdates(
+      plugins: _pending,
+      isCancelled: () => !mounted,
+      onDelivering: (plugin) => setState(() => _busyId = plugin.id),
+      onDelivered: (plugin, result) => _delivered(plugin, result),
+    );
     if (mounted) setState(() => _updatingAll = false);
   }
 

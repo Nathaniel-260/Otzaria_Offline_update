@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ import '../controllers/download_plan.dart';
 import '../controllers/download_summary.dart';
 import '../controllers/launcher_update_flow.dart';
 import '../controllers/plugins_module_controller.dart' show PluginsModuleStatus;
-import '../flows/home_flows.dart';
+import '../flows/library_flows.dart' show showLibraryChangesDialog;
 import '../self_update/launcher_release.dart';
 import '../services/app_paths.dart';
 import '../services/byte_size.dart';
@@ -28,6 +29,7 @@ import '../shell/home_guidance_session.dart';
 import '../shell/session_prompts.dart';
 import '../shell/shell_keys.dart';
 import '../shell/shell_navigator.dart';
+import '../shell/shell_tasks.dart';
 import '../theme/theme_exports.dart';
 import '../widgets/widgets_exports.dart';
 import 'app_report/crash_prompt_dialog.dart';
@@ -43,6 +45,8 @@ import 'plugins/plugins_screen.dart';
 import 'reports/reports_section.dart';
 import 'reports_upload_flow.dart';
 import 'settings_screen.dart';
+import 'tasks/download_task_view.dart';
+import 'tasks/update_here_task_view.dart';
 
 /// כפתור השפה שבמסך הפתיחה: עברית ↔ אנגלית, ונשמר בהגדרות.
 Future<void> toggleAppLanguage(SettingsController settings) {
@@ -149,6 +153,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     )
       ..addListener(_onSessionChange)
       ..addListener(_onSessionChangeInStore);
+    _session.tasks.addListener(_onTasks);
     _navigator
       ..addListener(_onSessionChange)
       ..addListener(_onNavigation);
@@ -157,6 +162,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
 
   @override
   void dispose() {
+    _session.tasks.removeListener(_onTasks);
     _dialogs.dispose();
     _navigator
       ..removeListener(_onSessionChange)
@@ -171,6 +177,17 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
 
   void _onSessionChange() {
     if (mounted) setState(() {});
+  }
+
+  /// משימה שנפתחה מוצגת מיד בשכבה מעל הגוף, ונעלמת כשהיא נסגרת.
+  void _onTasks() {
+    if (!mounted) return;
+    if (_session.tasks.hasTask) {
+      _navigator.showTask();
+    } else {
+      _navigator.endTask();
+    }
+    setState(() {});
   }
 
   /// מה שמוצג בחנות "מוזכר" — גם תוסף שהגיע בסנכרון בזמן שהמשתמש בה, כדי
@@ -294,12 +311,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   }
 
   @override
-  Future<bool> confirmSemanticSearch() => showTwoActionsDialog(
-        context: context,
-        title: context.strings.libraryDomain.companionSemanticName,
-        content: context.strings.libraryDomain.semanticDownloadPrompt,
-        confirmText: context.strings.home.downloadNowButton,
-      );
+  bool get taskScreenShown => _navigator.showsTask;
 
   @override
   Future<bool> confirmSemanticConsent() {
@@ -328,6 +340,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     required List<MirrorComponent> failed,
     required List<MirrorComponent> skipped,
   }) {
+    if (taskScreenShown) return;
     final t = context.strings;
     String label(MirrorComponent component) => switch (component) {
           MirrorComponent.app => t.guide.tileApp,
@@ -393,38 +406,39 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
 
   void _toggleLanguage() => unawaited(toggleAppLanguage(widget.settings));
 
-  HomeFlowDeps get _flowDeps => HomeFlowDeps(
-        otzaria: _session.otzaria,
-        library: _session.library,
-        isOtzariaRunning: _session.refreshProcessState,
-        closeOtzaria: _session.closeOtzaria,
-        onRequestReindex: _session.requestLibraryReindex,
-      );
+  List<GuidanceItem> get _hereItems =>
+      homeViewModelOf(_session).guidance.hereItems;
 
+  void _updateHere() => unawaited(_session.updateHere(_hereItems));
+
+  /// "הצג התקדמות": מסך המשימה, או הדף שבו רצה הפעולה.
+  void _showProgress() {
+    if (_session.tasks.hasTask) return _navigator.showTask();
+    final section = switch (homeViewModelOf(_session).task) {
+      HomeTask.installingApp => ShellSection.otzaria,
+      HomeTask.updatingLibrary => ShellSection.library,
+      _ => null,
+    };
+    if (section != null) unawaited(_goTo(section));
+  }
+
+  /// "איסוף לכונן": גילוי שאינו מעודכן נבנה מחדש מהספירה, בלי לאסוף.
   Future<void> _collectReports() async {
     final s = _session;
-    await offerErrorReportCollection(
-      context,
+    await collectReportsToDrive(
       s.errorReports,
       readOnly: widget.readOnly,
       isOtzariaRunning: s.refreshProcessState,
       searchFeedback: s.searchFeedback,
-      // הגילוי בדף והלחיצה הם האישור; התורים הישנים — רק הפס שבבית.
-      confirm: false,
+      disclosedReports: s.errorReportsToCollect,
+      disclosedSearchRecords: s.searchRecordsToCollect,
     );
     if (mounted) await s.recountReportsToCollect();
   }
 
   late final HomeActions _homeActions = HomeActions(
-    onInstallHere: () => unawaited(installOtzariaHere(context, _flowDeps)),
-    onUpdateHere: () => unawaited(
-      updateHere(
-        context,
-        _flowDeps,
-        items: homeViewModelOf(_session).guidance.hereItems,
-        onPluginsOnly: () => unawaited(_goTo(ShellSection.plugins)),
-      ),
-    ),
+    onInstallHere: _updateHere,
+    onUpdateHere: _updateHere,
     onDownload: () => unawaited(_session.downloadAll()),
     onLaunch: () => unawaited(_session.otzaria.launch()),
     onRecheck: () => unawaited(_session.checkNow()),
@@ -440,6 +454,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     onDismissElevation: _session.dismissElevation,
     onReviewLauncherUpdate: () => unawaited(_session.reviewLauncherUpdate()),
     onInstallLauncherUpdate: () => unawaited(_session.installLauncherUpdate()),
+    onShowProgress: _showProgress,
   );
 
   Widget _home() {
@@ -646,18 +661,154 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     );
   }
 
-  /// מקטע נבנה בכניסה הראשונה אליו ונשאר; רק המוצג מריץ טיקרים.
-  Widget _body(BuildContext context, ShellSection current) => IndexedStack(
-        key: ShellKeys.sectionStack,
-        index: current.index,
-        children: [
-          for (final section in ShellSection.values)
-            _navigator.isBuilt(section)
-                ? TickerMode(
-                    enabled: section == current,
-                    child: _sectionWidget(context, section),
-                  )
-                : const SizedBox.shrink(),
-        ],
-      );
+  /// מקטע נבנה בכניסה הראשונה אליו ונשאר; רק המוצג מריץ טיקרים. משימה
+  /// מוצגת בשכבה מעליהם, והמקטע שמתחתיה אינו מריץ טיקרים.
+  Widget _body(BuildContext context, ShellSection current) {
+    final task = _navigator.showsTask ? _session.tasks.current : null;
+    return Stack(
+      children: [
+        IndexedStack(
+          key: ShellKeys.sectionStack,
+          index: current.index,
+          children: [
+            for (final section in ShellSection.values)
+              _navigator.isBuilt(section)
+                  ? TickerMode(
+                      enabled: section == current && task == null,
+                      child: ExcludeFocus(
+                        excluding: task != null,
+                        child: _sectionWidget(context, section),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+          ],
+        ),
+        if (task != null)
+          Positioned.fill(
+            child: ColoredBox(
+              key: ShellKeys.taskLayer,
+              color: AppSurfaces.panelBackground(context),
+              child: _taskView(task),
+            ),
+          ),
+      ],
+    );
+  }
+
+  late final Listenable _downloadProgress = Listenable.merge([
+    _session.otzaria.progress,
+    _session.library.progress,
+    _session.plugins.progress,
+  ]);
+
+  DownloadSnapshot _downloadSnapshot() {
+    final s = _session;
+    switch (s.currentDownload) {
+      case MirrorComponent.app:
+        final received = s.otzaria.downloadReceived;
+        final total = s.otzaria.downloadTotal;
+        return DownloadSnapshot(
+          current: MirrorComponent.app,
+          received: received,
+          total: total,
+          fraction: received != null && total != null && total > 0
+              ? received / total
+              : null,
+        );
+      case MirrorComponent.library:
+        return DownloadSnapshot(
+          current: MirrorComponent.library,
+          received: s.library.downloadReceivedBytes,
+          total: s.library.downloadTotalBytes,
+          fraction: s.library.downloadProgress,
+        );
+      case MirrorComponent.plugins:
+        return DownloadSnapshot(
+          current: MirrorComponent.plugins,
+          fraction: s.plugins.syncProgress,
+        );
+      case null:
+        return const DownloadSnapshot();
+    }
+  }
+
+  void _dismissTask() => _session.tasks.dismiss();
+
+  void _leaveTaskTo(ShellSection section) {
+    _dismissTask();
+    unawaited(_goTo(section));
+  }
+
+  Widget _taskView(ShellTask task) {
+    final s = _session;
+    switch (task) {
+      case DownloadTask():
+        final here = _hereItems;
+        return DownloadTaskView(
+          task: task,
+          progress: _downloadProgress,
+          snapshot: _downloadSnapshot,
+          cancelling: s.isCancellingDownload,
+          done: DownloadDoneInfo(
+            appVersion: s.otzaria.latestVersion == null
+                ? null
+                : displayVersion(s.otzaria.latestVersion!),
+            libraryVersion: s.library.targetVersion,
+            pluginCount:
+                s.plugins.plugins.isEmpty ? null : s.plugins.plugins.length,
+            offer: here.isEmpty || widget.readOnly
+                ? DownloadHereOffer.none
+                : s.otzaria.currentVersion == null
+                    ? DownloadHereOffer.install
+                    : DownloadHereOffer.update,
+          ),
+          actions: DownloadTaskActions(
+            onAnswer: s.tasks.answer,
+            onCancel: () => unawaited(s.cancelDownload()),
+            onRetry: () => unawaited(s.downloadAll()),
+            onHome: _dismissTask,
+            onHere: _updateHere,
+          ),
+        );
+      case UpdateHereTask():
+        final failure = task.failure;
+        final library = s.library;
+        return UpdateHereTaskView(
+          task: task,
+          libraryProgress: library.progress,
+          librarySnapshot: () => LibraryApplySnapshot(
+            fraction: library.applyProgress,
+            stage: library.stageText,
+          ),
+          actions: UpdateHereActions(
+            onRespond: s.tasks.respond,
+            onStopWaiting: s.stopWaitingForSetup,
+            onFinishWithoutWaiting: s.tasks.finishWithoutWaiting,
+            onLaunch: () {
+              _dismissTask();
+              unawaited(s.otzaria.launch());
+            },
+            onHome: _dismissTask,
+            onRetry: _updateHere,
+            onOpenPage: (stage) => _leaveTaskTo(
+              stage == GuidanceItem.library
+                  ? ShellSection.library
+                  : ShellSection.otzaria,
+            ),
+            onReindex: library.hasPendingReindex
+                ? () => unawaited(s.deliverLibraryReindex())
+                : null,
+            onRestartElevated: Platform.isWindows &&
+                    (failure?.needsElevation ?? false) &&
+                    !s.exitPending
+                ? () => unawaited(s.restartElevated())
+                : null,
+            onLibraryChanges: library.changesNotesApplied &&
+                    library.changesNotes.isNotEmpty
+                ? () => unawaited(showLibraryChangesDialog(context, library))
+                : null,
+          ),
+        );
+    }
+  }
 }

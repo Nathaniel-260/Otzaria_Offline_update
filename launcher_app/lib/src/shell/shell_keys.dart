@@ -34,6 +34,15 @@ abstract final class ShellKeys {
   static const reportsCollect = ValueKey('reports.collect');
   static const reportsDisclosure = ValueKey('reports.disclosure');
 
+  static const taskLayer = ValueKey('task.layer');
+  static const taskPrimary = ValueKey('task.primary');
+  static const taskSecondary = ValueKey('task.secondary');
+  static const taskCancel = ValueKey('task.cancel');
+  static const taskStopWaiting = ValueKey('task.stopWaiting');
+  static const taskReindex = ValueKey('task.reindex');
+  static const taskElevation = ValueKey('task.elevation');
+  static const heroShowProgress = ValueKey('home.hero.showProgress');
+
   /// אריח הבית שמוביל אל [section].
   static ValueKey<String> tile(ShellSection section) =>
       ValueKey('home.tile.${section.name}');

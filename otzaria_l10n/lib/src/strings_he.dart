@@ -17,6 +17,8 @@ class HebrewStrings extends AppStrings {
   @override
   GuidanceStrings get guide => const _Guide();
   @override
+  TaskStrings get task => const _Task();
+  @override
   AppScreenStrings get appScreen => const _AppScreen();
   @override
   LibraryScreenStrings get libraryScreen => const _LibraryScreen();
@@ -174,23 +176,6 @@ class _Home extends HomeStrings {
   String appInstalledSnack(String version) => 'אוצריא עודכנה לגרסה $version';
 
   @override
-  String get firstInstallDialogTitle => 'אוצריא אינה מותקנת במחשב זה';
-  @override
-  String firstInstallPrompt(String appVersion, String libraryVersion) =>
-      'לא נמצאה כאן התקנה של אוצריא ולא נמצא מסד ספרים. בלחיצה אחת יותקנו '
-      'שניהם מהכונן, בלי אינטרנט: תוכנת אוצריא $appVersion, ואחריה ספריית '
-      'הספרים בגרסה $libraryVersion.\n\n'
-      'המתקין של אוצריא ייפתח ראשון, ובו תבחר לאן להתקין והאם ליצור קיצור '
-      'דרך. התקנת הספרייה תתחיל מיד אחריו ותימשך דקות ארוכות.';
-  @override
-  String get firstInstallConfirm => 'התקנה מלאה';
-  @override
-  String get closeOtzariaForLibraryDialogTitle => 'יש לסגור את אוצריא';
-  @override
-  String get closeOtzariaForLibraryPrompt =>
-      'אוצריא נפתחה בסיום ההתקנה, והיא נועלת את קובץ הספרייה. סגור אותה '
-      'ולחץ "נסה שוב" כדי להמשיך בהתקנת הספרייה.';
-  @override
   String get closeOtzariaForAppInstallDialogTitle => 'אוצריא פתוחה';
   @override
   String get closeOtzariaForAppInstallPrompt =>
@@ -199,20 +184,12 @@ class _Home extends HomeStrings {
   @override
   String get closeOtzariaAndInstallConfirm => 'סגירה והתקנה';
   @override
-  String get closeOtzariaForUpdatePrompt =>
-      'כדי לעדכן יש לסגור את אוצריא. הספרים שפתוחים יחכו לכם. לסגור אותה '
-      'עכשיו ולהמשיך בעדכון?';
-  @override
-  String get closeOtzariaAndUpdateConfirm => 'סגירה ועדכון';
-  @override
   String get elevatedAsOtherUserWarning =>
       'התוכנה רצה כמנהל בשם משתמש אחר — התקנה "למשתמש הנוכחי" תיכנס לחשבון '
       'של המנהל ולא לחשבון שלך. מומלץ להפעיל אותה בלי "הפעל כמנהל".';
 
   @override
   String get otzariaOpenSnack => 'אוצריא פתוחה — יש לסגור אותה ואז לנסות שוב.';
-  @override
-  String get libraryUpdateDialogTitle => 'עדכון הספרייה';
   @override
   String libraryFreshInstallPrompt(String targetVersion) =>
       'הספרייה תותקן בפעם הראשונה (גרסה $targetVersion) מהתיקייה שלצד '
@@ -233,8 +210,6 @@ class _Home extends HomeStrings {
   String get doNotRemoveDriveWarning =>
       'שים לב! אין להסיר את האונקי עד לסיום העדכון.';
 
-  @override
-  String get downloadNowButton => 'הורד עכשיו';
   @override
   String get cancelDownloadButton => 'ביטול ההורדה';
   @override
@@ -286,6 +261,290 @@ class _Home extends HomeStrings {
   String get libraryNeedsManualPath => 'נדרשת בחירת מיקום';
   @override
   String get libraryPersonalOtherMachine => 'מיועד למחשב אחר';
+}
+
+class _Task extends TaskStrings {
+  const _Task();
+
+  @override
+  String get semanticTitle => 'להוריד גם חיפוש חכם?';
+  @override
+  String get semanticBody =>
+      'חיפוש חכם מוצא מקורות לפי המשמעות, גם כשהמילים שונות ממה שחיפשתם.';
+  @override
+  String get semanticHint => 'אפשר לשנות את זה אחר כך בדף הספרייה.';
+  @override
+  String get semanticNoTitle => 'לא, רק החיפוש הרגיל (מומלץ)';
+  @override
+  String get semanticNoBody => 'אפשר להוסיף חיפוש חכם בהורדה הבאה.';
+  @override
+  String get semanticNoSize => 'בלי תוספת';
+  @override
+  String get semanticYesTitle => 'כן, גם חיפוש חכם';
+  @override
+  String get semanticYesBody =>
+      'מתאים כשיש מקום בכונן. ההורדה תהיה ארוכה יותר.';
+  @override
+  String get back => 'חזרה';
+  @override
+  String get startDownload => 'התחלת ההורדה';
+  @override
+  String get preparingTitle => 'מתכונן להורדה';
+  @override
+  String get preparingBody => 'בודק באתר אוצריא מה חדש.';
+  @override
+  String get downloadingTitle => 'מוריד את העדכונים לכונן';
+  @override
+  String get downloadingBody => 'אפשר להמשיך לעבוד במחשב בינתיים.';
+  @override
+  String downloadingStep(String name, int index, int count) =>
+      'מוריד את $name · $index מתוך $count';
+  @override
+  String get componentApp => 'תוכנת אוצריא';
+  @override
+  String get componentLibrary => 'הספרייה';
+  @override
+  String get componentPlugins => 'תוספים';
+  @override
+  String get stepApp => 'תוכנת אוצריא';
+  @override
+  String get stepLibrary => 'הספרייה';
+  @override
+  String get stepPlugins => 'התוספים';
+  @override
+  String transferRate(String perSecond) => '$perSecond בשנייה';
+  @override
+  String minutesLeft(int minutes) =>
+      minutes == 1 ? 'נותרה 1 דקה' : 'נותרו $minutes דקות';
+  @override
+  String bytesLine(String name, String done, String total) =>
+      '$name: ירדו $done מתוך $total';
+  @override
+  String stageDone(String? size) => size == null ? 'ירד' : 'ירד · $size';
+  @override
+  String get stageWaiting => 'ממתין';
+  @override
+  String get cancelling => 'מבטל…';
+  @override
+  String get cancelledTitle => 'ההורדה בוטלה';
+  @override
+  String get cancelledBody =>
+      'הכונן נשאר כמו לפני שהתחלתם, ואפשר להמשיך להשתמש בו כרגיל.';
+  @override
+  String get cancelledRevertFailedBody =>
+      'לא כל מה שירד הוסר מהכונן. הורדה חוזרת תמשיך ממנו.';
+  @override
+  String get downloadAgain => 'הורד שוב';
+  @override
+  String get backHome => 'חזרה לבית';
+  @override
+  String get backToHomePage => 'חזרה לדף הבית';
+  @override
+  String get doneTitle => 'הכונן מוכן';
+  @override
+  String get doneBody => 'כל העדכונים ירדו ונשמרו בכונן.';
+  @override
+  String doneSkipped(String names) => '$names לא ירדו — באתר אין בהם חדש.';
+  @override
+  String doneAppValue(String version) => 'אוצריא $version';
+  @override
+  String doneLibraryValue(int version) => 'גרסה $version';
+  @override
+  String donePluginsValue(int count) =>
+      count == 1 ? '1 תוסף בכונן' : '$count תוספים בכונן';
+  @override
+  String get donePluginsUpdated => 'חנות התוספים עודכנה';
+  @override
+  String get whatNow => 'מה עכשיו?';
+  @override
+  String get whatNowEject => 'הוציאו את הכונן בבטחה';
+  @override
+  String get whatNowEjectHint => '(סמל הכונן ליד השעון ← הוצאה)';
+  @override
+  String get whatNowConnect => 'חברו אותו למחשב שבו לומדים עם אוצריא.';
+  @override
+  String get whatNowOpen =>
+      'פתחו שם את "עדכוני אוצריא" מתוך הכונן, ולחצו "עדכון אוצריא במחשב הזה".';
+  @override
+  String get updateHereToo => 'לעדכן גם במחשב הזה';
+  @override
+  String get installHereToo => 'להתקין את אוצריא גם כאן';
+  @override
+  String get finish => 'סיום';
+  @override
+  String get networkTitle => 'אין חיבור לאינטרנט';
+  @override
+  String networkBody(String name) =>
+      'החיבור נקטע באמצע ההורדה של $name. מה שכבר ירד נשמר בכונן. בדקו את החיבור ולחצו "נסה שוב".';
+  @override
+  String get shabbatTitle => 'אתר אוצריא סגור בשבת ובחג';
+  @override
+  String get shabbatBody => 'אפשר להוריד במוצאי שבת. מה שכבר ירד נשמר בכונן.';
+  @override
+  String get spaceTitle => 'אין מספיק מקום בכונן';
+  @override
+  String spaceBody(String needed, String free) =>
+      'נדרשים $needed ופנויים $free. פנו מקום בכונן ולחצו "נסה שוב" — מה שכבר ירד נשמר.';
+  @override
+  String get snapshotTitle => 'ההורדה לא התחילה';
+  @override
+  String get snapshotBody =>
+      'לא הצלחנו לשמור את מצב הכונן לפני ההורדה, ובלי זה אי אפשר לבטל אותה בבטחה. שום דבר לא ירד. בדקו שהכונן מחובר ולחצו "נסה שוב".';
+  @override
+  String otherTitle(String name) => 'ההורדה של $name לא הושלמה';
+  @override
+  String get otherBody =>
+      'מה שכבר ירד נשמר בכונן, ו"נסה שוב" ימשיך ממנו. אם זה חוזר, הפרטים הטכניים יעזרו למי שמסייע לכם.';
+  @override
+  String get techDetails => 'פרטים טכניים';
+  @override
+  String get hideTechDetails => 'הסתרת הפרטים הטכניים';
+  @override
+  String get copyDetails => 'העתקה';
+  @override
+  String get detailsCopied => 'הפרטים הועתקו';
+  @override
+  String get otherUserTitle => 'אוצריא הותקנה על ידי משתמש אחר';
+  @override
+  String get otherUserBody =>
+      'היא הותקנה כמנהל, בחשבון אחר. אם תמשיכו מהחשבון הזה, העדכון עלול ליצור התקנה שנייה במקום לעדכן את הקיימת.';
+  @override
+  String get otherUserHint =>
+      'מומלץ להתחבר לחשבון שהתקין את אוצריא ולעדכן משם, או להפעיל את הכלי כמנהל.';
+  @override
+  String get continueAnyway => 'המשך בכל זאת';
+  @override
+  String get closeTitle => 'צריך לסגור את אוצריא';
+  @override
+  String get closeBody => 'העדכון מחליף קבצים שאוצריא משתמשת בהם עכשיו.';
+  @override
+  String closeHint({required bool plugins}) => plugins
+      ? 'שום דבר לא הולך לאיבוד: הספרים שפתוחים, הסימניות וההערות יחכו לכם בדיוק איפה שהשארתם. בסוף העדכון אוצריא תיפתח שוב כדי לאשר את התוספים.'
+      : 'שום דבר לא הולך לאיבוד: הספרים שפתוחים, הסימניות וההערות יחכו לכם בדיוק איפה שהשארתם.';
+  @override
+  String get closeAndContinue => 'סגירה והמשך';
+  @override
+  String get closeAfterWizardBody =>
+      'אשף ההתקנה פתח את אוצריא. כדי להתקין את הספרייה צריך לסגור אותה.';
+  @override
+  String get closeAfterWizardButton => 'סגירת אוצריא והמשך';
+  @override
+  String get notNow => 'לא עכשיו';
+  @override
+  String stepOf(int index, int count) => 'שלב $index מתוך $count';
+  @override
+  String get installingApp => 'מתקין את אוצריא';
+  @override
+  String get updatingApp => 'מעדכן את תוכנת אוצריא';
+  @override
+  String get installingLibrary => 'מתקין את הספרייה';
+  @override
+  String get updatingLibrary => 'מעדכן את הספרייה';
+  @override
+  String get sendingPlugins => 'שולח את התוספים לאוצריא';
+  @override
+  String get appWizardFirstBody =>
+      'אשף ההתקנה של אוצריא נפתח בחלון נפרד. המשיכו בו עד הסוף, והכלי ימשיך לבד.';
+  @override
+  String get appWizardBody =>
+      'אשף ההתקנה של אוצריא נפתח בחלון נפרד. בסופו אוצריא תיפתח מעצמה, והכלי ימשיך לבד.';
+  @override
+  String get libraryBody => 'כמה דקות, וזה מוכן.';
+  @override
+  String get pluginsBody =>
+      'הכלי שולח את התוספים לאוצריא, אחד אחד. את ההתקנה מאשרים בחלון של אוצריא.';
+  @override
+  String get keepDrive => 'אל תנתקו את הכונן עד הסוף';
+  @override
+  String appVersion(String version) => 'גרסה $version';
+  @override
+  String appInstalled(String version) => 'הותקנה · גרסה $version';
+  @override
+  String get appWizardOpen => 'אשף ההתקנה פתוח — המשיכו בו';
+  @override
+  String get appStoppedWaiting =>
+      'הפסקנו להמתין · בדקו בדף התוכנה אם ההתקנה הסתיימה';
+  @override
+  String get stopWaiting => 'הפסק להמתין';
+  @override
+  String get libraryFull => 'הספרייה המלאה';
+  @override
+  String libraryVersion(int version) => 'גרסה $version';
+  @override
+  String libraryDone(String detail) => 'הושלם · $detail';
+  @override
+  String get libraryWaitingClose => 'ממתין לסגירת אוצריא';
+  @override
+  String get librarySkipped => 'לא הותקנה עכשיו — אפשר להתקין אחר כך מדף הבית';
+  @override
+  String pluginsWaiting(int count) =>
+      count == 1 ? '1 תוסף · יישלח לאוצריא' : '$count תוספים · יישלחו לאוצריא';
+  @override
+  String get pluginsCurrent => 'אשרו כל תוסף בחלון של אוצריא';
+  @override
+  String get pluginsSent => 'נשלחו לאוצריא — אשרו שם כל תוסף';
+  @override
+  String get pluginRowSent => 'נשלח לאוצריא';
+  @override
+  String get pluginRowWaiting => 'ממתין לשליחה';
+  @override
+  String get pluginRowFailed => 'לא נשלח — אפשר לנסות מדף התוספים';
+  @override
+  String get finishWithoutWaiting => 'סיום בלי לחכות';
+  @override
+  String get installedTitle => 'אוצריא מותקנת';
+  @override
+  String get updatedTitle => 'אוצריא מעודכנת';
+  @override
+  String doneHereBody(
+          {required bool firstInstall,
+          required bool withLibrary,
+          required bool plugins}) =>
+      firstInstall
+          ? (withLibrary
+              ? 'אוצריא והספרייה מותקנות במחשב הזה ומוכנות ללימוד. אפשר לנתק את הכונן.'
+              : 'אוצריא מותקנת במחשב הזה. אפשר לנתק את הכונן.')
+          : plugins
+              ? 'מה שהיה בעדכון הותקן, והתוספים מחכים לאישור שלכם באוצריא. אפשר לנתק את הכונן.'
+              : 'כל מה שהיה בעדכון הותקן במחשב הזה. אפשר לנתק את הכונן.';
+  @override
+  String get reindexTitle => 'כדאי לבנות מחדש את החיפוש';
+  @override
+  String get reindexBody =>
+      'כך הספרים החדשים יימצאו בחיפוש. אוצריא תיפתח ותבנה אותו.';
+  @override
+  String get reindexButton => 'בנייה מחדש';
+  @override
+  String get toOtzaria => 'מעבר לאוצריא';
+  @override
+  String get wizardClosedTitle => 'ההתקנה של אוצריא לא הושלמה';
+  @override
+  String wizardClosedBody(
+          {required bool firstInstall, required bool libraryDone}) =>
+      firstInstall
+          ? 'אשף ההתקנה נסגר לפני הסוף, ואוצריא לא הותקנה. אפשר לנסות שוב בכל עת.'
+          : libraryDone
+              ? 'אשף ההתקנה נסגר לפני הסוף. אוצריא נשארה בגרסה הקודמת ועובדת כרגיל. הספרייה שכבר עודכנה נשארת מעודכנת.'
+              : 'אשף ההתקנה נסגר לפני הסוף. אוצריא נשארה בגרסה הקודמת ועובדת כרגיל.';
+  @override
+  String get stoppedTitle => 'העדכון נעצר';
+  @override
+  String get stoppedBody =>
+      'אוצריא נשארה פתוחה, ולכן שאר העדכון לא הותקן. מה שכבר הותקן נשאר.';
+  @override
+  String get libraryFailedTitle => 'עדכון הספרייה נכשל';
+  @override
+  String get appFailedTitle => 'התקנת אוצריא נכשלה';
+  @override
+  String get libraryFailedKeep => 'אוצריא ממשיכה לעבוד עם הספרייה הקודמת.';
+  @override
+  String get appFailedKeep => 'אוצריא נשארה בגרסה הקודמת.';
+  @override
+  String get toLibraryPage => 'לדף הספרייה';
+  @override
+  String get toAppPage => 'לדף התוכנה';
+  @override
+  String get showProgress => 'הצג התקדמות';
 }
 
 class _Guide extends GuidanceStrings {
@@ -614,8 +873,9 @@ class _Guide extends GuidanceStrings {
   @override
   String get reportsDisclosureReports =>
       'דיווחים: מה שכתבתם, כתובת המייל אם מסרתם אותה, קטעים מהיומן של '
-      'התוכנה, צילומי מסך וקבצים שצירפתם, ובדיווח על קריסה שאישרתם — גם '
-      'תמונת הזיכרון של התוכנה.';
+      'התוכנה, פרטים טכניים על המחשב ועל אוצריא (כמו גרסאות ומערכת ההפעלה), '
+      'צילומי מסך ותמונות שצירפתם, ובדיווח על קריסה שאישרתם — גם תמונת '
+      'הזיכרון של התוכנה.';
   @override
   String get reportsDisclosureSearch =>
       'רשומות החיפוש החכם, שנאספו בהסכמתכם: נתוני השימוש בחיפוש, כולל מילות '

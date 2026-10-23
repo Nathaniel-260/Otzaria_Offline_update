@@ -5,6 +5,7 @@
 // `dart:io` אינן מסתיימות בתוך ה-fake-async של `testWidgets`, ו-
 // `pumpAndSettle` היה נתקע על כל ספינר שממתין להן.
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -1093,6 +1094,52 @@ void main() {
 
     expect(controller.delivered, ['a', 'b']);
     expect(find.text(t.updatesDialogSentLabel), findsNWidgets(2));
+  });
+
+  // המסירה עברה לקונטרולר: "עדכון כאן" שבבית משתמש בה גם כשהחנות סגורה.
+  testWidgets('deliverUpdates: אחד אחרי השני במרווח, ומחזיר רק מה שנשלח',
+      (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: [
+        storePlugin('a', name: 'ראשון', manifestId: 'id-a', version: '2.0'),
+        storePlugin('b', name: 'שני', manifestId: 'id-b', version: '3.0'),
+      ],
+      installed: {'id-a': '1.0', 'id-b': '1.0'},
+    );
+    expect(controller.deliverableUpdates.map((p) => p.id), ['a', 'b']);
+
+    final delivered = <String>[];
+    List<StorePlugin>? sent;
+    unawaited(controller
+        .deliverUpdates(
+          onDelivered: (plugin, result) => delivered.add(plugin.id),
+        )
+        .then((value) => sent = value));
+    await tester.pump();
+    expect(controller.delivered, ['a']);
+    await tester
+        .pump(pluginUpdateDeliverySpacing - const Duration(milliseconds: 1));
+    expect(controller.delivered, ['a']);
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump();
+    expect(controller.delivered, ['a', 'b']);
+    expect(delivered, ['a', 'b']);
+    expect(sent!.map((p) => p.id), ['a', 'b']);
+
+    controller.delivered.clear();
+    controller.succeeds = false;
+    var cancelled = false;
+    List<StorePlugin>? none;
+    unawaited(controller
+        .deliverUpdates(isCancelled: () => cancelled)
+        .then((value) => none = value));
+    await tester.pump();
+    cancelled = true;
+    await tester.pump(pluginUpdateDeliverySpacing);
+    await tester.pump();
+    expect(controller.delivered, ['a']);
+    expect(none, isEmpty);
   });
 
   testWidgets('מסירה שנכשלה אינה מסומנת כנשלחה', (tester) async {

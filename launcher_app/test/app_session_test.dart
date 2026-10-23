@@ -486,7 +486,7 @@ class _FakePrompts implements SessionPrompts {
   Future<bool> confirmCancelDownload() async => false;
 
   @override
-  Future<bool> confirmSemanticSearch() async => false;
+  bool taskScreenShown = false;
 
   @override
   Future<bool> confirmSemanticConsent() async => false;

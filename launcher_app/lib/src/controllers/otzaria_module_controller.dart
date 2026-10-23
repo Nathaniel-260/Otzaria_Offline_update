@@ -116,6 +116,9 @@ class OtzariaModuleController extends ChangeNotifier
   /// [errorMessage] כדי שהממשק לא יצבע בחירה של המשתמש כתקלה אדומה.
   String? noticeMessage;
 
+  /// איך נגמרה ההתקנה האחרונה — בלי לפענח את [noticeMessage].
+  OtzariaInstallResult? lastInstallResult;
+
   /// הכשל האחרון היה "אין הרשאה" — ראו [Elevation] ואת התאום שלו
   /// ב-`LibraryModuleController`.
   bool needsElevation = false;
@@ -458,6 +461,7 @@ class OtzariaModuleController extends ChangeNotifier
 
     _installing = true;
     _stopSetupWait = false;
+    lastInstallResult = null;
     _recheckAfterInstall = false;
     status = OtzariaModuleStatus.installing;
     needsElevation = false;
@@ -482,18 +486,22 @@ class OtzariaModuleController extends ChangeNotifier
       );
       currentVersion = state.installedTagName;
       status = OtzariaModuleStatus.upToDate;
+      lastInstallResult = OtzariaInstallResult.installed;
       AppLogger.instance.info('התקנת אוצריא הסתיימה בהצלחה');
       recheck = useWizard;
     } on OtzariaInstallCancelled catch (e) {
       noticeMessage = e.toString();
+      lastInstallResult = OtzariaInstallResult.cancelled;
       AppLogger.instance.info('התקנת אוצריא בוטלה באשף');
       recheck = true;
     } on OtzariaWizardStillOpen catch (e) {
       noticeMessage = e.toString();
+      lastInstallResult = OtzariaInstallResult.wizardStillOpen;
       AppLogger.instance.info('אשף ההתקנה עדיין פתוח — ההתקנה לא זוהתה עדיין');
       recheck = true;
     } catch (e, st) {
       status = OtzariaModuleStatus.error;
+      lastInstallResult = OtzariaInstallResult.failed;
       errorMessage = Elevation.describe(e);
       needsElevation = Elevation.isAccessDenied(e);
       _recheckAfterInstall = false;
@@ -566,3 +574,5 @@ class OtzariaModuleController extends ChangeNotifier
     super.dispose();
   }
 }
+
+enum OtzariaInstallResult { installed, cancelled, wizardStillOpen, failed }

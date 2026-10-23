@@ -9,6 +9,7 @@ import '../settings/safer_mode.dart';
 import '../settings/settings_controller.dart';
 import '../widgets/screen_body.dart';
 import '../widgets/widgets_exports.dart';
+import 'home/home_view_model.dart' show displayVersion;
 
 /// מה הלחיצה על כפתור ההתקנה עושה בפועל. שלושתן מריצות את אותו מתקין
 /// מהתיקייה המקומית — ההבדל הוא מה נאמר למשתמש לפני כן.
@@ -225,10 +226,17 @@ class OtzariaScreen extends StatelessWidget {
       },
       content: switch (action) {
         _Install.update => appInstallPrompt(context, otzaria),
-        _Install.reinstall => t.reinstallPrompt('${otzaria.latestVersion}'),
+        _Install.reinstall =>
+          t.reinstallPrompt(displayVersion('${otzaria.latestVersion}')),
         _Install.older => t.installOlderPrompt(
-            '${otzaria.latestVersion}',
-            '${otzaria.currentVersion}',
+            displayVersion(
+              '${otzaria.latestVersion}',
+              other: otzaria.currentVersion,
+            ),
+            displayVersion(
+              '${otzaria.currentVersion}',
+              other: otzaria.latestVersion,
+            ),
           ),
       },
       confirmText: switch (action) {

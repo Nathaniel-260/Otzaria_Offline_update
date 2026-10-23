@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
 import 'package:launcher_app/src/controllers/error_reports_controller.dart';
+import 'package:launcher_app/src/controllers/download_plan.dart';
 import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
@@ -899,6 +900,142 @@ void main() {
     });
   });
 
+  group('מסכי המשימה — שכבה בגוף', () {
+    final task = stringsOf().task;
+
+    testWidgets('משימה נפתחת מעל הגוף, ושורת הכותרת נשארת', (tester) async {
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      final nav = navigatorOf(tester);
+      expect(find.byKey(ShellKeys.taskLayer), findsNothing);
+
+      s.tasks.prepareDownload();
+      await tester.pump();
+      expect(nav.showsTask, isTrue);
+      expect(find.byKey(ShellKeys.taskLayer), findsOneWidget);
+      expect(find.text(task.preparingTitle), findsOneWidget);
+      expect(find.byType(AppTitleBar), findsOneWidget);
+      // הבית שמתחת אינו מקבל מיקוד ואינו מריץ טיקרים.
+      final home = find.byType(HomePage, skipOffstage: false);
+      expect(
+        tester
+            .widget<TickerMode>(find
+                .ancestor(of: home, matching: find.byType(TickerMode))
+                .first)
+            .enabled,
+        isFalse,
+      );
+      s.tasks.abandonDownload();
+      await tester.pump();
+      expect(nav.showsTask, isFalse);
+      expect(find.byKey(ShellKeys.taskLayer), findsNothing);
+    });
+
+    testWidgets('Esc וגלגל השיניים אינם יוצאים ממשימה רצה', (tester) async {
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      final nav = navigatorOf(tester);
+      s.tasks.downloadRunning(const [MirrorComponent.app]);
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(nav.showsTask, isTrue);
+      await tester.tap(find.byTooltip(shell.settingsTooltip));
+      await tester.pump();
+      expect(nav.showsTask, isTrue);
+      expect(nav.isBuilt(ShellSection.settings), isFalse);
+
+      s.tasks.downloadDone();
+      await tester.pump();
+      expect(find.text(task.doneTitle), findsOneWidget);
+      await tester.tap(find.byKey(ShellKeys.taskPrimary));
+      await tester.pump();
+      expect(s.tasks.hasTask, isFalse);
+      expect(nav.showsTask, isFalse);
+      expect(nav.section, ShellSection.home);
+    });
+
+    testWidgets('סוף ההורדה נאמר במסך המשימה, ולא בהודעה צפה', (tester) async {
+      final snacks = <String>[];
+      final previousPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message?.startsWith('UiSnack') ?? false) snacks.add(message!);
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      await pumpShell(tester);
+      final state = tester.state(find.byType(AppShell)) as dynamic;
+      final s = sessionOf(tester);
+      s.tasks.downloadRunning(const [MirrorComponent.app]);
+      await tester.pump();
+      expect(state.taskScreenShown, isTrue);
+      state.reportDownload(
+        failed: const <MirrorComponent>[],
+        skipped: const <MirrorComponent>[],
+      );
+      expect(snacks, isEmpty);
+
+      s.tasks.downloadDone();
+      s.tasks.dismiss();
+      await tester.pump();
+      expect(state.taskScreenShown, isFalse);
+      state.reportDownload(
+        failed: const <MirrorComponent>[],
+        skipped: const <MirrorComponent>[],
+      );
+      debugPrint = previousPrint;
+      expect(snacks.single, contains(stringsOf().home.downloadDoneSnack));
+    });
+
+    testWidgets('השאלה על החיפוש החכם — "חזרה" סוגרת בלי להוריד',
+        (tester) async {
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      final answer = s.tasks.askBeforeDownload();
+      await tester.pump();
+      expect(find.text(task.semanticTitle), findsOneWidget);
+      await tester.tap(find.text(task.back));
+      await tester.pump();
+      expect(await answer, isNull);
+      expect(find.byKey(ShellKeys.taskLayer), findsNothing);
+    });
+
+    test('הגיבור פותח את מסכי המשימה, לא את הדיאלוגים הישנים', () {
+      final source = _appShellSource();
+      expect(source, contains('onInstallHere: _updateHere,'));
+      expect(source, contains('onUpdateHere: _updateHere,'));
+      expect(source,
+          contains('onDownload: () => unawaited(_session.downloadAll()),'));
+      expect(source, contains('onShowProgress: _showProgress,'));
+      expect(
+        source,
+        contains(
+            'void _updateHere() => unawaited(_session.updateHere(_hereItems));'),
+      );
+      expect(source, isNot(contains('installOtzariaHere')));
+      expect(source, isNot(contains('HomeFlowDeps')));
+    });
+
+    test('ההורדה מדווחת למסך המשימה דרך ShellTasks', () {
+      final session = _appSessionSource();
+      final host = session.substring(
+        session.indexOf('class _SessionDownloadHost'),
+        session.indexOf('class _SessionUpdateHost'),
+      );
+      expect(host, contains('_session.tasks.prepareDownload();'));
+      expect(host, contains('_session.tasks.askBeforeDownload()'));
+      expect(host,
+          contains('_session.tasks.downloadRunning(flow.activeComponents)'));
+      expect(host, contains('_session.tasks.downloadCancelled('));
+      expect(host, contains('s.tasks.downloadDone(skipped: skipped)'));
+      expect(host, contains('classifyDownloadFailure('));
+      // הביטול עצמו לא השתנה: אישור אזהרה ואז `requestCancel` (שמחזיר את הכונן).
+      final cancel = _methodBody(session, 'Future<void> cancelDownload()');
+      expect(cancel, contains('prompts.confirmCancelDownload()'));
+      expect(cancel, contains('_downloads.requestCancel()'));
+    });
+  });
+
   test('Ctrl+R ו-F5 מרעננים, ולא בזמן משימה ארוכה', () {
     final source = _appShellSource();
     expect(source, contains('LogicalKeyboardKey.keyR, control: true'));
@@ -1008,9 +1145,15 @@ void main() {
     test('איסוף מכפתור "איסוף" — בלי דו-שיח, וגם לא זה של התורים הישנים', () {
       final collect =
           _methodBody(shellSource, 'Future<void> _collectReports()');
-      expect(collect, contains('confirm: false'));
-      // בלי notices אין דיאלוג ה-Hive: הפס שבבית הוא המקור היחיד.
-      expect(collect, isNot(contains('notices:')));
+      // הזרימה עצמה אינה פותחת דו-שיח (נבדק ב-error_reports_test); כאן —
+      // שהיא מקבלת את מה שהגילוי הציג, וסופרת מחדש אחרי הלחיצה.
+      expect(collect, contains('collectReportsToDrive('));
+      expect(collect, contains('disclosedReports: s.errorReportsToCollect'));
+      expect(
+        collect,
+        contains('disclosedSearchRecords: s.searchRecordsToCollect'),
+      );
+      expect(collect, contains('await s.recountReportsToCollect()'));
     });
 
     test('תוסף שהגיע בזמן שהמשתמש בחנות אינו "חדש" בבית', () {
