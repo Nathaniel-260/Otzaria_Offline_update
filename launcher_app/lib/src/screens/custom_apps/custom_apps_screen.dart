@@ -25,6 +25,8 @@ class CustomAppsScreen extends StatefulWidget {
     this.readOnly = false,
     this.detailId,
     this.onDetailChanged,
+    this.online,
+    this.onOpenManage,
   });
 
   final CustomAppsController controller;
@@ -37,6 +39,12 @@ class CustomAppsScreen extends StatefulWidget {
   /// היא נתיב בנווט.
   final String? detailId;
   final ValueChanged<String?>? onDetailChanged;
+
+  /// `false` — אין אינטרנט במחשב הזה: אין בדיקה ואין הורדה ברשת.
+  final bool? online;
+
+  /// "ניהול התוכנות" כשאין עדיין אף תוכנה. `null` — אין כניסה (כונן מוגן).
+  final VoidCallback? onOpenManage;
 
   @override
   State<CustomAppsScreen> createState() => _CustomAppsScreenState();
@@ -133,6 +141,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
         controller: _c,
         app: selected,
         readOnly: widget.readOnly,
+        online: widget.online != false,
         onInstall: () => _install(selected),
         onLaunch: () => _launch(selected),
         onDownload: () => _download(selected),
@@ -149,7 +158,8 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
   List<Widget> _slivers(BuildContext context) {
     final t = context.strings.customApps;
     final busy = _c.isCheckingAll || _c.isDownloadingAll;
-    final online = _c.hasOnlineSources && !widget.readOnly;
+    final online =
+        _c.hasOnlineSources && !widget.readOnly && widget.online != false;
     final visible = _c.visibleApps;
     final progress = _progress(context);
 
@@ -193,6 +203,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
               controller: _c,
               app: app,
               readOnly: widget.readOnly,
+              online: widget.online != false,
               onOpenDetail: () => _select(app.descriptor.id),
               onInstall: () => _install(app),
               onLaunch: () => _launch(app),
@@ -287,6 +298,20 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
 
   Widget _emptyState(BuildContext context) {
     final t = context.strings.customApps;
+    if (!_c.hasApps) {
+      return EmptyState(
+        icon: FluentIcons.apps_add_in_24_regular,
+        title: t.manageEmptyTitle,
+        body: t.manageEmptyBody,
+        actions: [
+          if (widget.onOpenManage case final open?)
+            ActionButton.recommended(
+              text: t.openManagerButton,
+              onPressed: open,
+            ),
+        ],
+      );
+    }
     final uncategorized = _c.page == CustomAppsPage.uncategorized;
     return EmptyState(
       icon: FluentIcons.box_24_regular,

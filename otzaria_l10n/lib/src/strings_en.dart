@@ -1718,7 +1718,7 @@ class _Plugins extends PluginsStrings {
   String get noResultsBody => 'Try another word, or search all categories.';
 
   @override
-  String get filterStatusLabel => 'Status';
+  String get filterStatusLabel => 'Stability';
   @override
   String get filterSortLabel => 'Sort';
   @override
@@ -1747,7 +1747,7 @@ class _Plugins extends PluginsStrings {
   String ratingCountLabel(int count) =>
       count == 1 ? '$count rater' : '$count raters';
   @override
-  String ratingVerifiedLabel(int count) => '$count verified';
+  String ratingVerifiedLabel(int count) => '$count actually installed it';
   @override
   String get ratingVerifiedTooltip =>
       'Raters whose install of the plugin was actually recorded';
@@ -1776,7 +1776,7 @@ class _Plugins extends PluginsStrings {
   @override
   String get infoVersion => 'Version';
   @override
-  String get infoStatus => 'Stage';
+  String get infoStatus => 'Stability';
   @override
   String get infoAuthor => 'Developer';
   @override
@@ -1787,16 +1787,6 @@ class _Plugins extends PluginsStrings {
   String get infoNetworkRequired => 'Required';
   @override
   String get infoNetworkNotRequired => 'Not Required';
-  @override
-  String get infoCompatibility => 'Fits versions';
-  @override
-  String compatibilityRange(String from, String to) => '$from — up to $to';
-  @override
-  String get infoLocalFile => 'File on the drive';
-  @override
-  String get infoLocalFileMissing => 'Not on the drive yet';
-  @override
-  String get valueUnspecifiedFeminine => 'Not specified';
   @override
   String get valueUnspecifiedMasculine => 'Not specified';
 
@@ -1944,6 +1934,25 @@ class _Plugins extends PluginsStrings {
       one: 'The update was sent to Otzaria — approve it there',
       many: '$count updates were sent to Otzaria — approve them there');
   @override
+  String updateAllFailedSnack(int sent, int failed, String names) =>
+      '$sent sent to Otzaria, $failed failed: $names';
+  @override
+  String updateAllStoppedSnack(int sent) =>
+      'Updating stopped. Sent to Otzaria: $sent.';
+  @override
+  String get updateAllStoppingLabel => 'Stopping after the current plugin…';
+  @override
+  String get actionsBlockedSyncing =>
+      'Plugins cannot be installed or saved while the list updates from the website.';
+  @override
+  String get actionsBlockedExporting =>
+      'Plugins cannot be installed or saved while the store is being copied.';
+  @override
+  String get actionsBlockedUpdatingAll =>
+      'Other plugins cannot be installed or saved during "Update All".';
+  @override
+  String get howItWorksButton => 'How Does This Work?';
+  @override
   String get updatesSentTitle =>
       'The updates were sent to Otzaria — approve them there';
   @override
@@ -1987,6 +1996,11 @@ class _Plugins extends PluginsStrings {
   @override
   String get noteFileMissing =>
       'Not on the drive yet — downloaded on install (needs internet)';
+  @override
+  String get fileNotOnDriveLabel => 'The file is not on the drive';
+  @override
+  String get noteNextDriveDownload =>
+      'It comes with the next download to the drive';
   @override
   String get incompatibleTitle =>
       'This plugin does not fit the Otzaria on this computer';
@@ -2588,6 +2602,21 @@ class _LauncherUpdate extends LauncherUpdateStrings {
       'internet.';
 }
 
+const _englishMonths = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
 class _Units extends UnitStrings {
   const _Units();
 
@@ -2603,6 +2632,9 @@ class _Units extends UnitStrings {
   String gigabytes(String amount) => '$amount GB';
   @override
   String perSecond(String size) => '$size/s';
+  @override
+  String longDate(int day, int month, int year) =>
+      '${_englishMonths[(month - 1) % 12]} $day, $year';
 }
 
 class _LibraryDomain extends LibraryDomainStrings {
@@ -3767,7 +3799,7 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get infoSourceFile => 'Manually picked file';
   @override
-  String get infoInstalled => 'On this computer';
+  String get infoInstalled => 'Installed on this computer';
   @override
   String get infoStored => 'On the drive';
   @override
@@ -3778,6 +3810,12 @@ class _CustomApps extends CustomAppsStrings {
   String get infoStoredAdded => 'Added to the drive';
   @override
   String get valueUnknown => 'Unknown';
+  @override
+  String get valueNo => 'No';
+  @override
+  String get installedNoVersionValue => 'Yes, version unknown';
+  @override
+  String get notStoredValue => 'Not downloaded yet';
 
   // ── Empty states ──
   @override
@@ -3805,6 +3843,8 @@ class _CustomApps extends CustomAppsStrings {
   String get categoryDescriptionLabel => 'Description (optional)';
   @override
   String get addCategoryButton => 'Add category';
+  @override
+  String get editCategoryTitle => 'Edit Category';
   @override
   String get noCategoriesHint =>
       'No categories yet. Without them the screen shows every program '
@@ -3870,18 +3910,16 @@ class _CustomApps extends CustomAppsStrings {
   String get settingsCardTitle => 'Other Programs';
   @override
   String get settingsCardHint =>
-      'You can add your own programs, and this app will carry them on the '
-      'drive and install them on the offline computer — exactly as it does '
-      'for Otzaria. All management happens in the management window opened '
-      'from here; downloading and installing happen on the "Other Programs" '
-      'screen.';
+      'Your own programs, kept on the drive and installed even on a computer without internet.';
+  @override
+  String get manageRowTitle => 'Manage';
+  @override
+  String manageRowSubtitle(int count) =>
+      '${count == 1 ? '$count program' : '$count programs'} on the drive · add, edit, order and categories';
   @override
   String get emptyHint => 'No programs added';
   @override
   String get addButton => 'Add a Program';
-  @override
-  String registeredAppCount(int count) =>
-      count == 1 ? '$count program registered' : '$count programs registered';
   @override
   String get openManagerButton => 'Manage programs';
 
@@ -3929,7 +3967,8 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get githubUrlHint => 'For example github.com/owner/repo';
   @override
-  String get githubUrlInvalid => 'That is not a GitHub repository address';
+  String get githubUrlInvalid =>
+      'That is not the address of a program on the developers\' site (GitHub)';
   @override
   String get fetchAssetsButton => 'Show The Files';
   @override
@@ -3946,7 +3985,7 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get pickInstallerDialogTitle => 'Choose the installer file';
   @override
-  String installerKindSniffed(String kind) => 'Detected from the file: $kind';
+  String installerKindSniffed(String kind) => 'Detected: $kind';
   @override
   String get portableFileLabel => 'The file is the program itself';
   @override
@@ -3958,6 +3997,9 @@ class _CustomApps extends CustomAppsStrings {
   String get portableFileHint =>
       'Tick this when the file is not an installer but the program itself. '
       'On install you will be asked where to copy it, instead of running it.';
+  @override
+  String get portableDestinationHint =>
+      'Where to keep the program on each computer — you will be asked to choose a folder during installation.';
   @override
   String get pickCopyTargetDialogTitle => 'Where to copy the file';
   @override
@@ -3986,18 +4028,18 @@ class _CustomApps extends CustomAppsStrings {
   String get nameRequired => 'A program name is required';
   @override
   String get sourceRequired =>
-      'Choose a file, or a repository and a file in it';
+      'Choose a file, or an address and a file from it';
   @override
   String addedSnack(String name) => '$name was added';
   @override
   String updatedSnack(String name) => '$name was updated';
 
   @override
-  String get kindInno => 'Inno Setup';
+  String get kindInno => 'A regular installer';
   @override
-  String get kindNsis => 'NSIS';
+  String get kindNsis => 'A regular installer';
   @override
-  String get kindMsi => 'MSI';
+  String get kindMsi => 'A regular installer';
   @override
   String get kindZip => 'Archive';
   @override
@@ -4006,17 +4048,6 @@ class _CustomApps extends CustomAppsStrings {
   String get kindInteractive =>
       'Unrecognised installer — a normal install window will open';
 
-  @override
-  String installedVersion(String version) => 'Installed: version $version';
-  @override
-  String get installedUnknownVersion =>
-      'Installed, but the version cannot be read';
-  @override
-  String get notInstalled => 'Not installed';
-  @override
-  String get noDetectRules => 'Cannot detect — no executable file name was set';
-  @override
-  String storedInstaller(String version) => 'On the drive: version $version';
   @override
   String get noStoredInstaller => 'No installer downloaded yet';
 
@@ -4088,8 +4119,8 @@ class _CustomApps extends CustomAppsStrings {
   String get unverifiedDialogTitle => 'Install a file that was not checked?';
   @override
   String unverifiedDialogContent(String fileName) =>
-      '$fileName has no saved fingerprint, so it cannot be checked against the file that was added. '
-      'If you continue, it is computed and saved, and any later change to the file is blocked.';
+      'No identifying mark was saved for $fileName, so there is no way to make sure it was not changed. '
+      'If you continue, the mark is computed and saved, and any later change to the file is blocked.';
   @override
   String get unverifiedDialogConfirm => 'Install anyway';
   @override
@@ -4107,14 +4138,13 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get editTooltip => 'Edit';
   @override
-  String get removeTooltip => 'Remove from list';
+  String get removeTooltip => 'Remove from the drive';
   @override
-  String get removeDialogTitle => 'Remove From List';
+  String removeDialogTitle(String name) => 'Remove "$name" from the drive?';
   @override
   String removeDialogContent(String name) =>
-      '$name will be removed from the list, and its stored file will be '
-      'deleted from the drive.\n\n'
-      'The program itself will not be uninstalled from this computer.';
+      '"$name" will be removed from the list and its file deleted from the drive. '
+      'It will not be uninstalled from computers that already installed it.';
   @override
   String get removeDialogConfirm => 'Remove';
   @override
@@ -4140,9 +4170,6 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get manageEmptyBody =>
       'You can keep a program on the drive to install on computers without internet — from a file on this computer, or from the developer site (GitHub) so it updates by itself.';
-  @override
-  String get manageReadOnlyNote =>
-      'You cannot add programs while the drive is write-protected.';
   @override
   String get noCategoriesTitle => 'No categories';
   @override

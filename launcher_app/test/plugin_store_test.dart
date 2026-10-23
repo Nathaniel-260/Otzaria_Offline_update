@@ -102,6 +102,10 @@ class _RecordingController extends PluginsModuleController {
   final List<String> delivered = [];
   bool succeeds = true;
 
+  /// תוספים שהמסירה שלהם נכשלת, ומסירות שממתינות עד שהבדיקה משחררת.
+  final Set<String> failingIds = {};
+  final Map<String, Completer<void>> holds = {};
+
   /// מה שנשלח בהצלחה וממתין לאישור באוצריא — כמו ההמתנה האמיתית, בלי
   /// הטיימר שסורק את הדיסק. מתבטל כשהסריקה מגלה שהגרסה כבר מותקנת.
   final Set<String> sentIds = {};
@@ -109,7 +113,10 @@ class _RecordingController extends PluginsModuleController {
   @override
   Future<PluginInstallResult> directInstall(StorePlugin plugin) async {
     delivered.add(plugin.id);
-    if (!succeeds) return const PluginInstallResult.failure('אוצריא לא נפתחה');
+    await holds[plugin.id]?.future;
+    if (!succeeds || failingIds.contains(plugin.id)) {
+      return const PluginInstallResult.failure('אוצריא לא נפתחה');
+    }
     sentIds.add(plugin.id);
     notifyListeners();
     return const PluginInstallResult.ok();
@@ -119,6 +126,49 @@ class _RecordingController extends PluginsModuleController {
   bool isAwaitingInstallOf(StorePlugin plugin) =>
       sentIds.contains(plugin.id) &&
       statusOf(plugin) != PluginInstallStatus.upToDate;
+}
+
+/// סנכרון שמחזיר את [next] כשהבדיקה משחררת את [release] — בלי רשת.
+class _OutcomeController extends PluginsModuleController {
+  _OutcomeController(String dir) : super(mirrorRootDir: dir);
+
+  PluginSyncOutcome? next;
+  Completer<void> release = Completer<void>();
+  bool _running = false;
+
+  @override
+  bool get isSyncing => _running;
+
+  @override
+  Future<void> sync({bool Function()? isCancelled}) async {
+    _running = true;
+    notifyListeners();
+    await release.future;
+    lastSyncOutcome = next;
+    _running = false;
+    notifyListeners();
+  }
+}
+
+/// העתקת החנות שמסתיימת כשהבדיקה קוראת ל-[finish] — בלי לגעת בדיסק.
+class _ExportController extends PluginsModuleController {
+  _ExportController(String dir) : super(mirrorRootDir: dir);
+
+  final Completer<StoreAppExportOutcome> _done = Completer();
+  bool started = false;
+
+  void finish(StoreAppExportOutcome outcome) => _done.complete(outcome);
+
+  @override
+  Future<StoreAppExportOutcome> exportStoreApp(String destinationDir) async {
+    started = true;
+    isExporting = true;
+    notifyListeners();
+    final outcome = await _done.future;
+    isExporting = false;
+    notifyListeners();
+    return outcome;
+  }
 }
 
 /// האם ה-Scrollable הזה הוא הגליל הפנימי של שדה טקסט (`EditableText`).
@@ -505,7 +555,7 @@ void main() {
     await openCard(tester, 'תוסף שטרם ירד');
 
     expect(find.text(t.fileMissingTitle), findsOneWidget);
-    expect(find.text(t.infoLocalFileMissing), findsOneWidget);
+    expect(find.text(t.factNotOnDrive), findsOneWidget);
     // בלי קובץ אין מה לשמור — ולכן אין "שמור קובץ" לצד ההתקנה.
     expect(find.text(t.saveFileButton), findsNothing);
   });
@@ -666,7 +716,9 @@ void main() {
     expect(find.text(t.infoPanelTitle), findsOneWidget);
     expect(find.text(t.tagsPanelTitle), findsOneWidget);
     expect(find.text(t.descriptionTitle), findsOneWidget);
-    expect(find.text('a.otzplugin'), findsOneWidget);
+    // "מידע כללי" בלי פרטים טכניים: לא שם הקובץ, ולא ההתאמה שכבר ברצועה.
+    expect(find.text('a.otzplugin'), findsNothing);
+    expect(find.text(t.factNotOnDrive), findsNothing);
   });
 
   testWidgets('בדף צר נשארים שלושה תאי נתונים, בעמודה אחת', (tester) async {
@@ -903,9 +955,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(t.filterStatusLabel), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(StoreFilterChip, t.statusBeta));
+    // "יציבות": הכול / יציב / ניסיוני — ו"ניסיוני" כולל את הבטא.
+    expect(find.widgetWithText(StoreFilterChip, t.statusBeta), findsNothing);
+    await tester
+        .tap(find.widgetWithText(StoreFilterChip, t.statusExperimental));
     await tester.pumpAndSettle();
-    expect(plugins.statusFilter, PluginStatusFilter.beta);
+    expect(plugins.statusFilter, PluginStatusFilter.experimental);
     expect(find.text('יציב עם תגית'), findsNothing);
     expect(find.text('בטא בלי'), findsOneWidget);
 
@@ -1332,6 +1387,442 @@ void main() {
 
     expect(find.text(t.loadingCatalog), findsOneWidget);
     expect(find.byType(InfoProgressRow), findsOneWidget);
+  });
+
+  // ── תיקוני שלב 4: עדכון הכול, חסימות, "חדש", ייצוא ומצבים ────────────────
+
+  /// ההודעות ש-UiSnack ניסה להציג. בבדיקה אין overlay, ולכן הן נכתבות
+  /// ל-debugPrint — וזה מה שנאסף כאן.
+  /// [restore] חובה בסוף הבדיקה עצמה — המסגרת בודקת את debugPrint לפני
+  /// ה-tearDown.
+  ({List<String> messages, void Function() restore}) captureSnacks() {
+    final messages = <String>[];
+    final original = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null && message.startsWith('UiSnack')) {
+        messages.add(message);
+      }
+    };
+    return (messages: messages, restore: () => debugPrint = original);
+  }
+
+  List<StorePlugin> threeUpdates() => [
+        storePlugin('a', name: 'ראשון', manifestId: 'id-a', version: '2.0'),
+        storePlugin('b', name: 'שני', manifestId: 'id-b', version: '3.0'),
+        storePlugin('c', name: 'שלישי', manifestId: 'id-c', version: '4.0'),
+      ];
+  const threeInstalled = {'id-a': '1.0', 'id-b': '1.0', 'id-c': '1.0'};
+
+  testWidgets('"עדכון הכול": הודעת סיכום אחת — כמה נשלחו וכמה נכשלו',
+      (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: threeUpdates(),
+      installed: threeInstalled,
+    );
+    controller.failingIds.add('c');
+    final (messages: snacks, :restore) = captureSnacks();
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.updateAllButton));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 2; i++) {
+      await tester.pump(pluginUpdateDeliverySpacing);
+      await tester.pump();
+    }
+
+    expect(controller.delivered, ['a', 'b', 'c']);
+    expect(plugins.isUpdatingAll, isFalse);
+    // הודעה לכל כישלון הייתה נדרסת מיד בהודעת "נשלחו" — עכשיו יש אחת.
+    restore();
+    expect(snacks, hasLength(1));
+    expect(snacks.single, contains(t.updateAllFailedSnack(2, 1, 'שלישי')));
+  });
+
+  testWidgets('"עדכון הכול": "עצירה" עוצרת אחרי התוסף הנוכחי', (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: threeUpdates(),
+      installed: threeInstalled,
+    );
+    final (messages: snacks, :restore) = captureSnacks();
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.updateAllButton));
+    await tester.pump();
+    await tester.pump();
+    expect(controller.delivered, ['a']);
+    expect(plugins.isUpdatingAll, isTrue);
+
+    await tester.tap(find.widgetWithText(ActionButton, t.syncStopButton));
+    await tester.pump();
+    expect(find.text(t.updateAllStoppingLabel), findsOneWidget);
+    expect(button(tester, t.syncStopButton).onPressed, isNull);
+
+    await tester.pump(pluginUpdateDeliverySpacing);
+    await tester.pump();
+    expect(controller.delivered, ['a']);
+    expect(plugins.isUpdatingAll, isFalse);
+    restore();
+    expect(snacks.single, contains(t.updateAllStoppedSnack(1)));
+  });
+
+  testWidgets('"עדכון הכול" הוא משימה ארוכה: רענון וייצוא מושבתים, ויש הסבר',
+      (tester) async {
+    await seedRecording(
+      tester,
+      catalog: threeUpdates(),
+      installed: threeInstalled,
+    );
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.updateAllButton));
+    await tester.pump();
+    await tester.pump();
+
+    expect(plugins.isUpdatingAll, isTrue);
+    expect(button(tester, t.refreshButton).onPressed, isNull);
+    expect(find.text(t.actionsBlockedUpdatingAll), findsOneWidget);
+
+    // ממשיך גם כשהמסך נסגר: הריצה בקונטרולר, ונעצרת רק ב"עצירה".
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(pluginUpdateDeliverySpacing);
+    await tester.pump();
+    await tester.pump(pluginUpdateDeliverySpacing);
+    await tester.pump();
+    expect(plugins.isUpdatingAll, isFalse);
+  });
+
+  testWidgets('"בשליחה" לכל תוסף בנפרד — סיום אחד אינו מחזיר את השני',
+      (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: [
+        storePlugin('a', name: 'ראשון', manifestId: 'id-a', version: '2.0'),
+        storePlugin('b', name: 'שני', manifestId: 'id-b', version: '3.0'),
+      ],
+      installed: {'id-a': '1.0', 'id-b': '1.0'},
+    );
+    final holdA = Completer<void>();
+    final holdB = Completer<void>();
+    controller.holds['a'] = holdA;
+    controller.holds['b'] = holdB;
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.widgetWithText(ActionButton, t.updateToButton('2.0')));
+    await tester.pump();
+    await tester
+        .tap(find.widgetWithText(ActionButton, t.updateToButton('3.0')));
+    await tester.pump();
+    final sending = find.byWidgetPredicate(
+      (w) => w is ActionButton && w.isLoading && w.text == t.sendingLabel,
+    );
+    expect(sending, findsNWidgets(2));
+
+    holdA.complete();
+    await tester.pump();
+    await tester.pump();
+    // A הסתיים — B עדיין בשליחה, ואי אפשר לשלוח אותו פעם שנייה.
+    expect(sending, findsOneWidget);
+    expect(find.text(t.updateToButton('3.0')), findsNothing);
+
+    holdB.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(sending, findsNothing);
+    expect(controller.delivered, ['a', 'b']);
+  });
+
+  testWidgets(
+      'בזמן סנכרון: פעולות הכרטיסים, הדף ו"טעינה מחדש" מושבתות, עם הסבר',
+      (tester) async {
+    plugins.dispose();
+    final fixture = FixturePlugins(tempDir.path);
+    plugins = fixture;
+    await seed(tester, catalog: [
+      storePlugin('a', name: 'תוסף בכונן', withLocalFile: true),
+    ]);
+    fixture.fakeSyncing = true;
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pump();
+
+    expect(find.text(t.actionsBlockedSyncing), findsOneWidget);
+    expect(button(tester, t.installInOtzariaButton).onPressed, isNull);
+
+    await tester.tap(find.text(stringsOf().pages.advancedTitle));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(button(tester, t.reloadButton).onPressed, isNull);
+
+    // בלי pumpAndSettle: "רענון" מסתובב כל זמן הסנכרון.
+    await tester.tap(find.widgetWithText(PluginStoreCard, 'תוסף בכונן'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(button(tester, t.installInOtzariaButton).onPressed, isNull);
+    expect(button(tester, t.saveFileButton).onPressed, isNull);
+    expect(find.text(t.actionsBlockedSyncing), findsOneWidget);
+  });
+
+  testWidgets('בזמן ייצוא: הפעולות מושבתות עם הסבר', (tester) async {
+    await seed(tester, catalog: [
+      storePlugin('a', name: 'תוסף בכונן', withLocalFile: true),
+    ]);
+    plugins.isExporting = true;
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pump();
+
+    expect(find.text(t.actionsBlockedExporting), findsOneWidget);
+    expect(button(tester, t.installInOtzariaButton).onPressed, isNull);
+    plugins.isExporting = false;
+  });
+
+  testWidgets('עצירת סנכרון: "נעצר" רק כשהסנכרון באמת נעצר', (tester) async {
+    final (messages: snacks, :restore) = captureSnacks();
+    plugins.dispose();
+    final fake = _OutcomeController(tempDir.path);
+    plugins = fake;
+    await seed(tester, catalog: [storePlugin('a')]);
+
+    for (final (cancelled, expected) in [
+      (false, t.syncDoneSnack(0, 1)),
+      (true, t.syncStoppedSnack),
+    ]) {
+      snacks.clear();
+      fake.next = PluginSyncOutcome(
+        catalog: PluginCatalog(plugins: [storePlugin('a')]),
+        fetched: 0,
+        skipped: 1,
+        cancelled: cancelled,
+      );
+      await pumpScreen(tester, PluginsScreen(controller: plugins));
+      await tester.pump();
+      await tester.tap(find.text(t.refreshButton));
+      await tester.pump();
+      // לחיצה על "עצירה" אחרי שהתוסף האחרון כבר ירד — הסנכרון הושלם.
+      await tester.tap(find.text(t.syncStopButton));
+      fake.release.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(snacks.single, contains(expected), reason: 'cancelled=$cancelled');
+      fake.release = Completer<void>();
+    }
+    restore();
+  });
+
+  testWidgets('תגית נבחרת נשארת גלויה גם כשרשימת התגיות מקופלת',
+      (tester) async {
+    await seed(tester, catalog: [
+      for (var i = 0; i < 20; i++) storePlugin('p$i', tags: ['תגית $i']),
+    ]);
+    // "תגית 9" היא האחרונה במיון, מעבר ל-14 הראשונות.
+    plugins.setTagFilter('תגית 9');
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.showMoreTags), findsOneWidget);
+    final chip = tester.widget<StoreFilterChip>(
+        find.widgetWithText(StoreFilterChip, 'תגית 9'));
+    expect(chip.selected, isTrue);
+  });
+
+  testWidgets('שבב "חדש": מה שחדש בכניסה, וגם מה שהגיע בסנכרון באותה הרצה',
+      (tester) async {
+    final state = Directory(p.join(tempDir.path, 'state'))..createSync();
+    plugins.dispose();
+    plugins = PluginsModuleController(
+      mirrorRootDir: tempDir.path,
+      stateDir: state.path,
+    );
+    // הטעינה הראשונה במחשב קובעת נקודת התחלה — "א" אינו חדש.
+    await seed(tester, catalog: [storePlugin('a', name: 'ותיק')]);
+    await seed(tester, catalog: [
+      storePlugin('a', name: 'ותיק'),
+      storePlugin('b', name: 'חדש בכניסה'),
+    ]);
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+
+    Finder chipOn(String name) => find.descendant(
+          of: find.widgetWithText(PluginStoreCard, name),
+          matching: find.text(t.newChip),
+        );
+    expect(chipOn('ותיק'), findsNothing);
+    expect(chipOn('חדש בכניסה'), findsOneWidget);
+
+    // סנכרון שמביא תוסף נוסף — כמו `sync`, שמסתיים ב-`load`.
+    await seed(tester, catalog: [
+      storePlugin('a', name: 'ותיק'),
+      storePlugin('b', name: 'חדש בכניסה'),
+      storePlugin('c', name: 'הגיע בסנכרון'),
+    ]);
+    await tester.pumpAndSettle();
+    expect(chipOn('חדש בכניסה'), findsOneWidget);
+    expect(chipOn('הגיע בסנכרון'), findsOneWidget);
+
+    // נרשמו כ"נראו" — מה שחדש כבר אינו ממתין לסימון.
+    expect(plugins.newPlugins, isEmpty);
+  });
+
+  testWidgets('בלי אינטרנט וקובץ שלא ירד: "הקובץ לא ירד לכונן" במקום התקנה',
+      (tester) async {
+    await seed(tester, catalog: [storePlugin('a', name: 'תוסף שטרם ירד')]);
+
+    await pumpScreen(
+      tester,
+      PluginsScreen(controller: plugins, online: false),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.installInOtzariaButton), findsNothing);
+    expect(find.text(t.fileNotOnDriveLabel), findsOneWidget);
+    expect(find.text(t.noteNextDriveDownload), findsOneWidget);
+
+    await openCard(tester, 'תוסף שטרם ירד');
+    expect(find.text(t.fileMissingTitle), findsOneWidget);
+    expect(find.text(t.installInOtzariaButton), findsNothing);
+  });
+
+  testWidgets('כשל טעינה אינו מוצג יחד עם "אין תוספים"', (tester) async {
+    plugins.status = PluginsModuleStatus.error;
+    plugins.errorMessage = 'catalog.json פגום';
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pump();
+
+    expect(find.byType(InfoErrorRow), findsOneWidget);
+    expect(find.text(t.emptyTitle), findsNothing);
+  });
+
+  testWidgets('מצב ריק בלי אינטרנט: "איך זה עובד?" פותח את העזרה',
+      (tester) async {
+    var helped = 0;
+    await pumpScreen(
+      tester,
+      PluginsScreen(
+        controller: plugins,
+        online: false,
+        onOpenHelp: () => helped++,
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text(t.emptyTitle), findsOneWidget);
+    await tester.tap(find.text(t.howItWorksButton));
+    expect(helped, 1);
+  });
+
+  testWidgets('מספרי הגרסאות ברשימת הגרסאות LTR, והתאריכים בשם חודש',
+      (tester) async {
+    final plugin = StorePlugin.fromApi(const {
+      'id': 'v',
+      'name': 'עם גרסאות',
+      'shortDescription': 'תקציר',
+      'description': 'תיאור',
+      'version': '2.0.0',
+      'status': 'stable',
+      'author': 'מחבר',
+      'originalDate': '2026-10-18',
+      'tags': <String>[],
+      'supportsDirectInstall': true,
+      'downloadUrl': '/api/plugins/v/download',
+      'versions': [
+        {'version': '2.0.0', 'releasedAt': '2026-10-18', 'isLatest': true},
+        {'version': '1.0.0', 'releasedAt': '2026-09-01'},
+      ],
+    }, 'https://otzaria.org');
+    await seed(tester, catalog: [plugin]);
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await openCard(tester, 'עם גרסאות');
+
+    final version = tester.widget<Text>(find.text('1.0.0'));
+    expect(version.textDirection, TextDirection.ltr);
+    final longDate = stringsOf().units.longDate(18, 10, 2026);
+    expect(find.text(longDate), findsOneWidget);
+  });
+
+  testWidgets('דיאלוג סיום הייצוא מוצג גם אחרי שעברו לדף תוסף', (tester) async {
+    if (!StoreAppExportButton.isSupported) return;
+    plugins.dispose();
+    final exporting = _ExportController(tempDir.path);
+    plugins = exporting;
+    await seed(tester, catalog: [storePlugin('a', name: 'תוסף כלשהו')]);
+    exporting
+      ..storeApp = const MirroredStoreApp(
+        release: StoreAppRelease(
+          tagName: 'v2',
+          version: 2,
+          assetName: 'store.exe',
+          downloadUrl: 'https://example.invalid/store.exe',
+          sizeBytes: 1024,
+        ),
+        filePath: 'store.exe',
+      )
+      ..rememberedStoreDir = tempDir.path;
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(stringsOf().pages.advancedTitle));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.storeAppUpdateButton));
+    await tester.pumpAndSettle();
+    // "לעדכן שם?" — כן.
+    await tester.tap(find.text(t.storeAppOverwriteConfirm));
+    await tester.pump();
+    expect(exporting.started, isTrue);
+
+    // באמצע ההעתקה עוברים לדף תוסף — הכפתור שהתחיל את הזרימה יוצא מהעץ.
+    await openCard(tester, 'תוסף כלשהו');
+    expect(find.byType(StoreAppExportButton), findsNothing);
+
+    exporting.finish(StoreAppExportOutcome(
+      destinationDir: tempDir.path,
+      appPath: p.join(tempDir.path, 'store.exe'),
+      plugins: 1,
+      files: 2,
+      bytes: 2048,
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text(t.storeAppDoneTitle), findsOneWidget);
+  });
+
+  testWidgets('שם בכרטיס: עד שתי שורות בכרטיס, ובשורה — אחת עם השם המלא בריחוף',
+      (tester) async {
+    const name = 'תוסף עם שם ארוך מאוד שלא נכנס בשורה אחת של כרטיס צר בכלל';
+    await seed(tester, catalog: [storePlugin('a', name: name)]);
+
+    StoreHighlightText title() => tester.widget<StoreHighlightText>(
+          find.byWidgetPredicate(
+            (w) => w is StoreHighlightText && w.text == name,
+          ),
+        );
+
+    // רחב — שתי עמודות של כרטיסים.
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    expect(title().maxLines, 2);
+    expect(tester.takeException(), isNull);
+
+    // צר — עמודה אחת של שורות.
+    await pumpScreen(
+      tester,
+      PluginsScreen(controller: plugins),
+      size: const Size(700, 1600),
+    );
+    await tester.pumpAndSettle();
+    expect(title().maxLines, 1);
+    expect(find.byTooltip(name), findsOneWidget);
   });
 
   test('StoreBody.block עוטף כל תוכן כ-sliver ממורווח', () {

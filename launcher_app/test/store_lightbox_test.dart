@@ -72,4 +72,34 @@ void main() {
       expect(find.text(t.screenshotNumber(3, 3)), findsNothing);
     });
   }
+
+  // הכפתורים עקביים עם החצים: בעברית → הוא "הקודם", ולכן "הקודם" בצד ימין.
+  for (final (language, previousOnRight) in [
+    (AppLanguage.hebrew, true),
+    (AppLanguage.english, false),
+  ]) {
+    testWidgets('$language: "הקודם" בצד שממנו באים', (tester) async {
+      final t = stringsOf(language).plugins;
+      await pumpScreen(
+        tester,
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showStoreScreenshots(
+              context,
+              paths: const ['a.png', 'b.png'],
+              initialIndex: 0,
+            ),
+            child: const Text('open'),
+          ),
+        ),
+        language: language,
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final previous = tester.getCenter(find.byTooltip(t.screenshotPrevious));
+      final next = tester.getCenter(find.byTooltip(t.screenshotNext));
+      expect(previous.dx > next.dx, previousOnRight);
+    });
+  }
 }

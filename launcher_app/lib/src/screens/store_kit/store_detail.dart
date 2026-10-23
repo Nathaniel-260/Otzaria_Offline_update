@@ -438,7 +438,7 @@ class _Dot extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppTokens.borderRadiusAll,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
           child: AnimatedContainer(
             duration: AppTokens.animFast,
             width: current ? 18 : 6,

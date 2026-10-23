@@ -10,8 +10,8 @@ import '../../controllers/plugins_module_controller.dart';
 import '../../services/app_logger.dart';
 import '../../services/byte_size.dart';
 import '../../services/file_reveal.dart';
-import '../../services/hebrew_date.dart';
 import '../../services/native_file_dialogs.dart';
+import '../../services/timestamps.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 
@@ -28,14 +28,18 @@ class StoreAppExportButton extends StatelessWidget {
   const StoreAppExportButton({
     super.key,
     required this.controller,
+    required this.onExport,
     this.busyElsewhere = false,
   });
 
   final PluginsModuleController controller;
+
+  /// הזרימה רצה על ה-context של המסך: הכפתור יושב ב"מתקדם", ויוצא מהעץ
+  /// כשמקפלים אותו או נכנסים לדף תוסף באמצע ההעתקה.
+  final VoidCallback onExport;
   final bool busyElsewhere;
 
-  /// הפלטפורמות שיש להן מה לעשות עם קובץ ההרצה. מוחזק כאן כדי ששורת
-  /// הסנכרון תוכל להשמיט את הכפתור לגמרי במקום להציג אותו מושבת לנצח.
+  /// הפלטפורמות שיש להן מה לעשות עם קובץ ההרצה — בשאר השורה מושמטת.
   static bool get isSupported => Platform.isWindows;
 
   @override
@@ -57,7 +61,7 @@ class StoreAppExportButton extends StatelessWidget {
           : t.storeAppCopyButton,
       icon: FluentIcons.desktop_arrow_down_20_regular,
       isLoading: controller.isExporting,
-      onPressed: enabled ? () => runStoreAppExport(context, controller) : null,
+      onPressed: enabled ? onExport : null,
     );
 
     return tooltip == null ? button : Tooltip(message: tooltip, child: button);
@@ -127,8 +131,10 @@ Future<void> runStoreAppExport(
   if (outcome.skipped.isNotEmpty) {
     AppLogger.instance.info('הושמטו: ${outcome.skipped.join(', ')}');
   }
-  if (!context.mounted) return;
-  await _showDoneDialog(context, outcome);
+  // המסך עצמו עשוי להתחלף בזמן ההעתקה; אז הסיום עולה מעל המסגרת כולה.
+  final host = context.mounted ? context : navigatorKey.currentContext;
+  if (host == null || !host.mounted) return;
+  await _showDoneDialog(host, outcome);
 }
 
 /// ההסבר לפני שנוגעים בכלום — אותם שלושה יתרונות ואותם שבבים שבאתר.
@@ -153,8 +159,7 @@ Future<bool> _showIntroDialog(
       chips: [
         t.storeAppChipWindows,
         t.storeAppChipSize(formatBytes(release.sizeBytes)),
-        if (updated != null)
-          t.storeAppChipUpdated(HebrewDate.format(updated.toIso8601String())),
+        if (updated != null) t.storeAppChipUpdated(formatLongDate(updated)),
       ],
     ),
   );

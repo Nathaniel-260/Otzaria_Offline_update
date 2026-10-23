@@ -313,6 +313,17 @@ void main() {
       expect(s.longTaskRunning, isFalse);
     });
 
+    // סגירה באמצע הייתה עוצרת את המסירות בלי אזהרה.
+    test('"עדכון הכול" בחנות התוספים הוא משימה ארוכה', () {
+      final s = session();
+      s.plugins.updateAllRun = (done: 0, total: 2);
+      expect(s.longTaskRunning, isTrue);
+      expect(s.exitWouldInterrupt, isTrue);
+      expect(s.pluginSyncBlockedElsewhere, isFalse);
+      s.plugins.updateAllRun = null;
+      expect(s.longTaskRunning, isFalse);
+    });
+
     test('החלפת קובץ ההרצה היא exitPending וחלק ממשימה ארוכה', () {
       final s = session();
       s.launcherUpdate.status = LauncherUpdateStatus.installing;

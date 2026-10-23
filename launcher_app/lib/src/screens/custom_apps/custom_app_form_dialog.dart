@@ -511,24 +511,37 @@ class _CustomAppFormDialogState extends State<CustomAppFormDialog> {
                 hint: t.longDescriptionHint,
                 maxLines: 3,
               ),
-              FormTextField(
-                label: t.installDirLabel,
-                controller: _installDir,
-                hint: t.installDirHint,
-                onChanged: rebuild,
-                ltr: true,
-                trailing: ActionButton.neutral(
-                  text: t.pickInstallDirButton,
-                  onPressed: _pickInstallDir,
+              // תוכנה ניידת: התיקייה נבחרת בכל מחשב בזמן ההתקנה, ואין מה לזהות.
+              if (_portableFile)
+                FormLabelled(
+                  label: t.installDirLabel,
+                  child: Text(
+                    t.portableDestinationHint,
+                    style: AppTextStyles.body.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else ...[
+                FormTextField(
+                  label: t.installDirLabel,
+                  controller: _installDir,
+                  hint: t.installDirHint,
+                  onChanged: rebuild,
+                  ltr: true,
+                  trailing: ActionButton.neutral(
+                    text: t.pickInstallDirButton,
+                    onPressed: _pickInstallDir,
+                  ),
                 ),
-              ),
-              FormTextField(
-                label: t.exeNameLabel,
-                controller: _exeName,
-                hint: t.exeNameHint,
-                onChanged: rebuild,
-                ltr: true,
-              ),
+                FormTextField(
+                  label: t.exeNameLabel,
+                  controller: _exeName,
+                  hint: t.exeNameHint,
+                  onChanged: rebuild,
+                  ltr: true,
+                ),
+              ],
               CustomAppIconSection(
                 iconPath: _iconPath,
                 canExtract: _iconSourceExe() != null,

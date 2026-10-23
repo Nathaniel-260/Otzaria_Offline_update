@@ -30,8 +30,15 @@ typedef StoreAppOnlineAnswers = ({
   DateTime? checkedAt,
 });
 
-/// סינון לפי סטטוס התוסף בחנות (`stable` / `beta` / `experimental`).
-enum PluginStatusFilter { all, stable, beta, experimental }
+/// סינון לפי יציבות: "ניסיוני" כולל גם את מה שהאתר מסמן כבטא.
+enum PluginStatusFilter { all, stable, experimental }
+
+/// סיכום "עדכון הכול": מה נשלח, מה נכשל ולמה, והאם נעצר באמצע.
+typedef PluginUpdateAllOutcome = ({
+  List<StorePlugin> sent,
+  List<({StorePlugin plugin, String? error})> failed,
+  bool stopped,
+});
 
 /// הבורר שליד החיפוש: הכול / מותקנים / לא מותקנים.
 enum PluginInstallFilter { all, installed, notInstalled }
@@ -306,11 +313,15 @@ class PluginsModuleController extends ChangeNotifier
       storeApp = await _manager.loadStoreApp();
       await _loadStoreDestination();
       await _loadKnown();
-      // קטגוריה שנעלמה מהחנות לא נשארת בחורה.
+      // קטגוריה או תגית שנעלמו מהחנות לא נשארות בחורה.
       if (categoryFilter case final slug? when categoryBySlug(slug) == null) {
         categoryFilter = null;
       }
       _invalidateDerived();
+      if (tagFilter case final tag? when !allTags.contains(tag)) {
+        tagFilter = null;
+        _invalidateDerived();
+      }
       status = PluginsModuleStatus.ready;
     } catch (e, st) {
       status = PluginsModuleStatus.error;
@@ -767,6 +778,60 @@ class PluginsModuleController extends ChangeNotifier
     return result;
   }
 
+  final Set<String> _delivering = {};
+
+  /// התוסף נמסר לאוצריא ברגע זה — לכל תוסף בנפרד.
+  bool isDelivering(StorePlugin plugin) => _delivering.contains(plugin.id);
+
+  /// [directInstall] עם סימון "בשליחה" על התוסף עד שהמסירה חוזרת.
+  Future<PluginInstallResult> deliver(StorePlugin plugin) async {
+    _delivering.add(plugin.id);
+    notifyListeners();
+    try {
+      return await directInstall(plugin);
+    } finally {
+      _delivering.remove(plugin.id);
+      if (!isDisposed) notifyListeners();
+    }
+  }
+
+  /// "עדכון הכול" שרץ: כמה נשלחו מתוך כמה. `null` כשאינו רץ.
+  ({int done, int total})? updateAllRun;
+  bool get isUpdatingAll => updateAllRun != null;
+  bool _stopUpdateAll = false;
+  bool get updateAllStopRequested => _stopUpdateAll;
+
+  void stopUpdateAll() {
+    if (!isUpdatingAll || _stopUpdateAll) return;
+    _stopUpdateAll = true;
+    notifyListeners();
+  }
+
+  /// "עדכון הכול" מהחנות. רץ בקונטרולר ולא במסך: הוא משימה ארוכה שממשיכה
+  /// גם כשעוברים מסך, ונעצר רק ב-[stopUpdateAll]. `null` — כבר רץ.
+  Future<PluginUpdateAllOutcome?> updateAll(List<StorePlugin> targets) async {
+    if (isUpdatingAll || targets.isEmpty) return null;
+    _stopUpdateAll = false;
+    updateAllRun = (done: 0, total: targets.length);
+    notifyListeners();
+    final failed = <({StorePlugin plugin, String? error})>[];
+    final sent = await deliverUpdates(
+      plugins: targets,
+      isCancelled: () => _stopUpdateAll,
+      onDelivered: (plugin, result) {
+        if (!result.success) failed.add((plugin: plugin, error: result.error));
+        final run = updateAllRun;
+        if (run != null) updateAllRun = (done: run.done + 1, total: run.total);
+      },
+    );
+    final stopped =
+        _stopUpdateAll && sent.length + failed.length < targets.length;
+    updateAllRun = null;
+    _stopUpdateAll = false;
+    if (!isDisposed) notifyListeners();
+    return (sent: sent, failed: failed, stopped: stopped);
+  }
+
   /// מוסר לאוצריא, אחד אחרי השני, את העדכונים שאפשר להתקין ישירות
   /// ([plugins], וכברירת מחדל [deliverableUpdates]). מחזיר מה נשלח בהצלחה.
   Future<List<StorePlugin>> deliverUpdates({
@@ -783,7 +848,7 @@ class PluginsModuleController extends ChangeNotifier
       first = false;
       if (isDisposed || (isCancelled?.call() ?? false)) break;
       onDelivering?.call(plugin);
-      final result = await directInstall(plugin);
+      final result = await deliver(plugin);
       if (result.success) sent.add(plugin);
       onDelivered?.call(plugin, result);
     }
@@ -909,8 +974,12 @@ class PluginsModuleController extends ChangeNotifier
         return _sorted(plugins.where((plugin) {
           if (members != null && !members.contains(plugin.id)) return false;
           if (!_passesInstallFilter(plugin)) return false;
-          if (statusFilter != PluginStatusFilter.all &&
-              plugin.status != statusFilter.name) {
+          if (statusFilter == PluginStatusFilter.stable &&
+              plugin.status != 'stable') {
+            return false;
+          }
+          if (statusFilter == PluginStatusFilter.experimental &&
+              plugin.status == 'stable') {
             return false;
           }
           if (tagFilter != null && !plugin.tags.contains(tagFilter)) {
@@ -1027,10 +1096,15 @@ class PluginsModuleController extends ChangeNotifier
         .toList(growable: false);
   }
 
-  /// רושם שהטוסט של החנות הציג את התוספים האלה.
+  /// מה שסומן "חדש" בהרצה הזו — השבב נשאר עד סוף ההרצה, גם אחרי הרישום.
+  final Set<String> _newThisRun = {};
+  bool isNewThisRun(StorePlugin plugin) => _newThisRun.contains(plugin.id);
+
+  /// רושם שהחנות הציגה את התוספים האלה כחדשים.
   Future<void> markNewSeen(Iterable<StorePlugin> shown) async {
     final ids = shown.map((plugin) => plugin.id).toList();
     if (ids.isEmpty) return;
+    _newThisRun.addAll(ids);
     _seenIds = {...?_seenIds, ...ids};
     _newPlugins = null;
     await _known?.recordSeen(ids);

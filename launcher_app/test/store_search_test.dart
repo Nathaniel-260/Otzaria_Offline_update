@@ -32,4 +32,27 @@ void main() {
     expect(storeMatchRange('לוח שנה', 'סידור'), isNull);
     expect(storeMatchRange('לוח שנה', ''), isNull);
   });
+
+  test('מקף עברי (־) נחשב רווח — "בית־הכנסת" נמצא ב"בית הכנסת"', () {
+    expect(
+      storeTextMatches('דיני בית־הכנסת', normalizeStoreQuery('בית הכנסת')),
+      isTrue,
+    );
+    expect(
+      storeTextMatches('דיני בית הכנסת', normalizeStoreQuery('בית־הכנסת')),
+      isTrue,
+    );
+    const text = 'דיני בית־הכנסת';
+    final range = storeMatchRange(text, 'בית הכנסת')!;
+    expect(text.substring(range.start, range.end), 'בית־הכנסת');
+  });
+
+  // İ נעשית בשני תווים ב-lowercase; המיקומים חייבים להישאר מיושרים לטקסט.
+  test('אות שמתארכת ב-lowercase אינה שוברת את טווח ההדגשה', () {
+    const text = 'İstanbul מדריך';
+    final range = storeMatchRange(text, 'מדריך')!;
+    expect(text.substring(range.start, range.end), 'מדריך');
+    final whole = storeMatchRange(text, text)!;
+    expect(text.substring(whole.start, whole.end), text);
+  });
 }

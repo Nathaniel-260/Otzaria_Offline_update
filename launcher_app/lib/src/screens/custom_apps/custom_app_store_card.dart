@@ -19,6 +19,7 @@ class CustomAppStoreCard extends StatelessWidget {
     required this.onInstall,
     required this.onLaunch,
     required this.onDownload,
+    this.online = true,
   });
 
   final CustomAppsController controller;
@@ -26,6 +27,9 @@ class CustomAppStoreCard extends StatelessWidget {
 
   /// הכונן מוגן מפני כתיבה — אין הורדה אליו.
   final bool readOnly;
+
+  /// `false` — אין אינטרנט במחשב הזה, ואין הורדה.
+  final bool online;
 
   final VoidCallback onOpenDetail;
   final VoidCallback onInstall;
@@ -55,6 +59,7 @@ class CustomAppStoreCard extends StatelessWidget {
         onInstall: onInstall,
         onLaunch: onLaunch,
         onDownload: onDownload,
+        online: online,
       ),
       note: customAppNoteOf(context, app),
     );
@@ -76,6 +81,7 @@ class CustomAppAction extends StatelessWidget {
     required this.onLaunch,
     required this.onDownload,
     this.primary = false,
+    this.online = true,
   });
 
   final CustomAppsController controller;
@@ -87,6 +93,9 @@ class CustomAppAction extends StatelessWidget {
 
   /// בדף התוכנה — כפתור ראשי.
   final bool primary;
+
+  /// `false` — אין אינטרנט, ולכן אין "הורדה לכונן".
+  final bool online;
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +132,9 @@ class CustomAppAction extends StatelessWidget {
     }
     if (app.canInstall) return button(common.install, busy ? null : onInstall);
     // אין מה להתקין, אבל יש מאיפה להביא — וזה בדיוק מה שחסר לתוכנה הזו.
-    if (app.descriptor.sourceKind == AppSourceKind.github && !readOnly) {
+    if (app.descriptor.sourceKind == AppSourceKind.github &&
+        !readOnly &&
+        online) {
       final downloading = controller.downloadingId == app.descriptor.id;
       final onPressed =
           controller.downloadingId != null || controller.isDownloadingAll

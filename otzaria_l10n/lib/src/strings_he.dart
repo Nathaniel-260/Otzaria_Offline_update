@@ -1649,7 +1649,7 @@ class _Plugins extends PluginsStrings {
   String get noResultsBody => 'נסו מילה אחרת, או חפשו בכל הקטגוריות.';
 
   @override
-  String get filterStatusLabel => 'סטטוס';
+  String get filterStatusLabel => 'יציבות';
   @override
   String get filterSortLabel => 'מיון';
   @override
@@ -1678,7 +1678,7 @@ class _Plugins extends PluginsStrings {
   String ratingCountLabel(int count) =>
       count == 1 ? '$count מדרג' : '$count מדרגים';
   @override
-  String ratingVerifiedLabel(int count) => '$count מאומתים';
+  String ratingVerifiedLabel(int count) => '$count התקינו בפועל';
   @override
   String get ratingVerifiedTooltip => 'מדרגים שהתקנת התוסף אצלם נרשמה בפועל';
   @override
@@ -1706,7 +1706,7 @@ class _Plugins extends PluginsStrings {
   @override
   String get infoVersion => 'גרסה';
   @override
-  String get infoStatus => 'מצב';
+  String get infoStatus => 'יציבות';
   @override
   String get infoAuthor => 'מפתח';
   @override
@@ -1717,16 +1717,6 @@ class _Plugins extends PluginsStrings {
   String get infoNetworkRequired => 'נדרש';
   @override
   String get infoNetworkNotRequired => 'לא נדרש';
-  @override
-  String get infoCompatibility => 'מתאים לגרסאות';
-  @override
-  String compatibilityRange(String from, String to) => '$from — עד $to';
-  @override
-  String get infoLocalFile => 'הקובץ בכונן';
-  @override
-  String get infoLocalFileMissing => 'עוד לא ירד לכונן';
-  @override
-  String get valueUnspecifiedFeminine => 'לא צוינה';
   @override
   String get valueUnspecifiedMasculine => 'לא צוין';
 
@@ -1868,6 +1858,25 @@ class _Plugins extends PluginsStrings {
       one: 'העדכון נשלח לאוצריא — אשרו שם',
       many: '$count עדכונים נשלחו לאוצריא — אשרו שם');
   @override
+  String updateAllFailedSnack(int sent, int failed, String names) =>
+      '$sent נשלחו לאוצריא, $failed נכשלו: $names';
+  @override
+  String updateAllStoppedSnack(int sent) =>
+      'העדכון נעצר. נשלחו לאוצריא: $sent.';
+  @override
+  String get updateAllStoppingLabel => 'עוצר אחרי התוסף הנוכחי…';
+  @override
+  String get actionsBlockedSyncing =>
+      'בזמן העדכון מהאתר אי אפשר להתקין או לשמור תוספים.';
+  @override
+  String get actionsBlockedExporting =>
+      'בזמן העתקת החנות אי אפשר להתקין או לשמור תוספים.';
+  @override
+  String get actionsBlockedUpdatingAll =>
+      'בזמן "עדכון הכול" אי אפשר להתקין או לשמור תוספים אחרים.';
+  @override
+  String get howItWorksButton => 'איך זה עובד?';
+  @override
   String get updatesSentTitle => 'העדכונים נשלחו לאוצריא — אשרו שם';
   @override
   String get updatesSentBody =>
@@ -1910,6 +1919,10 @@ class _Plugins extends PluginsStrings {
   @override
   String get noteFileMissing =>
       'הקובץ עוד לא בכונן — יירד בהתקנה (צריך אינטרנט)';
+  @override
+  String get fileNotOnDriveLabel => 'הקובץ לא ירד לכונן';
+  @override
+  String get noteNextDriveDownload => 'יירד בהורדה הבאה לכונן';
   @override
   String get incompatibleTitle => 'התוסף לא מתאים לאוצריא שבמחשב הזה';
   @override
@@ -2463,6 +2476,21 @@ class _LauncherUpdate extends LauncherUpdateStrings {
       'לו. יש להוריד אותו מחדש במחשב שיש בו אינטרנט.';
 }
 
+const _hebrewMonths = [
+  'ינואר',
+  'פברואר',
+  'מרץ',
+  'אפריל',
+  'מאי',
+  'יוני',
+  'יולי',
+  'אוגוסט',
+  'ספטמבר',
+  'אוקטובר',
+  'נובמבר',
+  'דצמבר',
+];
+
 class _Units extends UnitStrings {
   const _Units();
 
@@ -2478,6 +2506,9 @@ class _Units extends UnitStrings {
   String gigabytes(String amount) => '\u2066$amount\u00a0GB\u2069';
   @override
   String perSecond(String size) => '\u2066$size/s\u2069';
+  @override
+  String longDate(int day, int month, int year) =>
+      '$day ב${_hebrewMonths[(month - 1) % 12]} $year';
 }
 
 class _LibraryDomain extends LibraryDomainStrings {
@@ -3540,9 +3571,9 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get infoSourceFile => 'קובץ שנבחר ידנית';
   @override
-  String get infoInstalled => 'במחשב הזה';
+  String get infoInstalled => 'מותקנת במחשב הזה';
   @override
-  String get infoStored => 'על הכונן';
+  String get infoStored => 'בכונן';
   @override
   String get infoOnline => 'ברשת';
   @override
@@ -3551,6 +3582,12 @@ class _CustomApps extends CustomAppsStrings {
   String get infoStoredAdded => 'נוסף לכונן';
   @override
   String get valueUnknown => 'לא ידוע';
+  @override
+  String get valueNo => 'לא';
+  @override
+  String get installedNoVersionValue => 'כן, הגרסה לא ידועה';
+  @override
+  String get notStoredValue => 'עוד לא ירד';
 
   // ── מצבים ריקים ──
   @override
@@ -3578,6 +3615,8 @@ class _CustomApps extends CustomAppsStrings {
   String get categoryDescriptionLabel => 'תיאור (לא חובה)';
   @override
   String get addCategoryButton => 'הוספת קטגוריה';
+  @override
+  String get editCategoryTitle => 'עריכת הקטגוריה';
   @override
   String get noCategoriesHint =>
       'עוד לא הוגדרו קטגוריות. בלעדיהן המסך מציג את כל התוכנות יחד.';
@@ -3638,16 +3677,16 @@ class _CustomApps extends CustomAppsStrings {
   String get settingsCardTitle => 'תוכנות נוספות';
   @override
   String get settingsCardHint =>
-      'אפשר להוסיף תוכנות משלכם, שהתוכנה תדע לשאת על הכונן ולהתקין במחשב '
-      'המנותק — בדיוק כמו שהיא עושה עם אוצריא. כל הניהול נעשה במסך הניהול '
-      'שנפתח מכאן; ההורדה וההתקנה עצמן במסך "תוכנות נוספות".';
+      'תוכנות משלכם שנשמרות בכונן ומותקנות גם במחשב בלי אינטרנט.';
+  @override
+  String get manageRowTitle => 'ניהול';
+  @override
+  String manageRowSubtitle(int count) =>
+      '${count == 1 ? '$count תוכנה' : '$count תוכנות'} בכונן · הוספה, עריכה, סידור וקטגוריות';
   @override
   String get emptyHint => 'לא נוספו תוכנות';
   @override
   String get addButton => 'הוספת תוכנה';
-  @override
-  String registeredAppCount(int count) =>
-      count == 1 ? '$count תוכנה רשומה' : '$count תוכנות רשומות';
   @override
   String get openManagerButton => 'ניהול התוכנות';
 
@@ -3693,7 +3732,7 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get githubUrlHint => 'למשל github.com/owner/repo';
   @override
-  String get githubUrlInvalid => 'זו אינה כתובת של ריפו בגיטהאב';
+  String get githubUrlInvalid => 'זו לא כתובת של תוכנה באתר המפתחים (GitHub)';
   @override
   String get fetchAssetsButton => 'הצגת הקבצים';
   @override
@@ -3709,7 +3748,7 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get pickInstallerDialogTitle => 'בחירת קובץ ההתקנה';
   @override
-  String installerKindSniffed(String kind) => 'זוהה מהקובץ: $kind';
+  String installerKindSniffed(String kind) => 'זוהה: $kind';
   @override
   String get portableFileLabel => 'הקובץ הוא התוכנה עצמה';
   @override
@@ -3721,6 +3760,9 @@ class _CustomApps extends CustomAppsStrings {
   String get portableFileHint =>
       'סמנו כשהקובץ אינו מתקין אלא התוכנה עצמה. בהתקנה תישאלו לאן להעתיק '
       'אותו, במקום להריץ אותו.';
+  @override
+  String get portableDestinationHint =>
+      'איפה לשמור את התוכנה בכל מחשב — בזמן ההתקנה תתבקשו לבחור תיקייה.';
   @override
   String get pickCopyTargetDialogTitle => 'לאן להעתיק את הקובץ';
   @override
@@ -3745,18 +3787,18 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get nameRequired => 'יש להזין שם לתוכנה';
   @override
-  String get sourceRequired => 'יש לבחור קובץ, או ריפו וקובץ מתוכו';
+  String get sourceRequired => 'יש לבחור קובץ, או כתובת וקובץ מתוכה';
   @override
   String addedSnack(String name) => '$name נוספה';
   @override
   String updatedSnack(String name) => '$name עודכנה';
 
   @override
-  String get kindInno => 'Inno Setup';
+  String get kindInno => 'קובץ התקנה רגיל';
   @override
-  String get kindNsis => 'NSIS';
+  String get kindNsis => 'קובץ התקנה רגיל';
   @override
-  String get kindMsi => 'MSI';
+  String get kindMsi => 'קובץ התקנה רגיל';
   @override
   String get kindZip => 'ארכיון';
   @override
@@ -3764,16 +3806,6 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get kindInteractive => 'מתקין שאינו מוכר — ייפתח חלון התקנה רגיל';
 
-  @override
-  String installedVersion(String version) => 'מותקנת: גרסה $version';
-  @override
-  String get installedUnknownVersion => 'מותקנת, אך לא ניתן לקרוא את הגרסה';
-  @override
-  String get notInstalled => 'אינה מותקנת';
-  @override
-  String get noDetectRules => 'לא ניתן לזהות — לא הוגדר שם קובץ הרצה';
-  @override
-  String storedInstaller(String version) => 'על הכונן: גרסה $version';
   @override
   String get noStoredInstaller => 'עוד לא הורד קובץ התקנה';
 
@@ -3842,8 +3874,8 @@ class _CustomApps extends CustomAppsStrings {
   String get unverifiedDialogTitle => 'להתקין קובץ שלא נבדק?';
   @override
   String unverifiedDialogContent(String fileName) =>
-      'לקובץ $fileName אין טביעת אצבע שמורה, ולכן אי אפשר לוודא שזה הקובץ שצורף במקור. '
-      'אם תמשיכו, היא תחושב ותישמר, ומכאן כל שינוי בקובץ ייחסם.';
+      'לא שמרנו לקובץ $fileName סימן זיהוי, ולכן אי אפשר לוודא שהוא לא שונה. '
+      'אם תמשיכו, הסימן יחושב ויישמר, ומכאן כל שינוי בקובץ ייחסם.';
   @override
   String get unverifiedDialogConfirm => 'התקנה בכל זאת';
   @override
@@ -3860,13 +3892,13 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get editTooltip => 'עריכה';
   @override
-  String get removeTooltip => 'הסרה מהרשימה';
+  String get removeTooltip => 'הסרה מהכונן';
   @override
-  String get removeDialogTitle => 'הסרה מהרשימה';
+  String removeDialogTitle(String name) => 'להסיר את "$name" מהכונן?';
   @override
   String removeDialogContent(String name) =>
-      '$name תוסר מהרשימה, והקובץ השמור שלה יימחק מהכונן.\n\n'
-      'התוכנה עצמה לא תוסר מהמחשב.';
+      '"$name" תוסר מהרשימה והקובץ שבכונן יימחק. '
+      'התוכנה לא תוסר ממחשבים שכבר התקינו אותה.';
   @override
   String get removeDialogConfirm => 'הסרה';
   @override
@@ -3892,8 +3924,6 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get manageEmptyBody =>
       'אפשר לשמור בכונן תוכנה שתרצו להתקין גם במחשבים בלי אינטרנט — מקובץ שיש במחשב, או מאתר המפתחים (GitHub) כדי שתתעדכן לבד.';
-  @override
-  String get manageReadOnlyNote => 'אי אפשר להוסיף כשאי אפשר לכתוב לכונן.';
   @override
   String get noCategoriesTitle => 'אין קטגוריות';
   @override

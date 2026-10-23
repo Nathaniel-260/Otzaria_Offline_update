@@ -36,14 +36,14 @@ class CustomAppsSettingsCard extends StatelessWidget {
         children: [
           SettingsActionTile.text(
             icon: FluentIcons.box_24_regular,
-            title: t.settingsCardTitle,
+            title: t.manageRowTitle,
             subtitle: readOnly
                 ? driveFull
                     ? context
                         .strings.readOnlyDrive.customAppsManageDisabledDriveFull
                     : context.strings.readOnlyDrive.customAppsManageDisabled
                 : controller.hasApps
-                    ? t.registeredAppCount(controller.apps.length)
+                    ? t.manageRowSubtitle(controller.apps.length)
                     : t.emptyHint,
             actions: [
               ActionButton.neutral(

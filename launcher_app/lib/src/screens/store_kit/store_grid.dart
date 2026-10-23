@@ -12,7 +12,7 @@ const double kStoreRowCardWidth = 480;
 /// הטקסט. הגובה **קבוע** — התיאור תמיד בשתי שורות שמורות — כדי שהרשת לא
 /// תצטרך למדוד אף כרטיס.
 double storeRowCardExtent(double textScale) => 32 + 100 * textScale;
-double storeTileCardExtent(double textScale) => 112 + 92 * textScale;
+double storeTileCardExtent(double textScale) => 112 + 104 * textScale;
 
 /// פריסת רשת הכרטיסים: עמודה אחת של שורות, או שתיים של כרטיסים.
 ///

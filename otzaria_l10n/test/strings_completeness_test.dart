@@ -123,10 +123,6 @@ const _sameInBothLanguages = {
   'plugins.ratingBadge', // מחרוזת פורמט טהורה: "4.5 (128)"
   // מחרוזת פורמט טהורה: שם שלב (כבר מתורגם) ולצידו mm:ss.
   'libraryDomain.applyStageElapsed',
-  // שמות ה-framework-ים של חבילות ההתקנה — שמות מוצר, לא מונחים.
-  'customApps.kindInno',
-  'customApps.kindNsis',
-  'customApps.kindMsi',
 };
 const _hebrewLettersInEnglish = {'settings.languageHebrew'};
 
@@ -135,6 +131,7 @@ const _hebrewLettersInEnglish = {'settings.languageHebrew'};
 const _selectorArgs = {
   'libraryDomain.applyPatchStage#0',
   'libraryDomain.applyVerifyStage#0',
+  'units.longDate#1', // החודש מוצג בשמו
 };
 const _noHebrewLettersInHebrew = {
   'common.emptyValue',
@@ -147,9 +144,6 @@ const _noHebrewLettersInHebrew = {
   'settings.languageEnglish',
   'plugins.localFileDescription',
   'plugins.ratingBadge',
-  'customApps.kindInno',
-  'customApps.kindNsis',
-  'customApps.kindMsi',
 };
 
 /// מונים שהיחיד שלהם מנוסח במילים ("תוסף אחד"), לפי `plural`. ב-1 הפלט חייב

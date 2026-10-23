@@ -132,7 +132,7 @@ final Map<String, List<VisualState>> _statesByPhase = {
 };
 
 /// השלבים שמצלמים את מצבי החנות.
-const _storePhases = {'phase4'};
+const _storePhases = {'phase4', 'phase4b'};
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
 Set<String> get _homeScenarioPhases =>
@@ -499,7 +499,7 @@ void main() {
               'לוח שנה עברי',
             'plugin_tikkun' => 'תיקון קוראים',
             'plugin_colors' => 'סימניות צבעוניות',
-            'plugin_nusach' => 'סידור לפי נוסח',
+            'plugin_nusach' || 'plugin_nusach_offline' => 'סידור לפי נוסח',
             'plugin_mydev' => 'התוסף שלי',
             'app_player' => 'נגן שיעורים',
             'app_detail_editor' => 'עורך מסמכים',

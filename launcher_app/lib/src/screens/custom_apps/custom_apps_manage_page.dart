@@ -45,7 +45,7 @@ Future<void> confirmRemoveCustomApp(
   final t = context.strings.customApps;
   final approved = await showWarningDialog(
     context: context,
-    title: t.removeDialogTitle,
+    title: t.removeDialogTitle(app.descriptor.name),
     content: t.removeDialogContent(app.descriptor.name),
     confirmText: t.removeDialogConfirm,
   );
@@ -130,9 +130,7 @@ class _CustomAppsManagePageState extends State<CustomAppsManagePage> {
             EmptyState(
               icon: FluentIcons.apps_add_in_24_regular,
               title: t.manageEmptyTitle,
-              body: widget.readOnly
-                  ? '${t.manageEmptyBody} ${t.manageReadOnlyNote}'
-                  : t.manageEmptyBody,
+              body: t.manageEmptyBody,
               actions: [add],
             ),
           )

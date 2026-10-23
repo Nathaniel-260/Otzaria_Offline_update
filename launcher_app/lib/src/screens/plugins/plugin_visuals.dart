@@ -103,6 +103,9 @@ enum PluginCardState {
   /// אוצריא עוד לא מותקנת כאן.
   needsOtzaria,
 
+  /// הקובץ לא ירד לכונן, ובמחשב הזה אין אינטרנט להביא אותו.
+  missingOffline,
+
   /// התוסף אינו תומך בהתקנה ישירה — רק שמירת קובץ.
   saveOnly,
 }
@@ -112,6 +115,7 @@ PluginCardState pluginCardStateOf(
   StorePlugin plugin, {
   required bool busy,
   required bool otzariaInstalled,
+  bool? online,
 }) {
   if (busy) return PluginCardState.sending;
   if (controller.isAwaitingInstallOf(plugin)) return PluginCardState.sent;
@@ -119,7 +123,7 @@ PluginCardState pluginCardStateOf(
     return PluginCardState.development;
   }
   final direct = controller.canDirectInstall(plugin);
-  return switch (controller.statusOf(plugin)) {
+  final state = switch (controller.statusOf(plugin)) {
     PluginInstallStatus.incompatible => PluginCardState.incompatible,
     PluginInstallStatus.updateAvailable =>
       direct ? PluginCardState.update : PluginCardState.saveOnly,
@@ -132,6 +136,11 @@ PluginCardState pluginCardStateOf(
             ? PluginCardState.install
             : PluginCardState.needsOtzaria,
   };
+  final fetchable =
+      state == PluginCardState.install || state == PluginCardState.update;
+  return fetchable && online == false && !controller.hasFileFor(plugin)
+      ? PluginCardState.missingOffline
+      : state;
 }
 
 /// הגרסה המינימלית של אוצריא שהתוסף דורש — לשורת ההסבר כשאינו מתאים.
@@ -154,6 +163,8 @@ String? pluginNoteOf(
       return t.noteNeedsOtzaria;
     case PluginCardState.saveOnly:
       return t.noteSaveOnly;
+    case PluginCardState.missingOffline:
+      return t.noteNextDriveDownload;
     case PluginCardState.update || PluginCardState.install:
       if (state == PluginCardState.update &&
           controller.isDisabledInOtzaria(plugin)) {
@@ -191,7 +202,7 @@ class PluginAction extends StatelessWidget {
   /// בדף הפרטים — כפתור ראשי.
   final bool primary;
 
-  /// פעולה אחרת רצה (עדכון הכול) — הכפתור מושבת.
+  /// סנכרון, ייצוא או "עדכון הכול" רצים — הכפתור מושבת.
   final bool blocked;
 
   @override
@@ -237,6 +248,10 @@ class PluginAction extends StatelessWidget {
         button(t.updateToButton(controller.versionOf(plugin)), onInstall),
       PluginCardState.install => button(t.installInOtzariaButton, onInstall),
       PluginCardState.needsOtzaria => button(t.installInOtzariaButton, null),
+      PluginCardState.missingOffline => StoreStateLabel(
+          icon: FluentIcons.arrow_download_20_regular,
+          text: t.fileNotOnDriveLabel,
+        ),
       PluginCardState.saveOnly => button(
           t.saveFileButton,
           controller.hasFileFor(plugin) ? onSave : null,

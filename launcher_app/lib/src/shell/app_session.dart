@@ -654,6 +654,7 @@ class AppSession extends ChangeNotifier {
       _customApps.isDownloadingAll ||
       _plugins.isExporting ||
       _plugins.isSyncing ||
+      _plugins.isUpdatingAll ||
       exitPending;
 
   bool get pluginSyncBlockedElsewhere =>

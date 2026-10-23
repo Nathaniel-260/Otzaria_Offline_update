@@ -81,6 +81,7 @@ class FormTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     final field = RtlTextField(
       controller: controller,
+      decoration: const InputDecoration(),
       maxLines: maxLines,
       minLines: maxLines,
       textDirection: ltr ? TextDirection.ltr : null,

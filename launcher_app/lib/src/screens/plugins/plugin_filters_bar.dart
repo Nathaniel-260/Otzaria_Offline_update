@@ -210,8 +210,16 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
 
     final tags = _c.allTags;
     final hasMore = tags.length > _collapsedTagCount;
-    final shownTags =
-        _allTagsShown || !hasMore ? tags : tags.take(_collapsedTagCount);
+    final selectedTag = _c.tagFilter;
+    // תגית שנבחרה נשארת גלויה גם כשהרשימה מקופלת — אחרת המסנן פעיל ובלתי נראה.
+    final shownTags = _allTagsShown || !hasMore
+        ? tags
+        : [
+            ...tags.take(_collapsedTagCount),
+            if (selectedTag != null &&
+                !tags.take(_collapsedTagCount).contains(selectedTag))
+              selectedTag,
+          ];
     final label = AppTextStyles.small.copyWith(color: cs.onSurfaceVariant);
 
     Widget line(String title, List<Widget> chips) => Row(

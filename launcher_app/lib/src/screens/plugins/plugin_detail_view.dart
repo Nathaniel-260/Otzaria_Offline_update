@@ -5,7 +5,7 @@ import 'package:plugins_manager/plugins_manager.dart';
 
 import '../../controllers/plugins_module_controller.dart';
 import '../../services/byte_size.dart';
-import '../../services/hebrew_date.dart';
+import '../../services/timestamps.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 import '../store_kit/store_kit.dart';
@@ -24,8 +24,9 @@ class PluginDetailView extends StatelessWidget {
     required this.onTagSelected,
     required this.onCategorySelected,
     this.busy = false,
-    this.blocked = false,
+    this.blockedReason,
     this.otzariaInstalled = true,
+    this.online,
   });
 
   final StorePlugin plugin;
@@ -35,8 +36,13 @@ class PluginDetailView extends StatelessWidget {
   final ValueChanged<String> onTagSelected;
   final ValueChanged<String> onCategorySelected;
   final bool busy;
-  final bool blocked;
+
+  /// למה הפעולות מושבתות כרגע (סנכרון, ייצוא, "עדכון הכול"), או `null`.
+  final String? blockedReason;
   final bool otzariaInstalled;
+  final bool? online;
+
+  bool get _blocked => blockedReason != null;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +51,7 @@ class PluginDetailView extends StatelessWidget {
       plugin,
       busy: busy,
       otzariaInstalled: otzariaInstalled,
+      online: online,
     );
     return StoreBody(
       slivers: [
@@ -85,17 +92,21 @@ class PluginDetailView extends StatelessWidget {
               onInstall: onInstall,
               onSave: onSave,
               primary: true,
-              blocked: blocked,
+              blocked: _blocked,
             ),
             if (canSave)
               ActionButton.neutral(
                 text: t.saveFileButton,
                 icon: FluentIcons.save_20_regular,
-                onPressed: busy || blocked ? null : onSave,
+                onPressed: busy || _blocked ? null : onSave,
               ),
           ],
-          // שורת ההסבר של "לא מתאים" כבר בבאנר שמעל.
-          note: state == PluginCardState.incompatible ? null : note,
+          // ההסבר של "לא מתאים" ושל קובץ חסר כבר בבאנר שמעל.
+          note: blockedReason ??
+              (state == PluginCardState.incompatible ||
+                      state == PluginCardState.missingOffline
+                  ? null
+                  : note),
         ),
         const SizedBox(height: 22),
         StoreFacts(facts: _facts(context)),
@@ -151,7 +162,9 @@ class PluginDetailView extends StatelessWidget {
   Widget? _banner(BuildContext context, PluginCardState state) {
     final t = context.strings.plugins;
     final missing = !controller.hasFileFor(plugin) &&
-        (state == PluginCardState.install || state == PluginCardState.update);
+        (state == PluginCardState.install ||
+            state == PluginCardState.update ||
+            state == PluginCardState.missingOffline);
     return switch (state) {
       PluginCardState.incompatible => NoticeBanner(
           kind: NoticeKind.warning,
@@ -267,19 +280,9 @@ class PluginDetailView extends StatelessWidget {
     return bytes > 0 ? bytes : null;
   }
 
-  String _compatibility(BuildContext context) {
-    final t = context.strings.plugins;
-    final target = controller.targetOf(plugin);
-    final from = target?.compatibleWith ?? plugin.compatibleWith;
-    final to = target?.maxAppVersion ?? plugin.maxAppVersion;
-    if (from.isEmpty) return t.valueUnspecifiedFeminine;
-    return to == null ? from : t.compatibilityRange(from, to);
-  }
-
   List<StoreInfoEntry> _info(BuildContext context) {
     final t = context.strings.plugins;
     final target = controller.targetOf(plugin);
-    final local = plugin.localFileFor(target?.version);
     final homepage = plugin.homepage;
     return [
       StoreInfoEntry(
@@ -289,7 +292,7 @@ class PluginDetailView extends StatelessWidget {
       ),
       StoreInfoEntry(
         label: t.infoUpdated,
-        value: HebrewDate.format(
+        value: formatLongDateRaw(
           plugin.displayUpdatedDate,
         ),
       ),
@@ -300,13 +303,6 @@ class PluginDetailView extends StatelessWidget {
       StoreInfoEntry(
         label: t.infoDownloads,
         value: formatCount(plugin.downloadCount),
-      ),
-      StoreInfoEntry(
-          label: t.infoCompatibility, value: _compatibility(context)),
-      StoreInfoEntry(
-        label: t.infoLocalFile,
-        value: local == null ? t.infoLocalFileMissing : local.fileName,
-        ltr: local != null,
       ),
       if (homepage.isNotEmpty)
         StoreInfoEntry(
@@ -355,11 +351,12 @@ class _Versions extends StatelessWidget {
         for (final entry in plugin.versions.take(_shown))
           AppRow(
             title: entry.version,
+            titleDirection: TextDirection.ltr,
             subtitle: [
               if (entry.isLatest) t.versionLatestTag,
               if (entry.version == installed) t.versionInstalledTag,
               if (entry.releasedAt.isNotEmpty)
-                HebrewDate.format(entry.releasedAt),
+                formatLongDateRaw(entry.releasedAt),
             ].join(' · '),
             trailing: entry.fileSize > 0
                 ? Text(formatBytes(entry.fileSize), style: meta)

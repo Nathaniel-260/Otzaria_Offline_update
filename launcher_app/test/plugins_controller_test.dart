@@ -247,6 +247,31 @@ void main() {
       expect(controller.pluginsDir, p.join(tempDir.path, 'mirror', 'plugins'));
     });
 
+    test('תגית שנעלמה מהחנות אינה נשארת מסנן פעיל ובלתי נראה', () async {
+      await saveCatalog(PluginCatalog(plugins: [
+        plugin('a', 'תוסף', tags: ['ישנה']),
+        plugin('b', 'אחר', tags: ['נשארת']),
+      ]));
+      await controller.load();
+      controller.setTagFilter('ישנה');
+      expect(controller.moreFiltersCount, 1);
+
+      await saveCatalog(PluginCatalog(plugins: [
+        plugin('a', 'תוסף', tags: ['נשארת']),
+        plugin('b', 'אחר', tags: ['נשארת']),
+      ]));
+      await controller.load();
+
+      expect(controller.tagFilter, isNull);
+      expect(controller.moreFiltersCount, 0);
+      expect(controller.filtered.map((p) => p.id), ['a', 'b']);
+
+      // תגית שעדיין קיימת נשמרת גם אחרי טעינה מחדש.
+      controller.setTagFilter('נשארת');
+      await controller.load();
+      expect(controller.tagFilter, 'נשארת');
+    });
+
     test('שבב קטגוריה שנעלמה מהחנות מתאפס ל"הכול"', () async {
       await saveCatalog(
         PluginCatalog(
@@ -312,9 +337,12 @@ void main() {
       expect(controller.filtered, hasLength(3));
     });
 
-    test('סינון סטטוס', () {
-      controller.setStatusFilter(PluginStatusFilter.beta);
-      expect(controller.filtered.map((p) => p.id), ['b']);
+    test('סינון יציבות: "ניסיוני" כולל גם בטא', () {
+      controller.setStatusFilter(PluginStatusFilter.experimental);
+      expect(controller.filtered.map((p) => p.id), ['b', 'c']);
+
+      controller.setStatusFilter(PluginStatusFilter.stable);
+      expect(controller.filtered.map((p) => p.id), ['a']);
 
       controller.setStatusFilter(PluginStatusFilter.all);
       expect(controller.filtered, hasLength(3));
@@ -599,7 +627,7 @@ void main() {
       controller
         ..setSearch('שני')
         ..setCategory('study')
-        ..setStatusFilter(PluginStatusFilter.beta)
+        ..setStatusFilter(PluginStatusFilter.experimental)
         ..setTagFilter('תגית')
         ..setInstallFilter(PluginInstallFilter.installed);
       expect(controller.moreFiltersCount, 2);

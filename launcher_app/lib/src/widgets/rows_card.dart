@@ -29,12 +29,16 @@ class AppRow extends StatelessWidget {
     this.label,
     this.below,
     this.dense = false,
+    this.titleDirection,
   });
 
   /// שורת סיכום בחלון צר: 44 במקום 56.
   final bool dense;
 
   final String title;
+
+  /// [TextDirection.ltr] לכותרת שהיא מספר גרסה, נתיב וכדומה.
+  final TextDirection? titleDirection;
   final String? subtitle;
   final Widget? leading;
   final Widget? trailing;
@@ -60,6 +64,7 @@ class AppRow extends StatelessWidget {
               )),
         Text(
           title,
+          textDirection: titleDirection,
           style:
               (label != null ? AppTextStyles.rowValue : AppTextStyles.rowTitle)
                   .copyWith(color: cs.onSurface),

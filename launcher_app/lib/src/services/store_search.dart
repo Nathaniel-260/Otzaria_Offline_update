@@ -11,9 +11,12 @@ const Map<int, int> _finals = {
   0x05E5: 0x05E6,
 };
 
+/// מקף עברי (־) — כרווח: "בית־הכנסת" נמצא בחיפוש "בית הכנסת".
+const int _maqaf = 0x05BE;
+
 /// ניקוד, טעמים, גרש וגרשיים — נמחקים מהטקסט ומהשאילתה.
 bool _isIgnored(int code) =>
-    (code >= 0x0591 && code <= 0x05C7) ||
+    (code >= 0x0591 && code <= 0x05C7 && code != _maqaf) ||
     code == 0x22 || // "
     code == 0x27 || // '
     code == 0x05F3 || // ׳
@@ -26,8 +29,13 @@ bool _isIgnored(int code) =>
   for (var i = 0; i < value.length; i++) {
     final code = value.codeUnitAt(i);
     if (_isIgnored(code)) continue;
-    out.write(String.fromCharCode(_finals[code] ?? code).toLowerCase());
-    origin.add(i);
+    final mapped = code == _maqaf ? 0x20 : (_finals[code] ?? code);
+    final lower = String.fromCharCode(mapped).toLowerCase();
+    out.write(lower);
+    // יש אותיות שב-lowercase נעשות שני תווים (İ) — מיקום לכל תו שנכתב.
+    for (var k = 0; k < lower.length; k++) {
+      origin.add(i);
+    }
   }
   return (text: out.toString(), origin: origin);
 }

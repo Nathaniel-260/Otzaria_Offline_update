@@ -31,6 +31,7 @@ class PluginsScreen extends StatefulWidget {
     this.otzariaInstalled = true,
     this.detailId,
     this.onDetailChanged,
+    this.onOpenHelp,
   });
 
   final PluginsModuleController controller;
@@ -49,6 +50,9 @@ class PluginsScreen extends StatefulWidget {
   /// ו-Esc מהפרטים מובילים לרשימה. בלעדיו המסך זוכר בעצמו.
   final String? detailId;
   final ValueChanged<String?>? onDetailChanged;
+
+  /// "איך זה עובד?" במצב הריק כשאין אינטרנט.
+  final VoidCallback? onOpenHelp;
 
   @override
   State<PluginsScreen> createState() => _PluginsScreenState();
@@ -70,16 +74,6 @@ class _PluginsScreenState extends State<PluginsScreen> {
       setState(() => _localSelectedId = id);
     }
   }
-
-  /// התוסף שנמסר כרגע לאוצריא.
-  String? _busyId;
-
-  /// "עדכון הכול" שרץ: כמה נשלחו מתוך כמה.
-  ({int done, int total})? _updatingAll;
-
-  /// התוספים שחדשים בהרצה הזו — מסומנים בשבב "חדש", ונרשמים כ"נראו" מיד.
-  Set<String> _newIds = const {};
-  bool _newCaptured = false;
 
   bool _stopSync = false;
 
@@ -107,13 +101,11 @@ class _PluginsScreenState extends State<PluginsScreen> {
     _captureNew();
   }
 
+  /// מה שחדש — גם מה שהגיע בסנכרון שרץ עכשיו — מסומן בשבב ונרשם כ"נראה".
   void _captureNew() {
-    if (_newCaptured || _c.status != PluginsModuleStatus.ready) return;
+    if (_c.status != PluginsModuleStatus.ready) return;
     final fresh = _c.newPlugins;
-    if (fresh.isEmpty) return;
-    _newCaptured = true;
-    _newIds = {for (final plugin in fresh) plugin.id};
-    unawaited(_c.markNewSeen(fresh));
+    if (fresh.isNotEmpty) unawaited(_c.markNewSeen(fresh));
   }
 
   bool get _canSync => !widget.readOnly && widget.online != false;
@@ -134,7 +126,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
     if (!mounted) return;
     final warnings = _c.syncWarnings;
     final shabbat = _c.shabbatNotice;
-    if (_stopSync) {
+    if (_c.lastSyncOutcome?.cancelled ?? false) {
       UiSnack.show(t.syncStoppedSnack);
     } else if (shabbat != null) {
       UiSnack.show(shabbat);
@@ -170,11 +162,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
 
   Future<void> _install(StorePlugin plugin) async {
     final t = context.strings.plugins;
-    setState(() => _busyId = plugin.id);
-    final result = await _c.directInstall(plugin);
-    if (!mounted) return;
-    setState(() => _busyId = null);
-
+    final result = await _c.deliver(plugin);
     if (result.success) {
       UiSnack.show(t.installSentSnack(plugin.name));
     } else {
@@ -182,37 +170,36 @@ class _PluginsScreenState extends State<PluginsScreen> {
     }
   }
 
-  /// "עדכון הכול": אחד אחרי השני, במרווח — ראו `deliverUpdates`.
+  /// "עדכון הכול": אחד אחרי השני, במרווח — ראו `deliverUpdates`. הודעה אחת
+  /// בסוף: הודעה לכל כישלון הייתה נדרסת מיד בהודעה שאחריה.
   Future<void> _updateAll() async {
     final t = context.strings.plugins;
     final targets =
         _pendingUpdates.where(_c.canDirectInstall).toList(growable: false);
-    if (targets.isEmpty) return;
-    setState(() => _updatingAll = (done: 0, total: targets.length));
-    final sent = await _c.deliverUpdates(
-      plugins: targets,
-      isCancelled: () => !mounted,
-      onDelivering: (plugin) => setState(() => _busyId = plugin.id),
-      onDelivered: (plugin, result) {
-        if (!mounted) return;
-        setState(() {
-          _busyId = null;
-          final run = _updatingAll;
-          if (run != null) {
-            _updatingAll = (done: run.done + 1, total: run.total);
-          }
-        });
-        if (!result.success) {
-          UiSnack.showError(result.error ?? t.installFailedSnack);
-        }
-      },
-    );
-    if (!mounted) return;
-    setState(() {
-      _updatingAll = null;
-      _busyId = null;
-    });
-    if (sent.isNotEmpty) UiSnack.show(t.updatesSentSnack(sent.length));
+    final outcome = await _c.updateAll(targets);
+    if (outcome == null) return;
+    final sent = outcome.sent.length;
+    if (outcome.failed.isNotEmpty) {
+      UiSnack.showError(t.updateAllFailedSnack(
+        sent,
+        outcome.failed.length,
+        t.joinNames([for (final f in outcome.failed) f.plugin.name]),
+      ));
+    } else if (outcome.stopped) {
+      UiSnack.show(t.updateAllStoppedSnack(sent));
+    } else if (sent > 0) {
+      UiSnack.show(t.updatesSentSnack(sent));
+    }
+  }
+
+  /// למה פעולות התוספים מושבתות עכשיו, או `null`. הסנכרון מחליף קבצים
+  /// במראה, והמסירה והשמירה קוראות מאותה מראה.
+  String? _blockedReason(BuildContext context) {
+    final t = context.strings.plugins;
+    if (_c.isSyncing) return t.actionsBlockedSyncing;
+    if (_c.isExporting) return t.actionsBlockedExporting;
+    if (_c.isUpdatingAll) return t.actionsBlockedUpdatingAll;
+    return null;
   }
 
   /// עדכונים שעוד לא נשלחו לאוצריא.
@@ -236,9 +223,10 @@ class _PluginsScreenState extends State<PluginsScreen> {
       return PluginDetailView(
         plugin: selected,
         controller: _c,
-        busy: _busyId == selected.id,
-        blocked: _updatingAll != null,
+        busy: _c.isDelivering(selected),
+        blockedReason: _blockedReason(context),
         otzariaInstalled: widget.otzariaInstalled,
+        online: widget.online,
         onSave: () => _save(selected),
         onInstall: () => _install(selected),
         onTagSelected: (tag) {
@@ -261,7 +249,12 @@ class _PluginsScreenState extends State<PluginsScreen> {
     final lastSync = _c.lastSync;
     final ready = _c.status == PluginsModuleStatus.ready;
     final empty = _c.plugins.isEmpty;
-    final busy = _c.isSyncing || _c.isExporting || widget.busyElsewhere;
+    final busy = _c.isSyncing ||
+        _c.isExporting ||
+        _c.isUpdatingAll ||
+        widget.busyElsewhere;
+    final blockedReason = _blockedReason(context);
+    final failed = _c.errorMessage != null;
 
     return [
       StoreBody.block(
@@ -269,7 +262,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           title: t.storeTitle,
           description: lastSync == null
               ? t.storeSubtitle
-              : '${t.storeSubtitle} ${t.asOfDate(formatDate(lastSync))}',
+              : '${t.storeSubtitle} ${t.asOfDate(formatLongDate(lastSync))}',
           actions: [
             if (_canSync)
               ActionButton.ghost(
@@ -282,7 +275,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
         ),
       ),
       if (_c.isSyncing) StoreBody.block(_syncProgress(context), bottom: 14),
-      if (_c.errorMessage != null)
+      if (failed)
         StoreBody.block(
           AppCard(
             padding: const EdgeInsets.all(16),
@@ -297,7 +290,8 @@ class _PluginsScreenState extends State<PluginsScreen> {
             child: InfoProgressRow(stage: t.loadingCatalog),
           ),
         )
-      else if (empty && !_c.isSyncing)
+      // אחרי כשל טעינה הרשימה ריקה כי לא נקראה — לא כי אין תוספים.
+      else if (empty && !_c.isSyncing && !failed)
         StoreBody.block(
           EmptyState(
             icon: FluentIcons.puzzle_piece_24_regular,
@@ -309,6 +303,12 @@ class _PluginsScreenState extends State<PluginsScreen> {
                   text: t.refreshButton,
                   icon: FluentIcons.arrow_sync_20_regular,
                   onPressed: busy ? null : () => unawaited(_sync()),
+                )
+              else if (widget.onOpenHelp case final help?)
+                ActionButton.neutral(
+                  text: t.howItWorksButton,
+                  icon: FluentIcons.question_circle_20_regular,
+                  onPressed: help,
                 ),
             ],
           ),
@@ -318,11 +318,16 @@ class _PluginsScreenState extends State<PluginsScreen> {
           PluginFiltersBar(controller: _c, searchController: _search),
           bottom: 6,
         ),
-        if (ready) ..._updatesBar(context),
+        if (ready || _c.isUpdatingAll) ..._updatesBar(context),
+        if (blockedReason != null)
+          StoreBody.block(_BlockedNote(blockedReason), top: 6, bottom: 4),
         if (_c.filtered.isEmpty)
           StoreBody.block(_noResults(context))
         else
-          StoreQueryScope(query: _c.search, child: _grid(context)),
+          StoreQueryScope(
+            query: _c.search,
+            child: _grid(context, blocked: blockedReason != null),
+          ),
         StoreBody.block(_advanced(context), top: 8),
       ],
     ];
@@ -381,9 +386,10 @@ class _PluginsScreenState extends State<PluginsScreen> {
     final updatable = _c.updatablePlugins;
     if (updatable.isEmpty) return const [];
     final pending = _pendingUpdates;
-    final run = _updatingAll;
+    final run = _c.updateAllRun;
     final names = [for (final plugin in pending) plugin.name];
     final deliverable = pending.any(_c.canDirectInstall);
+    final stopping = _c.updateAllStopRequested;
 
     final Widget banner;
     if (run != null) {
@@ -392,7 +398,15 @@ class _PluginsScreenState extends State<PluginsScreen> {
         leading: const IconTile(icon: FluentIcons.arrow_sync_24_regular),
         title: t.updatingAllLabel(
             run.done + 1 > run.total ? run.total : run.done + 1, run.total),
+        body: stopping ? t.updateAllStoppingLabel : null,
         below: AppProgressBar(value: run.done / run.total, thin: true),
+        actions: [
+          ActionButton.ghost(
+            text: t.syncStopButton,
+            size: ActionButtonSize.sm,
+            onPressed: stopping ? null : _c.stopUpdateAll,
+          ),
+        ],
       );
     } else if (pending.isEmpty) {
       banner = NoticeBanner(
@@ -411,7 +425,9 @@ class _PluginsScreenState extends State<PluginsScreen> {
           if (deliverable)
             ActionButton.recommended(
               text: t.updateAllButton,
-              onPressed: _busyId == null ? () => unawaited(_updateAll()) : null,
+              onPressed: _c.isSyncing || _c.isExporting
+                  ? null
+                  : () => unawaited(_updateAll()),
             ),
         ],
       );
@@ -434,7 +450,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
     );
   }
 
-  Widget _grid(BuildContext context) {
+  Widget _grid(BuildContext context, {required bool blocked}) {
     final plugins = _c.filtered;
     return SliverGrid.builder(
       gridDelegate: StoreGridDelegate(
@@ -449,11 +465,12 @@ class _PluginsScreenState extends State<PluginsScreen> {
           state: pluginCardStateOf(
             _c,
             plugin,
-            busy: _busyId == plugin.id,
+            busy: _c.isDelivering(plugin),
             otzariaInstalled: widget.otzariaInstalled,
+            online: widget.online,
           ),
-          isNew: _newIds.contains(plugin.id),
-          blocked: _updatingAll != null,
+          isNew: _c.isNewThisRun(plugin),
+          blocked: blocked,
           onOpenDetail: () => _select(plugin.id),
           onSave: () => _save(plugin),
           onInstall: () => _install(plugin),
@@ -477,23 +494,49 @@ class _PluginsScreenState extends State<PluginsScreen> {
               subtitle: t.storeAppRowBody,
               trailing: StoreAppExportButton(
                 controller: _c,
-                busyElsewhere: widget.busyElsewhere,
+                busyElsewhere: widget.busyElsewhere || _c.isUpdatingAll,
+                onExport: () => unawaited(runStoreAppExport(context, _c)),
               ),
               below:
                   _c.isExporting ? StoreAppCopyProgress(controller: _c) : null,
             ),
           AppRow(
             title: t.reloadRowTitle,
-            subtitle: _c.pluginsDir == null ? t.syncDirUnknownTooltip : null,
+            subtitle: _blockedReason(context) ??
+                (_c.pluginsDir == null ? t.syncDirUnknownTooltip : null),
             below: _c.pluginsDir == null ? null : PathText(_c.pluginsDir!),
             trailing: ActionButton.neutral(
               text: t.reloadButton,
               icon: FluentIcons.arrow_clockwise_20_regular,
-              onPressed: _c.isSyncing ? null : _c.load,
+              onPressed: _blockedReason(context) == null ? _c.load : null,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// שורת ההסבר מעל הרשת כשהפעולות מושבתות.
+class _BlockedNote extends StatelessWidget {
+  const _BlockedNote(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(FluentIcons.info_16_regular, size: 16, color: cs.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: AppTextStyles.meta.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -53,7 +53,9 @@ class RtlTextField extends StatelessWidget {
     return TextField(
       controller: controller,
       focusNode: focusNode,
-      decoration: decoration,
+      // בלי decoration אין InputDecorator, וה-theme לא מצייר מסגרת — השדה
+      // נעלם על רקע הדיאלוג.
+      decoration: decoration ?? const InputDecoration(),
       // 14 כמו `.field input`; ברירת המחדל של M3 היא 16.
       style: AppTextStyles.field,
       onChanged: onChanged,

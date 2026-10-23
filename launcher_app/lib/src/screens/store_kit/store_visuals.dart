@@ -528,7 +528,7 @@ class StoreSectionTitle extends StatelessWidget {
   }
 }
 
-/// קו שמתחזק לכיוון הסוף, ונקודה בקצהו.
+/// נקודה צמודה לכותרת, וקו שנמוג ממנה והלאה — כמו `.h2::after` במוקאפ.
 class _OrnamentPainter extends CustomPainter {
   const _OrnamentPainter({
     required this.line,
@@ -543,17 +543,21 @@ class _OrnamentPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final y = size.height / 2;
-    final end = rtl ? 4.0 : size.width - 4;
-    final start = rtl ? size.width : 0.0;
+    final near = rtl ? size.width : 0.0;
+    final far = rtl ? 0.0 : size.width;
     final paint = Paint()
       ..strokeWidth = 1
       ..shader = LinearGradient(
-        colors: [line.withValues(alpha: 0), line],
+        colors: [line, line.withValues(alpha: 0)],
       ).createShader(
-        Rect.fromPoints(Offset(start, y), Offset(end, y + 1)),
+        Rect.fromPoints(Offset(near, y), Offset(far, y + 1)),
       );
-    canvas.drawLine(Offset(start, y), Offset(end, y), paint);
-    canvas.drawCircle(Offset(end, y), 3.5, Paint()..color = dot);
+    canvas.drawLine(Offset(near, y), Offset(far, y), paint);
+    canvas.drawCircle(
+      Offset(rtl ? size.width - 4 : 4, y),
+      3.5,
+      Paint()..color = dot,
+    );
   }
 
   @override

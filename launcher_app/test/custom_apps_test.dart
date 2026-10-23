@@ -26,6 +26,7 @@ import 'package:launcher_app/src/services/custom_app_detection_snapshot.dart';
 import 'package:launcher_app/src/theme/theme_exports.dart';
 import 'package:launcher_app/src/widgets/settings_card.dart';
 import 'package:launcher_app/src/widgets/sub_page_header.dart';
+import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -134,6 +135,8 @@ void main() {
       expect(find.text('תוכנות נוספות'), findsWidgets);
       expect(find.text('לא נוספו תוכנות'), findsOneWidget);
       expect(find.text('ניהול התוכנות'), findsOneWidget);
+      // כותרת הכרטיס והשורה אינן אותה מילה פעמיים.
+      expect(find.text(stringsOf().customApps.manageRowTitle), findsOneWidget);
       // ההוספה עברה למסך הניהול — בהגדרות אין יותר שום פעולה על המרשם.
       expect(find.text('הוספת תוכנה'), findsNothing);
       expect(find.text('ניהול קטגוריות'), findsNothing);
@@ -156,6 +159,27 @@ void main() {
   });
 
   group('מסך התוכנות', () {
+    testWidgets('"כל התוכנות" ריק: הסבר ומעבר לניהול', (tester) async {
+      final t = stringsOf().customApps;
+      await tester.runAsync(controller.load);
+      var opened = 0;
+      await pumpScreen(
+        tester,
+        CustomAppsScreen(controller: controller, onOpenManage: () => opened++),
+      );
+      await tester.pump();
+
+      expect(find.text(t.manageEmptyTitle), findsOneWidget);
+      expect(find.text(t.emptyCategoryTitle), findsNothing);
+      await tester.tap(find.text(t.openManagerButton));
+      expect(opened, 1);
+
+      // בכונן מוגן אין כניסה לניהול — וגם אין כפתור.
+      await pumpScreen(tester, CustomAppsScreen(controller: controller));
+      await tester.pump();
+      expect(find.text(t.openManagerButton), findsNothing);
+    });
+
     testWidgets('שם ותיאור מוצגים כפי שהם — תוכן שאינו מתורגם', (tester) async {
       await addApp(
         tester,
@@ -185,10 +209,15 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('התקנה'), findsOneWidget);
-      // ובדף: "על הכונן: גרסה 1.4.2".
+      // בכרטיס אין הערה: "התקנה" כבר אומרת שהיא אינה מותקנת.
+      expect(find.byType(StoreNote), findsNothing);
+      // ובדף: "בכונן │ 1.4.2" — הערך בלבד, בלי לחזור על התווית.
       await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
-      expect(find.textContaining('על הכונן: גרסה 1.4.2'), findsOneWidget);
+      final t = stringsOf().customApps;
+      expect(find.text(t.infoStored), findsOneWidget);
+      expect(find.text('1.4.2'), findsOneWidget);
+      expect(find.textContaining(t.infoStored), findsOneWidget);
     });
 
     // ההבחנה החשובה: "לא חיפשנו" אינו "חיפשנו ולא מצאנו".
@@ -198,8 +227,10 @@ void main() {
       await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('לא ניתן לזהות'), findsOneWidget);
-      expect(find.textContaining('אינה מותקנת'), findsNothing);
+      final t = stringsOf().customApps;
+      expect(find.text(t.infoInstalled), findsOneWidget);
+      expect(find.text(t.valueUnknown), findsOneWidget);
+      expect(find.text(t.valueNo), findsNothing);
     });
 
     testWidgets('עם שם קובץ הרצה שלא נמצא — כן "אינה מותקנת"', (tester) async {
@@ -208,7 +239,7 @@ void main() {
       await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('אינה מותקנת'), findsOneWidget);
+      expect(find.text(stringsOf().customApps.valueNo), findsOneWidget);
     });
 
     // הכרטיס נושא פעולה ראשית אחת; "הורדה לכונן" היא זו כשאין מה להתקין.
@@ -236,7 +267,8 @@ void main() {
 
       expect(find.text('הוספת תוכנה'), findsNothing);
       expect(find.byTooltip('עריכה'), findsNothing);
-      expect(find.byTooltip('הסרה מהרשימה'), findsNothing);
+      expect(
+          find.byTooltip(stringsOf().customApps.removeTooltip), findsNothing);
     });
 
     testWidgets('כמה תוכנות — כולן מוצגות', (tester) async {
@@ -581,7 +613,8 @@ void main() {
       expect(find.text('ראשונה'), findsOneWidget);
       expect(find.text('שנייה'), findsOneWidget);
       expect(find.byTooltip('עריכה'), findsNWidgets(2));
-      expect(find.byTooltip('הסרה מהרשימה'), findsNWidgets(2));
+      expect(find.byTooltip(stringsOf().customApps.removeTooltip),
+          findsNWidgets(2));
     });
 
     testWidgets('עריכה משנה את הרשומה ואינה יוצרת שנייה', (tester) async {
@@ -861,7 +894,8 @@ void main() {
       expect(find.text('מגיטהאב'), findsOneWidget);
       expect(find.text('מקומית'), findsOneWidget);
       expect(find.byTooltip('עריכה'), findsNWidgets(2));
-      expect(find.byTooltip('הסרה מהרשימה'), findsNWidgets(2));
+      expect(find.byTooltip(stringsOf().customApps.removeTooltip),
+          findsNWidgets(2));
       expect(find.text('התקנה'), findsNothing);
       expect(find.text('הורדה לכונן'), findsNothing);
       expect(find.text('בדיקה ברשת לכל התוכנות'), findsNothing);
@@ -875,6 +909,62 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('עריכת התוכנה'), findsOneWidget);
+    });
+
+    testWidgets('שדות הטופס נראים: לכל שדה מסגרת ומילוי מה-theme', (
+      tester,
+    ) async {
+      await tester.runAsync(controller.load);
+      await openManager(tester);
+      await tester.tap(find.text('הוספת תוכנה'));
+      await tester.pumpAndSettle();
+
+      final fields = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      expect(fields, findsWidgets);
+      for (final element in fields.evaluate()) {
+        final decorator = find.descendant(
+          of: find.byWidget(element.widget),
+          matching: find.byType(InputDecorator),
+        );
+        expect(decorator, findsOneWidget);
+        final decoration = tester.widget<InputDecorator>(decorator).decoration;
+        expect(decoration.filled, isTrue);
+        expect(decoration.enabledBorder, isA<OutlineInputBorder>());
+      }
+    });
+
+    testWidgets('"הקובץ הוא התוכנה עצמה" מחליף את התיקייה ושם ההרצה בהסבר', (
+      tester,
+    ) async {
+      final t = stringsOf().customApps;
+      await tester.runAsync(controller.load);
+      await openManager(tester);
+      await tester.tap(find.text('הוספת תוכנה'));
+      await tester.pumpAndSettle();
+      expect(find.text(t.exeNameLabel), findsOneWidget);
+      expect(find.text(t.portableDestinationHint), findsNothing);
+
+      await tester.ensureVisible(find.text(t.portableFileLabel));
+      await tester.tap(find.text(t.portableFileLabel));
+      await tester.pumpAndSettle();
+      expect(find.text(t.exeNameLabel), findsNothing);
+      expect(find.text(t.pickInstallDirButton), findsNothing);
+      expect(find.text(t.portableDestinationHint), findsOneWidget);
+    });
+
+    testWidgets('הסרה: שאלה עם השם, ובגוף — מה נמחק ומה לא', (tester) async {
+      final t = stringsOf().customApps;
+      await addApp(tester, id: 'a', name: 'להסרה');
+      await openManager(tester);
+      await tester.tap(find.byTooltip(t.removeTooltip));
+      await tester.pumpAndSettle();
+      expect(find.text(t.removeDialogTitle('להסרה')), findsOneWidget);
+      expect(find.text(t.removeDialogContent('להסרה')), findsOneWidget);
+      await tester.tap(find.text('ביטול'));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('הוספה פותחת את הטופס גם כשהמרשם ריק', (tester) async {
@@ -892,7 +982,7 @@ void main() {
       await addApp(tester, id: 'a', name: 'להסרה');
       await openManager(tester);
 
-      await tester.tap(find.byTooltip('הסרה מהרשימה'));
+      await tester.tap(find.byTooltip(stringsOf().customApps.removeTooltip));
       await tester.pumpAndSettle();
       await tester.tap(find.text('ביטול'));
       await tester.pumpAndSettle();
@@ -901,7 +991,7 @@ void main() {
 
       // ההסרה עצמה נבדקת ב"הסרה מוציאה מהרשימה": כתיבה לדיסק שהתחילה
       // מלחיצה אינה מסתיימת בתוך testWidgets. כאן — שהאישור מפעיל אותה.
-      await tester.tap(find.byTooltip('הסרה מהרשימה'));
+      await tester.tap(find.byTooltip(stringsOf().customApps.removeTooltip));
       await tester.pumpAndSettle();
       await tester.tap(find.text('הסרה').last);
       await tester.pump(const Duration(milliseconds: 500));
@@ -1480,6 +1570,78 @@ void main() {
       expect(c.onlineVersions, isNot(contains('old')));
       expect(fake.passedReleases['old'], isNull);
       expect(fake.passedSources['old'], isNull);
+    });
+
+    testWidgets('בלי אינטרנט: אין בדיקה ואין הורדה ברשת — לא בראש ולא בדף', (
+      tester,
+    ) async {
+      final t = stringsOf().customApps;
+      late CustomAppsController c;
+      await tester.runAsync(() async {
+        c = (await fakeController({'a': '2.0.0'}, ids: ['a'])).controller;
+        await c.load();
+      });
+      addTearDown(c.dispose);
+
+      await pumpScreen(tester, CustomAppsScreen(controller: c, online: false));
+      await tester.pump();
+      expect(find.text(t.checkAllOnlineButton), findsNothing);
+      expect(find.text(t.downloadAllButton), findsNothing);
+      await tester.tap(find.byType(StoreItemCard).first);
+      await tester.pump();
+      expect(find.text(t.checkOnlineButton), findsNothing);
+      expect(find.text(t.downloadButton), findsNothing);
+
+      // מחובר: הבדיקה מוצגת; "הורדה לכונן" — רק כשידוע שבכונן ישן.
+      await tester.pumpWidget(const SizedBox());
+      await pumpScreen(tester, CustomAppsScreen(controller: c, online: true));
+      await tester.pump();
+      expect(find.text(t.checkAllOnlineButton), findsOneWidget);
+      await tester.tap(find.byType(StoreItemCard).first);
+      await tester.pump();
+      expect(find.text(t.checkOnlineButton), findsOneWidget);
+      expect(find.text(t.downloadButton), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('"בדיקה ברשת" בדף: מצב טעינה, ובלי בקשה כפולה בלחיצה חוזרת', (
+      tester,
+    ) async {
+      final t = stringsOf().customApps;
+      late CustomAppsController c;
+      late _FakeManager fake;
+      await tester.runAsync(() async {
+        final built = await fakeController({'a': '2.0.0'}, ids: ['a']);
+        c = built.controller;
+        fake = built.fake;
+        await c.load();
+      });
+      addTearDown(c.dispose);
+      final gate = Completer<void>();
+      fake.peekGate = gate;
+
+      await pumpScreen(tester, CustomAppsScreen(controller: c));
+      await tester.pump();
+      await tester.tap(find.byType(StoreItemCard).first);
+      await tester.pump();
+
+      ActionButton check() =>
+          tester.widget(find.widgetWithText(ActionButton, t.checkOnlineButton));
+      await tester.tap(find.text(t.checkOnlineButton));
+      await tester.pump();
+      expect(check().spinning, isTrue);
+      expect(check().onPressed, isNull);
+      await tester.tap(find.text(t.checkOnlineButton), warnIfMissed: false);
+      await tester.pump();
+      expect(fake.peeked, ['a']);
+
+      gate.complete();
+      await tester.pump();
+      await tester.pump();
+      expect(check().onPressed, isNotNull);
+      // ברשת יש גרסה חדשה מזו שבכונן — עכשיו "הורדה לכונן" מוצעת.
+      expect(find.text(t.downloadButton), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('אחרי עריכה ההורדה אינה נשענת על release ישן', (tester) async {

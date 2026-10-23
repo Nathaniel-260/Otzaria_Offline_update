@@ -587,6 +587,21 @@ final Map<String, StoreScenario> storeScenarios = {
     },
     after: null,
   ),
+  'plugin_nusach_offline': (
+    build: (f) {
+      f.seedPlugins();
+      return _store(f, detail: 'nusach', online: false);
+    },
+    after: null,
+  ),
+  'plugins_updating': (
+    build: (f) {
+      f.seedPlugins();
+      f.plugins.updateAllRun = (done: 1, total: 3);
+      return _store(f);
+    },
+    after: null,
+  ),
   'plugin_mydev': (
     build: (f) {
       f.seedPlugins();

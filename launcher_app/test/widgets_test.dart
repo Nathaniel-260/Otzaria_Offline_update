@@ -263,6 +263,49 @@ void main() {
       }
     });
 
+    // בלי decoration אין InputDecorator, וה-theme לא מצייר מסגרת ולא מילוי —
+    // כך נעלמו שדות טופס "הוספת תוכנה" על רקע הדיאלוג.
+    testWidgets('RtlTextField בלי decoration עדיין מצויר כשדה (מסגרת ומילוי)', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrap(const RtlTextField()));
+      final decorator =
+          tester.widget<InputDecorator>(find.byType(InputDecorator));
+      expect(decorator.decoration.filled, isTrue);
+      expect(decorator.decoration.enabledBorder, isA<OutlineInputBorder>());
+    });
+
+    test('אף RtlTextField ב-lib אינו מבטל את ה-decoration', () {
+      final calls = <String>[];
+      for (final entity in Directory('lib').listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        final source = entity.readAsStringSync();
+        var at = source.indexOf('RtlTextField(');
+        while (at >= 0) {
+          // הארגומנטים עד הסוגר התואם.
+          var depth = 0;
+          var end = at + 'RtlTextField'.length;
+          for (; end < source.length; end++) {
+            final ch = source[end];
+            if (ch == '(') depth++;
+            if (ch == ')' && --depth == 0) break;
+          }
+          final args = source.substring(at, end);
+          if (!args.startsWith('RtlTextField({')) {
+            calls.add(entity.path);
+            expect(
+              args.replaceAll(' ', ''),
+              isNot(contains('decoration:null')),
+              reason: entity.path,
+            );
+          }
+          at = source.indexOf('RtlTextField(', end);
+        }
+      }
+      // הסורק באמת מוצא את השדות — טופס התוכנה, החיפוש, הדיווחים ועוד.
+      expect(calls.length, greaterThanOrEqualTo(10));
+    });
+
     testWidgets('RtlTextField מדווח על הקלדה, ומושבת אינו מקבל קלט', (
       tester,
     ) async {

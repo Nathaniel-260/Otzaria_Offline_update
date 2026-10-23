@@ -60,4 +60,22 @@ void main() {
       expect(digitsOf(he), digitsOf(en));
     });
   });
+
+  group('formatLongDate — הפורמט האחיד של החנויות', () {
+    test('יום, שם חודש ושנה בשתי השפות', () {
+      AppL10n.use(AppLanguage.hebrew);
+      expect(formatLongDate(DateTime(2026, 10, 18, 12)), '18 באוקטובר 2026');
+      AppL10n.use(AppLanguage.english);
+      expect(formatLongDate(DateTime(2026, 10, 18, 12)), 'October 18, 2026');
+    });
+
+    test('מחרוזת מה-API: תאריך בלבד אינו זז, ומה שאינו תאריך חוזר כמות שהוא',
+        () {
+      AppL10n.use(AppLanguage.hebrew);
+      expect(formatLongDateRaw('2026-01-01'), '1 בינואר 2026');
+      expect(formatLongDateRaw(''), '');
+      expect(formatLongDateRaw(null), '');
+      expect(formatLongDateRaw('לא תאריך'), 'לא תאריך');
+    });
+  });
 }

@@ -39,3 +39,20 @@ String formatDate(DateTime value) {
   }
   return '${_two(local.day)}.${_two(local.month)}.${local.year}';
 }
+
+/// תאריך בשם חודש — הפורמט האחיד של החנויות: "18 באוקטובר 2026".
+String formatLongDate(DateTime value) {
+  final local = value.toLocal();
+  return AppL10n.strings.units.longDate(local.day, local.month, local.year);
+}
+
+/// [formatLongDate] למחרוזת תאריך מה-API (`YYYY-MM-DD` או ISO-8601 מלא).
+/// מחרוזת שאינה תאריך מוחזרת כמות שהיא — עדיף על שגיאה במסך.
+String formatLongDateRaw(String? raw) {
+  if (raw == null || raw.isEmpty) return '';
+  final date = DateTime.tryParse(raw);
+  if (date == null) return raw;
+  // תאריך בלי שעה הוא יום בלוח, לא רגע — המרה לשעון המקומי הייתה מזיזה אותו.
+  final day = raw.length <= 10 ? date : date.toLocal();
+  return AppL10n.strings.units.longDate(day.day, day.month, day.year);
+}

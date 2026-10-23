@@ -25,11 +25,15 @@ class CustomAppDetailView extends StatelessWidget {
     required this.onDownload,
     required this.onPickLocation,
     required this.onCategorySelected,
+    this.online = true,
   });
 
   final CustomAppsController controller;
   final CustomAppView app;
   final bool readOnly;
+
+  /// `false` — אין אינטרנט: אין בדיקה ואין הורדה ברשת.
+  final bool online;
   final VoidCallback onInstall;
   final VoidCallback onLaunch;
   final VoidCallback onDownload;
@@ -38,6 +42,7 @@ class CustomAppDetailView extends StatelessWidget {
 
   AppDescriptor get _descriptor => app.descriptor;
   bool get _isFromGithub => _descriptor.sourceKind == AppSourceKind.github;
+  bool get _canFetch => _isFromGithub && !readOnly && online;
   bool get _isDownloading => controller.downloadingId == _descriptor.id;
 
   @override
@@ -57,10 +62,17 @@ class CustomAppDetailView extends StatelessWidget {
       onLaunch: onLaunch,
       onDownload: onDownload,
       primary: true,
+      online: online,
     );
-    // ההורדה היא הפעולה הראשית רק כשאין מה להתקין; אחרת — כפתור משני.
-    final downloadIsPrimary =
-        !app.canInstall && !app.canLaunch && _isFromGithub && !readOnly;
+    // ההורדה היא הפעולה הראשית רק כשאין מה להתקין; אחרת — כפתור משני, ורק
+    // כשמה שבכונן חסר או ישן מזה שברשת.
+    final downloadIsPrimary = !app.canInstall && !app.canLaunch && _canFetch;
+    final stored = app.storedInstaller;
+    final onlineVersion = controller.onlineVersions[_descriptor.id];
+    final driveOutdated = stored == null ||
+        (onlineVersion != null &&
+            customAppOnlineIsNewer(onlineVersion, stored.version));
+    final checking = controller.checkingIds.contains(_descriptor.id);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -87,7 +99,7 @@ class CustomAppDetailView extends StatelessWidget {
                 icon: FluentIcons.folder_open_20_regular,
                 onPressed: controller.isBusy ? null : onPickLocation,
               ),
-            if (_isFromGithub && !readOnly && !downloadIsPrimary)
+            if (_canFetch && !downloadIsPrimary && driveOutdated)
               ActionButton.neutral(
                 text: t.downloadButton,
                 icon: FluentIcons.arrow_download_20_regular,
@@ -97,11 +109,14 @@ class CustomAppDetailView extends StatelessWidget {
                     ? null
                     : onDownload,
               ),
-            if (_isFromGithub && !readOnly)
+            if (_canFetch)
               ActionButton.ghost(
                 text: t.checkOnlineButton,
                 icon: FluentIcons.arrow_sync_20_regular,
-                onPressed: () => unawaited(_checkOnline(context)),
+                spinning: checking,
+                onPressed: checking || controller.isCheckingAll
+                    ? null
+                    : () => unawaited(_checkOnline(context)),
               ),
           ],
           note: customAppNoteOf(context, app),
@@ -176,14 +191,18 @@ class CustomAppDetailView extends StatelessWidget {
     final t = context.strings.customApps;
     final stored = app.storedInstaller;
     final online = customAppOnlineLabel(context, controller, app);
+    final installedValue = customAppInstalledValue(context, app);
+    final storedValue = customAppStoredValue(context, app);
     return [
       StoreInfoEntry(
         label: t.infoInstalled,
-        value: customAppInstalledLabel(context, app),
+        value: installedValue.text,
+        ltr: installedValue.ltr,
       ),
       StoreInfoEntry(
         label: t.infoStored,
-        value: customAppStoredLabel(context, app),
+        value: storedValue.text,
+        ltr: storedValue.ltr,
       ),
       if (_isFromGithub)
         StoreInfoEntry(
@@ -207,7 +226,7 @@ class CustomAppDetailView extends StatelessWidget {
         ),
         StoreInfoEntry(
           label: t.infoStoredAdded,
-          value: formatDate(stored.addedAt),
+          value: formatLongDate(stored.addedAt),
         ),
       ],
     ];

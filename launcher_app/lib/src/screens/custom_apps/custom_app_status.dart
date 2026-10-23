@@ -8,26 +8,31 @@ import '../../widgets/widgets_exports.dart';
 /// התוויות שמתארות את מצב התוכנה — משותפות לכרטיס ולדף, כדי שהשניים לא
 /// יאמרו על אותה תוכנה שני דברים שונים.
 
-/// "אינה מותקנת" נאמר **רק** כשבאמת חיפשנו. בלי שם קובץ הרצה התשובה
-/// הנכונה היא "לא ניתן לדעת", וזה לא אותו דבר.
-String customAppInstalledLabel(BuildContext context, CustomAppView app) {
+/// הערך שליד "מותקנת במחשב הזה": הגרסה, או "לא". "לא" נאמר **רק** כשבאמת
+/// חיפשנו — בלי שם קובץ הרצה התשובה היא "לא ידוע", וזה לא אותו דבר.
+({String text, bool ltr}) customAppInstalledValue(
+  BuildContext context,
+  CustomAppView app,
+) {
   final t = context.strings.customApps;
-  if (!app.canDetect) return t.noDetectRules;
-
+  if (!app.canDetect) return (text: t.valueUnknown, ltr: false);
   final installed = app.installed;
-  if (installed == null) return t.notInstalled;
+  if (installed == null) return (text: t.valueNo, ltr: false);
   final version = installed.version;
   return version == null
-      ? t.installedUnknownVersion
-      : t.installedVersion(version);
+      ? (text: t.installedNoVersionValue, ltr: false)
+      : (text: version, ltr: true);
 }
 
-String customAppStoredLabel(BuildContext context, CustomAppView app) {
-  final t = context.strings.customApps;
+/// הערך שליד "בכונן": הגרסה, או "עוד לא ירד".
+({String text, bool ltr}) customAppStoredValue(
+  BuildContext context,
+  CustomAppView app,
+) {
   final stored = app.storedInstaller;
   return stored == null
-      ? t.noStoredInstaller
-      : t.storedInstaller(stored.version);
+      ? (text: context.strings.customApps.notStoredValue, ltr: false)
+      : (text: stored.version, ltr: true);
 }
 
 /// מאיפה התוכנה: "מאתר המפתחים (GitHub)" או "מקובץ".
@@ -54,13 +59,11 @@ List<String> customAppMeta(BuildContext context, CustomAppView app) {
   ];
 }
 
-/// ההערה מתחת לפעולה: למה אין מה להתקין, או מה ידוע על ההתקנה כאן.
-String? customAppNoteOf(BuildContext context, CustomAppView app) {
-  final t = context.strings.customApps;
-  if (!app.canInstall && !app.canLaunch) return t.noStoredInstaller;
-  if (app.canLaunch) return null;
-  return customAppInstalledLabel(context, app);
-}
+/// ההערה מתחת לפעולה — רק כשאין מה להתקין. "התקנה" כבר אומרת שאינה מותקנת.
+String? customAppNoteOf(BuildContext context, CustomAppView app) =>
+    !app.canInstall && !app.canLaunch
+        ? context.strings.customApps.noStoredInstaller
+        : null;
 
 String? customAppOnlineLabel(
   BuildContext context,

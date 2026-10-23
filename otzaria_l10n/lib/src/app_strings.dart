@@ -943,11 +943,6 @@ abstract class PluginsStrings {
   String get infoNetwork;
   String get infoNetworkRequired;
   String get infoNetworkNotRequired;
-  String get infoCompatibility;
-  String compatibilityRange(String from, String to);
-  String get infoLocalFile;
-  String get infoLocalFileMissing;
-  String get valueUnspecifiedFeminine;
   String get valueUnspecifiedMasculine;
 
   // ── גלריית צילומי המסך ──────────────────────────────────────────────────
@@ -1031,6 +1026,13 @@ abstract class PluginsStrings {
   String get updateAllButton;
   String updatingAllLabel(int current, int total);
   String updatesSentSnack(int count);
+  String updateAllFailedSnack(int sent, int failed, String names);
+  String updateAllStoppedSnack(int sent);
+  String get updateAllStoppingLabel;
+  String get actionsBlockedSyncing;
+  String get actionsBlockedExporting;
+  String get actionsBlockedUpdatingAll;
+  String get howItWorksButton;
   String get updatesSentTitle;
   String get updatesSentBody;
   String installSentSnack(String pluginName);
@@ -1051,6 +1053,8 @@ abstract class PluginsStrings {
   String get noteSaveOnly;
   String get noteDisabled;
   String get noteFileMissing;
+  String get fileNotOnDriveLabel;
+  String get noteNextDriveDownload;
   String get incompatibleTitle;
   String incompatibleBodyVersions(String needs, String here);
   String get incompatibleBody;
@@ -1365,6 +1369,9 @@ abstract class UnitStrings {
 
   /// [size] — גודל מעוצב: "6.8 MB/s".
   String perSecond(String size);
+
+  /// תאריך מלא בשם חודש לועזי: "18 באוקטובר 2026" / "October 18, 2026".
+  String longDate(int day, int month, int year);
 }
 
 // ── הודעות מחבילות הספרייה (השורש + library_manager) ─────────────────────────
@@ -1870,6 +1877,9 @@ abstract class CustomAppsStrings {
   String get infoStoredSize;
   String get infoStoredAdded;
   String get valueUnknown;
+  String get valueNo;
+  String get installedNoVersionValue;
+  String get notStoredValue;
 
   // ── מצבים ריקים ──
   String get emptyCategoryTitle;
@@ -1884,6 +1894,7 @@ abstract class CustomAppsStrings {
   String get categoryNameHint;
   String get categoryDescriptionLabel;
   String get addCategoryButton;
+  String get editCategoryTitle;
   String get noCategoriesHint;
   String get removeCategoryTooltip;
   String removeCategoryDialogTitle(String name);
@@ -1920,11 +1931,12 @@ abstract class CustomAppsStrings {
   /// שורת ההגדרות — שורה אחת, שכל תפקידה לפתוח את מסך הניהול.
   String get settingsCardTitle;
   String get settingsCardHint;
+  String get manageRowTitle;
+  String manageRowSubtitle(int count);
   String get emptyHint;
   String get addButton;
 
   /// כמה תוכנות רשומות. זה מה שמבדיל את השורה הריקה מהמלאה בהגדרות.
-  String registeredAppCount(int count);
   String get openManagerButton;
 
   // ── מסך הניהול: **כל** ניהול המרשם — הוספה, עריכה, הסרה, קטגוריות וסדר ──
@@ -1970,6 +1982,7 @@ abstract class CustomAppsStrings {
   String get portableFileHint;
   String get interactiveInstallLabel;
   String get interactiveInstallHint;
+  String get portableDestinationHint;
   String get pickCopyTargetDialogTitle;
   String copiedFileSnack(String path);
 
@@ -1997,13 +2010,6 @@ abstract class CustomAppsStrings {
   String get kindInteractive;
 
   // ── כרטיס תוכנה ──
-  String installedVersion(String version);
-  String get installedUnknownVersion;
-  String get notInstalled;
-
-  /// "לא חיפשנו" אינו "חיפשנו ולא מצאנו" — ראו `CustomAppView.canDetect`.
-  String get noDetectRules;
-  String storedInstaller(String version);
   String get noStoredInstaller;
 
   String get downloadButton;
@@ -2065,7 +2071,7 @@ abstract class CustomAppsStrings {
 
   String get editTooltip;
   String get removeTooltip;
-  String get removeDialogTitle;
+  String removeDialogTitle(String name);
 
   /// חייב לומר במפורש שהתוכנה עצמה **אינה** מוסרת מהמחשב.
   String removeDialogContent(String name);
@@ -2082,7 +2088,6 @@ abstract class CustomAppsStrings {
   String get onlineNotChecked;
   String get manageEmptyTitle;
   String get manageEmptyBody;
-  String get manageReadOnlyNote;
   String get noCategoriesTitle;
   String get orderSectionTitle;
   String get formStepSource;

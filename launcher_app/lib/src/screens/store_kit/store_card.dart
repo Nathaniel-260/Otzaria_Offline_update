@@ -61,24 +61,28 @@ class _StoreItemCardState extends State<StoreItemCard> {
     final query = StoreQueryScope.of(context);
     final textScaler = MediaQuery.textScalerOf(context);
 
-    final name = StoreHighlightText(
-      widget.title,
-      query: query,
-      maxLines: 1,
-      style: AppTextStyles.cardTitle.copyWith(
-        color: _hovered ? cs.primary : cs.onSurface,
-      ),
-    );
-    final head = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [name, const SizedBox(height: 4), widget.meta],
-    );
-    const descStyle = TextStyle(
-      fontFamily: 'Segoe UI',
-      fontSize: 13,
-      height: 1.55,
-    );
+    Widget head({required bool tile}) {
+      final name = StoreHighlightText(
+        widget.title,
+        query: query,
+        maxLines: tile ? 2 : 1,
+        style: AppTextStyles.cardTitle.copyWith(
+          color: _hovered ? cs.primary : cs.onSurface,
+        ),
+      );
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // בשורה הגובה קבוע לשורת שם אחת — השם המלא בריחוף.
+          if (tile) name else Tooltip(message: widget.title, child: name),
+          const SizedBox(height: 4),
+          widget.meta,
+        ],
+      );
+    }
+
+    final descStyle = AppTextStyles.small.copyWith(height: 1.55);
     final description = SizedBox(
       height: textScaler.scale(13 * 1.55 * 2),
       child: StoreHighlightText(
@@ -116,8 +120,8 @@ class _StoreItemCardState extends State<StoreItemCard> {
                       ? constraints.maxHeight + 32 < tile - 0.5
                       : constraints.maxWidth + 32 >= kStoreRowCardWidth;
                   return row
-                      ? _row(head, description)
-                      : _tile(head, description);
+                      ? _row(head(tile: false), description)
+                      : _tile(head(tile: true), description);
                 },
               ),
             ),

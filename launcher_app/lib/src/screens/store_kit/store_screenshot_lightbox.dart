@@ -108,11 +108,9 @@ class _LightboxState extends State<_Lightbox> {
               ),
             ),
             if (hasMany) ...[
-              // המיקום והחץ נשמרים כפי שהם בעברית, ומשתקפים ב-LTR.
+              // "הקודם" בצד שממנו באים — ימין בעברית, כמו החץ → במקלדת.
               _NavButton(
-                alignment: isRtl
-                    ? AlignmentDirectional.centerEnd
-                    : AlignmentDirectional.centerStart,
+                alignment: AlignmentDirectional.centerStart,
                 icon: isRtl
                     ? FluentIcons.chevron_right_24_regular
                     : FluentIcons.chevron_left_24_regular,
@@ -120,9 +118,7 @@ class _LightboxState extends State<_Lightbox> {
                 onPressed: () => _step(-1),
               ),
               _NavButton(
-                alignment: isRtl
-                    ? AlignmentDirectional.centerStart
-                    : AlignmentDirectional.centerEnd,
+                alignment: AlignmentDirectional.centerEnd,
                 icon: isRtl
                     ? FluentIcons.chevron_left_24_regular
                     : FluentIcons.chevron_right_24_regular,

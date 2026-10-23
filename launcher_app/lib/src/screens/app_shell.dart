@@ -567,6 +567,10 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       ShellSection.customApps => CustomAppsScreen(
           controller: s.customApps,
           readOnly: widget.readOnly,
+          online: onlineState(s),
+          onOpenManage: widget.readOnly
+              ? null
+              : () => unawaited(_navigator.push(const CustomAppsManageRoute())),
           detailId: _detailId(ShellSection.customApps),
           onDetailChanged: (id) => _showDetail(ShellSection.customApps, id),
         ),
@@ -602,6 +606,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           busyElsewhere: s.pluginSyncBlockedElsewhere,
           detailId: _detailId(ShellSection.plugins),
           onDetailChanged: (id) => _showDetail(ShellSection.plugins, id),
+          onOpenHelp: _openHelp,
         ),
       ShellSection.reports => ReportsPage(
           errorReports: s.errorReports,
