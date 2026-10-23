@@ -759,6 +759,27 @@ void main() {
       expect(find.byKey(ShellKeys.hero), findsOneWidget);
     });
 
+    // כשבדיקת התוכנה נכשלה לא ידוע אם היא בכונן — אין "בכונן אין את התוכנה".
+    testWidgets('דף הספרייה: בדיקת התוכנה שנכשלה אינה "אין בכונן"', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      await open(tester, ShellSection.library);
+      final s = sessionOf(tester);
+      bool? installable() =>
+          tester.widget<LibraryScreen>(screen(LibraryScreen)).appInstallable;
+
+      s.otzaria.status = OtzariaModuleStatus.upToDate;
+      settings.notifyListeners();
+      await tester.pump();
+      expect(installable(), isFalse);
+
+      s.otzaria.status = OtzariaModuleStatus.error;
+      settings.notifyListeners();
+      await tester.pump();
+      expect(installable(), isNull);
+    });
+
     testWidgets('"בית" בפירור מחזיר לבית', (tester) async {
       await pumpShell(tester);
       await open(tester, ShellSection.plugins);
@@ -1837,6 +1858,31 @@ void main() {
       expect(find.text(stringsOf().saferMode.verifyTitle), findsOneWidget);
       // המסך עצמו כלל לא נבנה — גם לא מוסתר מאחורי הדיאלוג.
       expect(screen(SettingsScreen), findsNothing);
+    });
+
+    testWidgets('"הורדה" בלי בחירה — הודעה בלבד, בלי מעבר ובלי בקשת סיסמה', (
+      tester,
+    ) async {
+      await tester.runAsync(
+        () => settings.update(
+          AppSettings(
+            autoCheckUpdates: false,
+            saferModeEnabled: true,
+            saferModePassword: SaferModePassword.encode('1234'),
+            syncApp: false,
+            syncPlugins: false,
+            syncLibrary: false,
+            personalUpdateMode: false,
+          ),
+        ),
+      );
+      await pumpShell(tester);
+
+      await sessionOf(tester).downloadAll();
+      await tester.pump();
+
+      expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
+      expect(navigatorOf(tester).section, ShellSection.home);
     });
 
     testWidgets('ביטול הדיאלוג משאיר את המשתמש בדף הבית', (tester) async {

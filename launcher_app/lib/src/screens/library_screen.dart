@@ -69,7 +69,7 @@ class LibraryScreen extends StatelessWidget {
   /// ורק כשהיא בכונן ([appInstallable]) והספרייה עוד לא מותקנת.
   final bool appInstalled;
 
-  /// `null` — מודול התוכנה עוד בבדיקה, ולכן לא ידוע אם היא בכונן.
+  /// `null` — מודול התוכנה עוד בבדיקה או שהבדיקה נכשלה: לא ידוע אם היא בכונן.
   final bool? appInstallable;
 
   bool get _isBusy =>

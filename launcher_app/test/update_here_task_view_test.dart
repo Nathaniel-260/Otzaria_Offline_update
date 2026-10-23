@@ -424,6 +424,21 @@ void main() {
       expect(copied, [clean]);
     });
 
+    testWidgets('טקסט שהתקצר — סימון ישן אינו מפיל את Ctrl+C', (tester) async {
+      await open(tester);
+      await pumpScreen(
+        tester,
+        const Material(child: TechDetails(text: 'x')),
+        size: const Size(800, 600),
+      );
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(copied, isEmpty);
+    });
+
     testWidgets('"העתקה" בתפריט הלחיצה הימנית — בלי תווי הבידוד',
         (tester) async {
       await open(tester);
@@ -500,6 +515,15 @@ void main() {
         expect(tester.getRect(bar).bottom, size.height);
       }
       // בחלון גבוה התג לא נצמד לראש: התוכן ממורכז בשטח שמעל הפס.
+      final badgeTop = tester.getRect(find.byType(ResultBadge)).top;
+      expect(badgeTop, greaterThan(36 + 40));
+    });
+
+    testWidgets('חלון צר וגבוה — התוכן ממורכז גם שם', (tester) async {
+      const size = Size(760, 1000);
+      await pumpScreen(tester, taskScenarioInWindow('installDone'), size: size);
+      final bar = find.byKey(const ValueKey('task.result.actions'));
+      expect(tester.getRect(bar).bottom, size.height);
       final badgeTop = tester.getRect(find.byType(ResultBadge)).top;
       expect(badgeTop, greaterThan(36 + 40));
     });

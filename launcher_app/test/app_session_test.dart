@@ -331,8 +331,7 @@ void main() {
       expect(s.otzaria.status, isNot(OtzariaModuleStatus.checking));
     });
 
-    test('"הורדה" בלי בחירה בהגדרות — הודעה ומעבר להגדרות, בלי "מתכונן"',
-        () async {
+    test('"הורדה" בלי בחירה בהגדרות — הודעה, בלי "מתכונן"', () async {
       final s = session();
       await settings.update(settings.settings.copyWith(
         syncApp: false,

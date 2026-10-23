@@ -268,7 +268,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   @override
   void notifyNoSyncSelection() {
     UiSnack.show(AppL10n.strings.guide.noSyncSelectionNote);
-    unawaited(_goTo(ShellSection.settings));
   }
 
   @override
@@ -584,7 +583,10 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           readOnly: widget.readOnly,
           appInstalled: s.otzaria.currentVersion != null,
           appInstallable: switch (s.otzaria.status) {
-            OtzariaModuleStatus.idle || OtzariaModuleStatus.checking => null,
+            OtzariaModuleStatus.idle ||
+            OtzariaModuleStatus.checking ||
+            OtzariaModuleStatus.error =>
+              null,
             final status => status == OtzariaModuleStatus.updateAvailable,
           },
           onUpdateHere: () => _updateOnly(GuidanceItem.library),

@@ -47,7 +47,7 @@ class TaskHeading extends StatelessWidget {
 
 /// דף תוצאה (`resPage`): תג, כותרת, גוף, תוספת, ועמודת פעולות ברוחב 352.
 /// הפעולות קבועות בתחתית בכל גודל חלון, כדי שהפעולה הראשית תיראה בלי גלילה;
-/// בחלון רחב וגבוה התוכן ממורכז מעליהן.
+/// כשיש מקום, התוכן ממורכז מעליהן — גם בחלון צר וגבוה.
 class TaskResult extends StatelessWidget {
   const TaskResult({
     super.key,
@@ -109,13 +109,10 @@ class TaskResult extends StatelessWidget {
               padding: padding,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight: narrow
-                      ? 0
-                      : (constraints.maxHeight - padding.vertical)
-                          .clamp(0, double.infinity),
+                  minHeight: (constraints.maxHeight - padding.vertical)
+                      .clamp(0, double.infinity),
                 ),
                 child: Align(
-                  alignment: narrow ? Alignment.topCenter : Alignment.center,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: wide ? 560 : 460),
                     child: content,
@@ -153,6 +150,15 @@ class TechDetails extends StatefulWidget {
 class _TechDetailsState extends State<TechDetails> {
   bool _open = false;
   TextSelection _selection = const TextSelection.collapsed(offset: -1);
+
+  @override
+  void didUpdateWidget(TechDetails oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // סימון מהטקסט הקודם היה חורג מגבולות טקסט קצר יותר בהעתקה.
+    if (widget.text != oldWidget.text) {
+      _selection = const TextSelection.collapsed(offset: -1);
+    }
+  }
 
   /// סימון והעתקה ידניים (Ctrl+C או התפריט) — בלי תווי הבידוד של הגדלים.
   void _copySelection() {

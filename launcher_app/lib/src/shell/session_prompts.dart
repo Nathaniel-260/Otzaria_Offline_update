@@ -21,7 +21,8 @@ abstract interface class SessionPrompts {
 
   Future<bool> confirmCancelDownload();
 
-  /// "הורדה" כשבהגדרות לא נבחר שום רכיב: הודעה, ומעבר להגדרות.
+  /// "הורדה" כשבהגדרות לא נבחר שום רכיב: הודעה בלבד, בלי מעבר (בדרך להגדרות
+  /// עלול לעמוד דיאלוג הסיסמה של המצב הבטוח).
   void notifyNoSyncSelection();
 
   Future<bool> confirmClose({required bool downloading});
