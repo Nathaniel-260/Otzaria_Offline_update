@@ -1,5 +1,5 @@
-// בדיקות להדרכת "שאלות נפוצות" — הדיאלוג שנפתח מ-"?" בשורת הכותרת,
-// האקורדיון, וההתאמה האישית שנפתחת בגלגל השיניים.
+// בדיקות לשאלות הנפוצות — דף העזרה שנפתח מ-"?" בשורת הכותרת, האקורדיון,
+// ומצב העריכה (כולל השער של מצב הסייפר ובקשת העריכה מההגדרות).
 //
 // הבדיקה האחרונה כאן היא השומר החשוב: שדה שאלה/תשובה שנוסף לחוזה המלל ולא
 // נכנס ל-`faqGroups` פשוט לא היה מוצג, בלי שדבר ייפול.
@@ -7,14 +7,16 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/faq_controller.dart';
 import 'package:launcher_app/src/screens/faq/faq_content.dart';
-import 'package:launcher_app/src/screens/faq/faq_dialog.dart';
+import 'package:launcher_app/src/screens/help/help_page.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
+import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/faq_customization.dart';
+import 'package:launcher_app/src/settings/safer_mode.dart';
+import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import 'test_harness.dart';
@@ -38,11 +40,23 @@ void main() {
     await deleteTempDir(tempDir);
   });
 
-  Future<void> pumpBody(WidgetTester tester) =>
-      pumpScreen(tester, Scaffold(body: FaqBody(faq: faq)));
+  Future<void> pumpBody(
+    WidgetTester tester, {
+    SaferModeGate? saferMode,
+    ValueNotifier<bool>? editRequests,
+  }) =>
+      pumpScreen(
+        tester,
+        Scaffold(
+          body: HelpPage(
+            faq: faq,
+            saferMode: saferMode,
+            editRequests: editRequests,
+          ),
+        ),
+      );
 
-  /// רשימת השאלות גוללת (גובהה חסום), ולכן כל לחיצה בתוכה חייבת קודם להביא
-  /// את המטרה אל תוך החלון — אחרת ה-tap נופל על קואורדינטה שמחוץ לגליל.
+  /// הדף גולל, ולכן כל לחיצה בו חייבת קודם להביא את המטרה אל תוך החלון.
   Future<void> tapInList(WidgetTester tester, Finder target) async {
     await tester.ensureVisible(target);
     await tester.pumpAndSettle();
@@ -50,49 +64,107 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// כניסה למצב העריכה דרך גלגל השיניים, ויציאה ממנו. שניהם מחוץ לגליל.
+  /// כניסה למצב העריכה ויציאה ממנו — אותו כפתור בראש הדף.
   Future<void> enterEditMode(WidgetTester tester) async {
-    await tester.tap(find.byIcon(FluentIcons.settings_24_regular));
-    await tester.pumpAndSettle();
+    expect(find.text(t.editButton), findsOneWidget);
+    await tapInList(tester, find.byKey(const ValueKey('faq.edit')));
   }
 
   Future<void> leaveEditMode(WidgetTester tester) async {
-    await tester.tap(find.byIcon(FluentIcons.checkmark_24_regular));
-    await tester.pumpAndSettle();
+    expect(find.text(t.editDoneButton), findsOneWidget);
+    await tapInList(tester, find.byKey(const ValueKey('faq.edit')));
   }
 
-  group('הדיאלוג', () {
-    testWidgets('לחיצה פותחת את ההדרכה עם כל הקבוצות', (tester) async {
-      await tester.pumpWidget(
-        wrap(
-          Builder(
-            builder: (context) => Center(
-              child: TextButton(
-                key: const Key('open'),
-                onPressed: () => showFaqDialog(context, faq: faq),
-                child: const SizedBox(width: 40, height: 20),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.byKey(const Key('open')));
-      await tester.pumpAndSettle();
+  group('דף העזרה', () {
+    testWidgets('הדף מציג את השאלות עם כל הקבוצות, בלי דו-שיח', (tester) async {
+      await pumpBody(tester);
 
-      expect(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.text(t.title),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text(t.title), findsOneWidget);
       expect(find.text(t.intro), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
       for (final group in faqGroups(stringsOf())) {
         expect(find.text(group.title), findsOneWidget, reason: group.title);
       }
-      // כרטיס הסיום אינו שם כל עוד לא מולאו פרטים — "אפשר לפנות אלינו" בלי
+      // איש הקשר אינו שם כל עוד לא מולאו פרטים — "אפשר לפנות אלינו" בלי
       // לומר למי אינו עוזר לאיש.
       expect(find.text(t.contactTitle), findsNothing);
+    });
+
+    testWidgets('בקשת עריכה מההגדרות נכנסת לעריכה ומתאפסת', (tester) async {
+      final request = ValueNotifier(true);
+      addTearDown(request.dispose);
+      await pumpBody(tester, editRequests: request);
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.editTitle), findsOneWidget);
+      expect(request.value, isFalse);
+
+      // ובקשה בזמן שהדף כבר פתוח — אחרי יציאה מהעריכה.
+      await leaveEditMode(tester);
+      expect(find.text(t.editTitle), findsNothing);
+      request.value = true;
+      await tester.pumpAndSettle();
+      expect(find.text(t.editTitle), findsOneWidget);
+    });
+  });
+
+  group('עריכה במצב סייפר', () {
+    late Directory settingsDir;
+    late SettingsController settings;
+
+    setUp(() {
+      settingsDir = Directory.systemTemp.createTempSync('faq_safer');
+      settings = SettingsController(dataDir: settingsDir.path);
+    });
+
+    tearDown(() async {
+      settings.dispose();
+      await deleteTempDir(settingsDir);
+    });
+
+    testWidgets('הכניסה לעריכה מבקשת סיסמה; שגויה או ביטול — נשארים בקריאה',
+        (tester) async {
+      await tester.runAsync(
+        () => settings.update(
+          AppSettings(
+            saferModeEnabled: true,
+            saferModePassword: SaferModePassword.encode('1234'),
+          ),
+        ),
+      );
+      final gate = SaferModeGate(settings);
+      final s = stringsOf().saferMode;
+      await pumpBody(tester, saferMode: gate);
+
+      await tester.tap(find.byKey(const ValueKey('faq.edit')));
+      await tester.pumpAndSettle();
+      expect(find.text(s.verifyTitle), findsOneWidget);
+      expect(find.text(s.verifyFaqHint), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '9999');
+      await tester.tap(find.text(stringsOf().common.confirm));
+      await tester.pumpAndSettle();
+      // השגיאה בתוך הדו-שיח, והוא נשאר פתוח.
+      expect(find.text(s.wrongPassword), findsOneWidget);
+      await tester.tap(find.text(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+      expect(find.text(t.editTitle), findsNothing);
+      expect(gate.isLocked, isTrue);
+
+      await tester.tap(find.byKey(const ValueKey('faq.edit')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '1234');
+      await tester.tap(find.text(stringsOf().common.confirm));
+      await tester.pumpAndSettle();
+      expect(find.text(t.editTitle), findsOneWidget);
+      expect(gate.isLocked, isFalse);
+
+      // יציאה וכניסה חוזרת — בלי לשאול שוב באותה הרצה.
+      await leaveEditMode(tester);
+      await tester.tap(find.byKey(const ValueKey('faq.edit')));
+      await tester.pumpAndSettle();
+      expect(find.text(s.verifyTitle), findsNothing);
+      expect(find.text(t.editTitle), findsOneWidget);
     });
   });
 
@@ -121,7 +193,7 @@ void main() {
     testWidgets('כל השאלות מוצגות באנגלית גם כן', (tester) async {
       await pumpScreen(
         tester,
-        Scaffold(body: FaqBody(faq: faq)),
+        Scaffold(body: HelpPage(faq: faq)),
         language: AppLanguage.english,
       );
       final en = stringsOf(AppLanguage.english);
@@ -219,19 +291,19 @@ void main() {
       expect(find.text(t.noExtrasYet), findsOneWidget);
     });
 
-    testWidgets('כרטיס הסיום מופיע רק אחרי שמולאו פרטים', (tester) async {
+    testWidgets('איש הקשר מופיע רק אחרי שמולאו פרטים', (tester) async {
       await pumpBody(tester);
       expect(find.text(t.contactTitle), findsNothing);
 
       await enterEditMode(tester);
 
-      final nameField = find.widgetWithText(TextField, t.contactNameLabel);
+      final nameField = find.byKey(const ValueKey('faq.contact.name'));
       await tester.ensureVisible(nameField);
       await tester.pumpAndSettle();
 
       await tester.enterText(nameField, 'ר׳ ישראל');
       await tester.enterText(
-        find.widgetWithText(TextField, t.contactPhoneLabel),
+        find.byKey(const ValueKey('faq.contact.phone')),
         '050-0000000',
       );
       // השמירה מושהית בכוונה — כתיבת קובץ בכל הקשה על כונן נייד.
@@ -242,7 +314,7 @@ void main() {
 
       expect(find.text(t.contactTitle), findsOneWidget);
       expect(find.text('ר׳ ישראל'), findsOneWidget);
-      expect(find.text(t.contactPhoneLine('050-0000000')), findsOneWidget);
+      expect(find.text('050-0000000'), findsOneWidget);
     });
   });
 

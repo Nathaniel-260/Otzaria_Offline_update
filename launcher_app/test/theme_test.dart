@@ -341,7 +341,7 @@ void main() {
             return Scaffold(
               backgroundColor: AppSurfaces.panelBackground(context),
               body: SettingsCard(
-                title: s.settings.appearanceCardTitle,
+                title: s.settings.groupGeneral,
                 children: [
                   InfoStatusRow(
                     icon: FluentIcons.info_24_regular,

@@ -132,11 +132,12 @@ void main() {
       await pumpScreen(tester,
           CustomAppsSettingsCard(controller: controller, onOpenManager: () {}));
 
-      expect(find.text('תוכנות נוספות'), findsWidgets);
-      expect(find.text('לא נוספו תוכנות'), findsOneWidget);
-      expect(find.text('ניהול התוכנות'), findsOneWidget);
-      // כותרת הכרטיס והשורה אינן אותה מילה פעמיים.
-      expect(find.text(stringsOf().customApps.manageRowTitle), findsOneWidget);
+      final t = stringsOf().customApps;
+      // שורה לחיצה אחת: "ניהול", ופירוט שאומר שעוד אין תוכנות.
+      expect(find.text(t.manageRowTitle), findsOneWidget);
+      expect(find.text(t.emptyHint), findsOneWidget);
+      final row = tester.widget<AppRow>(find.byType(AppRow));
+      expect(row.onTap, isNotNull);
       // ההוספה עברה למסך הניהול — בהגדרות אין יותר שום פעולה על המרשם.
       expect(find.text('הוספת תוכנה'), findsNothing);
       expect(find.text('ניהול קטגוריות'), findsNothing);

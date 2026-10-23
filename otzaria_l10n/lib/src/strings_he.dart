@@ -1374,233 +1374,206 @@ class _Settings extends SettingsScreenStrings {
   String get title => 'הגדרות';
 
   @override
-  String get automationCardTitle => 'אוטומציה';
+  String get groupGeneral => 'כללי';
   @override
-  String get automationCardHint => 'ברירת המחדל: בדיקה בלבד, בלי להתקין.';
+  String get groupPrivacy => 'פרטיות ודיווחים';
   @override
-  String get autoCheckTitle => 'התוכנה תבדוק עדכונים בפתיחה';
+  String get groupAbout => 'אודות';
   @override
-  String get autoCheckSubtitle =>
-      'משווה את המותקן לתיקייה המקומית, וכשיש רשת גם לגרסה החדשה ביותר';
-  @override
-  String get autoCheckHint =>
-      'הבדיקה ברשת היא מטא-דאטה בלבד, בלי הורדה. כשל (אין רשת) נבלע בשקט, '
-      'והכפתור הידני בדף הבית עובד בכל מקרה.';
-  @override
-  String get autoInstallTitle =>
-      'פתיחת התוכנה תעדכן אוטומטית את התוכנה והספרייה';
-  @override
-  String get autoInstallSubtitle =>
-      'מעדכן בפתיחה מה שכבר מותקן; אינו מתקין בפעם הראשונה, ומדלג כשאוצריא '
-      'פתוחה';
+  String get advancedSummary =>
+      'נעילה בסיסמה, עדכון למחשב מסוים, שאלות נפוצות, יומן ואיפוס';
 
   @override
-  String get autoInstallDialogTitle => 'להפעיל התקנה אוטומטית?';
+  String get languageTitle => 'שפה';
   @override
-  String get autoInstallDialogContent =>
-      'מעתה תוכנת אוצריא והספרייה יעודכנו ללא אישור נוסף בכל פעם שתימצא גרסה '
-      'חדשה בתיקייה שלצד התוכנה — אך ורק כשהן כבר מותקנות. התקנה ראשונה '
-      'נשארת בידיים שלך, וגם ההורדה עצמה תישאר יזומה.';
-  @override
-  String get autoInstallDialogWarning =>
-      'התקנה מחליפה קבצים במחשב שלך. אם אינך בטוח/ה — עדיף להשאיר את '
-      'האפשרות כבויה ולאשר כל עדכון בנפרד.';
-  @override
-  String get autoInstallDialogConfirm => 'הפעל התקנה אוטומטית';
-
-  @override
-  String get downloadCardTitle => 'הורדה';
-  @override
-  String get downloadCardHint =>
-      'אילו רכיבים כפתור "הורד עכשיו" בדף הבית מביא לתיקייה המקומית. '
-      'ההורדה עצמה תמיד יזומה בלחיצה.';
-  @override
-  String get syncTargetsTitle => 'בחר מה ברצונך להוריד מהרשת';
-  @override
-  String get syncTargetsHint =>
-      'תוכנה — קובץ ההתקנה של הגרסה האחרונה. ספרייה — הרכיב הכבד, המסד המלא '
-      'הוא כ-\u20661.5\u00a0GB\u2069. תוספים — הקטלוג וקובצי ההתקנה של כל התוספים.';
-  @override
-  String get syncTargetAll => 'הכל';
-  @override
-  String get syncTargetApp => 'תוכנה';
-  @override
-  String get syncTargetLibrary => 'ספרייה';
-  @override
-  String get syncTargetPlugins => 'תוספים';
-  @override
-  String get syncLibraryLockedSubtitle =>
-      'עדכון אישי פעיל, ולכן הספרייה תמיד נכללת בהורדה';
-  @override
-  String get personalModeTitle => 'עדכון אישי — למחשב שלי בלבד';
-  @override
-  String get personalModeSubtitle =>
-      'רק קובצי העדכון מהגרסה שמותקנת אצלך ומעלה, בלי המסד המלא';
-  @override
-  String get personalModeHint =>
-      'המסד המלא הוא כ-\u20661.5\u00a0GB\u2069. את גרסת המסד שלכם מזהים בלחיצה, במסך הספרייה.';
-  @override
-  String get personalModeDialogTitle => 'להפעיל עדכון אישי?';
-  @override
-  String get personalModeDialogContent =>
-      'ההורדה תביא רק את קובצי העדכון מהגרסה שמותקנת אצלך ומעלה — עשרות מגה־בייט '
-      'במקום כמה ג׳יגה־בייט.\n\n'
-      'התוכנה אינה קוראת את גרסת המסד מעצמה: במסך הספרייה יש ללחוץ על '
-      '"זהה את גרסת המסד שלי", וזאת דווקא במחשב שאוצריא שלכם מותקנת בו. '
-      'הלחיצה נשמרת על הכונן ונוסעת איתו למחשב המקוון, כך שאוצריא שמותקנת '
-      'שם לא תיקבע במקומה.';
-  @override
-  String get personalModeDialogWarning =>
-      'הכונן לא ישמש עוד להתקנה במחשב אחר: המסד המלא יימחק ממנו בהורדה הבאה, '
-      'וגם מסלול ההתאוששות (התקנה מלאה כשקובץ עדכון אינו מתאים) לא יהיה זמין.';
-  @override
-  String get personalModeDialogConfirm => 'הפעל עדכון אישי';
-
-  @override
-  String get appearanceCardTitle => 'שפה';
-  @override
-  String get languageTitle => 'שפת הממשק';
-  @override
-  String get languageSubtitle =>
-      'משנה את שפת כל המסכים וההודעות מיד. "אוטומטי" — לפי שפת המחשב.';
-  @override
-  String get languageSystem => 'אוטומטי';
+  String get languageSystem => 'כמו במחשב';
   @override
   String get languageHebrew => 'עברית';
   @override
   String get languageEnglish => 'English';
 
   @override
-  String get supportCardTitle => 'תמיכה';
+  String get autoCheckTitle => 'לבדוק עדכונים בכל פתיחה';
   @override
-  String get logTitle => 'יומן הפעילות';
+  String get autoCheckSubtitle =>
+      'בודק מה יש בכונן, ובמחשב מחובר — גם מה חדש באתר.';
   @override
-  String get logSubtitle => 'כל הבדיקות, ההורדות וההתקנות נרשמות מקומית בלבד';
+  String get autoInstallTitle => 'לעדכן לבד בלי לשאול';
   @override
-  String get openLogFolderButton => 'פתיחת תיקיית הלוגים';
+  String get autoInstallSubtitle =>
+      'כשיש בכונן עדכון למחשב הזה, הוא מותקן מיד בפתיחה. לא חל על התקנה ראשונה.';
+  @override
+  String get autoInstallDialogTitle => 'לעדכן לבד בלי לשאול?';
+  @override
+  String get autoInstallDialogContent =>
+      'בכל פעם שהכלי ייפתח במחשב שיש בכונן עדכון בשבילו, העדכון יותקן מיד. '
+      'אם אוצריא תהיה פתוחה, העדכון יחכה לפעם הבאה.';
+  @override
+  String get autoInstallDialogWarning =>
+      'ההתקנה מחליפה קבצים במחשב בלי לשאול. אם אינכם בטוחים, השאירו את זה כבוי.';
+  @override
+  String get autoInstallDialogConfirm => 'הפעלה';
 
   @override
-  String get resetTitle => 'איפוס ההגדרות';
+  String get syncTargetsTitle => 'מה להוריד לכונן';
   @override
-  String get resetSubtitle =>
-      'מחזיר את כל ההגדרות לברירת המחדל, בלי למחוק התקנות';
+  String get syncTargetsSubtitle => 'מה שלא מסומן לא יירד, גם אם יש לו עדכון.';
+  @override
+  String get syncTargetAll => 'הכול';
+  @override
+  String get syncTargetApp => 'תוכנת אוצריא';
+  @override
+  String get syncTargetLibrary => 'הספרייה';
+  @override
+  String get syncTargetPlugins => 'תוספים';
+  @override
+  String get syncLibraryLockedSubtitle => 'הספרייה נקבעת לפי המחשב שנרשם.';
+
+  @override
+  String get personalModeTitle => 'הכנת עדכון למחשב מסוים';
+  @override
+  String get personalModeSubtitle =>
+      'הכלי זוכר מה מותקן במחשב אחד ומוריד רק את מה שחסר לו.';
+  @override
+  String get personalModeRegisterLink => 'לרישום המחשב';
+  @override
+  String get personalModeDialogTitle => 'להפעיל עדכון למחשב מסוים?';
+  @override
+  String get personalModeDialogContent =>
+      'ההורדה תביא רק את קובצי העדכון מהגרסה שמותקנת אצלכם ומעלה — עשרות מגה־בייט '
+      'במקום כמה ג׳יגה־בייט.\n\n'
+      'הכלי אינו קורא את גרסת הספרייה מעצמו: בדף הספרייה יש ללחוץ על '
+      '"זהה את גרסת המסד שלי", וזאת דווקא במחשב שאוצריא שלכם מותקנת בו. '
+      'הלחיצה נשמרת על הכונן ונוסעת איתו למחשב המחובר, כך שאוצריא שמותקנת '
+      'שם לא תיקבע במקומה.';
+  @override
+  String get personalModeDialogWarning =>
+      'הכונן לא ישמש עוד להתקנה במחשב אחר: הספרייה המלאה תימחק ממנו בהורדה '
+      'הבאה, וגם ההתקנה המלאה כשקובץ עדכון אינו מתאים לא תהיה זמינה.';
+  @override
+  String get personalModeDialogConfirm => 'הפעלה';
+
+  @override
+  String get faqEditTitle => 'עריכת השאלות הנפוצות';
+  @override
+  String get faqEditSubtitle => 'הסתרה, הוספת שאלות ופרטי איש קשר לעזרה במקום';
+
+  @override
+  String get logTitle => 'יומן הפעולות';
+  @override
+  String get logSubtitle => 'לשליחה לתמיכה כשמשהו לא עובד.';
+  @override
+  String get openLogFolderButton => 'פתח את התיקייה';
+
+  @override
+  String get resetTitle => 'איפוס הגדרות';
+  @override
+  String get resetSubtitle => 'מחזיר את כל ההגדרות לברירת המחדל. הסיסמה נשארת.';
   @override
   String get resetButton => 'איפוס';
   @override
-  String get resetDialogTitle => 'איפוס ההגדרות';
+  String get resetDialogTitle => 'לאפס את כל ההגדרות?';
   @override
-  String get resetDialogContent => 'כל ההגדרות יחזרו לברירת המחדל.';
+  String get resetDialogContent =>
+      'כל ההגדרות יחזרו לברירת המחדל. מה שבכונן לא נמחק, והסיסמה נשארת.';
   @override
-  String get resetDialogWarning =>
-      'ההתקנות עצמן, המסד, התוספים והעדכונים שהורדו לא יימחקו.';
-  @override
-  String get resetDialogConfirm => 'אפס הגדרות';
+  String get resetDialogConfirm => 'איפוס ההגדרות';
   @override
   String get resetDoneSnack => 'ההגדרות אופסו';
+
+  @override
+  String aboutTitle(String version) => 'עדכוני אוצריא $version';
+  @override
+  String get aboutSubtitle => 'מה חדש, ובדיקה אם יש גרסה חדשה';
+  @override
+  String aboutNewVersion(String version) =>
+      'יש גרסה חדשה: $version · מה חדש ועדכון';
+  @override
+  String get changelogSubtitle => 'מה השתנה בכלי, גרסה אחר גרסה';
 }
 
 class _SaferMode extends SaferModeStrings {
   const _SaferMode();
 
   @override
-  String get cardTitle => 'מצב סייפר';
+  String get lockTitle => 'נעילה בסיסמה';
   @override
-  String get cardHint =>
-      'נעילת ההגדרות בסיסמה. הורדה, בדיקה והתקנה נשארות פתוחות לכולם — '
-      'רק שינוי ההגדרות ועריכת ההדרכה נדרשים לסיסמה.';
+  String get noPasswordSubtitle =>
+      'מונעת שינוי הגדרות, בחירת גרסה ניסיונית ועריכת השאלות הנפוצות בלי סיסמה.';
   @override
-  String get toggleTitle => 'מצב סייפר';
+  String get setPasswordButton => 'קביעת סיסמה';
   @override
-  String get toggleOnSubtitle => 'ההגדרות ועריכת ההדרכה נעולות בסיסמה';
+  String get lockOnSubtitle => 'פעילה: הכניסה להגדרות תבקש סיסמה.';
   @override
-  String get toggleOffSubtitle => 'ההגדרות פתוחות לכל מי שפותח את התוכנה';
+  String get lockOffSubtitle => 'יש סיסמה, אבל הנעילה כבויה.';
   @override
-  String get needsPasswordSubtitle => 'יש לבחור סיסמה תחילה';
+  String get passwordRowTitle => 'הסיסמה';
   @override
-  String get setPasswordButton => 'בחר סיסמה';
+  String get passwordRowSubtitle => 'אפשר להחליף או למחוק.';
   @override
-  String get passwordTileTitle => 'סיסמה';
+  String get passwordRowLockedSubtitle => 'כדי למחוק אותה, כבו קודם את הנעילה.';
   @override
-  String get passwordTileSubtitle => 'סיסמה הוגדרה — אפשר לשנות או למחוק אותה';
+  String get changeButton => 'החלפה';
   @override
-  String get passwordOptionsButton => 'אפשרויות';
+  String get clearButton => 'מחיקה';
   @override
-  String get enabledSnack => 'מצב סייפר הופעל';
+  String get enabledSnack => 'הנעילה הופעלה';
   @override
-  String get disabledSnack => 'מצב סייפר הושבת';
+  String get disabledSnack => 'הנעילה כובתה';
 
   @override
-  String get verifyTitle => 'הזן סיסמה';
+  String get verifyTitle => 'נדרשת סיסמה';
   @override
-  String get verifySettingsHint =>
-      'הנך במצב סייפר. הזן את הסיסמה כדי לגשת להגדרות.';
+  String get verifySettingsHint => 'ההגדרות נעולות בסיסמה.';
   @override
-  String get verifyFaqHint =>
-      'הנך במצב סייפר. הזן את הסיסמה כדי לערוך את ההדרכה.';
+  String get verifyFaqHint => 'עריכת השאלות הנפוצות נעולה בסיסמה.';
   @override
-  String get verifyEnableHint => 'הזן את הסיסמה כדי להפעיל את מצב הסייפר.';
+  String get verifyEnableHint => 'כדי להפעיל את הנעילה, הקלידו את הסיסמה.';
   @override
-  String get verifyDisableHint => 'הזן את הסיסמה כדי להשבית את מצב הסייפר.';
-  @override
-  String get verifyChangeHint => 'הזן את הסיסמה הנוכחית כדי לשנות אותה.';
+  String get verifyDisableHint => 'כדי לכבות את הנעילה, הקלידו את הסיסמה.';
   @override
   String get passwordLabel => 'סיסמה';
   @override
-  String get passwordFieldHint => 'הזן את הסיסמה';
+  String get wrongPassword => 'הסיסמה לא נכונה. נסו שוב.';
   @override
-  String get wrongPassword => 'סיסמה שגויה';
+  String get passwordRequired => 'יש להקליד סיסמה.';
   @override
-  String get showPasswordTooltip => 'הצג את הסיסמה';
+  String get showPasswordTooltip => 'הצגת הסיסמה';
   @override
-  String get hidePasswordTooltip => 'הסתר את הסיסמה';
+  String get hidePasswordTooltip => 'הסתרת הסיסמה';
 
   @override
-  String get setTitle => 'בחירת סיסמה';
+  String get setTitle => 'קביעת סיסמה';
   @override
-  String get setIntro =>
-      'הסיסמה נשמרת מעורבלת בקובץ ההגדרות שעל הכונן, ואין דרך לשחזר אותה. '
-      'מי שיאבד אותה יצטרך למחוק את קובץ ההגדרות.';
+  String setIntro(int minLength) =>
+      'הסיסמה תידרש לכניסה להגדרות, לבחירת גרסה ניסיונית ולעריכת השאלות '
+      'הנפוצות. לפחות $minLength תווים. סיסמה שנשכחה אי אפשר לשחזר — רק '
+      'למחוק את קובץ ההגדרות שבכונן.';
+  @override
+  String get setConfirm => 'שמירה והפעלת הנעילה';
+  @override
+  String get changeTitle => 'החלפת סיסמה';
+  @override
+  String get currentPasswordLabel => 'הסיסמה הנוכחית';
   @override
   String get newPasswordLabel => 'סיסמה חדשה';
   @override
-  String minLengthHint(int minLength) => 'לפחות $minLength תווים';
-  @override
-  String get confirmPasswordLabel => 'אימות סיסמה';
-  @override
-  String get confirmPasswordFieldHint => 'הזן שוב את הסיסמה';
-  @override
-  String get passwordRequired => 'יש להזין סיסמה';
+  String get confirmPasswordLabel => 'שוב, לאימות';
   @override
   String passwordTooShort(int minLength) =>
-      'הסיסמה חייבת להיות באורך $minLength תווים לפחות';
+      'הסיסמה קצרה מדי: לפחות $minLength תווים.';
   @override
-  String get passwordsDoNotMatch => 'הסיסמאות אינן זהות';
+  String get passwordsDoNotMatch => 'שתי הסיסמאות לא זהות.';
   @override
-  String get passwordSavedSnack => 'הסיסמה נשמרה';
+  String get passwordSetSnack => 'הסיסמה נקבעה והנעילה פעילה';
   @override
-  String get saveButton => 'שמור';
+  String get passwordChangedSnack => 'הסיסמה הוחלפה';
 
   @override
-  String get activateNowTitle => 'להפעיל את מצב הסייפר עכשיו?';
-  @override
-  String get activateNowContent =>
-      'מכאן והלאה תידרש הסיסמה כדי להיכנס להגדרות ולערוך את ההדרכה. '
-      'אפשר גם להפעיל את המצב מאוחר יותר, מהמתג שבכרטיס.';
-  @override
-  String get activateNowConfirm => 'הפעל עכשיו';
-
-  @override
-  String get clearButton => 'מחיקת הסיסמה';
-  @override
-  String get clearBlockedButton => 'יש להשבית את מצב הסייפר לפני מחיקת הסיסמה';
-  @override
-  String get clearDialogTitle => 'מחיקת הסיסמה';
+  String get clearDialogTitle => 'למחוק את הסיסמה?';
   @override
   String get clearDialogContent =>
-      'לא תידרש עוד סיסמה, ולא יהיה אפשר להפעיל את מצב הסייפר עד שתיבחר '
-      'סיסמה חדשה.';
-  @override
-  String get clearDialogConfirm => 'מחק את הסיסמה';
+      'בלי סיסמה, כל מי שפותח את הכלי יוכל לשנות הגדרות.';
   @override
   String get passwordRemovedSnack => 'הסיסמה נמחקה';
 }
@@ -2018,7 +1991,7 @@ class _Faq extends FaqStrings {
   @override
   String get title => 'שאלות נפוצות';
   @override
-  String get intro => 'לחיצה על שאלה פותחת את התשובה.';
+  String get intro => 'תשובות קצרות לשאלות שחוזרות על עצמן.';
 
   @override
   String get groupBasics => 'איך זה עובד';
@@ -2172,22 +2145,21 @@ class _Faq extends FaqStrings {
       'בוחרים "אוצריא".';
 
   @override
-  String get contactTitle => 'עדיין יש לכם שאלה?';
+  String get contactTitle => 'לעזרה במקום';
 
   @override
-  String get editTooltip => 'התאמה אישית של ההדרכה';
+  String get editButton => 'עריכה';
   @override
-  String get editDoneTooltip => 'סיום ההתאמה';
+  String get editDoneButton => 'סיום עריכה';
   @override
-  String get editIntro =>
-      'כאן אפשר להסתיר שאלות שאינן נוגעות לכם, להוסיף שאלות משלכם, ולרשום את '
-      'הפרטים שלכם בתחתית הרשימה. ההתאמות נשמרות בתיקייה שלצד התוכנה ונוסעות '
-      'איתה על הכונן.';
+  String get editTitle => 'עריכת השאלות הנפוצות';
+  @override
+  String get editIntro => 'שאלות מוסתרות לא יוצגו. השינויים נשמרים בכונן.';
 
   @override
-  String get hideTooltip => 'הסתרת השאלה';
+  String get hideTooltip => 'הסתרה';
   @override
-  String get restoreTooltip => 'החזרת השאלה';
+  String get restoreTooltip => 'הצגה';
   @override
   String get hiddenLabel => 'מוסתרת';
 
@@ -2222,16 +2194,11 @@ class _Faq extends FaqStrings {
       'השאלה והתשובה יימחקו מההדרכה. אפשר להוסיף אותן שוב בכל עת.';
 
   @override
-  String get contactCardTitle => 'הפרטים שלי בתחתית ההדרכה';
+  String get contactAutoSaveNote => 'נשמר מעצמו.';
   @override
-  String get contactCardHint =>
-      'מי שמכין כונן לאחרים יכול לרשום כאן למי לפנות. שדה ריק פשוט אינו מוצג.';
-  @override
-  String get contactNameLabel => 'שם';
+  String get contactNameLabel => 'שם איש הקשר';
   @override
   String get contactPhoneLabel => 'טלפון';
-  @override
-  String contactPhoneLine(String phone) => 'טלפון: $phone';
 }
 
 class _SetupError extends SetupErrorStrings {
@@ -2420,9 +2387,6 @@ class _LauncherUpdate extends LauncherUpdateStrings {
 
   @override
   String get whatsNewHeading => 'מה התחדש:';
-
-  @override
-  String get versionTileTitle => 'גרסת התוכנה';
 
   @override
   String get changelogButton => 'יומן שינויים';
@@ -3676,15 +3640,12 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get settingsCardTitle => 'תוכנות נוספות';
   @override
-  String get settingsCardHint =>
-      'תוכנות משלכם שנשמרות בכונן ומותקנות גם במחשב בלי אינטרנט.';
-  @override
   String get manageRowTitle => 'ניהול';
   @override
   String manageRowSubtitle(int count) =>
       '${count == 1 ? '$count תוכנה' : '$count תוכנות'} בכונן · הוספה, עריכה, סידור וקטגוריות';
   @override
-  String get emptyHint => 'לא נוספו תוכנות';
+  String get emptyHint => 'עוד לא נוספו תוכנות · הוספה, עריכה, סידור וקטגוריות';
   @override
   String get addButton => 'הוספת תוכנה';
   @override
@@ -4079,26 +4040,21 @@ class _AppReports extends AppReportsStrings {
   const _AppReports();
 
   @override
-  String get cardTitle => 'דיווח על תקלות';
+  String get crashModeTitle => 'אחרי סגירה לא צפויה של הכלי';
   @override
-  String get crashModeTitle => 'דיווח אחרי סגירה לא צפויה';
+  String get crashModeSubtitle => 'לשלוח למפתחים דיווח קצר על מה שקרה.';
   @override
-  String get crashModeSubtitle =>
-      'מה לעשות כשהתוכנה מזהה שנסגרה בלי סגירה מסודרת';
+  String get crashModeAsk => 'לשאול';
   @override
-  String get crashModeAsk => 'שאל אותי';
+  String get crashModeAlways => 'לשלוח תמיד';
   @override
-  String get crashModeAlways => 'שלח אוטומטית';
+  String get crashModeNever => 'לא לשלוח';
   @override
-  String get crashModeNever => 'לעולם לא';
-  @override
-  String get manageTileTitle => 'הדיווחים שלך, ודיווח על בעיה בכלי';
+  String get manageTileTitle => 'דיווחים על תקלות';
   @override
   String manageTileSubtitle(int pending, int sent) => pending == 0
       ? 'אין דיווחים שמורים בתור · $sent נשלחו'
       : '$pending שמורים בתור · $sent נשלחו';
-  @override
-  String get manageButton => 'הצג דיווחים';
 
   @override
   String get manageDialogIntro =>

@@ -20,7 +20,8 @@ import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_manage_page.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
-import 'package:launcher_app/src/screens/faq/faq_dialog.dart';
+import 'package:launcher_app/src/screens/faq/faq_body.dart';
+import 'package:launcher_app/src/screens/help/help_page.dart';
 import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/screens/launcher/launcher_update_page.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
@@ -222,24 +223,53 @@ void main() {
     expect(screen(SettingsScreen), findsNothing);
   });
 
-  testWidgets('"?" בשורת הכותרת פותח את השאלות הנפוצות, ואין כפתור צף', (
+  testWidgets('"?" בשורת הכותרת פותח את דף העזרה בגוף, בלי דו-שיח', (
     tester,
   ) async {
     await pumpShell(tester);
 
-    expect(find.byType(FaqBody, skipOffstage: false), findsNothing);
+    expect(screen(HelpPage), findsNothing);
     await tester.tap(find.byTooltip(shell.helpTooltip));
     // בדיקות הרקע של המסגרת מסובבות מחוונים, ולכן לא pumpAndSettle.
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
 
+    expect(navigatorOf(tester).section, ShellSection.help);
+    expect(screen(HelpPage), findsOneWidget);
+    expect(screen(FaqBody), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    // דף משנה: חזרה ופירור "בית › שאלות נפוצות", והכלי "?" מסומן.
+    expect(find.byTooltip(shell.backTooltip), findsOneWidget);
+    expect(find.text(stringsOf().faq.title), findsAtLeastNWidgets(2));
     expect(
       find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.byType(FaqBody),
+        of: find.byType(AppTitleBar),
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.selected == true,
+        ),
       ),
       findsOneWidget,
     );
+
+    await back(tester);
+    expect(navigatorOf(tester).section, ShellSection.home);
+  });
+
+  testWidgets('"עריכת השאלות הנפוצות" בהגדרות פותח את העזרה במצב עריכה', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    await open(tester, ShellSection.settings);
+
+    await tester.tap(find.text(stringsOf().pages.advancedTitle));
+    await tester.pump();
+    await tester.ensureVisible(find.byKey(const ValueKey('settings.faqEdit')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('settings.faqEdit')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(navigatorOf(tester).section, ShellSection.help);
+    expect(find.text(stringsOf().faq.editTitle), findsOneWidget);
   });
 
   testWidgets('גלגל השיניים בשורת הכותרת פותח את ההגדרות ומסומן', (
@@ -861,10 +891,11 @@ void main() {
 
       final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
       expect(card, findsOneWidget);
-      final button = tester.widget<ActionButton>(
-        find.descendant(of: card, matching: find.byType(ActionButton)),
+      // שורה ולא כפתור: בכונן מוגן היא אינה לחיצה, והפירוט אומר למה.
+      final row = tester.widget<AppRow>(
+        find.descendant(of: card, matching: find.byType(AppRow)),
       );
-      expect(button.onPressed == null, readOnly);
+      expect(row.onTap == null, readOnly);
       expect(
         find.descendant(
           of: card,
@@ -911,7 +942,7 @@ void main() {
     final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
     await tester.ensureVisible(card);
     await tester.tap(
-      find.descendant(of: card, matching: find.byType(ActionButton)),
+      find.descendant(of: card, matching: find.byType(AppRow)),
     );
     await tester.pump();
 
@@ -1952,6 +1983,21 @@ void main() {
 
       expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
       expect(screen(SettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('העזרה אינה נעולה — רק העריכה שבה', (tester) async {
+      await lockSettings(tester);
+      await pumpShell(tester);
+
+      await tester.tap(find.byTooltip(shell.helpTooltip));
+      await tester.pump();
+
+      expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
+      expect(screen(HelpPage), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('faq.edit')));
+      await tester.pump();
+      expect(find.text(stringsOf().saferMode.verifyFaqHint), findsOneWidget);
     });
 
     testWidgets('גם גלגל השיניים שבשורת הכותרת עובר בשער', (tester) async {

@@ -289,7 +289,7 @@ void main() {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SectionLabel(he.settings.appearanceCardTitle),
+            SectionLabel(he.settings.groupGeneral),
             NoticeBanner(
               kind: NoticeKind.banner,
               leading: const IconTile(icon: FluentIcons.info_24_regular),
@@ -370,7 +370,7 @@ void main() {
       await open(
         tester,
         AppDialog.twoActions(
-          title: he.settings.resetDialogTitle,
+          title: he.settings.resetTitle,
           content: he.settings.resetDialogContent,
         ),
       );
@@ -379,7 +379,7 @@ void main() {
       await open(
         tester,
         AppDialog.singleAction(
-          title: he.settings.resetDialogTitle,
+          title: he.settings.resetTitle,
           customContent: const SizedBox(height: 40),
         ),
       );

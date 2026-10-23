@@ -109,6 +109,148 @@ final List<VisualState> _phase2aStates = [
   ),
 ];
 
+/// שלב 5: ההגדרות (מקופל ופתוח), דו-שיחי הנעילה והשאלות הנפוצות.
+Future<void> _openSettings(WidgetTester tester) =>
+    _tapTooltip(tester, stringsOf().shell.settingsTooltip);
+
+Future<void> _tapVisible(WidgetTester tester, Finder target) async {
+  // רשימה עצלה: מה שמתחת לחלון עוד לא נבנה, ולכן גוללים עד שהוא נמצא.
+  for (var i = 0; i < 12 && target.evaluate().isEmpty; i++) {
+    await tester.drag(find.byType(ListView).last, const Offset(0, -300));
+    await tester.pump();
+  }
+  await tester.ensureVisible(target.first);
+  await tester.pump();
+  await tester.tap(target.first);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+Future<void> _openSettingsAdvanced(WidgetTester tester) async {
+  await _openSettings(tester);
+  await _tapVisible(tester, find.text(stringsOf().pages.advancedTitle));
+}
+
+/// סיסמה 1234 נקבעת דרך הדו-שיח — והנעילה פעילה אחריה.
+Future<void> _setPassword(WidgetTester tester) async {
+  await _openSettingsAdvanced(tester);
+  await _tapVisible(tester, find.text(stringsOf().saferMode.setPasswordButton));
+  final fields = find.byType(TextField);
+  await tester.enterText(fields.at(0), '1234');
+  await tester.enterText(fields.at(1), '1234');
+  await tester.tap(find.text(stringsOf().saferMode.setConfirm));
+  await tester.runAsync(
+    () => Future<void>.delayed(const Duration(milliseconds: 300)),
+  );
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+Future<void> _scrollDown(WidgetTester tester) async {
+  await tester.drag(find.byType(ListView).last, const Offset(0, -2000));
+  await tester.pump();
+}
+
+final List<VisualState> _phase5States = [
+  (name: 'settings', open: _openSettings),
+  (
+    name: 'settings_advanced',
+    open: (t) async {
+      await _openSettingsAdvanced(t);
+      await _scrollDown(t);
+    },
+  ),
+  (
+    name: 'dlg_lang',
+    open: (t) async {
+      await _openSettings(t);
+      await _tapVisible(t, find.byKey(const ValueKey('settings.language')));
+    },
+  ),
+  (
+    name: 'dlg_auto_install',
+    open: (t) async {
+      await _openSettings(t);
+      await _tapVisible(t, find.text(stringsOf().settings.autoInstallTitle));
+    },
+  ),
+  (
+    name: 'dlg_pw_set',
+    open: (t) async {
+      await _openSettingsAdvanced(t);
+      await _tapVisible(
+        t,
+        find.text(stringsOf().saferMode.setPasswordButton),
+      );
+    },
+  ),
+  (
+    name: 'settings_locked',
+    open: (t) async {
+      await _setPassword(t);
+      await _scrollDown(t);
+    },
+  ),
+  (
+    name: 'dlg_pw_enter',
+    open: (t) async {
+      await _setPassword(t);
+      await _tapVisible(t, find.text(stringsOf().saferMode.lockTitle));
+    },
+  ),
+  (
+    name: 'dlg_pw_change',
+    open: (t) async {
+      await _setPassword(t);
+      await _tapVisible(t, find.text(stringsOf().saferMode.changeButton));
+    },
+  ),
+  (
+    name: 'dlg_pw_delete',
+    open: (t) async {
+      await _setPassword(t);
+      // המחיקה מושבתת כשהנעילה פעילה — מכבים אותה קודם.
+      await _tapVisible(t, find.text(stringsOf().saferMode.lockTitle));
+      await t.enterText(find.byType(TextField), '1234');
+      await t.tap(find.text(stringsOf().common.confirm));
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await t.pump(const Duration(milliseconds: 400));
+      await _tapVisible(t, find.text(stringsOf().saferMode.clearButton));
+    },
+  ),
+  (
+    name: 'dlg_reset',
+    open: (t) async {
+      await _openSettingsAdvanced(t);
+      await _tapVisible(t, find.byKey(const ValueKey('settings.reset')));
+    },
+  ),
+  (name: 'help', open: (t) => _tapTooltip(t, stringsOf().shell.helpTooltip)),
+  (
+    name: 'help_open',
+    open: (t) async {
+      await _tapTooltip(t, stringsOf().shell.helpTooltip);
+      await _tapVisible(t, find.text(stringsOf().faq.qOfflineFlow));
+    },
+  ),
+  (
+    name: 'help_edit',
+    open: (t) async {
+      await _tapTooltip(t, stringsOf().shell.helpTooltip);
+      await _tapVisible(t, find.byKey(const ValueKey('faq.edit')));
+    },
+  ),
+  (
+    name: 'help_edit_bottom',
+    open: (t) async {
+      await _tapTooltip(t, stringsOf().shell.helpTooltip);
+      await _tapVisible(t, find.byKey(const ValueKey('faq.edit')));
+      await _scrollDown(t);
+    },
+  ),
+];
+
 /// שלב חדש מוסיף כאן את רשימת המצבים שלו.
 final Map<String, List<VisualState>> _statesByPhase = {
   'phase0': _phase0States,
@@ -129,6 +271,7 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase3b': const [],
   // החנות והתוכנות הנוספות מצולמות מה-fixtures — ראו `store_<scenario>`.
   'phase4': const [],
+  'phase5': _phase5States,
 };
 
 /// השלבים שמצלמים את מצבי החנות.

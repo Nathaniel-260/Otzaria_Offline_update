@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/custom_apps_controller.dart';
 import '../../widgets/widgets_exports.dart';
 
-/// שורה אחת במסך ההגדרות, וכל תפקידה לפתוח את דף הניהול
+/// "תוכנות נוספות" בהגדרות: שורה אחת, שכל תפקידה לפתוח את דף הניהול
 /// (`CustomAppsManagePage`) — ההוספה, העריכה, הקטגוריות והסדר יושבים שם.
 class CustomAppsSettingsCard extends StatelessWidget {
   const CustomAppsSettingsCard({
@@ -26,31 +26,30 @@ class CustomAppsSettingsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.strings.customApps;
+    final ro = context.strings.readOnlyDrive;
 
     // מאזין בעצמו: מספר התוכנות משתנה בזמן שדף הניהול פתוח.
     return ListenableBuilder(
       listenable: controller,
-      builder: (context, _) => SettingsCard(
-        title: t.settingsCardTitle,
-        hint: t.settingsCardHint,
+      builder: (context, _) => RowsCard(
         children: [
-          SettingsActionTile.text(
-            icon: FluentIcons.box_24_regular,
+          AppRow(
+            key: const ValueKey('settings.customApps.manage'),
+            leading: const IconTile(
+              icon: FluentIcons.apps_24_regular,
+              size: IconTileSize.sm,
+              tone: IconTileTone.quiet,
+            ),
             title: t.manageRowTitle,
+            // כונן מוגן: כל פעולת ניהול כותבת לכונן — מושבת, והפירוט אומר למה.
             subtitle: readOnly
                 ? driveFull
-                    ? context
-                        .strings.readOnlyDrive.customAppsManageDisabledDriveFull
-                    : context.strings.readOnlyDrive.customAppsManageDisabled
+                    ? ro.customAppsManageDisabledDriveFull
+                    : ro.customAppsManageDisabled
                 : controller.hasApps
                     ? t.manageRowSubtitle(controller.apps.length)
                     : t.emptyHint,
-            actions: [
-              ActionButton.neutral(
-                text: t.openManagerButton,
-                onPressed: readOnly ? null : onOpenManager,
-              ),
-            ],
+            onTap: readOnly ? null : onOpenManager,
           ),
         ],
       ),

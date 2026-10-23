@@ -380,25 +380,29 @@ class StoreCategoryChip extends StatelessWidget {
 }
 
 /// שבב סינון (`.fchip`): 32, רדיוס 8, מסגרת outline; הנבחר tonal עם ✓.
+/// נעול — מנעול במקום ✓, ב-60% ובלי לחיצה (`.fchip:disabled`).
 class StoreFilterChip extends StatelessWidget {
   const StoreFilterChip({
     super.key,
     required this.label,
     required this.selected,
     required this.onTap,
+    this.locked = false,
   });
 
   final String label;
   final bool selected;
   final VoidCallback? onTap;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final foreground = selected ? cs.onSecondaryContainer : cs.onSurface;
-    return Semantics(
+    final chip = Semantics(
       button: true,
       selected: selected,
+      enabled: !locked,
       child: FocusRing(
         child: Material(
           color: selected ? cs.secondaryContainer : Colors.transparent,
@@ -410,7 +414,7 @@ class StoreFilterChip extends StatelessWidget {
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: onTap,
+            onTap: locked ? null : onTap,
             overlayColor: AppSurfaces.stateLayer(cs.primary),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 32),
@@ -419,9 +423,11 @@ class StoreFilterChip extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (selected) ...[
+                    if (selected || locked) ...[
                       Icon(
-                        FluentIcons.checkmark_16_regular,
+                        locked
+                            ? FluentIcons.lock_closed_16_regular
+                            : FluentIcons.checkmark_16_regular,
                         size: 16,
                         color: foreground,
                       ),
@@ -439,6 +445,7 @@ class StoreFilterChip extends StatelessWidget {
         ),
       ),
     );
+    return locked ? Opacity(opacity: 0.6, child: chip) : chip;
   }
 }
 

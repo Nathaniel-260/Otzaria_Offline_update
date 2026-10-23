@@ -1714,7 +1714,7 @@ tile appears only when there are apps) is for using them: download, check online
 install, launch. Adding, editing, removing, categories and order live on
 `CustomAppsManagePage`, opened from Settings → Other programs → Manage as
 `CustomAppsManageRoute` — a page inside the body, behind the same safer-mode gate as
-Settings. The add/edit form stays a dialog. On a read-only drive the Manage button is
+Settings. The add/edit form stays a dialog. On a read-only drive the Manage row is
 disabled with the reason, since every management action writes to the drive.
 
 **`CustomAppsScreen` listens to its own controller**, like `PluginsScreen` and
@@ -2005,7 +2005,8 @@ export progress) must sit inside `ListenableBuilder(listenable: controller.progr
 or it freezes until the next state change.
 
 **`AppShell` builds sections lazily.** There is no side rail: the body is the home
-page or a sub-page opened from a home tile or the title-bar gear (`ShellNavigator`;
+page or a sub-page opened from a home tile or the title-bar gear or "?" — help is a
+body section hosting the FAQ, not a dialog (`ShellNavigator`;
 back button, breadcrumb and Esc return; a plugin or custom-app detail page is a
 `PluginDetailRoute`/`CustomAppDetailRoute`, so its single back and Esc lead to the
 list). `IndexedStack` builds every child, so the

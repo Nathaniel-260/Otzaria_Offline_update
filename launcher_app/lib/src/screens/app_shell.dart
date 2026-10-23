@@ -35,7 +35,7 @@ import 'app_report/crash_prompt_dialog.dart';
 import 'custom_apps/custom_apps_manage_page.dart';
 import 'custom_apps/custom_apps_screen.dart';
 import 'error_reports_flow.dart';
-import 'faq/faq_dialog.dart';
+import 'help/help_page.dart';
 import 'home/home_page.dart';
 import 'home/home_progress.dart';
 import 'home/home_view_model.dart';
@@ -165,6 +165,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   void dispose() {
     _session.tasks.removeListener(_onTasks);
     _dialogs.dispose();
+    _faqEditRequest.dispose();
     _navigator
       ..removeListener(_onSessionChange)
       ..removeListener(_onNavigation)
@@ -335,7 +336,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         onUploadingChanged: onUploadingChanged,
       );
 
-  Future<void> _goTo(ShellSection section) => _navigator.select(section);
+  Future<bool> _goTo(ShellSection section) => _navigator.select(section);
 
   /// שער הניווט: ההגדרות (וניהול התוכנות שתחתן) נעולות במצב הסייפר. השער
   /// בנווט ולא במסך, כי מסך שנבנה נשאר בעץ ושער בתוכו היה נשאר פתוח.
@@ -356,13 +357,15 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     return true;
   }
 
-  void _openHelp() => unawaited(
-        showFaqDialog(
-          context,
-          faq: _session.faq,
-          saferMode: _session.saferMode,
-        ),
-      );
+  void _openHelp() => unawaited(_goTo(ShellSection.help));
+
+  /// "עריכת השאלות הנפוצות" בהגדרות — דף העזרה נכנס לעריכה כשהוא מוצג.
+  final ValueNotifier<bool> _faqEditRequest = ValueNotifier(false);
+
+  Future<void> _editFaq() async {
+    _faqEditRequest.value = true;
+    if (!await _goTo(ShellSection.help)) _faqEditRequest.value = false;
+  }
 
   void _toggleLanguage() => unawaited(toggleAppLanguage(widget.settings));
 
@@ -479,7 +482,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       ShellSection.customApps => g.tileCustomApps,
       ShellSection.reports => context.strings.pages.repCrumb,
       ShellSection.settings => context.strings.settings.title,
-      ShellSection.help => context.strings.shell.helpTooltip,
+      ShellSection.help => context.strings.faq.title,
       ShellSection.launcher => context.strings.pages.selfCrumb,
     };
   }
@@ -651,9 +654,17 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           driveFull: widget.driveFull,
           appReports: widget.appReports,
           onOpenReports: () => unawaited(_goTo(ShellSection.reports)),
+          launcherUpdate: s.launcherUpdate,
+          onOpenLauncherUpdate: () => unawaited(_goTo(ShellSection.launcher)),
+          onEditFaq: () => unawaited(_editFaq()),
+          onOpenLibrary: () => unawaited(_goTo(ShellSection.library)),
         ),
-      // העזרה עדיין דו-שיח (`showFaqDialog`), ואין אליה ניווט.
-      ShellSection.home || ShellSection.help => const SizedBox.shrink(),
+      ShellSection.help => HelpPage(
+          faq: s.faq,
+          saferMode: s.saferMode,
+          editRequests: _faqEditRequest,
+        ),
+      ShellSection.home => const SizedBox.shrink(),
     };
   }
 
@@ -681,8 +692,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           AppTitleBar(
             onHelp: _openHelp,
             onSettings: () => unawaited(_goTo(ShellSection.settings)),
-            activeTool:
-                section == ShellSection.settings ? TitleBarTool.settings : null,
+            activeTool: switch (section) {
+              ShellSection.settings => TitleBarTool.settings,
+              ShellSection.help => TitleBarTool.help,
+              _ => null,
+            },
             // משימה רצה אינה נעזבת — גלגל השיניים והעזרה מושבתים גם למראה.
             toolsEnabled: !_session.exitPending &&
                 !(_navigator.showsTask && _session.tasks.isRunning),

@@ -298,7 +298,7 @@ void main() {
     await tester.tap(find.text(stringsOf().appScreen.channelPrerelease));
     await tester.pumpAndSettle();
 
-    expect(find.text('הזן סיסמה'), findsOneWidget);
+    expect(find.text(stringsOf().saferMode.verifyTitle), findsOneWidget);
     expect(settings.settings.preferAppPrerelease, isFalse);
   });
 
@@ -352,7 +352,7 @@ void main() {
     expect(button.onPressed, isNotNull);
   });
 
-  testWidgets('בחירת רכיבי ההורדה היא שורת סימון אחת, והיא נשמרת', (
+  testWidgets('בחירת רכיבי ההורדה היא שורת שבבים אחת, והיא נשמרת', (
     tester,
   ) async {
     final t = stringsOf().settings;
@@ -404,20 +404,17 @@ void main() {
       ),
     );
 
-    expect(find.text(t.syncLibraryLockedSubtitle), findsOneWidget);
-    final bar = tester.widget<SegmentedButton<Object?>>(
-      find.ancestor(
-        of: find.text(t.syncTargetAll),
-        matching: find.byWidgetPredicate((w) => w is SegmentedButton),
-      ),
-    );
-    final library = bar.segments.singleWhere((s) => !s.enabled);
-    expect(find.text(t.syncTargetLibrary), findsOneWidget);
-    // נעול ומסומן, ולכן גם "הכל" מסומן — כל ארבעת הסגמנטים.
-    expect(bar.selected, contains(library.value));
-    expect(bar.selected, hasLength(4));
+    expect(find.textContaining(t.syncLibraryLockedSubtitle), findsOneWidget);
+    final chips = tester
+        .widgetList<StoreFilterChip>(find.byType(StoreFilterChip))
+        .toList();
+    final library = chips.singleWhere((c) => c.locked);
+    expect(library.label, t.syncTargetLibrary);
+    // נעול ומסומן, ולכן גם "הכל" מסומן — כל ארבעת השבבים.
+    expect(library.selected, isTrue);
+    expect(chips.where((c) => c.selected), hasLength(4));
 
-    // לחיצה על הסגמנט הנעול אינה משנה דבר.
+    // לחיצה על השבב הנעול אינה משנה דבר.
     await tester.tap(find.text(t.syncTargetLibrary), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(settings.settings.syncLibrary, isFalse);
@@ -973,7 +970,10 @@ void main() {
     expect(find.text('תוסף אחר'), findsOneWidget);
   });
 
-  testWidgets('מסך ההגדרות מציג את כל קטגוריות ההגדרה', (tester) async {
+  testWidgets('מסך ההגדרות מציג את קבוצות ההגדרה, ומתקדם מקופל', (
+    tester,
+  ) async {
+    final t = stringsOf().settings;
     await pumpScreen(
       tester,
       SettingsScreen(
@@ -983,15 +983,32 @@ void main() {
       ),
     );
 
-    expect(find.text('אוטומציה'), findsOneWidget);
-    expect(find.text('הורדה'), findsOneWidget);
-    expect(find.text('שפה'), findsOneWidget);
-    expect(find.text('תמיכה'), findsOneWidget);
-    // השפה היא הכרטיס הראשון, לפני האוטומציה.
-    expect(
-      tester.getTopLeft(find.text('שפה')).dy,
-      lessThan(tester.getTopLeft(find.text('אוטומציה')).dy),
-    );
+    expect(find.text(t.groupGeneral), findsOneWidget);
+    expect(find.text(stringsOf().pages.advancedTitle), findsOneWidget);
+    expect(find.text(t.advancedSummary), findsOneWidget);
+    expect(find.text(t.groupAbout), findsOneWidget);
+    // בלי קונטרולרים — בלי הקבוצות שתלויות בהם.
+    expect(find.text(t.groupPrivacy), findsNothing);
+    // הסדר: כללי, מתקדם, אודות.
+    double top(String text) => tester.getTopLeft(find.text(text)).dy;
+    expect(top(t.groupGeneral), lessThan(top(t.languageTitle)));
+    expect(top(t.languageTitle), lessThan(top(t.autoCheckTitle)));
+    expect(top(t.syncTargetsTitle),
+        lessThan(top(stringsOf().pages.advancedTitle)));
+    expect(top(stringsOf().pages.advancedTitle), lessThan(top(t.groupAbout)));
+    expect(find.text(t.aboutTitle(launcherVersion)), findsOneWidget);
+    // מתקדם מקופל: הנעילה, העדכון למחשב מסוים, היומן והאיפוס אינם שם.
+    expect(find.text(stringsOf().saferMode.lockTitle), findsNothing);
+    expect(find.text(t.personalModeTitle), findsNothing);
+    expect(find.text(t.resetTitle), findsNothing);
+
+    await openAdvanced(tester);
+    await tester.pumpAndSettle();
+    expect(find.text(stringsOf().saferMode.lockTitle), findsOneWidget);
+    expect(find.text(t.personalModeTitle), findsOneWidget);
+    expect(find.text(t.logTitle), findsOneWidget);
+    expect(find.text(t.resetTitle), findsOneWidget);
+
     // ההגדרה "timeout להורדה" הוסרה — הזמן הקצוב נקבע בלקוחות עצמם.
     expect(find.text('רשת'), findsNothing);
     expect(find.text('timeout להורדה'), findsNothing);
@@ -1001,9 +1018,12 @@ void main() {
     // גיבוי המסד בוטל לגמרי — אין כרטיס אחסון ואין מה לכבות/להדליק.
     expect(find.text('אחסון'), findsNothing);
     expect(find.text('גיבוי בטיחות של המסד'), findsNothing);
-    // ערוץ הגרסאות קבוע ואינו הגדרה, וההתקנה האוטומטית של תוספים לא קיימת.
+    // הערוץ רק בדף התוכנה, ואין מראה (ערכת נושא, צבע) ואין "הצג שאלות".
+    expect(find.text(stringsOf().appScreen.channelStable), findsNothing);
+    expect(find.text(stringsOf().appScreen.channelPrerelease), findsNothing);
     expect(find.text('ערוצי גרסאות'), findsNothing);
     expect(find.text('התקנת תוספים אוטומטית'), findsNothing);
+    expect(find.byType(SegmentedButton<Object?>), findsNothing);
   });
 
   testWidgets('"יומן שינויים" בשורת הגרסה פותח את היומן הארוז', (tester) async {
@@ -1028,6 +1048,64 @@ void main() {
     expect(find.text('לא נמצא קובץ יומן שינויים.'), findsNothing);
   });
 
+  testWidgets('אודות פותח את דף הכלי, ומתקדם פותח את עריכת השאלות', (
+    tester,
+  ) async {
+    var launcherPage = 0;
+    var faqEdit = 0;
+    await pumpScreen(
+      tester,
+      SettingsScreen(
+        controller: settings,
+        onOpenLog: () {},
+        launcherVersion: launcherVersion,
+        onOpenLauncherUpdate: () => launcherPage++,
+        onEditFaq: () => faqEdit++,
+      ),
+    );
+
+    final t = stringsOf().settings;
+    expect(find.text(t.aboutTitle(launcherVersion)), findsOneWidget);
+    // בלי מצב עדכון ידוע — הפירוט הכללי, ולא "יש גרסה חדשה".
+    expect(find.text(t.aboutSubtitle), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('settings.about')));
+    await tester.tap(find.byKey(const ValueKey('settings.about')));
+    expect(launcherPage, 1);
+
+    await openAdvanced(tester);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('settings.faqEdit')));
+    await tester.tap(find.byKey(const ValueKey('settings.faqEdit')));
+    expect(faqEdit, 1);
+  });
+
+  testWidgets('עדכון למחשב מסוים פעיל — קישור לרישום המחשב בדף הספרייה', (
+    tester,
+  ) async {
+    var library = 0;
+    await tester.runAsync(
+      () => settings.update(const AppSettings(personalUpdateMode: true)),
+    );
+    await pumpScreen(
+      tester,
+      SettingsScreen(
+        controller: settings,
+        onOpenLog: () {},
+        launcherVersion: launcherVersion,
+        onOpenLibrary: () => library++,
+      ),
+    );
+    await openAdvanced(tester);
+    await tester.pumpAndSettle();
+
+    final link = find.text(stringsOf().settings.personalModeRegisterLink);
+    await tester.ensureVisible(link);
+    await tester.tap(link);
+    expect(library, 1);
+    // הלחיצה על הקישור אינה מכבה את המצב.
+    expect(settings.settings.personalUpdateMode, isTrue);
+  });
+
   testWidgets('מסך ההגדרות באנגלית — הכול מתורגם והכיוון מתהפך', (
     tester,
   ) async {
@@ -1045,18 +1123,18 @@ void main() {
     // שינוי לגיטימי, וכשהוא הפיל את הבדיקה הזאת הוא הפיל איתה את כל ה-CI.
     // מה שנבדק כאן הוא שהמסך אכן מתורגם ומתהפך, לא איך בדיוק הוא מנוסח.
     const en = EnglishStrings();
-    expect(find.text(en.settings.automationCardTitle), findsOneWidget);
-    expect(find.text(en.settings.downloadCardTitle), findsOneWidget);
-    expect(find.text(en.settings.appearanceCardTitle), findsOneWidget);
-    expect(find.text(en.settings.supportCardTitle), findsOneWidget);
+    expect(find.text(en.settings.groupGeneral), findsOneWidget);
+    expect(find.text(en.settings.groupAbout), findsOneWidget);
     expect(find.text(en.settings.languageTitle), findsOneWidget);
+    expect(find.text(en.settings.autoCheckTitle), findsOneWidget);
+    expect(find.text(en.settings.syncTargetsTitle), findsOneWidget);
     expect(
-      find.text(const HebrewStrings().settings.automationCardTitle),
+      find.text(const HebrewStrings().settings.groupGeneral),
       findsNothing,
     );
 
     final direction = Directionality.of(
-      tester.element(find.text(en.settings.automationCardTitle)),
+      tester.element(find.text(en.settings.groupGeneral)),
     );
     expect(direction, TextDirection.ltr);
   });
@@ -1071,13 +1149,16 @@ void main() {
       ),
     );
 
-    // ברירת המחדל היא "אוטומטי" — לפי שפת המחשב.
+    final t = stringsOf().settings;
+    // ברירת המחדל היא "כמו במחשב" — לפי שפת המחשב.
     expect(settings.settings.languagePreference, AppLanguagePreference.system);
-    // הבורר הוא תפריט נפתח (כמו באוצריא), ולכן פותחים אותו לפני הבחירה.
-    await tester.tap(find.text('אוטומטי'));
+    // הבורר פותח דו-שיח של כרטיסי אפשרות; בחירה סוגרת אותו.
+    await tester.tap(find.text(t.languageSystem));
     await tester.pumpAndSettle();
+    expect(find.byType(OptionCard), findsNWidgets(3));
     await tester.tap(find.text('English').last);
     await tester.pumpAndSettle();
+    expect(find.byType(OptionCard), findsNothing);
 
     expect(settings.settings.languagePreference, AppLanguagePreference.english);
     expect(settings.settings.language, AppLanguage.english);
@@ -1097,7 +1178,7 @@ void main() {
     );
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('אוטומטי').last);
+    await tester.tap(find.text(t.languageSystem).last);
     await tester.pumpAndSettle();
 
     expect(settings.settings.languagePreference, AppLanguagePreference.system);
@@ -1127,7 +1208,12 @@ void main() {
 
     await tester.tap(find.text(stringsOf().settings.autoInstallTitle));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('הפעל התקנה אוטומטית'));
+    // האזהרה עצמה נאמרת בדו-שיח.
+    expect(
+      find.text(stringsOf().settings.autoInstallDialogWarning),
+      findsOneWidget,
+    );
+    await tester.tap(find.text(stringsOf().settings.autoInstallDialogConfirm));
     await tester.pumpAndSettle();
 
     expect(settings.settings.autoInstall, isTrue);
@@ -1466,6 +1552,8 @@ void main() {
       ),
     );
 
+    await openAdvanced(tester);
+    await tester.pumpAndSettle();
     await tester.tap(find.text(t.personalModeTitle));
     await tester.pumpAndSettle();
 

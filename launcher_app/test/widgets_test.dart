@@ -592,8 +592,8 @@ void main() {
       await tester.pumpWidget(
         wrap(
           SettingsCard(
-            title: he.settings.automationCardTitle,
-            subtitle: he.settings.automationCardHint,
+            title: he.settings.groupGeneral,
+            subtitle: he.settings.advancedSummary,
             children: [
               SettingsActionTile.text(
                 icon: FluentIcons.timer_24_regular,
@@ -605,8 +605,8 @@ void main() {
         ),
       );
 
-      expect(find.text(he.settings.automationCardTitle), findsOneWidget);
-      expect(find.text(he.settings.automationCardHint), findsOneWidget);
+      expect(find.text(he.settings.groupGeneral), findsOneWidget);
+      expect(find.text(he.settings.advancedSummary), findsOneWidget);
       expect(find.text(he.settings.autoCheckTitle), findsOneWidget);
     });
 
@@ -1058,13 +1058,13 @@ void main() {
         wrap(
           ScreenBody(
             title: he.settings.title,
-            children: [Text(he.settings.appearanceCardTitle)],
+            children: [Text(he.settings.groupGeneral)],
           ),
         ),
       );
 
       expect(find.text(he.settings.title), findsOneWidget);
-      expect(find.text(he.settings.appearanceCardTitle), findsOneWidget);
+      expect(find.text(he.settings.groupGeneral), findsOneWidget);
       // רוחב התוכן הוא 720; הריפוד של הדף יושב בתוך הרשימה.
       expect(
         tester.getSize(find.byType(ListView)).width,
@@ -1342,12 +1342,12 @@ void main() {
           context: context,
           title: he.settings.resetDialogTitle,
           content: he.settings.resetDialogContent,
-          subtitle: he.settings.resetDialogWarning,
+          subtitle: he.settings.personalModeDialogWarning,
           confirmText: he.settings.resetDialogConfirm,
         ),
       );
 
-      expect(find.text(he.settings.resetDialogWarning), findsOneWidget);
+      expect(find.text(he.settings.personalModeDialogWarning), findsOneWidget);
       // האישור ההרסני הוא ווריאנט האזהרה, והביטול הוא ה-FilledButton.
       expect(
         find.widgetWithText(FilledButton, he.common.cancel),
@@ -1428,8 +1428,8 @@ void main() {
       await expectNoOverflow(
         tester,
         () => SettingsCard(
-          title: he.settings.automationCardTitle,
-          subtitle: he.settings.automationCardHint,
+          title: he.settings.groupGeneral,
+          subtitle: he.settings.advancedSummary,
           children: [
             SettingsActionTile.switchTile(
               icon: FluentIcons.arrow_download_24_regular,
@@ -1484,7 +1484,7 @@ void main() {
               SettingsActionTile.multiSegmentedTile<int>(
                 icon: FluentIcons.cloud_arrow_down_24_regular,
                 title: he.settings.syncTargetsTitle,
-                hint: he.settings.syncTargetsHint,
+                hint: he.settings.syncTargetsSubtitle,
                 selected: const {1, 2},
                 onToggled: (_) {},
                 options: [
@@ -1519,7 +1519,7 @@ void main() {
             SettingsActionTile.dropdownTile<int>(
               icon: FluentIcons.local_language_24_regular,
               title: he.settings.languageTitle,
-              subtitle: he.settings.languageSubtitle,
+              subtitle: he.settings.autoCheckSubtitle,
               currentValue: 0,
               onSelected: (_) {},
               entries: [
@@ -1614,14 +1614,14 @@ void main() {
                 title: s.setupError.title,
                 children: [
                   SettingsCard(
-                    title: s.settings.appearanceCardTitle,
-                    subtitle: s.settings.languageSubtitle,
-                    hint: s.settings.syncTargetsHint,
+                    title: s.settings.groupGeneral,
+                    subtitle: s.settings.autoCheckSubtitle,
+                    hint: s.settings.syncTargetsSubtitle,
                     children: [
                       SettingsActionTile.text(
                         icon: FluentIcons.info_24_regular,
                         title: s.setupError.whatToDo,
-                        subtitle: s.settings.languageSubtitle,
+                        subtitle: s.settings.autoCheckSubtitle,
                         actions: [
                           ActionButton.neutral(
                             text: s.common.copyPathButton,

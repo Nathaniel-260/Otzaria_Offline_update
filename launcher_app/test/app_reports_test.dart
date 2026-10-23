@@ -448,12 +448,19 @@ void main() {
       final service = _MemoryService()..pending.add(_report('p1'));
       final settings = _MemorySettings();
       final reports = _controller(service, settings: settings);
-      await tester.pumpWidget(
-          wrap(AppReportsSettingsCard(reports: reports, onOpenReports: () {})));
+      var opened = 0;
+      await tester.pumpWidget(wrap(AppReportsSettingsCard(
+        reports: reports,
+        onOpenReports: () => opened++,
+      )));
       await reports.refresh();
       await tester.pumpAndSettle();
 
       expect(find.text(t.manageTileSubtitle(1, 0)), findsOneWidget);
+      // שורה לחיצה לדף הדיווחים, ושורה לדיווח על בעיה בכלי.
+      await tester.tap(find.byKey(const ValueKey('app-reports-manage')));
+      expect(opened, 1);
+      expect(find.byKey(const ValueKey('app-reports-problem')), findsOneWidget);
       // מרכז הסגמנט ולא מרכז התווית: בגופן הבדיקה התווית גולשת מתחת לכפתור.
       final segment = tester.getRect(
         find.byType(SegmentedButton<AppCrashReportMode>),
@@ -1252,7 +1259,7 @@ void main() {
     expect(await _openRejected('https://evil.com/x'), isFalse);
     expect(await _openRejected('https://user@github.com/x'), isFalse);
     expect(await _openRejected('not a url'), isFalse);
-    expect(AppL10n.strings.appReports.cardTitle, isNotEmpty);
+    expect(AppL10n.strings.appReports.crashModeTitle, isNotEmpty);
   });
 }
 

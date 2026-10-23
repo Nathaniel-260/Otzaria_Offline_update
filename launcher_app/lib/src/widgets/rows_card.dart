@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/theme_exports.dart';
 import 'app_card.dart';
+import 'custom_switch.dart';
 import 'focus_ring.dart';
 import 'rtl_icon.dart';
 
@@ -30,7 +31,11 @@ class AppRow extends StatelessWidget {
     this.below,
     this.dense = false,
     this.titleDirection,
+    this.alignTop = false,
   });
+
+  /// אריח הסמל והקצה בראש השורה ולא במרכזה — לשורה שיש מתחתיה פקדים.
+  final bool alignTop;
 
   /// שורת סיכום בחלון צר: 44 במקום 56.
   final bool dense;
@@ -86,6 +91,8 @@ class AppRow extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 16, vertical: dense ? 4 : 12),
         child: Row(
+          crossAxisAlignment:
+              alignTop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
           children: [
             if (leading != null) ...[leading!, const SizedBox(width: 14)],
             Expanded(child: text),
@@ -111,6 +118,58 @@ class AppRow extends StatelessWidget {
         onTap: onTap,
         overlayColor: AppSurfaces.stateLayer(cs.primary),
         child: row,
+      ),
+    );
+  }
+}
+
+/// שורה עם מתג (`.row` + `.sw`): כל השורה לחיצה, וגם Enter ו-Space. בלי
+/// [onChanged] היא מושבתת, והפירוט אומר למה.
+class AppSwitchRow extends StatelessWidget {
+  const AppSwitchRow({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+    this.subtitle,
+    this.leading,
+    this.below,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget? leading;
+  final Widget? below;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final onChanged = this.onChanged;
+    final toggle = onChanged == null ? null : () => onChanged(!value);
+    return Semantics(
+      toggled: value,
+      enabled: onChanged != null,
+      child: FocusRing(
+        borderRadius: BorderRadius.zero,
+        offset: -3,
+        child: InkWell(
+          onTap: toggle,
+          overlayColor: AppSurfaces.stateLayer(cs.primary),
+          child: AppRow(
+            title: title,
+            subtitle: subtitle,
+            leading: leading,
+            below: below,
+            trailing: ExcludeFocus(
+              child: CustomSwitch(
+                value: value,
+                onChanged: toggle == null ? null : (_) => toggle(),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

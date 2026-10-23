@@ -1425,252 +1425,218 @@ class _Settings extends SettingsScreenStrings {
   String get title => 'Settings';
 
   @override
-  String get automationCardTitle => 'Automation';
+  String get groupGeneral => 'General';
   @override
-  String get automationCardHint =>
-      'Default: check only, never install on its own.';
+  String get groupPrivacy => 'Privacy and reports';
   @override
-  String get autoCheckTitle => 'Check for updates on startup';
+  String get groupAbout => 'About';
   @override
-  String get autoCheckSubtitle =>
-      'Compares what is installed with the local folder, and with the latest '
-      'release whenever there is a connection';
-  @override
-  String get autoCheckHint =>
-      'The online part is metadata only, with no download. Failure (no '
-      'internet) is ignored silently, and the manual button on the home '
-      'screen always works.';
-  @override
-  String get autoInstallTitle =>
-      'Starting this program updates Otzaria and the library automatically';
-  @override
-  String get autoInstallSubtitle =>
-      'Updates what is already installed on startup; never installs the first '
-      'time, and is skipped while Otzaria is open';
+  String get advancedSummary =>
+      'Password lock, update for a specific computer, common questions, log and reset';
 
   @override
-  String get autoInstallDialogTitle => 'Turn on automatic installs?';
+  String get languageTitle => 'Language';
   @override
-  String get autoInstallDialogContent =>
-      'From now on, the Otzaria program and the library will be updated '
-      'without asking whenever a newer version is found in the folder next to '
-      'this program — but only once they are already installed. The first '
-      'install stays your call, and so does the download itself.';
-  @override
-  String get autoInstallDialogWarning =>
-      'Installing replaces files on your computer. If you are not sure, '
-      'leave this off and approve each update yourself.';
-  @override
-  String get autoInstallDialogConfirm => 'Turn on automatic installs';
-
-  @override
-  String get downloadCardTitle => 'Download';
-  @override
-  String get downloadCardHint =>
-      'Which parts the "Download now" button on the home screen brings into '
-      'the local folder. The download itself always starts with a click.';
-  @override
-  String get syncTargetsTitle => 'Choose what to download from the internet';
-  @override
-  String get syncTargetsHint =>
-      'Program — the installer for the latest version. Library — the heavy '
-      'part, the full database is about 1.5 GB. Plugins — the catalogue and '
-      'the installation files for every plugin.';
-  @override
-  String get syncTargetAll => 'All';
-  @override
-  String get syncTargetApp => 'Program';
-  @override
-  String get syncTargetLibrary => 'Library';
-  @override
-  String get syncTargetPlugins => 'Plugins';
-  @override
-  String get syncLibraryLockedSubtitle =>
-      'Personal update is on, so the library is always downloaded';
-  @override
-  String get personalModeTitle => 'Personal update — this computer only';
-  @override
-  String get personalModeSubtitle =>
-      'Only the update files from the version you already have onwards, '
-      'without the full database';
-  @override
-  String get personalModeHint =>
-      'The full database is about 1.5 GB. You detect your own database '
-      'version with a click, on the library screen.';
-  @override
-  String get personalModeDialogTitle => 'Turn on personal update?';
-  @override
-  String get personalModeDialogContent =>
-      'The download will bring only the update files from the version you '
-      'already have onwards — tens of megabytes instead of several gigabytes.\n\n'
-      'This program never reads your database version on its own: on the '
-      'library screen, press "Detect my database version" — on the computer '
-      'where your Otzaria is installed. The result is stored on the drive and '
-      'travels with it to the online computer, so an Otzaria installed there '
-      'cannot take its place.';
-  @override
-  String get personalModeDialogWarning =>
-      'The drive will no longer serve another computer: the next download '
-      'removes the full database from it, and the recovery route (a full '
-      'install when an update file does not fit) will not be available.';
-  @override
-  String get personalModeDialogConfirm => 'Turn on personal update';
-
-  @override
-  String get appearanceCardTitle => 'Language';
-  @override
-  String get languageTitle => 'Interface Language';
-  @override
-  String get languageSubtitle =>
-      'Changes every screen and message right away. "Automatic" follows the '
-      'computer.';
-  @override
-  String get languageSystem => 'Automatic';
+  String get languageSystem => 'Same as the computer';
   @override
   String get languageHebrew => 'עברית';
   @override
   String get languageEnglish => 'English';
 
   @override
-  String get supportCardTitle => 'Support';
+  String get autoCheckTitle => 'Check for updates every time it opens';
   @override
-  String get logTitle => 'Activity Log';
+  String get autoCheckSubtitle =>
+      'Checks what is on the drive, and on a connected computer also what is new on the site.';
   @override
-  String get logSubtitle =>
-      'Every check, download and install is recorded locally only';
+  String get autoInstallTitle => 'Update on its own without asking';
   @override
-  String get openLogFolderButton => 'Open the log folder';
+  String get autoInstallSubtitle =>
+      'When the drive has an update for this computer, it is installed right on opening. '
+      'Never applies to a first installation.';
+  @override
+  String get autoInstallDialogTitle => 'Update on its own without asking?';
+  @override
+  String get autoInstallDialogContent =>
+      'Whenever the tool opens on a computer the drive has an update for, the update '
+      'is installed right away. If Otzaria is open, the update waits for next time.';
+  @override
+  String get autoInstallDialogWarning =>
+      'Installing replaces files on the computer without asking. If you are not sure, leave this off.';
+  @override
+  String get autoInstallDialogConfirm => 'Turn on';
+
+  @override
+  String get syncTargetsTitle => 'What to download to the drive';
+  @override
+  String get syncTargetsSubtitle =>
+      'Anything not selected is not downloaded, even if it has an update.';
+  @override
+  String get syncTargetAll => 'All';
+  @override
+  String get syncTargetApp => 'Otzaria';
+  @override
+  String get syncTargetLibrary => 'Library';
+  @override
+  String get syncTargetPlugins => 'Plugins';
+  @override
+  String get syncLibraryLockedSubtitle =>
+      'The library follows the registered computer.';
+
+  @override
+  String get personalModeTitle => 'Prepare an update for a specific computer';
+  @override
+  String get personalModeSubtitle =>
+      'The tool remembers what one computer has installed and downloads only what it is missing.';
+  @override
+  String get personalModeRegisterLink => 'Register the computer';
+  @override
+  String get personalModeDialogTitle =>
+      'Turn on updates for a specific computer?';
+  @override
+  String get personalModeDialogContent =>
+      'The download brings only the update files from the version you have installed '
+      'onwards — tens of megabytes instead of several gigabytes.\n\n'
+      'The tool does not read the library version by itself: on the Library page, click '
+      '"Detect my database version" — on the computer where your Otzaria is installed. '
+      'The click is saved on the drive and travels with it to the connected computer, '
+      'so the Otzaria installed there is not taken instead.';
+  @override
+  String get personalModeDialogWarning =>
+      'The drive will no longer install on another computer: the full library is '
+      'removed from it on the next download, and the full installation for when an '
+      'update file does not fit will not be available either.';
+  @override
+  String get personalModeDialogConfirm => 'Turn on';
+
+  @override
+  String get faqEditTitle => 'Edit the common questions';
+  @override
+  String get faqEditSubtitle =>
+      'Hide questions, add your own, and a contact for help on site';
+
+  @override
+  String get logTitle => 'Activity log';
+  @override
+  String get logSubtitle => 'To send to support when something does not work.';
+  @override
+  String get openLogFolderButton => 'Open the folder';
 
   @override
   String get resetTitle => 'Reset settings';
   @override
   String get resetSubtitle =>
-      'Restores every setting to its default without removing installations';
+      'Returns every setting to its default. The password stays.';
   @override
   String get resetButton => 'Reset';
   @override
-  String get resetDialogTitle => 'Reset settings';
+  String get resetDialogTitle => 'Reset all settings?';
   @override
-  String get resetDialogContent => 'Every setting returns to its default.';
-  @override
-  String get resetDialogWarning =>
-      'Your installations, the database, the plugins and anything already '
-      'downloaded are left untouched.';
+  String get resetDialogContent =>
+      'Every setting returns to its default. Nothing on the drive is deleted, and the password stays.';
   @override
   String get resetDialogConfirm => 'Reset settings';
   @override
-  String get resetDoneSnack => 'Settings have been reset';
+  String get resetDoneSnack => 'Settings were reset';
+
+  @override
+  String aboutTitle(String version) => 'Otzaria Updates $version';
+  @override
+  String get aboutSubtitle => 'What is new, and whether a new version exists';
+  @override
+  String aboutNewVersion(String version) =>
+      'New version: $version · what is new and update';
+  @override
+  String get changelogSubtitle =>
+      'What changed in the tool, version by version';
 }
 
 class _SaferMode extends SaferModeStrings {
   const _SaferMode();
 
   @override
-  String get cardTitle => 'Safer mode';
+  String get lockTitle => 'Password lock';
   @override
-  String get cardHint =>
-      'Locks the settings behind a password. Downloading, checking and '
-      'installing stay open to everyone — only changing settings and editing '
-      'the guide ask for the password.';
+  String get noPasswordSubtitle =>
+      'Prevents changing settings, choosing a pre-release version and editing the common questions without a password.';
   @override
-  String get toggleTitle => 'Safer mode';
+  String get setPasswordButton => 'Set a password';
   @override
-  String get toggleOnSubtitle => 'Settings and guide editing are locked';
+  String get lockOnSubtitle => 'On: opening Settings asks for the password.';
   @override
-  String get toggleOffSubtitle =>
-      'Settings are open to anyone who opens the app';
+  String get lockOffSubtitle => 'There is a password, but the lock is off.';
   @override
-  String get needsPasswordSubtitle => 'Choose a password first';
+  String get passwordRowTitle => 'The password';
   @override
-  String get setPasswordButton => 'Choose a password';
+  String get passwordRowSubtitle => 'You can change or delete it.';
   @override
-  String get passwordTileTitle => 'Password';
+  String get passwordRowLockedSubtitle =>
+      'To delete it, turn the lock off first.';
   @override
-  String get passwordTileSubtitle =>
-      'A password is set — you can change or delete it';
+  String get changeButton => 'Change';
   @override
-  String get passwordOptionsButton => 'Options';
+  String get clearButton => 'Delete';
   @override
-  String get enabledSnack => 'Safer mode is on';
+  String get enabledSnack => 'The lock is on';
   @override
-  String get disabledSnack => 'Safer mode is off';
+  String get disabledSnack => 'The lock is off';
 
   @override
-  String get verifyTitle => 'Enter password';
+  String get verifyTitle => 'Password required';
   @override
-  String get verifySettingsHint =>
-      'Safer mode is on. Enter the password to open the settings.';
+  String get verifySettingsHint => 'Settings are locked with a password.';
   @override
   String get verifyFaqHint =>
-      'Safer mode is on. Enter the password to edit the guide.';
+      'Editing the common questions is locked with a password.';
   @override
-  String get verifyEnableHint => 'Enter the password to turn safer mode on.';
+  String get verifyEnableHint => 'To turn the lock on, type the password.';
   @override
-  String get verifyDisableHint => 'Enter the password to turn safer mode off.';
-  @override
-  String get verifyChangeHint => 'Enter the current password to change it.';
+  String get verifyDisableHint => 'To turn the lock off, type the password.';
   @override
   String get passwordLabel => 'Password';
   @override
-  String get passwordFieldHint => 'Enter the password';
+  String get wrongPassword => 'The password is wrong. Try again.';
   @override
-  String get wrongPassword => 'Wrong password';
+  String get passwordRequired => 'Type a password.';
   @override
   String get showPasswordTooltip => 'Show the password';
   @override
   String get hidePasswordTooltip => 'Hide the password';
 
   @override
-  String get setTitle => 'Choose a password';
+  String get setTitle => 'Set a password';
   @override
-  String get setIntro =>
-      'The password is stored hashed in the settings file on the drive, and '
-      'cannot be recovered. Losing it means deleting the settings file.';
+  String setIntro(int minLength) =>
+      'The password will be needed to open Settings, choose a pre-release version and '
+      'edit the common questions. At least $minLength characters. A forgotten password '
+      'cannot be recovered — only the settings file on the drive can be deleted.';
+  @override
+  String get setConfirm => 'Save and turn the lock on';
+  @override
+  String get changeTitle => 'Change the password';
+  @override
+  String get currentPasswordLabel => 'Current password';
   @override
   String get newPasswordLabel => 'New password';
   @override
-  String minLengthHint(int minLength) => 'At least $minLength characters';
-  @override
-  String get confirmPasswordLabel => 'Confirm password';
-  @override
-  String get confirmPasswordFieldHint => 'Enter the password again';
-  @override
-  String get passwordRequired => 'A password is required';
+  String get confirmPasswordLabel => 'Again, to confirm';
   @override
   String passwordTooShort(int minLength) =>
-      'The password must be at least $minLength characters long';
+      'The password is too short: at least $minLength characters.';
   @override
-  String get passwordsDoNotMatch => 'The passwords do not match';
+  String get passwordsDoNotMatch => 'The two passwords are not the same.';
   @override
-  String get passwordSavedSnack => 'Password saved';
+  String get passwordSetSnack => 'The password is set and the lock is on';
   @override
-  String get saveButton => 'Save';
+  String get passwordChangedSnack => 'The password was changed';
 
   @override
-  String get activateNowTitle => 'Turn safer mode on now?';
-  @override
-  String get activateNowContent =>
-      'From now on the password will be required to open the settings and to '
-      'edit the guide. You can also turn it on later, from the switch on the '
-      'card.';
-  @override
-  String get activateNowConfirm => 'Turn on now';
-
-  @override
-  String get clearButton => 'Delete the password';
-  @override
-  String get clearBlockedButton =>
-      'Turn safer mode off before deleting the password';
-  @override
-  String get clearDialogTitle => 'Delete the password';
+  String get clearDialogTitle => 'Delete the password?';
   @override
   String get clearDialogContent =>
-      'No password will be asked for any more, and safer mode cannot be turned '
-      'on again until a new password is chosen.';
+      'Without a password, anyone who opens the tool can change settings.';
   @override
-  String get clearDialogConfirm => 'Delete the password';
-  @override
-  String get passwordRemovedSnack => 'Password deleted';
+  String get passwordRemovedSnack => 'The password was deleted';
 }
 
 class _Plugins extends PluginsStrings {
@@ -2099,7 +2065,7 @@ class _Faq extends FaqStrings {
   @override
   String get title => 'Common questions';
   @override
-  String get intro => 'Click a question to see the answer.';
+  String get intro => 'Short answers to questions that keep coming up.';
 
   @override
   String get groupBasics => 'How this works';
@@ -2274,22 +2240,22 @@ class _Faq extends FaqStrings {
       'pick "Otzaria" there. That site is in Hebrew only.';
 
   @override
-  String get contactTitle => 'Still have a question?';
+  String get contactTitle => 'Help on site';
 
   @override
-  String get editTooltip => 'Customise this guide';
+  String get editButton => 'Edit';
   @override
-  String get editDoneTooltip => 'Done customising';
+  String get editDoneButton => 'Done';
+  @override
+  String get editTitle => 'Edit the common questions';
   @override
   String get editIntro =>
-      'Here you can hide questions that do not apply to you, add your own, and '
-      'put your details at the bottom of the list. Customisations are saved in '
-      'the folder beside the program and travel with it on the drive.';
+      'Hidden questions are not shown. Changes are saved on the drive.';
 
   @override
-  String get hideTooltip => 'Hide this question';
+  String get hideTooltip => 'Hide';
   @override
-  String get restoreTooltip => 'Bring this question back';
+  String get restoreTooltip => 'Show';
   @override
   String get hiddenLabel => 'hidden';
 
@@ -2325,17 +2291,11 @@ class _Faq extends FaqStrings {
       'them again at any time.';
 
   @override
-  String get contactCardTitle => 'My details at the bottom of the guide';
+  String get contactAutoSaveNote => 'Saved automatically.';
   @override
-  String get contactCardHint =>
-      'If you prepare drives for other people, put here who they should '
-      'contact. An empty field is simply not shown.';
-  @override
-  String get contactNameLabel => 'Name';
+  String get contactNameLabel => 'Contact name';
   @override
   String get contactPhoneLabel => 'Phone';
-  @override
-  String contactPhoneLine(String phone) => 'Phone: $phone';
 }
 
 class _SetupError extends SetupErrorStrings {
@@ -2541,9 +2501,6 @@ class _LauncherUpdate extends LauncherUpdateStrings {
 
   @override
   String get whatsNewHeading => "What's new:";
-
-  @override
-  String get versionTileTitle => 'Program version';
 
   @override
   String get changelogButton => 'Changelog';
@@ -3909,15 +3866,12 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get settingsCardTitle => 'Other Programs';
   @override
-  String get settingsCardHint =>
-      'Your own programs, kept on the drive and installed even on a computer without internet.';
-  @override
   String get manageRowTitle => 'Manage';
   @override
   String manageRowSubtitle(int count) =>
       '${count == 1 ? '$count program' : '$count programs'} on the drive · add, edit, order and categories';
   @override
-  String get emptyHint => 'No programs added';
+  String get emptyHint => 'No programs yet · add, edit, order and categories';
   @override
   String get addButton => 'Add a Program';
   @override
@@ -4333,26 +4287,22 @@ class _AppReports extends AppReportsStrings {
   const _AppReports();
 
   @override
-  String get cardTitle => 'Problem reports';
-  @override
-  String get crashModeTitle => 'Reporting after an unexpected exit';
+  String get crashModeTitle => 'After the tool closes unexpectedly';
   @override
   String get crashModeSubtitle =>
-      'What to do when the app finds it did not close properly';
+      'Send the developers a short report about what happened.';
   @override
-  String get crashModeAsk => 'Ask me';
+  String get crashModeAsk => 'Ask';
   @override
-  String get crashModeAlways => 'Send automatically';
+  String get crashModeAlways => 'Always send';
   @override
-  String get crashModeNever => 'Never';
+  String get crashModeNever => 'Do not send';
   @override
-  String get manageTileTitle => 'Your reports, and reporting a problem';
+  String get manageTileTitle => 'Problem reports';
   @override
   String manageTileSubtitle(int pending, int sent) => pending == 0
       ? 'No reports waiting · $sent sent'
       : '$pending waiting · $sent sent';
-  @override
-  String get manageButton => 'Show reports';
 
   @override
   String get manageDialogIntro =>

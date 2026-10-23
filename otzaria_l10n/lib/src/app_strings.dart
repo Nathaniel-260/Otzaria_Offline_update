@@ -740,14 +740,24 @@ abstract class SettingsScreenStrings {
 
   String get title;
 
-  String get automationCardTitle;
-  String get automationCardHint;
+  // ── קבוצות ──
+  String get groupGeneral;
+  String get groupPrivacy;
+  String get groupAbout;
 
-  /// שאלה אחת — מקומית ורשת יחד. ההסתייגויות יושבות ב[autoCheckHint],
-  /// בסימן השאלה שליד השורה, ולא כשורות טקסט על המסך.
+  /// מה מקופל תחת "מתקדם" — שורה אחת מתחת לכותרת.
+  String get advancedSummary;
+
+  // ── שפה ──
+  /// גם כותרת הדו-שיח שבוחרים בו.
+  String get languageTitle;
+  String get languageSystem;
+  String get languageHebrew;
+  String get languageEnglish;
+
+  // ── בדיקה והתקנה אוטומטיות ──
   String get autoCheckTitle;
   String get autoCheckSubtitle;
-  String get autoCheckHint;
 
   /// שאלה אחת לתוכנה ולספרייה גם יחד.
   String get autoInstallTitle;
@@ -757,40 +767,35 @@ abstract class SettingsScreenStrings {
   String get autoInstallDialogWarning;
   String get autoInstallDialogConfirm;
 
-  String get downloadCardTitle;
-  String get downloadCardHint;
-
-  /// שורת הסימון של רכיבי ההורדה — תווית אחת וארבע אפשרויות, במקום מתג
-  /// לכל רכיב. ההסברים שהיו בתת-הכותרות עברו ל[syncTargetsHint].
+  // ── מה להוריד לכונן ──
+  /// שבבי סימון: "הכול" ושלושת הרכיבים. "הכול" הוא קיצור, לא הגדרה.
   String get syncTargetsTitle;
-  String get syncTargetsHint;
+  String get syncTargetsSubtitle;
   String get syncTargetAll;
   String get syncTargetApp;
   String get syncTargetLibrary;
   String get syncTargetPlugins;
 
-  /// מוצג מתחת לשורת הסימון כשעדכון אישי נועל את "ספרייה" במצב דלוק.
+  /// נוסף לשורה כשעדכון למחשב מסוים נועל את "הספרייה" במצב דלוק.
   String get syncLibraryLockedSubtitle;
 
-  // ── עדכון אישי ──
+  // ── עדכון למחשב מסוים ──
   /// מוריד רק את קובצי העדכון מהגרסה שכבר מותקנת ומעלה, בלי המסד המלא —
   /// ולכן הכונן אינו משמש עוד להפצה למחשבים אחרים.
   String get personalModeTitle;
   String get personalModeSubtitle;
-  String get personalModeHint;
+
+  /// קישור לדף הספרייה, שבו מזהים את גרסת המסד של המחשב.
+  String get personalModeRegisterLink;
   String get personalModeDialogTitle;
   String get personalModeDialogContent;
   String get personalModeDialogWarning;
   String get personalModeDialogConfirm;
 
-  String get appearanceCardTitle;
-  String get languageTitle;
-  String get languageSubtitle;
-  String get languageSystem;
-  String get languageHebrew;
-  String get languageEnglish;
+  // ── מתקדם ──
+  String get faqEditTitle;
+  String get faqEditSubtitle;
 
-  String get supportCardTitle;
   String get logTitle;
   String get logSubtitle;
   String get openLogFolderButton;
@@ -800,35 +805,44 @@ abstract class SettingsScreenStrings {
   String get resetButton;
   String get resetDialogTitle;
   String get resetDialogContent;
-  String get resetDialogWarning;
   String get resetDialogConfirm;
   String get resetDoneSnack;
+
+  // ── אודות ──
+  String aboutTitle(String version);
+
+  /// כשאין גרסה חדשה ידועה — הדף עצמו אומר אם יש.
+  String get aboutSubtitle;
+  String aboutNewVersion(String version);
+  String get changelogSubtitle;
 }
 
 // ── מצב סייפר ─────────────────────────────────────────────────────────────────
 
 /// נעילת ההגדרות בסיסמה. מלל משלו ולא בתוך [SettingsScreenStrings], כי הוא
-/// מופיע גם מחוץ למסך ההגדרות — בכניסה אליו, ובמעבר לעריכת ההדרכה.
+/// מופיע גם מחוץ למסך ההגדרות — בכניסה אליו, ובמעבר לעריכת השאלות הנפוצות.
 abstract class SaferModeStrings {
   const SaferModeStrings();
 
-  // ── הכרטיס שבהגדרות ──
-  String get cardTitle;
-  String get cardHint;
-  String get toggleTitle;
-  String get toggleOnSubtitle;
-  String get toggleOffSubtitle;
+  // ── השורות שבהגדרות › מתקדם ──
+  String get lockTitle;
 
-  /// כשעוד לא נבחרה סיסמה — אין מה להפעיל, ולכן שורת המתג מוחלפת בכפתור.
-  String get needsPasswordSubtitle;
+  /// כשעוד אין סיסמה — אין מה להפעיל, ולכן במקום המתג יש כפתור.
+  String get noPasswordSubtitle;
   String get setPasswordButton;
-  String get passwordTileTitle;
-  String get passwordTileSubtitle;
-  String get passwordOptionsButton;
+  String get lockOnSubtitle;
+  String get lockOffSubtitle;
+  String get passwordRowTitle;
+  String get passwordRowSubtitle;
+
+  /// אי אפשר למחוק סיסמה כשהנעילה פעילה — זו הייתה דלת אחורית מתוך הנעילה.
+  String get passwordRowLockedSubtitle;
+  String get changeButton;
+  String get clearButton;
   String get enabledSnack;
   String get disabledSnack;
 
-  // ── דיאלוג האימות ──
+  // ── בקשת הסיסמה ──
   String get verifyTitle;
 
   /// למה מבקשים את הסיסמה עכשיו — משפט אחד לכל מקום שנעול.
@@ -836,41 +850,31 @@ abstract class SaferModeStrings {
   String get verifyFaqHint;
   String get verifyEnableHint;
   String get verifyDisableHint;
-  String get verifyChangeHint;
   String get passwordLabel;
-  String get passwordFieldHint;
   String get wrongPassword;
+  String get passwordRequired;
   String get showPasswordTooltip;
   String get hidePasswordTooltip;
 
-  // ── דיאלוג בחירת הסיסמה ──
+  // ── קביעה והחלפה ──
   String get setTitle;
-  String get setIntro;
+  String setIntro(int minLength);
+  String get setConfirm;
+  String get changeTitle;
+  String get currentPasswordLabel;
   String get newPasswordLabel;
-  String minLengthHint(int minLength);
   String get confirmPasswordLabel;
-  String get confirmPasswordFieldHint;
-  String get passwordRequired;
   String passwordTooShort(int minLength);
   String get passwordsDoNotMatch;
-  String get passwordSavedSnack;
-  String get saveButton;
+  String get passwordSetSnack;
+  String get passwordChangedSnack;
 
-  /// הצעה להפעיל את המצב מיד אחרי שנבחרה סיסמה ראשונה.
-  String get activateNowTitle;
-  String get activateNowContent;
-  String get activateNowConfirm;
-
-  // ── מחיקת הסיסמה ──
-  String get clearButton;
-
-  /// אי אפשר למחוק סיסמה כשהמצב פעיל — זו הייתה דלת אחורית מתוך הנעילה.
-  String get clearBlockedButton;
+  // ── מחיקה ──
   String get clearDialogTitle;
   String get clearDialogContent;
-  String get clearDialogConfirm;
   String get passwordRemovedSnack;
 }
+
 // ── חנות התוספים ──────────────────────────────────────────────────────────────
 
 abstract class PluginsStrings {
@@ -1163,16 +1167,17 @@ abstract class FaqStrings {
   String get qNoExpenses;
   String get aNoExpenses;
 
-  // ── סיום ────────────────────────────────────────────────────────────────
-  /// כותרת כרטיס הסיום. הכרטיס כולו מוצג **רק** למי שמילא שם או טלפון
-  /// בהתאמה האישית — "אפשר לפנות אלינו" בלי לומר למי אינו עוזר לאיש.
+  // ── איש הקשר ────────────────────────────────────────────────────────────
+  /// כותרת המקטע של איש הקשר. בקריאה הוא מוצג **רק** כשמולאו שם או טלפון —
+  /// "אפשר לפנות אלינו" בלי לומר למי אינו עוזר לאיש.
   String get contactTitle;
 
-  // ── התאמה אישית ─────────────────────────────────────────────────────────
-  /// מצב העריכה שנפתח בגלגל השיניים: הסתרת שאלות, הוספת שאלות משלי, והפרטים
-  /// שיופיעו בתחתית הרשימה. מיועד למי שמכין כונן לאחרים.
-  String get editTooltip;
-  String get editDoneTooltip;
+  // ── עריכה ───────────────────────────────────────────────────────────────
+  /// מצב העריכה של דף העזרה: הסתרת שאלות, הוספת שאלות משלי, ואיש הקשר.
+  /// מיועד למי שמכין כונן לאחרים.
+  String get editButton;
+  String get editDoneButton;
+  String get editTitle;
   String get editIntro;
 
   String get hideTooltip;
@@ -1197,13 +1202,10 @@ abstract class FaqStrings {
   String get deleteConfirmTitle;
   String get deleteConfirmContent;
 
-  String get contactCardTitle;
-  String get contactCardHint;
+  /// מתחת לשדות: אין כפתור שמירה.
+  String get contactAutoSaveNote;
   String get contactNameLabel;
   String get contactPhoneLabel;
-
-  /// שורת הטלפון כפי שהיא מוצגת בתחתית ההדרכה.
-  String contactPhoneLine(String phone);
 }
 
 // ── מסך "התוכנה במקום הלא נכון" ───────────────────────────────────────────────
@@ -1330,7 +1332,6 @@ abstract class LauncherUpdateStrings {
   String get whatsNewHeading;
 
   // ── הגדרות ──────────────────────────────────────────────────────────────
-  String get versionTileTitle;
   String get changelogButton;
   String get changelogDialogTitle;
   String get changelogNotFound;
@@ -1930,7 +1931,6 @@ abstract class CustomAppsStrings {
 
   /// שורת ההגדרות — שורה אחת, שכל תפקידה לפתוח את מסך הניהול.
   String get settingsCardTitle;
-  String get settingsCardHint;
   String get manageRowTitle;
   String manageRowSubtitle(int count);
   String get emptyHint;
@@ -2235,7 +2235,6 @@ abstract class AppReportsStrings {
   const AppReportsStrings();
 
   // ── הכרטיס בהגדרות ──
-  String get cardTitle;
   String get crashModeTitle;
   String get crashModeSubtitle;
   String get crashModeAsk;
@@ -2243,7 +2242,6 @@ abstract class AppReportsStrings {
   String get crashModeNever;
   String get manageTileTitle;
   String manageTileSubtitle(int pending, int sent);
-  String get manageButton;
 
   // ── חלון הניהול ──
   String get manageDialogIntro;
