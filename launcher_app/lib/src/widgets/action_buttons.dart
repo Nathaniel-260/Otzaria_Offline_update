@@ -349,3 +349,43 @@ class SecondaryIconButton extends StatelessWidget {
     );
   }
 }
+
+/// כפתור סמל שקוף (`.ibtn`): 40, או 32 ב-[small]. [danger] — מחיקה.
+class AppIconButton extends StatelessWidget {
+  const AppIconButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.small = false,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool small;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final extent = small ? 32.0 : 40.0;
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: RtlIcon(icon, size: small ? 18 : 20),
+        style: IconButton.styleFrom(
+          foregroundColor: danger ? cs.error : cs.onSurfaceVariant,
+          disabledForegroundColor: AppPalette.of(context).disabledText,
+          fixedSize: Size(extent, extent),
+          minimumSize: Size(extent, extent),
+          padding: EdgeInsets.zero,
+          shape: AppTokens.roundedShape,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ).copyWith(overlayColor: AppSurfaces.stateLayer(cs.primary)),
+      ),
+    );
+  }
+}

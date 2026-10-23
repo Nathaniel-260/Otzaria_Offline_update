@@ -30,3 +30,12 @@ String formatTimestamp(DateTime value) {
   }
   return '${_two(local.day)}.${_two(local.month)}.${local.year}, $time';
 }
+
+/// תאריך בלבד, באותו סדר כמו [formatTimestamp].
+String formatDate(DateTime value) {
+  final local = value.toLocal();
+  if (!AppL10n.language.isRtl) {
+    return '${local.year}-${_two(local.month)}-${_two(local.day)}';
+  }
+  return '${_two(local.day)}.${_two(local.month)}.${local.year}';
+}

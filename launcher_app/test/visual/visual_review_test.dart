@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/home/home_page.dart';
-import 'package:launcher_app/src/screens/reports/reports_section.dart';
+import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
@@ -20,10 +20,12 @@ import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_navigator.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
 import '../home_fixtures.dart';
+import '../page_fixtures.dart';
 import '../task_fixtures.dart';
 import '../test_harness.dart';
 import '../test_support.dart';
@@ -118,6 +120,8 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase2a3': _phase2aStates,
   // מסכי המשימה מצולמים מהמודל — ראו `task_<scenario>`.
   'phase2b': _phase2aStates,
+  // הדפים מצולמים מהקונטרולרים — ראו `page_<scenario>`.
+  'phase3': _phase2aStates,
 };
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
@@ -343,7 +347,7 @@ void main() {
                         showWindowButtons: true,
                       ),
                       Expanded(
-                        child: ReportsSection(
+                        child: ReportsPage(
                           errorReports: null,
                           searchFeedback: null,
                           connection: null,
@@ -371,6 +375,84 @@ void main() {
           WidgetsApp.debugAllowBannerOverride = true;
         }
       });
+    }
+  }
+
+  for (final MapEntry(key: name, value: build) in pageScenarios.entries) {
+    for (final advanced in [
+      false,
+      if (advancedScenarios.contains(name)) true
+    ]) {
+      for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
+        final file = '$name${advanced ? '_advanced' : ''}$suffix';
+        testWidgets('$_phase/page_$file', skip: !_enabled || _phase != 'phase3',
+            (tester) async {
+          await tester.runAsync(loadVisualFonts);
+          WidgetsApp.debugAllowBannerOverride = false;
+          try {
+            useViewSize(tester, size);
+            // מלל התחום (otzaria_l10n) נקרא מהשפה הגלובלית, לא מה-context.
+            AppL10n.use(AppLanguage.hebrew);
+            final crumb = switch (name.split('_').first) {
+              'otzaria' => stringsOf().guide.tileApp,
+              'library' => stringsOf().guide.tileLibrary,
+              'reports' => stringsOf().guide.tileReports,
+              _ => stringsOf().pages.selfCrumb,
+            };
+            await tester.pumpWidget(
+              RepaintBoundary(
+                key: boundary,
+                child: wrap(
+                  Scaffold(
+                    backgroundColor: const Color(0xFFF6EDE5),
+                    body: Column(
+                      children: [
+                        AppTitleBar(
+                          onHelp: () {},
+                          onSettings: () {},
+                          showWindowButtons: true,
+                        ),
+                        Expanded(
+                          child: SubPageHeaderScope(
+                            header: SubPageHeader(
+                              onBack: () {},
+                              onHome: () {},
+                              trail: [(label: crumb, onTap: null)],
+                            ),
+                            child: build(tempDir.path, settings),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await settle(tester);
+            if (advanced) {
+              await tester.drag(
+                find.byType(ListView).first,
+                const Offset(0, -2000),
+              );
+              await settle(tester);
+              await tester.tap(find.text(stringsOf().pages.advancedTitle));
+              await settle(tester);
+              await tester.drag(
+                find.byType(ListView).first,
+                const Offset(0, -2000),
+              );
+              await settle(tester);
+            }
+            await capture(
+              tester,
+              p.join('build', 'visual_review', _phase, 'page_$file.png'),
+            );
+            await tester.pumpWidget(const SizedBox.shrink());
+          } finally {
+            WidgetsApp.debugAllowBannerOverride = true;
+          }
+        });
+      }
     }
   }
 

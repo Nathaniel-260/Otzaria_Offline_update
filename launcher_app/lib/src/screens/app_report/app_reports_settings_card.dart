@@ -4,16 +4,18 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/app_reports_controller.dart';
 import '../../widgets/widgets_exports.dart';
-import 'app_report_dialog.dart';
-import 'reports_management_dialog.dart';
 
-/// כרטיס "דיווח על תקלות" בהגדרות: פתיחת הטופס, מצב הדיווח אחרי קריסה,
-/// וסיכום התור וההיסטוריה עם הכניסה לניהולם — כמו `ReportsCard` +
-/// `AppReportsPanel` של אוצריא, בכרטיס אחד.
+/// כרטיס "דיווח על תקלות" בהגדרות: מצב הדיווח אחרי קריסה, וכניסה לדף
+/// הדיווחים — שם הטופס, התור וההיסטוריה.
 class AppReportsSettingsCard extends StatefulWidget {
-  const AppReportsSettingsCard({super.key, required this.reports});
+  const AppReportsSettingsCard({
+    super.key,
+    required this.reports,
+    this.onOpenReports,
+  });
 
   final AppReportsController reports;
+  final VoidCallback? onOpenReports;
 
   @override
   State<AppReportsSettingsCard> createState() => _AppReportsSettingsCardState();
@@ -40,34 +42,12 @@ class _AppReportsSettingsCardState extends State<AppReportsSettingsCard> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _openForm() async {
-    await showAppReportDialog(context, reports: _reports);
-    await _reports.refresh();
-  }
-
-  Future<void> _openManagement() async {
-    await showReportsManagementDialog(context, reports: _reports);
-    await _reports.refresh();
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = context.strings.appReports;
     return SettingsCard(
       title: t.cardTitle,
       children: [
-        SettingsActionTile.text(
-          icon: FluentIcons.bug_24_regular,
-          title: t.reportTileTitle,
-          subtitle: t.reportTileSubtitle,
-          actions: [
-            ActionButton.recommended(
-              key: const ValueKey('app-reports-open-form'),
-              text: t.openFormButton,
-              onPressed: _openForm,
-            ),
-          ],
-        ),
         SettingsActionTile.segmentedTile<AppCrashReportMode>(
           key: const ValueKey('app-reports-crash-mode'),
           icon: FluentIcons.warning_24_regular,
@@ -87,21 +67,22 @@ class _AppReportsSettingsCardState extends State<AppReportsSettingsCard> {
           currentValue: _reports.crashMode,
           onChanged: _reports.setCrashMode,
         ),
-        SettingsActionTile.text(
-          icon: FluentIcons.task_list_ltr_24_regular,
-          title: t.manageTileTitle,
-          subtitle: t.manageTileSubtitle(
-            _reports.pendingCount,
-            _reports.sentTotal,
-          ),
-          actions: [
-            ActionButton.neutral(
-              key: const ValueKey('app-reports-manage'),
-              text: t.manageButton,
-              onPressed: _openManagement,
+        if (widget.onOpenReports case final open?)
+          SettingsActionTile.text(
+            icon: FluentIcons.task_list_ltr_24_regular,
+            title: t.manageTileTitle,
+            subtitle: t.manageTileSubtitle(
+              _reports.pendingCount,
+              _reports.sentTotal,
             ),
-          ],
-        ),
+            actions: [
+              ActionButton.neutral(
+                key: const ValueKey('app-reports-manage'),
+                text: t.manageButton,
+                onPressed: open,
+              ),
+            ],
+          ),
       ],
     );
   }

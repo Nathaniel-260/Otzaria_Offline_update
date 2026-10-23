@@ -41,52 +41,56 @@ class _AdvancedSectionState extends State<AdvancedSection> {
           Semantics(
             expanded: _open,
             child: FocusRing(
-              child: InkWell(
-                onTap: () => setState(() => _open = !_open),
-                borderRadius: AppTokens.borderRadiusAll,
-                overlayColor: AppSurfaces.stateLayer(cs.primary),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                  child: Row(
-                    children: [
-                      IconTile(
-                        icon: widget.icon,
-                        size: IconTileSize.sm,
-                        tone: IconTileTone.quiet,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.title,
-                              style: AppTextStyles.rowTitle.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            if (widget.summary != null)
+              // הכותרת יושבת גם בדף בלי Scaffold (בדיקות, דף בתוך דף).
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: () => setState(() => _open = !_open),
+                  borderRadius: AppTokens.borderRadiusAll,
+                  overlayColor: AppSurfaces.stateLayer(cs.primary),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                    child: Row(
+                      children: [
+                        IconTile(
+                          icon: widget.icon,
+                          size: IconTileSize.sm,
+                          tone: IconTileTone.quiet,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                widget.summary!,
-                                style: AppTextStyles.meta.copyWith(
+                                widget.title,
+                                style: AppTextStyles.rowTitle.copyWith(
                                   color: cs.onSurfaceVariant,
                                 ),
                               ),
-                          ],
+                              if (widget.summary != null)
+                                Text(
+                                  widget.summary!,
+                                  style: AppTextStyles.meta.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      AnimatedRotation(
-                        turns: _open ? 0.5 : 0,
-                        duration: AppTokens.animFast,
-                        child: Icon(
-                          FluentIcons.chevron_down_20_regular,
-                          size: 20,
-                          color: cs.outline,
+                        AnimatedRotation(
+                          turns: _open ? 0.5 : 0,
+                          duration: AppTokens.animFast,
+                          child: Icon(
+                            FluentIcons.chevron_down_20_regular,
+                            size: 20,
+                            color: cs.outline,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -35,6 +35,7 @@ class SettingsScreen extends StatelessWidget {
     this.driveFull = false,
     this.saferMode,
     this.appReports,
+    this.onOpenReports,
   });
 
   final SettingsController controller;
@@ -56,6 +57,9 @@ class SettingsScreen extends StatelessWidget {
 
   /// הדיווחים של הלאנצ'ר על עצמו. `null` בבדיקות שאינן נוגעות בהם.
   final AppReportsController? appReports;
+
+  /// דף הדיווחים — שם הטופס, התור וההיסטוריה.
+  final VoidCallback? onOpenReports;
 
   AppSettings get _s => controller.settings;
 
@@ -80,7 +84,10 @@ class SettingsScreen extends StatelessWidget {
           ),
         _saferModeCard(context),
         if (appReports case final reports?)
-          AppReportsSettingsCard(reports: reports),
+          AppReportsSettingsCard(
+            reports: reports,
+            onOpenReports: onOpenReports,
+          ),
         _supportCard(context),
       ],
     );

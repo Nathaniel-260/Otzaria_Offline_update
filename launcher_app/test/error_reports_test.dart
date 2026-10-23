@@ -20,9 +20,8 @@ import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/error_reports_flow.dart';
 import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/screens/home/home_view_model.dart';
-import 'package:launcher_app/src/screens/reports/reports_section.dart';
+import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/screens/reports_upload_flow.dart';
-import 'package:launcher_app/src/screens/reports_upload_section.dart';
 import 'package:launcher_app/src/services/report_offer_trigger.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
@@ -35,6 +34,7 @@ import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
+import 'reports_page_finders.dart';
 import 'test_harness.dart';
 
 Map<String, dynamic> _report(String id) => OutboxReport.fileJson(
@@ -397,16 +397,30 @@ void main() {
   });
 
   test('דיווח בודד בעברית בלשון יחיד', () {
-    expect(t.uploadButton(1), contains('1 דיווח '));
-    expect(t.uploadPendingOffline(1), contains('1 דיווח.'));
-    expect(t.uploadPendingUnchecked(1), contains('1 דיווח.'));
+    final pages = stringsOf().pages;
+    expect(pages.repWaitingTitle(1), '1 דיווח ממתין לשליחה');
+    expect(pages.repStoredTitle(1), '1 דיווח שמור בכונן');
     expect(t.uploadSummary(1, 0, 0), 'נשלח 1 דיווח');
-    expect(t.uploadButton(3), contains('3 דיווחים'));
+    expect(pages.repWaitingTitle(3), contains('3 דיווחים'));
   });
 
   test('ניסוח יחיד בעברית: פועל וספירה', () {
-    expect(t.uploadPendingOffline(1), startsWith('ממתין להעלאה 1 דיווח'));
-    expect(t.uploadPendingOffline(2), startsWith('ממתינים להעלאה 2 דיווחים'));
+    final pages = stringsOf().pages;
+    expect(pages.repWaitingTitle(1), contains('ממתין'));
+    expect(pages.repWaitingTitle(2), startsWith('2 דיווחים ממתינים'));
+    final library = stringsOf().libraryDomain;
+    expect(
+      library.semanticFeedbackUploaded(1, 1),
+      'נשלחה 1 רשומת נתוני אימון; נשארה 1 בכונן',
+    );
+    expect(
+      library.semanticFeedbackUploaded(2, 3),
+      'נשלחו 2 רשומות נתוני אימון; נשארו 3 בכונן',
+    );
+    expect(
+      library.semanticFeedbackCollected(1),
+      'נאספה 1 רשומת נתוני אימון לכונן',
+    );
   });
 
   group('איסוף לכונן מדף הדיווחים', () {
@@ -698,14 +712,14 @@ void main() {
   group('הגילוי על הפרטיות לצד כפתור האיסוף', () {
     final g = stringsOf().guide;
 
-    ReportsSection page({
+    ReportsPage page({
       int reports = 0,
       int searchRecords = 0,
       bool busy = false,
       bool readOnly = false,
       VoidCallback? onCollect,
     }) =>
-        ReportsSection(
+        ReportsPage(
           errorReports: null,
           searchFeedback: null,
           connection: null,
@@ -843,12 +857,12 @@ void main() {
 
     /// דף הדיווחים. החיבור — אותו כלל של `onlineState`: בדיקה מקוונת אחת
     /// שהצליחה מספיקה.
-    ReportsSection home(
+    ReportsPage home(
       ErrorReportsController reports, {
       bool readOnly = false,
       Future<void> Function()? onUpload,
     }) =>
-        ReportsSection(
+        ReportsPage(
           readOnly: readOnly,
           errorReports: reports,
           searchFeedback: feedback,
@@ -888,8 +902,13 @@ void main() {
         }),
       );
 
-      expect(find.text(t.uploadButton(2)), findsOneWidget);
-      await tester.tap(find.text(t.uploadButton(2)));
+      expect(sendOffer(5), findsOneWidget);
+      expect(find.text(libraryT.semanticFeedbackUploadAction), findsNothing);
+      expect(find.text(libraryT.semanticFeedbackUploadBody(3)), findsNothing);
+
+      await tester.tap(sendOffer(5));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(libraryT.semanticFeedbackUploadAction));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing);
@@ -908,14 +927,14 @@ void main() {
       await c.refreshOutbox();
       otzaria.onlineCheckError = 'no network';
 
-      await pumpScreen(tester, home(c));
-      expect(find.text(t.uploadPendingOffline(2)), findsOneWidget);
-      expect(find.text(t.uploadButton(2)), findsNothing);
+      await pumpScreen(tester, home(c, feedback: feedback));
+      expect(storedOffline(3), findsOneWidget);
+      expect(sendOffer(3), findsNothing);
 
       otzaria.onlineCheckError = null;
-      await pumpScreen(tester, home(c));
-      expect(find.text(t.uploadPendingOffline(2)), findsNothing);
-      expect(find.text(t.uploadButton(2)), findsOneWidget);
+      await pumpScreen(tester, home(c, feedback: feedback));
+      expect(storedOffline(3), findsNothing);
+      expect(sendOffer(3), findsOneWidget);
     });
 
     testWidgets('בלי בדיקה מקוונת מוצלחת אין כפתור', (tester) async {
@@ -924,9 +943,62 @@ void main() {
       final c = controller();
       await c.refreshOutbox();
       await pumpScreen(tester, home(c));
-      expect(find.text(t.uploadPendingUnchecked(1)), findsOneWidget);
-      expect(find.text(t.uploadButton(1)), findsNothing);
-      expect(find.text(t.uploadPendingOffline(1)), findsNothing);
+      expect(storedUnchecked(1), findsOneWidget);
+      expect(sendOffer(1), findsNothing);
+      expect(storedOffline(1), findsNothing);
+    });
+
+    testWidgets('עצירה בין שלבי ההעלאה משאירה את המשוב בכונן', (tester) async {
+      outbox.add('a');
+      final c = controller();
+      await c.refreshOutbox();
+      final transport = _CountFeedback(carried: 2);
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => null,
+      );
+      addTearDown(feedback.dispose);
+      final gate = Completer<void>();
+      outbox.beforeCount =
+          () => outbox.reports.isEmpty ? gate.future : Future<void>.value();
+      var stopped = false;
+      late BuildContext ctx;
+      await pumpScreen(tester, Builder(builder: (context) {
+        ctx = context;
+        return ReportsPage(
+          errorReports: c,
+          searchFeedback: feedback,
+          connection: true,
+          isUploadingAll: true,
+          busy: false,
+          reportsToCollect: 0,
+          onCollect: () {},
+          onUpload: null,
+          onStop: () => stopped = true,
+        );
+      }));
+      final uploading = uploadAllReports(
+        ctx,
+        errorReports: c,
+        searchFeedback: feedback,
+        isCancelled: () => stopped,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(
+          find.text(stringsOf().libraryDomain.semanticFeedbackUploadAction));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(c.isUploading, isFalse);
+      expect(feedback.isUploading, isFalse);
+      await tester.tap(find.text(t.uploadStopButton));
+      gate.complete();
+      await tester.pump();
+      final result = await uploading;
+      expect(transport.uploads, 0);
+      expect(transport.carried, 2);
+      expect(result?.severity, ReportsUploadSeverity.info);
+      await tester.pumpWidget(const SizedBox.shrink());
     });
 
     testWidgets('רק בדיקת הלאנצ׳ר הצליחה: אפשר להעלות', (tester) async {
@@ -936,11 +1008,63 @@ void main() {
       final c = controller();
       await c.refreshOutbox();
       await pumpScreen(tester, home(c));
-      expect(find.text(t.uploadButton(1)), findsOneWidget);
+      expect(sendOffer(1), findsOneWidget);
     });
 
     testWidgets('העלאה שנכשלה: שגיאה אחת, בלי שורות נוספות', (tester) async {
       outbox.add('a');
+      final transport = _CountFeedback(carried: 2, throwOnUpload: true);
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => null,
+      );
+      addTearDown(feedback.dispose);
+      final c = controller();
+      await c.refreshOutbox();
+      await feedback.refreshOutbox();
+      final libraryT = stringsOf().libraryDomain;
+      final printed = <String>[];
+      final originalPrint = debugPrint;
+      debugPrint = (message, {wrapWidth}) => printed.add(message ?? '');
+      late BuildContext ctx;
+      await pumpScreen(
+        tester,
+        Builder(builder: (context) {
+          ctx = context;
+          return home(
+            c,
+            feedback: feedback,
+            onUpload: () async => outcome = await uploadAllReports(
+              ctx,
+              errorReports: c,
+              searchFeedback: feedback,
+            ),
+          );
+        }),
+      );
+      await tester.tap(sendOffer(3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(libraryT.semanticFeedbackUploadAction));
+      await tester.pumpAndSettle();
+      debugPrint = originalPrint;
+      expect(outcome?.severity, ReportsUploadSeverity.error);
+
+      expect(outbox.reports, isEmpty);
+      expect(printed, [
+        'UiSnack ללא overlay: ${t.uploadSummary(1, 0, 0)}\n'
+            '${libraryT.semanticFeedbackFailed}',
+      ]);
+    });
+
+    testWidgets('דיווחים שנכשלו: המשוב לא עולה, ונשאר בסיכום כממתין',
+        (tester) async {
+      outbox.add('a');
+      final transport = _CountFeedback(carried: 2);
+      final feedback = SearchFeedbackController(
+        transport: transport,
+        resolveSource: () async => null,
+      );
+      addTearDown(feedback.dispose);
       final c = controller(
         client: MockClient((_) async => http.Response('oops', 500)),
       );
@@ -948,8 +1072,25 @@ void main() {
       final printed = <String>[];
       final originalPrint = debugPrint;
       debugPrint = (message, {wrapWidth}) => printed.add(message ?? '');
-      final ctx = await host(tester);
-      final result = await uploadAllReports(ctx, errorReports: c);
+      late BuildContext ctx;
+      await pumpScreen(
+        tester,
+        Builder(builder: (context) {
+          ctx = context;
+          return home(
+            c,
+            feedback: feedback,
+            onUpload: () async => outcome = await uploadAllReports(
+              ctx,
+              errorReports: c,
+              searchFeedback: feedback,
+            ),
+          );
+        }),
+      );
+      await tester.tap(sendOffer(3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(libraryT.semanticFeedbackUploadAction));
       await tester.pumpAndSettle();
       debugPrint = originalPrint;
 
@@ -991,14 +1132,14 @@ void main() {
       final c = controller();
       await c.refreshOutbox();
       await pumpScreen(tester, home(c));
-      expect(find.textContaining(t.uploadButton(0)), findsNothing);
+      expect(sendOffer(0), findsNothing);
 
       outbox
         ..add('a')
         ..add('b');
       await c.refreshOutbox();
       await tester.pump();
-      expect(find.text(t.uploadButton(2)), findsOneWidget);
+      expect(sendOffer(2), findsOneWidget);
     });
 
     testWidgets('לא מופיע כשהכונן לקריאה בלבד', (tester) async {
@@ -1006,7 +1147,7 @@ void main() {
       final c = controller();
       await c.refreshOutbox();
       await pumpScreen(tester, home(c, readOnly: true));
-      expect(find.text(t.uploadButton(1)), findsNothing);
+      expect(sendOffer(1), findsNothing);
     });
 
     testWidgets('יותר מ-8 → הסבר קודם; עצירה בהמתנה, והמשך מהמקום',
@@ -1028,7 +1169,7 @@ void main() {
         }),
       );
 
-      await tester.tap(find.text(t.uploadButton(10)));
+      await tester.tap(sendOffer(10));
       await tester.pumpAndSettle();
       final minutes = c.estimateMinutes(10);
       expect(
@@ -1049,16 +1190,16 @@ void main() {
       await tester.pump();
       expect(c.isUploading, isFalse);
       expect(outbox.reports, hasLength(2));
-      expect(find.text(t.uploadButton(2)), findsOneWidget);
+      expect(sendOffer(2), findsOneWidget);
 
       // המשך אחרי שהחלון נסגר: שניים ≤ 8, ולכן בלי דיאלוג.
       now = now.add(const Duration(minutes: 2));
-      await tester.tap(find.text(t.uploadButton(2)));
+      await tester.tap(sendOffer(2));
       await tester.pump();
       await tester.pump();
       expect(find.text(t.uploadLongDialogTitle), findsNothing);
       expect(outbox.reports, isEmpty);
-      expect(find.textContaining(t.uploadButton(0)), findsNothing);
+      expect(sendOffer(0), findsNothing);
       // ההמתנה שננטשה בעצירה עוד תלויה בשעון המזויף.
       await tester.pump(const Duration(seconds: 1));
     });

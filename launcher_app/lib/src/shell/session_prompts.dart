@@ -3,7 +3,6 @@ import 'package:error_reports_manager/error_reports_manager.dart';
 import '../controllers/app_reports_controller.dart';
 import '../controllers/download_plan.dart';
 import '../controllers/launcher_update_flow.dart';
-import '../self_update/launcher_release.dart';
 
 /// כל מה ש-[AppSession] צריך מהממשק: דיאלוגים, הודעות וזרימות שתלויות
 /// ב-`BuildContext`. המסגרת מממשת, והסשן עצמו אינו מחזיק `BuildContext`.
@@ -16,9 +15,6 @@ abstract interface class SessionPrompts {
     AppReportsController reports,
     CrashCandidate candidate,
   );
-
-  /// `null` כשהדיאלוג לא הוצג (התור לא התפנה).
-  Future<bool?> offerLauncherUpdate(LauncherRelease release, String? whatsNew);
 
   Future<bool> confirmLauncherInstall(String version, {String? whatsNew});
 

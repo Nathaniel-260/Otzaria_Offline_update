@@ -345,7 +345,7 @@ void main() {
                 children: [
                   InfoStatusRow(
                     icon: FluentIcons.info_24_regular,
-                    title: s.libraryScreen.stateRowTitle,
+                    title: s.pages.libSourceTitle,
                     kind: StatusKind.ok,
                     label: s.common.upToDate,
                   ),

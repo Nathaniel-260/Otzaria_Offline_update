@@ -14,10 +14,9 @@ import '../controllers/download_summary.dart';
 import '../controllers/launcher_update_flow.dart';
 import '../controllers/plugins_module_controller.dart' show PluginsModuleStatus;
 import '../flows/library_flows.dart' show showLibraryChangesDialog;
-import '../self_update/launcher_release.dart';
 import '../services/app_paths.dart';
-import '../services/byte_size.dart';
 import '../services/dialog_queue.dart';
+import '../services/file_reveal.dart';
 import '../services/notices_seen_store.dart';
 import '../services/sleep_inhibitor.dart';
 import '../settings/app_settings.dart';
@@ -39,10 +38,11 @@ import 'faq/faq_dialog.dart';
 import 'home/home_page.dart';
 import 'home/home_progress.dart';
 import 'home/home_view_model.dart';
+import 'launcher/launcher_update_page.dart';
 import 'library_screen.dart';
 import 'otzaria_screen.dart';
 import 'plugins/plugins_screen.dart';
-import 'reports/reports_section.dart';
+import 'reports/reports_page.dart';
 import 'reports_upload_flow.dart';
 import 'settings_screen.dart';
 import 'tasks/download_task_view.dart';
@@ -234,24 +234,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       );
 
   @override
-  Future<bool?> offerLauncherUpdate(LauncherRelease release, String? whatsNew) {
-    final t = context.strings.launcherUpdate;
-    return _dialogs.run(
-      () => showTwoActionsDialog(
-        context: context,
-        title: t.availableDialogTitle,
-        content: '${t.availableDialogContent(release.version)}\n\n'
-            '${t.availableDialogDetail(formatBytes(release.sizeBytes))}',
-        customContent: whatsNew == null
-            ? null
-            : WhatsNewSection(heading: t.whatsNewHeading, markdown: whatsNew),
-        cancelText: t.availableDialogCancel,
-        confirmText: t.availableDialogConfirm,
-      ),
-    );
-  }
-
-  @override
   Future<bool> confirmLauncherInstall(String version, {String? whatsNew}) {
     final t = context.strings.launcherUpdate;
     return showTwoActionsDialog(
@@ -411,6 +393,31 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
 
   void _updateHere() => unawaited(_session.updateHere(_hereItems));
 
+  /// מדף התוכנה או הספרייה — הרכיב הזה בלבד, באותו מסך משימה.
+  void _updateOnly(
+    GuidanceItem item, {
+    bool reinstallApp = false,
+    bool fullLibrary = false,
+  }) =>
+      unawaited(
+        _session.updateHere(
+          [item],
+          reinstallApp: reinstallApp,
+          fullLibrary: fullLibrary,
+        ),
+      );
+
+  Future<void> _openLauncherFolder() async {
+    final dir = _session.launcherUpdate.mirrorDir;
+    if (await FileReveal.revealDirectory(dir)) return;
+    UiSnack.show(dir);
+  }
+
+  VoidCallback? get _restartElevated =>
+      Platform.isWindows && !_session.exitPending
+          ? () => unawaited(_session.restartElevated())
+          : null;
+
   /// "הצג התקדמות": מסך המשימה, או הדף שבו רצה הפעולה.
   void _showProgress() {
     if (_session.tasks.hasTask) return _navigator.showTask();
@@ -452,8 +459,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         unawaited(_session.dismissLegacyReportsNotice()),
     onRestartElevated: () => unawaited(_session.restartElevated()),
     onDismissElevation: _session.dismissElevation,
-    onReviewLauncherUpdate: () => unawaited(_session.reviewLauncherUpdate()),
-    onInstallLauncherUpdate: () => unawaited(_session.installLauncherUpdate()),
+    onOpenLauncherUpdate: () => unawaited(_goTo(ShellSection.launcher)),
     onShowProgress: _showProgress,
   );
 
@@ -493,6 +499,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       ShellSection.reports => g.tileReports,
       ShellSection.settings => context.strings.settings.title,
       ShellSection.help => context.strings.shell.helpTooltip,
+      ShellSection.launcher => context.strings.pages.selfCrumb,
     };
   }
 
@@ -563,6 +570,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onCloseOtzaria: s.closeOtzaria,
           onInstallAdopted: s.plugins.refreshInstalled,
           saferMode: s.saferMode,
+          busy: s.longTaskRunning,
+          onUpdateHere: () => _updateOnly(GuidanceItem.app),
+          onReinstall: () => _updateOnly(GuidanceItem.app, reinstallApp: true),
         ),
       ShellSection.customApps => CustomAppsScreen(
           controller: s.customApps,
@@ -579,6 +589,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onRequestReindex: s.requestLibraryReindex,
           onGoToSettings: () => unawaited(_goTo(ShellSection.settings)),
           onGrantSemanticConsent: s.grantSemanticConsent,
+          busy: s.longTaskRunning,
+          readOnly: widget.readOnly,
+          onUpdateHere: () => _updateOnly(GuidanceItem.library),
+          onInstallFull: () =>
+              _updateOnly(GuidanceItem.library, fullLibrary: true),
         ),
       ShellSection.plugins => PluginsScreen(
           controller: s.plugins,
@@ -589,7 +604,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           detailId: _detailId(ShellSection.plugins),
           onDetailChanged: (id) => _showDetail(ShellSection.plugins, id),
         ),
-      ShellSection.reports => ReportsSection(
+      ShellSection.reports => ReportsPage(
           errorReports: s.errorReports,
           searchFeedback: s.searchFeedback,
           connection: s.isCheckingOnline ? null : onlineState(s),
@@ -602,6 +617,19 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onStop: s.stopReports,
           readOnly: widget.readOnly,
           driveFull: widget.driveFull,
+          legacyNotice: s.showsLegacyReportsNotice,
+          onDismissLegacy: () =>
+              unawaited(_session.dismissLegacyReportsNotice()),
+          appReports: widget.appReports,
+        ),
+      ShellSection.launcher => LauncherUpdatePage(
+          controller: s.launcherUpdate,
+          readOnly: widget.readOnly,
+          busy: s.exitWouldInterrupt,
+          onDownload: () => unawaited(s.downloadLauncherUpdate()),
+          onInstall: () => unawaited(s.installLauncherUpdate()),
+          onOpenFolder: () => unawaited(_openLauncherFolder()),
+          onRestartElevated: _restartElevated,
         ),
       ShellSection.settings => SettingsScreen(
           controller: widget.settings,
@@ -612,6 +640,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           readOnly: widget.readOnly,
           driveFull: widget.driveFull,
           appReports: widget.appReports,
+          onOpenReports: () => unawaited(_goTo(ShellSection.reports)),
         ),
       // העזרה עדיין דו-שיח (`showFaqDialog`), ואין אליה ניווט.
       ShellSection.home || ShellSection.help => const SizedBox.shrink(),
@@ -798,11 +827,8 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             onReindex: library.hasPendingReindex
                 ? () => unawaited(s.deliverLibraryReindex())
                 : null,
-            onRestartElevated: Platform.isWindows &&
-                    (failure?.needsElevation ?? false) &&
-                    !s.exitPending
-                ? () => unawaited(s.restartElevated())
-                : null,
+            onRestartElevated:
+                (failure?.needsElevation ?? false) ? _restartElevated : null,
             onLibraryChanges: library.changesNotesApplied &&
                     library.changesNotes.isNotEmpty
                 ? () => unawaited(showLibraryChangesDialog(context, library))

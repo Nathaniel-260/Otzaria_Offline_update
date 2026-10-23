@@ -12,7 +12,6 @@ import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/home/home_view_model.dart';
-import 'package:launcher_app/src/self_update/launcher_release.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/services/sleep_inhibitor.dart';
@@ -134,8 +133,8 @@ void main() {
       expect(flags.first, isTrue);
       expect(s.isCheckingOnline, isFalse);
       expect(s.lastCheckedAt, isNotNull);
-      // בלי רשת אין גרסה חדשה של הכלי, ולכן גם אין הצעה להוריד אותה.
-      expect(prompts.calls, isNot(contains('offerLauncherUpdate')));
+      // בלי רשת אין גרסה חדשה של הכלי, ולכן גם אין שאלה על התקנה.
+      expect(prompts.calls, isNot(contains('confirmLauncherInstall')));
     });
 
     test('כונן לקריאה בלבד: אינו בודק כלום ואינו מודיע', () async {
@@ -382,7 +381,7 @@ void main() {
         await check;
       });
       expect(errors, isEmpty);
-      expect(prompts.calls, isNot(contains('offerLauncherUpdate')));
+      expect(prompts.calls, isNot(contains('confirmLauncherInstall')));
     });
 
     test('פירוק מיד אחרי start', () async {
@@ -459,15 +458,6 @@ class _FakePrompts implements SessionPrompts {
   }
 
   @override
-  Future<bool?> offerLauncherUpdate(
-    LauncherRelease release,
-    String? whatsNew,
-  ) async {
-    calls.add('offerLauncherUpdate');
-    return false;
-  }
-
-  @override
   Future<bool?> showCrashPrompt(
     AppReportsController reports,
     CrashCandidate candidate,
@@ -476,8 +466,10 @@ class _FakePrompts implements SessionPrompts {
 
   @override
   Future<bool> confirmLauncherInstall(String version,
-          {String? whatsNew}) async =>
-      false;
+      {String? whatsNew}) async {
+    calls.add('confirmLauncherInstall');
+    return false;
+  }
 
   @override
   void notifyLauncherUpdate(LauncherUpdateNotice notice, String detail) {}

@@ -36,6 +36,9 @@ class LauncherUpdateController extends ChangeNotifier
   /// הגרסה שרצה כרגע — מוצגת גם כשאין שום עדכון.
   String get currentVersion => _updater.currentVersion;
 
+  /// התיקייה בכונן שבה יושבת הגרסה שהורדה — להחלפה ידנית.
+  String get mirrorDir => _updater.mirrorDir;
+
   /// הגרסה שמוכנה בתיקייה, אם יש.
   String? downloadedVersion;
 

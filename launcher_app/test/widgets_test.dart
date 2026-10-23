@@ -575,7 +575,7 @@ void main() {
           SettingsCard(
             children: [
               SettingsActionTile.path(
-                title: he.libraryScreen.dbFileTitle,
+                title: he.pages.libLocationTitle,
                 path: r'C:\אוצריא\seforim.db',
                 placeholder: he.libraryScreen.dbFileMissing,
               ),
@@ -602,7 +602,7 @@ void main() {
           SettingsCard(
             children: [
               SettingsActionTile.path(
-                title: he.libraryScreen.dbFileTitle,
+                title: he.pages.libLocationTitle,
                 path: null,
                 placeholder: he.libraryScreen.dbFileMissing,
               ),
@@ -849,7 +849,7 @@ void main() {
             children: [
               InfoStatusRow(
                 icon: FluentIcons.database_24_regular,
-                title: he.libraryScreen.stateRowTitle,
+                title: he.pages.libSourceTitle,
                 kind: StatusKind.ok,
                 label: he.common.upToDate,
               ),
@@ -858,7 +858,7 @@ void main() {
         ),
       );
 
-      expect(find.text(he.libraryScreen.stateRowTitle), findsOneWidget);
+      expect(find.text(he.pages.libSourceTitle), findsOneWidget);
       expect(find.byType(StatusChip), findsOneWidget);
       expect(find.text(he.common.upToDate), findsOneWidget);
     });
@@ -1405,7 +1405,7 @@ void main() {
             ),
             SettingsActionTile.path(
               icon: FluentIcons.folder_24_regular,
-              title: he.libraryScreen.dbFileTitle,
+              title: he.pages.libLocationTitle,
               path: r'C:\Users\דוגמה\AppData\Roaming\otzaria\books\seforim.db',
               placeholder: he.libraryScreen.dbFileMissing,
             ),
@@ -1507,7 +1507,7 @@ void main() {
             CardActionsRow(
               actions: [
                 ActionButton.recommended(
-                  text: he.appScreen.installUpdateButton,
+                  text: he.pages.libUpdateButton,
                   onPressed: () {},
                 ),
                 ActionButton.ghost(text: he.common.launch, onPressed: () {}),
@@ -1523,7 +1523,7 @@ void main() {
           children: [
             InfoStatusRow(
               icon: FluentIcons.database_24_regular,
-              title: s.libraryScreen.stateRowTitle,
+              title: s.pages.libSourceTitle,
               kind: StatusKind.updateAvailable,
               label: s.common.updateAvailable,
             ),

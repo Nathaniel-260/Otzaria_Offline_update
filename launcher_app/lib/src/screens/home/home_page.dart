@@ -31,8 +31,7 @@ class HomeActions {
     this.onDismissLegacyReports = _noop,
     this.onRestartElevated = _noop,
     this.onDismissElevation = _noop,
-    this.onReviewLauncherUpdate = _noop,
-    this.onInstallLauncherUpdate = _noop,
+    this.onOpenLauncherUpdate = _noop,
     this.onShowProgress = _noop,
   });
 
@@ -50,8 +49,9 @@ class HomeActions {
   final VoidCallback onDismissLegacyReports;
   final VoidCallback onRestartElevated;
   final VoidCallback onDismissElevation;
-  final VoidCallback onReviewLauncherUpdate;
-  final VoidCallback onInstallLauncherUpdate;
+
+  /// "פרטים ועדכון" בשורת הכלי — דף "עדכון הכלי הזה".
+  final VoidCallback onOpenLauncherUpdate;
 
   /// "הצג התקדמות" בגיבור של משימה רצה — מסך המשימה או הדף שבו היא רצה.
   final VoidCallback onShowProgress;
@@ -1337,42 +1337,30 @@ class _Foot extends StatelessWidget {
   Widget _launcher(BuildContext context, LauncherLine line, TextStyle style) {
     final cs = Theme.of(context).colorScheme;
     final g = context.strings.guide;
-    final t = context.strings.launcherUpdate;
     final busy = model.guidance.primary == GuidancePrimary.taskInProgress;
     final version = line.version == null ? '' : displayVersion(line.version!);
-    final (IconData icon, String text, String? link, VoidCallback? onLink) =
-        switch (line.kind) {
+    final (IconData icon, String text) = switch (line.kind) {
       LauncherLineKind.online => (
           FluentIcons.sparkle_16_regular,
           g.launcherOnline(version),
-          g.launcherDetailsLink,
-          busy ? null : actions.onReviewLauncherUpdate,
         ),
-      LauncherLineKind.ready => (
+      LauncherLineKind.ready || LauncherLineKind.readyManual => (
           FluentIcons.sparkle_16_regular,
           g.launcherOnDrive(version),
-          t.installButton,
-          busy ? null : actions.onInstallLauncherUpdate,
-        ),
-      LauncherLineKind.readyManual => (
-          FluentIcons.sparkle_16_regular,
-          '${g.launcherOnDrive(version)} · ${t.installUnavailableNotice}',
-          null,
-          null,
         ),
       LauncherLineKind.downloading => (
           FluentIcons.arrow_download_16_regular,
           g.launcherDownloading,
-          null,
-          null,
         ),
       LauncherLineKind.error => (
           FluentIcons.warning_16_regular,
           line.error ?? '',
-          line.version == null ? null : g.launcherDetailsLink,
-          busy ? null : actions.onReviewLauncherUpdate,
         ),
     };
+    final link = line.kind == LauncherLineKind.downloading
+        ? null
+        : g.launcherDetailsLink;
+    final onLink = busy ? null : actions.onOpenLauncherUpdate;
     return ConstrainedBox(
       key: ShellKeys.launcherLine,
       constraints: const BoxConstraints(minWidth: 260),

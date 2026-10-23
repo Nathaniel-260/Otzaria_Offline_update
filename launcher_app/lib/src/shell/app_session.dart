@@ -195,7 +195,7 @@ class AppSession extends ChangeNotifier {
   int _searchRecordsToCollect = 0;
   DateTime? _checkedAt;
 
-  /// "מה התחדש" כבר הוצג בהצעה, ולכן אישור ההתקנה שאחריה לא חוזר עליו.
+  /// "מה התחדש" כבר מוצג בדף הכלי, ולכן אישור ההתקנה לא חוזר עליו.
   bool _whatsNewAlreadyShown = false;
 
   bool _elevationPending = false;
@@ -636,25 +636,10 @@ class AppSession extends ChangeNotifier {
     _markChecked();
   }
 
-  /// "פרטים ועדכון" בתחתית הבית: מה חדש בגרסה, ואחרי אישור — הורדה.
-  Future<void> reviewLauncherUpdate() async {
-    if (!isActive || readOnly) return;
-    final c = _launcherUpdate;
-    final release = c.onlineRelease;
-    if (release == null || !c.hasOnlineUpdate || c.isDownloading) return;
-
-    final whatsNew = c.onlineWhatsNew;
-    final approved = await prompts.offerLauncherUpdate(release, whatsNew);
-    if (approved != true || !isActive) return;
-    _whatsNewAlreadyShown = whatsNew != null;
-    try {
-      await downloadLauncherUpdate();
-    } finally {
-      _whatsNewAlreadyShown = false;
-    }
-  }
-
-  Future<void> downloadLauncherUpdate() => _launcherFlow.download();
+  /// "הורדה והפעלה מחדש" בדף הכלי: מה חדש כבר מוצג בדף, ולכן אישור
+  /// ההתקנה שאחרי ההורדה אינו חוזר עליו.
+  Future<void> downloadLauncherUpdate() =>
+      _fromLauncherPage(_launcherFlow.download);
 
   bool get longTaskRunning =>
       _downloads.isDownloading ||
@@ -693,7 +678,18 @@ class AppSession extends ChangeNotifier {
       _searchFeedback.isUploading ||
       _uploadingReports;
 
-  Future<void> installLauncherUpdate() => _launcherFlow.install();
+  Future<void> installLauncherUpdate() =>
+      _fromLauncherPage(_launcherFlow.install);
+
+  Future<void> _fromLauncherPage(Future<void> Function() action) async {
+    if (!isActive) return;
+    _whatsNewAlreadyShown = true;
+    try {
+      await action();
+    } finally {
+      _whatsNewAlreadyShown = false;
+    }
+  }
 
   Future<bool> _confirmLauncherInstall(String version) =>
       prompts.confirmLauncherInstall(
@@ -747,9 +743,19 @@ class AppSession extends ChangeNotifier {
   }
 
   /// "עדכון אוצריא במחשב הזה" / "התקנת אוצריא" — מסך המשימה.
-  Future<void> updateHere(List<GuidanceItem> items) async {
+  /// מדף התוכנה: [reinstallApp] — התקנה מחדש של אותה גרסה. מדף הספרייה:
+  /// [fullLibrary] — הספרייה המלאה שבכונן במקום עדכון שנכשל.
+  Future<void> updateHere(
+    List<GuidanceItem> items, {
+    bool reinstallApp = false,
+    bool fullLibrary = false,
+  }) async {
     if (tasks.isRunning || exitPending || !isActive) return;
-    await _updateHere.run(items);
+    await _updateHere.run(
+      items,
+      reinstallApp: reinstallApp,
+      fullLibrary: fullLibrary,
+    );
   }
 
   void stopWaitingForSetup() => _updateHere.stopWaiting();

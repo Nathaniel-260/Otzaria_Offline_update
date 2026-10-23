@@ -285,7 +285,7 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
   only decided at publish time, so `tool/changelog.sh stamp` (run by
   `set_launcher_version.sh`) adds the `* **0.N**` heading above them, and the
   Release workflow's `guard` job fails when there is nothing unheaded to stamp.
-  That file is what "מה התחדש" shows, in the update dialogs and in Settings.
+  That file is what "מה חדש" shows, on the "update this tool" page and in Settings.
   **Bug fixes alone require neither a changelog entry nor a question about one.**
   For other changes, ask the maintainer whether they warrant a changelog entry
   before editing that file, and follow their answer. Before release, document the
@@ -2052,12 +2052,14 @@ UI for *Otzaria's* reports: a "reports" tile on the home page that appears only 
 there is something to collect or send, and the reports page behind it — "collect from
 Otzaria" (`collectReportsToDrive`: the disclosure above the button is the consent, so
 a category it did not show is not collected — it recounts instead) and **one** upload button
-(`ReportsUploadSection` → `uploadAllReports`, which uploads the reports and the
+(`ReportsPage` → `uploadAllReports`, which uploads the reports and the
 smart-search feedback in sequence and reports one summary). `ReportOfferCoordinator`
 still decides *when*, but its `perform` only counts (`recountReportsToCollect`); nothing
 is collected without a click. The upload button appears only while some module's last
 online check succeeded (`onlineState` / `connectionOf`); otherwise only a caption says
-reports are waiting. Paths, table
+reports are waiting. The same page hosts the launcher's own reports (`AppReportsPanel`:
+queue, history, issue links) and "report a problem with this tool" (`AppReportDialog`);
+Settings keeps only the crash mode and a link to the page. Paths, table
 layout and the transaction are tabulated in `error_reports_manager/README.md`.
 
 **The launcher's own reports are a port of Otzaria's app reports, told apart

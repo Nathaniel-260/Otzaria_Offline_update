@@ -22,6 +22,8 @@ class _App implements UpdateHereApp {
   String? errorMessage;
   @override
   bool needsElevation = false;
+  @override
+  bool canReinstall = false;
 
   AppInstallOutcome outcome = AppInstallOutcome.installed;
   Completer<void>? gate;
@@ -62,8 +64,11 @@ class _Library implements UpdateHereLibrary {
   String? errorMessage;
   @override
   bool needsElevation = false;
+  @override
+  bool canApplyFull = false;
 
   bool succeeds = true;
+  int fullApplies = 0;
   bool availableAfterRecheck = true;
   int applies = 0;
   int rechecks = 0;
@@ -75,6 +80,14 @@ class _Library implements UpdateHereLibrary {
     log.add('library');
     onApply?.call();
     if (succeeds) hasUpdateAvailable = false;
+    return succeeds;
+  }
+
+  @override
+  Future<bool> applyFull() async {
+    fullApplies++;
+    log.add('library-full');
+    if (succeeds) canApplyFull = false;
     return succeeds;
   }
 
@@ -445,6 +458,38 @@ void main() {
       await flow.run(both);
       expect(log, ['app', 'recheck']);
       expect(task()!.outcomes[GuidanceItem.library], StageOutcome.skipped);
+      expect(task()!.phase, UpdateHereTaskPhase.done);
+    });
+  });
+
+  group('מדף התוכנה ומדף הספרייה', () {
+    test('התקנה מחדש: אותה גרסה רצה באשף, ורק כשהיא בכונן', () async {
+      app.hasUpdateAvailable = false;
+      expect(await flow.run(const [GuidanceItem.app]), isFalse);
+      expect(app.installs, 0);
+
+      app.canReinstall = true;
+      // בלי בקשה מפורשת — "אין עדכון" נשאר "אין מה להתקין".
+      expect(await flow.run(const [GuidanceItem.app]), isFalse);
+      expect(
+        await flow.run(const [GuidanceItem.app], reinstallApp: true),
+        isTrue,
+      );
+      expect(log, ['app']);
+      expect(task()!.outcomes[GuidanceItem.app], StageOutcome.done);
+    });
+
+    test('הספרייה המלאה: רק אחרי כשל, ובמקום העדכון הרגיל', () async {
+      library.hasUpdateAvailable = false;
+      expect(
+        await flow.run(const [GuidanceItem.library], fullLibrary: true),
+        isFalse,
+      );
+      library.canApplyFull = true;
+      await flow.run(const [GuidanceItem.library], fullLibrary: true);
+      expect(log, ['library-full']);
+      expect(library.applies, 0);
+      expect(library.fullApplies, 1);
       expect(task()!.phase, UpdateHereTaskPhase.done);
     });
   });

@@ -37,7 +37,7 @@ class _RecheckButtonState extends State<RecheckButton> {
   }
 
   @override
-  Widget build(BuildContext context) => ActionButton.neutral(
+  Widget build(BuildContext context) => ActionButton.ghost(
         text: context.strings.common.recheck,
         icon: FluentIcons.arrow_sync_24_regular,
         spinning: _spinning,

@@ -15,6 +15,7 @@ abstract class AppStrings {
   HomeStrings get home;
   GuidanceStrings get guide;
   TaskStrings get task;
+  PageStrings get pages;
   AppScreenStrings get appScreen;
   LibraryScreenStrings get libraryScreen;
   SettingsScreenStrings get settings;
@@ -121,27 +122,8 @@ abstract class HomeStrings {
   const HomeStrings();
 
   String get otzariaRunningTitle;
-  String get otzariaRunningSubtitle;
-
-  String get appInstallDialogTitle;
-  String get appInstallConfirm;
-  String appInstalledSnack(String version);
-
-  String get closeOtzariaForAppInstallDialogTitle;
-  String get closeOtzariaForAppInstallPrompt;
-  String get closeOtzariaAndInstallConfirm;
-
-  String get elevatedAsOtherUserWarning;
 
   String get otzariaOpenSnack;
-
-  String libraryFreshInstallPrompt(String targetVersion);
-  String libraryUpdatePrompt(String localVersion, String targetVersion);
-  String get libraryUpdateConfirm;
-
-  /// טווח ולא מספר: הזמן בפועל משתנה פי 3–5 בין מחשבים.
-  String libraryApplyEstimate(int lowMinutes, int highMinutes);
-  String libraryUpdatedSnack(String version);
 
   /// אזהרה לפני עדכון הספרייה ולאורכו — התוכנה והעדכונים יושבים על הכונן
   /// הנשלף, ושליפתו באמצע ההחלה קוטעת את העדכון.
@@ -177,12 +159,7 @@ abstract class HomeStrings {
   String get downloadStarting;
 
   // ── תוויות מצב הספרייה, משותפות לדף הבית ולמסך הספרייה ──────────────────
-  String get libraryNotInstalledYet;
-  String get libraryUpdating;
   String get libraryApplyActive;
-  String get libraryNothingDownloaded;
-  String get libraryNeedsManualPath;
-  String get libraryPersonalOtherMachine;
 }
 
 // ── מסכי המשימה ──
@@ -314,6 +291,100 @@ abstract class TaskStrings {
   String get toLibraryPage;
   String get toAppPage;
   String get showProgress;
+}
+
+// ── דפי הרכיבים ──
+
+/// דפי התוכנה, הספרייה, הדיווחים ועדכון הכלי. הנוסח מהמוקאפ.
+abstract class PageStrings {
+  const PageStrings();
+
+  String get advancedTitle;
+  String get onThisComputer;
+  String get onTheDrive;
+  String get nothingYet;
+  String downloadedOn(String date);
+  String get chipUpdateOnDrive;
+  String get chipUpToDate;
+  String get lockedChip;
+  String get appChipNotInstalled;
+  String appUpdateButton(String version);
+  String get appInstallButton;
+  String get appNeedsDownloadNote;
+  String appWhatsNew(String version);
+  String get appAdvancedSummary;
+  String get appChannelTitle;
+  String get appChannelBody;
+  String get appReinstallTitle;
+  String appReinstallBody(String version);
+  String get appReinstallUnavailable;
+  String get appLocationTitle;
+  String get appSourceTitle;
+  String get libSemanticSection;
+  String get libAdvancedSummary;
+  String get libMissingFilesTitle;
+  String libChipCompanions(String names);
+  String get libChipOtherMachine;
+  String libVersion(int version);
+  String get libNotInstalled;
+  String get libInstallButton;
+  String get libUpdateButton;
+  String get libNotFoundTitle;
+  String get libNotFoundBody;
+  String get libPickFolderButton;
+  String get libSemanticTitle;
+  String get libSemanticBody;
+  String get libSemanticGrant;
+  String get libSemanticClosedNote;
+  String get libSemanticActive;
+  String get libSemanticActiveBody;
+  String get libLocationTitle;
+  String get libFullTitle;
+  String libFullBody(String size);
+  String get libFullUnavailable;
+  String get libPersonalTitle;
+  String get libPersonalOn;
+  String get libPersonalOff;
+  String get libPersonalSettingsNote;
+  String get libPersonalReadOnly;
+  String get libSourceTitle;
+  String get repDescription;
+  String get repSendingTitle;
+  String repWaitingTitle(int count);
+  String repWaitingBody({required bool withSearch});
+  String repStoredTitle(int count);
+  String get repStoredBody;
+  String get repUncheckedBody;
+  String get repOnlyOnline;
+  String repAlsoStored(int count);
+  String repLockedShort({required bool driveFull});
+  String get repNothingTitle;
+  String get repSendButton;
+  String get repWhatIsSent;
+  String repOwnPending(int count);
+  String get repProblemSection;
+  String get repProblemTitle;
+  String get repProblemBody;
+  String get selfCrumb;
+  String get selfTitle;
+  String get selfDescription;
+  String selfChipOnline(String version);
+  String selfChipOnDrive(String version);
+  String get selfChipUpToDate;
+  String get selfCurrentVersion;
+  String get selfNewVersion;
+  String get selfDownloadButton;
+  String selfDownloading(int percent);
+  String get selfInstalling;
+  String get selfErrorTitle;
+  String get selfErrorKeepsWorking;
+  String get selfManualTitle;
+  String get selfOpenFolder;
+  String get selfAdminTitle;
+  String get selfAdminBody;
+  String get selfReadOnly;
+  String selfWhatsNew(String version);
+  String get selfWhatsNewEmpty;
 }
 
 // ── דף הבית: הכוונה לפי המצב ───────────────────────────────────────────────────
@@ -492,12 +563,7 @@ abstract class GuidanceStrings {
 abstract class AppScreenStrings {
   const AppScreenStrings();
 
-  String get title;
-
-  String get stateCardTitle;
-  String get stateRowTitle;
   String get readyToInstall;
-  String get nothingDownloadedYet;
 
   String get installedVersion;
   String get noInstallDetected;
@@ -506,51 +572,20 @@ abstract class AppScreenStrings {
   String get installAdoptedSnack;
   String get installNotFoundSnack;
 
-  String get mirrorVersionTitle;
   String get mirrorEmpty;
   String channelPair(String stable, String prerelease);
 
-  String get channelTileTitle;
-  String prereleaseSubtitle(String version);
-  String stableSubtitle(String version);
   String get channelStable;
   String get channelPrerelease;
 
-  String get processTitle;
-  String get processRunning;
-
   String get installingProgress;
   String get launchButton;
-  String get installUpdateButton;
 
   /// התקנה חוזרת של אותה גרסה — מוצעת דווקא כשהכול מעודכן, כדי לתקן התקנה
   /// פגומה בלי להמתין לגרסה הבאה.
   String get reinstallButton;
-  String get reinstallDialogTitle;
-  String reinstallPrompt(String version);
 
-  /// המותקן חדש מהתיקייה — התקנה משם היא נסיגת גרסה, וזה חייב להיאמר
-  /// בדיאלוג. הכפתור עצמו נשאר פעיל: לפעמים בדיוק לשם כך לוחצים.
-  String get installOlderButton;
-  String get installOlderDialogTitle;
-  String installOlderPrompt(String mirrorVersion, String installedVersion);
-
-  /// "מה התחדש" הוא דיאלוג מאחורי כפתור, ולא כרטיס על המסך — הערות הגרסה
-  /// ארוכות, והן מעניינות רגע אחד בלבד.
-  String get whatsNewTitle;
-  String get whatsNewButton;
   String get whatsNewEmpty;
-
-  String get sourceCardTitle;
-  String get sourceCardHint;
-  String get sourceDirTitle;
-
-  /// נוסח דיאלוג ההתקנה — משותף למסך הזה ולאריח שבדף הבית.
-  String installPrompt({
-    required String? latestVersion,
-    required String? currentVersion,
-    required bool prereleaseNote,
-  });
 }
 
 // ── מסך הספרייה ───────────────────────────────────────────────────────────────
@@ -558,12 +593,6 @@ abstract class AppScreenStrings {
 abstract class LibraryScreenStrings {
   const LibraryScreenStrings();
 
-  String get title;
-
-  String get stateCardTitle;
-  String get stateRowTitle;
-
-  String get dbFileTitle;
   String get dbFileMissing;
   String get pickDbButton;
   String get pickDbDialogTitle;
@@ -579,21 +608,9 @@ abstract class LibraryScreenStrings {
   String customLocationPrompt(String dbPath);
   String get customLocationConfirm;
 
-  String get localVersionTitle;
-  String get targetVersionTitle;
-  String get targetVersionNothingDownloaded;
-  String get targetVersionUnknown;
-
-  /// כותרת ההסבר למה העדכון הזה מוריד מסד שלם ולא קובצי עדכון — התוכן עצמו
-  /// מגיע מ-`LibraryUpdatePlan.reason`.
-  String get updateRouteNoteTitle;
-
   String get otzariaRunningTitle;
-  String get otzariaRunningSubtitle;
 
   String get updatingProgress;
-  String get installUpdateButton;
-  String get updateDialogTitle;
 
   /// "מה חדש בספרייה" — `library-changes.md` של הגרסאות שבטווח העדכון.
   String get changesTitle;
@@ -616,14 +633,7 @@ abstract class LibraryScreenStrings {
   String reindexFailedSnack(String error);
 
   String get fullDownloadInsteadButton;
-  String get fullDownloadInsteadDialogTitle;
-  String fullDownloadInsteadPrompt(String size);
 
-  String get sourceCardTitle;
-  String get sourceCardHint;
-  String get sourceDirTitle;
-
-  String get mirrorContentTitle;
   String get mirrorEmpty;
   String get mirrorUnreadable;
 
@@ -1244,11 +1254,6 @@ abstract class LauncherUpdateStrings {
   String get installButton;
 
   // ── דיאלוג "פרטים ועדכון" ──────────────────────────────────────────────
-  String get availableDialogTitle;
-  String availableDialogContent(String version);
-  String availableDialogDetail(String size);
-  String get availableDialogConfirm;
-  String get availableDialogCancel;
 
   // ── דיאלוג "ההורדה הושלמה" ──────────────────────────────────────────────
   String get readyDialogTitle;
@@ -1602,11 +1607,6 @@ abstract class LibraryDomainStrings {
   /// אינה סורקת את ברירת המחדל שלה, ולכן בלי ההוראה הזו היא נפתחת על
   /// ספרייה ריקה בלי שום רמז למה.
   String libraryLocationNeedsManualSetting(String dbPath);
-
-  /// מה שהעדכון יעשה כשהמסד עצמו מעודכן ורק קבצים נלווים ממתינים. בלי זה
-  /// המסך הציע "עדכון ספרייה" ליד "גרסה 27 → 27", והמשתמש קרא זאת כתקלה.
-  String companionsOnlyPending(String names);
-  String companionsOnlyPrompt(String names);
 
   /// רשומה שהקובץ שלה חסר או קטוע במראה — המראה שעל הכונן חלקית.
   String companionsMissingFromMirror(String names);
@@ -2129,7 +2129,6 @@ abstract class ErrorReportsStrings {
   String get introDialogConfirm;
 
   // ── העלאה, במחשב המקוון ──
-  String uploadButton(int count);
   String get uploadLongDialogTitle;
   String uploadLongDialogContent(int count, int perMinute, int minutes);
   String get uploadLongDialogConfirm;
@@ -2138,6 +2137,7 @@ abstract class ErrorReportsStrings {
   String get uploadStopButton;
   String uploadPendingOffline(int count);
   String uploadPendingUnchecked(int count);
+  String get uploadingFeedbackStage;
   String get uploadCollectingBusy;
   String get uploadUnexpectedFailure;
 
@@ -2171,9 +2171,6 @@ abstract class AppReportsStrings {
 
   // ── הכרטיס בהגדרות ──
   String get cardTitle;
-  String get reportTileTitle;
-  String get reportTileSubtitle;
-  String get openFormButton;
   String get crashModeTitle;
   String get crashModeSubtitle;
   String get crashModeAsk;
@@ -2184,11 +2181,8 @@ abstract class AppReportsStrings {
   String get manageButton;
 
   // ── חלון הניהול ──
-  String get manageDialogTitle;
   String get manageDialogIntro;
-  String get pendingSectionTitle;
   String get pendingEmpty;
-  String pendingCount(int count);
   String get sendNowButton;
   String get clearPendingButton;
   String get sendOneButton;

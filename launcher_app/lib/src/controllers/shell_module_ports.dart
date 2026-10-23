@@ -60,6 +60,9 @@ class OtzariaModulePort
   bool get needsElevation => _otzaria.needsElevation;
 
   @override
+  bool get canReinstall => _otzaria.status == OtzariaModuleStatus.upToDate;
+
+  @override
   void stopWaiting() => _otzaria.stopWaitingForSetup();
 
   @override
@@ -133,11 +136,23 @@ class LibraryModulePort
   bool get needsElevation => _library.needsElevation;
 
   @override
+  bool get canApplyFull => _library.canRetryWithFullDownload;
+
+  @override
   Future<bool> apply() async {
     await _library.update();
-    return _library.status == LibraryModuleStatus.upToDate &&
-        _library.errorMessage == null;
+    return _appliedCleanly;
   }
+
+  @override
+  Future<bool> applyFull() async {
+    await _library.updateWithFullDownload();
+    return _appliedCleanly;
+  }
+
+  bool get _appliedCleanly =>
+      _library.status == LibraryModuleStatus.upToDate &&
+      _library.errorMessage == null;
 }
 
 class PluginsModulePort implements PluginsMirrorModule, UpdateHerePlugins {

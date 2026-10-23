@@ -31,6 +31,21 @@ abstract final class ShellKeys {
   static const welcomeLinks = ValueKey('home.welcome.links');
 
   static const sectionStack = ValueKey('shell.sections');
+
+  static const statusPrimary = ValueKey('page.status.primary');
+  static const pageAdvanced = ValueKey('page.advanced');
+  static const appChannel = ValueKey('otzaria.channel');
+  static const appReinstall = ValueKey('otzaria.reinstall');
+  static const libraryLocation = ValueKey('library.location');
+  static const libraryReindex = ValueKey('library.reindex');
+  static const libraryFull = ValueKey('library.full');
+  static const libraryPersonal = ValueKey('library.personal');
+  static const librarySource = ValueKey('library.source');
+  static const libraryConsent = ValueKey('library.consent');
+  static const reportsSend = ValueKey('reports.send');
+  static const reportsStop = ValueKey('reports.stop');
+  static const reportsProblem = ValueKey('reports.problem');
+  static const reportsLegacy = ValueKey('reports.legacy');
   static const reportsCollect = ValueKey('reports.collect');
   static const reportsDisclosure = ValueKey('reports.disclosure');
 

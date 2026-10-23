@@ -12,6 +12,9 @@ enum ShellSection {
   reports,
   settings,
   help,
+
+  /// עדכון הכלי הזה — מהשורה שבתחתית הבית.
+  launcher,
 }
 
 /// יעד בתוך גוף החלון. אין `Navigator.push`: שורת הכותרת נשארת תמיד.

@@ -669,38 +669,42 @@ void main() {
           driveName: 'E:',
         );
 
-    testWidgets('גרסה חדשה באתר: "פרטים ועדכון" — לא התקנה', (tester) async {
-      var reviews = 0;
+    testWidgets('גרסה חדשה באתר: "פרטים ועדכון" פותח את דף הכלי — לא התקנה', (
+      tester,
+    ) async {
+      var opened = 0;
       await pumpScreen(
         tester,
         HomePage(
           model: withLauncher(
             const LauncherLine(LauncherLineKind.online, version: '3.3.0'),
           ),
-          actions: HomeActions(onReviewLauncherUpdate: () => reviews++),
+          actions: HomeActions(onOpenLauncherUpdate: () => opened++),
         ),
       );
       expect(find.text(g.launcherOnline('3.3.0')), findsOneWidget);
       expect(find.text(he.launcherUpdate.installButton), findsNothing);
       await tester.tap(find.text(g.launcherDetailsLink));
-      expect(reviews, 1);
+      expect(opened, 1);
     });
 
-    testWidgets('גרסה שכבר בכונן: התקנה, גם בלי רשת, וחסומה בזמן משימה', (
+    testWidgets('גרסה שכבר בכונן: הקישור לדף הכלי, וחסום בזמן משימה', (
       tester,
     ) async {
-      var installs = 0;
+      var opened = 0;
       const ready = LauncherLine(LauncherLineKind.ready, version: '3.3.0');
       await pumpScreen(
         tester,
         HomePage(
           model: withLauncher(ready),
-          actions: HomeActions(onInstallLauncherUpdate: () => installs++),
+          actions: HomeActions(onOpenLauncherUpdate: () => opened++),
         ),
       );
       expect(find.text(g.launcherOnDrive('3.3.0')), findsOneWidget);
-      await tester.tap(find.text(he.launcherUpdate.installButton));
-      expect(installs, 1);
+      // ההתקנה עצמה בדף הכלי, לא בשורה שבבית.
+      expect(find.text(he.launcherUpdate.installButton), findsNothing);
+      await tester.tap(find.text(g.launcherDetailsLink));
+      expect(opened, 1);
 
       await pumpScreen(
         tester,
@@ -709,27 +713,30 @@ void main() {
       expect(
         tester
             .widget<TextLink>(
-              find.widgetWithText(TextLink, he.launcherUpdate.installButton),
+              find.widgetWithText(TextLink, g.launcherDetailsLink),
             )
             .onTap,
         isNull,
       );
     });
 
-    testWidgets('בלי קובץ הרצה להחלפה: הסבר, בלי כפתור התקנה', (tester) async {
+    testWidgets('בלי קובץ הרצה להחלפה: הקישור לדף הכלי, בלי כפתור התקנה', (
+      tester,
+    ) async {
+      var opened = 0;
       await pumpScreen(
         tester,
         HomePage(
           model: withLauncher(
             const LauncherLine(LauncherLineKind.readyManual, version: '3.3.0'),
           ),
+          actions: HomeActions(onOpenLauncherUpdate: () => opened++),
         ),
       );
-      expect(
-        find.textContaining(he.launcherUpdate.installUnavailableNotice),
-        findsOneWidget,
-      );
+      expect(find.text(g.launcherOnDrive('3.3.0')), findsOneWidget);
       expect(find.text(he.launcherUpdate.installButton), findsNothing);
+      await tester.tap(find.text(g.launcherDetailsLink));
+      expect(opened, 1);
     });
 
     testWidgets('אין מה לומר על הכלי — אין שורה; "נבדק ב-" עם רמז Ctrl+R', (

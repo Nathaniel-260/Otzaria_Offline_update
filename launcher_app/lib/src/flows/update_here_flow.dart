@@ -23,6 +23,9 @@ abstract interface class UpdateHereApp {
   String? get errorMessage;
   bool get needsElevation;
 
+  /// הגרסה שבכונן היא זו שמותקנת — "התקנה מחדש" אפשרית.
+  bool get canReinstall;
+
   /// האשף של אוצריא — המשתמש ממשיך בו בחלון נפרד.
   Future<AppInstallOutcome> installWithWizard();
   void stopWaiting();
@@ -35,8 +38,14 @@ abstract interface class UpdateHereLibrary {
   String? get errorMessage;
   bool get needsElevation;
 
+  /// בכונן יש ספרייה מלאה שאפשר להתקין במקום עדכון שנכשל.
+  bool get canApplyFull;
+
   /// `true` — הספרייה מעודכנת אחרי ההחלה.
   Future<bool> apply();
+
+  /// כמו [apply], מהספרייה המלאה שבכונן.
+  Future<bool> applyFull();
   Future<void> recheck();
 }
 
@@ -80,7 +89,12 @@ class UpdateHereFlow {
   ShellTasks get _tasks => host.tasks;
 
   /// השלבים לפי מה שבאמת יש להתקין מתוך [items], בסדר ההרצה.
-  List<GuidanceItem> stagesFor(List<GuidanceItem> items) {
+  /// [reinstallApp] — גם אותה גרסה; [fullLibrary] — הספרייה המלאה שבכונן.
+  List<GuidanceItem> stagesFor(
+    List<GuidanceItem> items, {
+    bool reinstallApp = false,
+    bool fullLibrary = false,
+  }) {
     if (!app.isInstalled) {
       return [
         if (app.hasUpdateAvailable) GuidanceItem.app,
@@ -91,9 +105,10 @@ class UpdateHereFlow {
       ];
     }
     return [
-      if (items.contains(GuidanceItem.library) && library.hasUpdateAvailable)
+      if (items.contains(GuidanceItem.library) &&
+          (fullLibrary ? library.canApplyFull : library.hasUpdateAvailable))
         GuidanceItem.library,
-      if (items.contains(GuidanceItem.app) && app.hasUpdateAvailable)
+      if (items.contains(GuidanceItem.app) && _canInstallApp(reinstallApp))
         GuidanceItem.app,
       if (items.contains(GuidanceItem.plugins) &&
           plugins.deliverableUpdates.isNotEmpty)
@@ -101,10 +116,21 @@ class UpdateHereFlow {
     ];
   }
 
+  bool _canInstallApp(bool reinstall) =>
+      app.hasUpdateAvailable || (reinstall && app.canReinstall);
+
   /// `false` — אין מה להתקין, והמשימה לא נפתחה.
-  Future<bool> run(List<GuidanceItem> items) async {
+  Future<bool> run(
+    List<GuidanceItem> items, {
+    bool reinstallApp = false,
+    bool fullLibrary = false,
+  }) async {
     final first = !app.isInstalled;
-    final stages = stagesFor(items);
+    final stages = stagesFor(
+      items,
+      reinstallApp: reinstallApp,
+      fullLibrary: fullLibrary,
+    );
     if (stages.isEmpty) return false;
     _tasks.startUpdateHere(
       stages,
@@ -126,8 +152,16 @@ class UpdateHereFlow {
     for (final stage in stages) {
       if (!host.isActive) return true;
       final keepGoing = switch (stage) {
-        GuidanceItem.library => await _library(first: first, ranAny: ranAny),
-        GuidanceItem.app => await _app(first: first, ranAny: ranAny),
+        GuidanceItem.library => await _library(
+            first: first,
+            ranAny: ranAny,
+            full: fullLibrary,
+          ),
+        GuidanceItem.app => await _app(
+            first: first,
+            ranAny: ranAny,
+            reinstall: reinstallApp,
+          ),
         GuidanceItem.plugins => await _plugins(),
       };
       if (keepGoing == null) return _abandon();
@@ -158,7 +192,11 @@ class UpdateHereFlow {
     return true;
   }
 
-  Future<bool?> _library({required bool first, required bool ranAny}) async {
+  Future<bool?> _library({
+    required bool first,
+    required bool ranAny,
+    bool full = false,
+  }) async {
     if (first) {
       // מיקום המסד נגזר ממה שהאשף בחר — בודקים מחדש אחרי ההתקנה.
       await library.recheck();
@@ -184,7 +222,7 @@ class UpdateHereFlow {
     }
     if (!host.isActive) return false;
     _tasks.stageRunning(GuidanceItem.library);
-    final ok = await library.apply();
+    final ok = await (full ? library.applyFull() : library.apply());
     if (!host.isActive) return false;
     if (!ok) {
       _tasks.updateFailed(UpdateFailure(
@@ -198,10 +236,14 @@ class UpdateHereFlow {
     return true;
   }
 
-  Future<bool?> _app({required bool first, required bool ranAny}) async {
+  Future<bool?> _app({
+    required bool first,
+    required bool ranAny,
+    bool reinstall = false,
+  }) async {
     final closed = await _ensureClosed(ranAny: ranAny);
     if (closed != true) return closed;
-    if (!app.hasUpdateAvailable) {
+    if (!_canInstallApp(reinstall)) {
       _tasks.stageFinished(GuidanceItem.app, StageOutcome.skipped);
       return true;
     }

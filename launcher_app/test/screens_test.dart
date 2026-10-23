@@ -24,9 +24,11 @@ import 'package:launcher_app/src/services/timestamps.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:path/path.dart' as path;
 import 'package:plugins_manager/plugins_manager.dart';
 
 import 'test_harness.dart';
@@ -59,6 +61,52 @@ void main() {
     library.targetVersion = 2;
   }
 
+  OtzariaScreen otzariaPage({
+    VoidCallback? onUpdateHere,
+    VoidCallback? onReinstall,
+    SaferModeGate? saferMode,
+  }) =>
+      OtzariaScreen(
+        otzaria: otzaria,
+        settings: settings,
+        otzariaIsRunning: false,
+        onCloseOtzaria: () async => true,
+        onUpdateHere: onUpdateHere,
+        onReinstall: onReinstall,
+        saferMode: saferMode,
+      );
+
+  LibraryScreen libraryPage({
+    VoidCallback? onUpdateHere,
+    Future<void> Function()? onRequestReindex,
+    bool readOnly = false,
+  }) =>
+      LibraryScreen(
+        library: library,
+        otzariaIsRunning: false,
+        onCloseOtzaria: () async => true,
+        isDownloading: false,
+        onProcessStateChanged: () async => false,
+        onRequestReindex: onRequestReindex ?? () async {},
+        onGoToSettings: () {},
+        onUpdateHere: onUpdateHere,
+        readOnly: readOnly,
+      );
+
+  /// "מתקדם" מקופל כברירת מחדל. בלי pumpAndSettle: מצב "בודק" מסתובב.
+  Future<void> openAdvanced(WidgetTester tester) async {
+    final arrow = tester.widget<AnimatedRotation>(
+      find.descendant(
+        of: find.byKey(ShellKeys.pageAdvanced),
+        matching: find.byType(AnimatedRotation),
+      ),
+    );
+    if (arrow.turns != 0) return;
+    await tester.ensureVisible(find.byKey(ShellKeys.pageAdvanced));
+    await tester.tap(find.text(stringsOf().pages.advancedTitle));
+    await tester.pump();
+  }
+
   tearDown(() {
     otzaria.dispose();
     library.dispose();
@@ -68,99 +116,124 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  testWidgets('מסך תוכנה מציג מצב ו"מה התחדש"', (tester) async {
-    await pumpScreen(
-      tester,
-      OtzariaScreen(
-        otzaria: otzaria,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-      ),
-    );
-
-    expect(find.text('מצב ההתקנה'), findsOneWidget);
-    // הערות הגרסה יושבות מאחורי כפתור, ולא כריבוע על המסך.
-    expect(find.text('מה התחדש בגרסה האחרונה'), findsNothing);
-    await tester.tap(find.widgetWithText(ActionButton, 'מה התחדש'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('מה התחדש בגרסה האחרונה'), findsOneWidget);
-    expect(
-      find.text('אין תיאור לגרסה הזו, או שעדיין לא הורדה גרסה.'),
-      findsOneWidget,
-    );
-    // בלי שתי גרסאות בתיקייה אין מה לבחור, ולכן אין פקד ערוץ.
-    expect(find.text('הגרסה שתותקן'), findsNothing);
-  });
-
-  testWidgets('אוצריא מותקנת ומעודכנת — כפתור ההתקנה מחדש פעיל', (
+  testWidgets('דף התוכנה: כרטיס מצב, שתי הגרסאות, ו"מה חדש" בדף', (
     tester,
   ) async {
+    final p = stringsOf().pages;
+    otzaria.status = OtzariaModuleStatus.updateAvailable;
+    otzaria.currentVersion = '0.9.95';
+    otzaria.latestVersion = '0.9.96';
+    await pumpScreen(tester, otzariaPage());
+
+    expect(find.text(stringsOf().guide.tileApp), findsOneWidget);
+    expect(find.text(p.chipUpdateOnDrive), findsOneWidget);
+    expect(find.text(p.onThisComputer), findsOneWidget);
+    expect(find.text('0.9.95'), findsOneWidget);
+    expect(find.text('0.9.96'), findsOneWidget);
+    // מה חדש בגוף הדף, לא מאחורי כפתור.
+    expect(find.text(p.appWhatsNew('0.9.96')), findsOneWidget);
+    expect(
+      find.text(stringsOf().appScreen.whatsNewEmpty),
+      findsOneWidget,
+    );
+    // פעולה ראשית אחת — העדכון; "פתח את אוצריא" משנית.
+    expect(
+      tester.widget<ActionButton>(find.byKey(ShellKeys.statusPrimary)).text,
+      p.appUpdateButton('0.9.96'),
+    );
+    // בלי שתי גרסאות בכונן אין מה לבחור, ולכן אין פקד ערוץ.
+    await openAdvanced(tester);
+    expect(find.text(p.appChannelTitle), findsNothing);
+  });
+
+  testWidgets('מעודכנת — "פתח את אוצריא" ראשי, והתקנה מחדש במתקדם', (
+    tester,
+  ) async {
+    final p = stringsOf().pages;
     otzaria.status = OtzariaModuleStatus.upToDate;
     otzaria.currentVersion = '0.9.96';
     otzaria.latestVersion = '0.9.96';
+    var reinstalls = 0;
+    await pumpScreen(tester, otzariaPage(onReinstall: () => reinstalls++));
 
-    await pumpScreen(
-      tester,
-      OtzariaScreen(
-        otzaria: otzaria,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-      ),
+    expect(find.text(p.chipUpToDate), findsOneWidget);
+    expect(
+      tester.widget<ActionButton>(find.byKey(ShellKeys.statusPrimary)).text,
+      stringsOf().guide.launchButton,
     );
-
-    final button = tester.widget<ActionButton>(
-      find.widgetWithText(ActionButton, 'התקנה מחדש'),
+    await openAdvanced(tester);
+    // אותה גרסה — נאמר שזו התקנה חוזרת, לא "עדכון מ-0.9.96 ל-0.9.96".
+    expect(find.text(p.appReinstallBody('0.9.96')), findsOneWidget);
+    final button = find.descendant(
+      of: find.byKey(ShellKeys.appReinstall),
+      matching: find.byType(ActionButton),
     );
-    expect(button.onPressed, isNotNull);
-    // הדיאלוג אומר שזו אותה גרסה, ולא "עדכון מגרסה 0.9.96 לגרסה 0.9.96".
-    await tester.tap(find.widgetWithText(ActionButton, 'התקנה מחדש'));
-    await tester.pumpAndSettle();
-    expect(find.text('להתקין את אוצריא מחדש?'), findsOneWidget);
-    expect(find.textContaining('כבר מותקנת ומעודכנת'), findsOneWidget);
+    expect(tester.widget<ActionButton>(button).onPressed, isNotNull);
+    await tester.tap(button);
+    expect(reinstalls, 1);
   });
 
-  testWidgets('המותקן חדש מהתיקייה — הכפתור פעיל ואומר שזו נסיגת גרסה', (
+  testWidgets('המחשב מעודכן יותר מהכונן — מצב רגוע, בלי שום התקנה', (
     tester,
   ) async {
+    final p = stringsOf().pages;
     otzaria.status = OtzariaModuleStatus.installedIsNewer;
     otzaria.currentVersion = '0.9.97';
     otzaria.latestVersion = '0.9.96';
-
+    var installs = 0;
     await pumpScreen(
       tester,
-      OtzariaScreen(
-        otzaria: otzaria,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-      ),
+      otzariaPage(
+          onUpdateHere: () => installs++, onReinstall: () => installs++),
     );
 
-    await tester.tap(find.widgetWithText(ActionButton, 'התקנת הגרסה שבתיקייה'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('נסיגת גרסה ולא עדכון'), findsOneWidget);
+    expect(find.text(stringsOf().guide.chipNewerHere), findsOneWidget);
+    expect(find.text('0.9.97'), findsOneWidget);
+    // הפעולה היחידה בכרטיס — פתיחת אוצריא.
+    expect(
+      tester.widget<ActionButton>(find.byKey(ShellKeys.statusPrimary)).text,
+      stringsOf().guide.launchButton,
+    );
+    expect(find.textContaining('0.9.96 ', findRichText: true), findsNothing);
+    expect(find.text(p.appWhatsNew('0.9.96')), findsNothing);
+
+    await openAdvanced(tester);
+    expect(find.text(p.appReinstallUnavailable), findsOneWidget);
+    for (final button in tester.widgetList<ActionButton>(
+      find.byType(ActionButton),
+    )) {
+      if (button.text == stringsOf().appScreen.reinstallButton) {
+        expect(button.onPressed, isNull);
+      }
+    }
+    expect(installs, 0);
   });
 
-  testWidgets('אין מה להתקין — כפתור ההתקנה מושבת', (tester) async {
+  testWidgets('לא מותקנת ואין בכונן — אין כפתור התקנה, ויש הסבר', (
+    tester,
+  ) async {
+    final p = stringsOf().pages;
     otzaria.status = OtzariaModuleStatus.needsDownload;
+    await pumpScreen(tester, otzariaPage(onUpdateHere: () {}));
 
-    await pumpScreen(
-      tester,
-      OtzariaScreen(
-        otzaria: otzaria,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-      ),
-    );
+    expect(find.text(p.appChipNotInstalled), findsOneWidget);
+    expect(find.byKey(ShellKeys.statusPrimary), findsNothing);
+    expect(find.text(p.appInstallButton), findsNothing);
+    expect(find.text(p.appNeedsDownloadNote), findsOneWidget);
+  });
 
-    final button = tester.widget<ActionButton>(
-      find.widgetWithText(ActionButton, 'התקנת העדכון'),
-    );
-    expect(button.onPressed, isNull);
+  testWidgets('לא מותקנת ויש בכונן — "התקנת אוצריא" מוסר למשימה', (
+    tester,
+  ) async {
+    otzaria.status = OtzariaModuleStatus.updateAvailable;
+    otzaria.latestVersion = '0.9.96';
+    var installs = 0;
+    await pumpScreen(tester, otzariaPage(onUpdateHere: () => installs++));
+
+    expect(find.text(stringsOf().pages.appInstallButton), findsOneWidget);
+    expect(find.text(stringsOf().guide.launchButton), findsNothing);
+    await tester.tap(find.byKey(ShellKeys.statusPrimary));
+    expect(installs, 1);
   });
 
   testWidgets('בחירת ערוץ מוצגת רק כשיש שתי גרסאות, ונשמרת בהגדרות', (
@@ -171,6 +244,8 @@ void main() {
     otzaria.stableVersion = '0.9.90';
     otzaria.prereleaseVersion = '0.9.97';
     otzaria.latestVersion = '0.9.90';
+    // מצב קבוע — "בודק" מסתובב ולא נותן ל-pumpAndSettle להסתיים.
+    otzaria.status = OtzariaModuleStatus.upToDate;
 
     await pumpScreen(
       tester,
@@ -181,11 +256,12 @@ void main() {
         onCloseOtzaria: () async => true,
       ),
     );
+    await openAdvanced(tester);
 
-    expect(find.text('הגרסה שתותקן'), findsOneWidget);
-    expect(find.textContaining('הגרסה היציבה (0.9.90)'), findsOneWidget);
+    expect(find.text(stringsOf().pages.appChannelTitle), findsOneWidget);
+    expect(find.textContaining('0.9.90 (יציבה)'), findsOneWidget);
 
-    await tester.tap(find.text('לא יציבה'));
+    await tester.tap(find.text(stringsOf().appScreen.channelPrerelease));
     await tester.pumpAndSettle();
 
     expect(settings.settings.preferAppPrerelease, isTrue);
@@ -198,6 +274,7 @@ void main() {
     otzaria.stableVersion = '0.9.90';
     otzaria.prereleaseVersion = '0.9.97';
     otzaria.latestVersion = '0.9.90';
+    otzaria.status = OtzariaModuleStatus.upToDate;
     await tester.runAsync(
       () => settings.update(
         AppSettings(
@@ -217,8 +294,11 @@ void main() {
         saferMode: SaferModeGate(settings),
       ),
     );
+    await openAdvanced(tester);
 
-    await tester.tap(find.text('לא יציבה'));
+    // השבב אומר שזה נעול, והבחירה עצמה מבקשת סיסמה.
+    expect(find.text(stringsOf().pages.lockedChip), findsOneWidget);
+    await tester.tap(find.text(stringsOf().appScreen.channelPrerelease));
     await tester.pumpAndSettle();
 
     expect(find.text('הזן סיסמה'), findsOneWidget);
@@ -242,6 +322,7 @@ void main() {
         onCloseOtzaria: () async => true,
       ),
     );
+    await openAdvanced(tester);
 
     final selector = tester.widget<SegmentedButton<bool>>(
       find.byType(SegmentedButton<bool>),
@@ -266,6 +347,7 @@ void main() {
         onCloseOtzaria: () async => true,
       ),
     );
+    await openAdvanced(tester);
 
     final button = tester.widget<ActionButton>(
       find.widgetWithText(ActionButton, 'בחירת מיקום ידנית'),
@@ -359,25 +441,26 @@ void main() {
     expect(settings.settings.syncLibrary, isFalse);
   });
 
-  testWidgets('מסך הספרייה מציג מצב ואת התיקייה שממנה מעדכנים', (tester) async {
-    await pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async => false,
-        onRequestReindex: () async {},
-        onGoToSettings: () {},
-      ),
-    );
+  testWidgets('דף הספרייה: כרטיס מצב, ובמתקדם התיקייה שממנה מעדכנים', (
+    tester,
+  ) async {
+    final p = stringsOf().pages;
+    fakeLibraryUpdateAvailable();
+    var tasks = 0;
+    await pumpScreen(tester, libraryPage(onUpdateHere: () => tasks++));
 
-    expect(find.text('מצב המסד'), findsOneWidget);
-    expect(find.text('התיקייה שממנה מעדכנים'), findsOneWidget);
-    // אין יותר בחירת מקור — התיקייה קבועה ליד התוכנה.
+    expect(find.text(stringsOf().guide.tileLibrary), findsOneWidget);
+    expect(find.text(p.chipUpdateOnDrive), findsOneWidget);
+    expect(find.text(p.libVersion(1)), findsOneWidget);
+    expect(find.text(p.libVersion(2)), findsOneWidget);
+    await tester.tap(find.byKey(ShellKeys.statusPrimary));
+    expect(tasks, 1);
+
+    expect(find.text(p.libSourceTitle), findsNothing);
+    await openAdvanced(tester);
+    expect(find.text(p.libSourceTitle), findsOneWidget);
+    // אין בחירת מקור — התיקייה קבועה ליד התוכנה.
     expect(find.text('עדכון מתיקייה מקומית'), findsNothing);
-    expect(find.text('חזרה לעדכון מהרשת'), findsNothing);
   });
 
   testWidgets('"מה חדש בספרייה" לפני ההתקנה ואחריה, והדיאלוג מציג את הרשימה', (
@@ -462,44 +545,6 @@ void main() {
     expect(wentToSettings, 1);
   });
 
-  /// הכפתורים ישבו כשורה בתוך [AppCard.section], ולכן על משטח הכרטיס הלבן.
-  /// מקומם מתחתיו, על רקע הלוח.
-  testWidgets('כפתורי הפעולה של הכרטיס אינם יושבים על משטח הכרטיס', (
-    tester,
-  ) async {
-    Finder actionsInsideCard() => find.descendant(
-          of: find.byType(AppCard),
-          matching: find.byType(CardActionsRow),
-        );
-
-    await pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async => false,
-        onRequestReindex: () async {},
-        onGoToSettings: () {},
-      ),
-    );
-    expect(find.byType(CardActionsRow), findsOneWidget);
-    expect(actionsInsideCard(), findsNothing);
-
-    await pumpScreen(
-      tester,
-      OtzariaScreen(
-        otzaria: otzaria,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-      ),
-    );
-    expect(find.byType(CardActionsRow), findsOneWidget);
-    expect(actionsInsideCard(), findsNothing);
-  });
-
   // לפני התיקון ההתקנה הטרייה נחתה בתיקיית הלאנצ'ר בלי שאיש ראה זאת מראש.
   testWidgets('בלי מסד — מוצג יעד ההתקנה ואפשר לשנות אותו', (tester) async {
     library.installTargetPath = r'C:\otzaria\books\seforim.db';
@@ -516,9 +561,10 @@ void main() {
         onGoToSettings: () {},
       ),
     );
+    await openAdvanced(tester);
 
     expect(find.text('הספרייה תותקן אל'), findsOneWidget);
-    expect(find.text('קובץ seforim.db פעיל'), findsNothing);
+    expect(find.text(stringsOf().pages.libLocationTitle), findsNothing);
     expect(
       find.widgetWithText(ActionButton, 'בחירת מיקום להתקנה'),
       findsOneWidget,
@@ -540,123 +586,12 @@ void main() {
         onGoToSettings: () {},
       ),
     );
+    await openAdvanced(tester);
 
-    expect(find.text('קובץ seforim.db פעיל'), findsOneWidget);
+    expect(find.text(stringsOf().pages.libLocationTitle), findsOneWidget);
     expect(
       find.widgetWithText(ActionButton, 'בחירת מיקום להתקנה'),
       findsNothing,
-    );
-  });
-
-  testWidgets('מסך הספרייה חוסם לפי בדיקה טרייה — לא לפי מה שמוצג', (
-    tester,
-  ) async {
-    fakeLibraryUpdateAvailable();
-    var checks = 0;
-    // אותו תיקון כמו בדף הבית, ובמסך אחר: המסך עלה כשאוצריא הייתה פתוחה,
-    // ומאז נסגרה — והעדכון היה נחסם עד להפעלה מחדש של הלאנצ'ר.
-    await pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: true,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async {
-          checks++;
-          return false;
-        },
-        onRequestReindex: () async {},
-        onGoToSettings: () {},
-      ),
-    );
-
-    await tester.tap(find.widgetWithText(ActionButton, 'התקנת העדכון'));
-    await tester.pumpAndSettle();
-
-    expect(checks, 1);
-    expect(find.text('עדכן עכשיו'), findsOneWidget);
-  });
-
-  testWidgets('מסך הספרייה: אוצריא שנפתחה מאז הבנייה כן חוסמת', (tester) async {
-    fakeLibraryUpdateAvailable();
-    var checks = 0;
-    await pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async {
-          checks++;
-          return true;
-        },
-        onRequestReindex: () async {},
-        onGoToSettings: () {},
-      ),
-    );
-
-    await tester.tap(find.widgetWithText(ActionButton, 'התקנת העדכון'));
-    await tester.pumpAndSettle();
-
-    expect(checks, 1);
-    expect(find.text('עדכן עכשיו'), findsNothing);
-  });
-
-  // issue #19: patch שאינו מתאים למסד המקומי הותיר את המשתמש תקוע — אין
-  // בממשק שום דרך להתקין במקומו את המסד המלא שממילא יושב במראה.
-  testWidgets('כפתור הספרייה המלאה מופיע רק אחרי כשל, ופותח דיאלוג אישור', (
-    tester,
-  ) async {
-    final t = stringsOf().libraryScreen;
-    fakeLibraryUpdateAvailable();
-
-    await pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async => false,
-        onRequestReindex: () async {},
-        onGoToSettings: () {},
-      ),
-    );
-    expect(
-      find.widgetWithText(ActionButton, t.fullDownloadInsteadButton),
-      findsNothing,
-    );
-
-    // כמו אחרי כשל אמיתי של מסלול הדלתא. המסך הוא StatelessWidget שנבנה
-    // מחדש על ידי המסגרת, ולכן הבדיקה בונה אותו שוב ולא מסתמכת על notify.
-    library.status = LibraryModuleStatus.error;
-    library.errorMessage = 'ה-patch אינו מתאים למסד';
-    library.canRetryWithFullDownload = true;
-    await pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async => false,
-        onRequestReindex: () async {},
-        onGoToSettings: () {},
-      ),
-    );
-
-    await tester.tap(
-      find.widgetWithText(ActionButton, t.fullDownloadInsteadButton),
-    );
-    await tester.pumpAndSettle();
-
-    // הדיאלוג בלבד — ההתקנה עצמה נוגעת בדיסק ואינה חלק מבדיקת המסך.
-    // הגודל לא ידוע כאן (אין בדיקה אמיתית מאחור), וזה בדיוק מה שמוצג.
-    expect(
-      find.text(t.fullDownloadInsteadPrompt(stringsOf().common.unknownValue)),
-      findsOneWidget,
     );
   });
 
@@ -682,6 +617,7 @@ void main() {
         );
 
     await pumpLibrary();
+    await openAdvanced(tester);
     expect(find.text(t.reindexTitle), findsNothing);
 
     // כמו אחרי עדכון מסד מוצלח: הסימון נקרא בבדיקה ויושב בקונטרולר.
@@ -691,6 +627,7 @@ void main() {
       dbVersion: 42,
     );
     await pumpLibrary();
+    await openAdvanced(tester);
 
     expect(find.text(t.reindexTitle), findsOneWidget);
     await tester.tap(find.widgetWithText(ActionButton, t.reindexButton));
@@ -1347,42 +1284,26 @@ void main() {
     otzaria.prereleaseVersion = '0.9.99';
     otzaria.latestVersion = '0.9.99';
 
-    await pumpScreen(
-      tester,
-      OtzariaScreen(
-        otzaria: otzaria,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-      ),
-    );
+    await pumpScreen(tester, otzariaPage());
 
-    expect(find.text(t.mirrorVersionTitle), findsOneWidget);
+    expect(find.text(stringsOf().pages.onTheDrive), findsOneWidget);
     expect(find.text('0.9.99'), findsOneWidget);
+    await openAdvanced(tester);
     // בלי שתי גרסאות אין מה לבחור, ולכן אין פקד ערוץ ואין זוג גרסאות.
-    expect(find.text(t.channelTileTitle), findsNothing);
+    expect(find.text(stringsOf().pages.appChannelTitle), findsNothing);
     expect(find.text(t.channelStable), findsNothing);
     expect(find.text(t.channelPrerelease), findsNothing);
   });
 
-  testWidgets('מסך התוכנה מציג את הכרטיסים באנגלית', (tester) async {
-    final t = stringsOf(AppLanguage.english).appScreen;
+  testWidgets('דף התוכנה באנגלית', (tester) async {
+    final en = stringsOf(AppLanguage.english);
 
-    await pumpScreen(
-      tester,
-      OtzariaScreen(
-        otzaria: otzaria,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-      ),
-      language: AppLanguage.english,
-    );
+    await pumpScreen(tester, otzariaPage(), language: AppLanguage.english);
 
-    expect(find.text(t.stateCardTitle), findsOneWidget);
-    expect(find.text(t.whatsNewButton), findsOneWidget);
-    expect(find.text(t.sourceCardTitle), findsOneWidget);
-    expect(find.text(stringsOf().appScreen.stateCardTitle), findsNothing);
+    expect(find.text(en.guide.tileApp), findsOneWidget);
+    expect(find.text(en.pages.onThisComputer), findsOneWidget);
+    expect(find.text(en.pages.advancedTitle), findsOneWidget);
+    expect(find.text(stringsOf().guide.tileApp), findsNothing);
   });
 
   // שני המסכים עיצבו את "הורד לאחרונה" בעצמם דרך `DateTime.toString`, וכך
@@ -1404,7 +1325,8 @@ void main() {
         onCloseOtzaria: () async => true,
       ),
     );
-    expect(find.text(expected), findsOneWidget);
+    await openAdvanced(tester);
+    expect(find.textContaining(expected), findsOneWidget);
 
     library.lastDownloadedAt = at;
     await pumpScreen(
@@ -1419,7 +1341,8 @@ void main() {
         onGoToSettings: () {},
       ),
     );
-    expect(find.text(expected), findsOneWidget);
+    await openAdvanced(tester);
+    expect(find.textContaining(expected), findsOneWidget);
   });
 
   // ── מסך הספרייה: שגיאה והתקדמות ───────────────────────────────────────────
@@ -1440,11 +1363,12 @@ void main() {
         onGoToSettings: () {},
       ),
     );
+    await openAdvanced(tester);
 
     expect(find.byType(InfoErrorRow), findsOneWidget);
     expect(find.text('המראה המקומית פגומה'), findsOneWidget);
     expect(
-      find.text(stringsOf().libraryScreen.mirrorUnreadable),
+      find.textContaining(stringsOf().libraryScreen.mirrorUnreadable),
       findsOneWidget,
     );
   });
@@ -1471,10 +1395,15 @@ void main() {
         onGoToSettings: () {},
       ),
     );
+    await openAdvanced(tester);
 
     expect(find.text(stringsOf().libraryDomain.localDbLocked), findsOneWidget);
-    expect(find.text(t.mirrorNotChecked), findsOneWidget);
-    expect(find.text(t.mirrorUnreadable), findsNothing);
+    Finder inSource(String text) => find.descendant(
+          of: find.byKey(ShellKeys.librarySource),
+          matching: find.textContaining(text),
+        );
+    expect(inSource(t.mirrorNotChecked), findsOneWidget);
+    expect(inSource(t.mirrorUnreadable), findsNothing);
   });
 
   // מצב "עדכון אישי": האריח שמאפשר לרשום את הגרסה מופיע רק במצב הזה, כי הוא
@@ -1493,19 +1422,25 @@ void main() {
         );
 
     await pumpScreen(tester, screen());
+    await openAdvanced(tester);
     expect(find.text(t.personalVersionTitle), findsNothing);
 
     library.personalUpdateMode = true;
     await pumpScreen(tester, screen());
+    await openAdvanced(tester);
 
     expect(find.text(t.personalVersionTitle), findsOneWidget);
     // טרם נרשמה גרסה — המסך אומר במפורש איפה יש ללחוץ.
-    expect(find.text(t.personalVersionMissing), findsOneWidget);
+    expect(find.textContaining(t.personalVersionMissing), findsOneWidget);
     expect(find.text(t.personalVersionButton), findsOneWidget);
 
     library.personalFromVersion = 20;
     await pumpScreen(tester, screen());
-    expect(find.text(t.personalVersionRecorded('20')), findsOneWidget);
+    await openAdvanced(tester);
+    expect(
+      find.textContaining(t.personalVersionRecorded('20')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('מצב אישי בלי גרסה רשומה מדווח שירד המסד המלא', (tester) async {
@@ -1525,6 +1460,7 @@ void main() {
         onGoToSettings: () {},
       ),
     );
+    await openAdvanced(tester);
 
     expect(
       find.text(stringsOf().libraryScreen.downloadNotePersonalUnknownVersion),
@@ -1616,5 +1552,126 @@ void main() {
     expect(const AppSettings().preferAppPrerelease, isFalse);
     expect(reloaded.settings.preferAppPrerelease, isTrue);
     reloaded.dispose();
+  });
+
+  // ── מתקדם: כל שורה נגישה ────────────────────────────────────────────────
+
+  testWidgets('דף התוכנה: כל שורות המתקדם נגישות', (tester) async {
+    final p = stringsOf().pages;
+    otzaria.status = OtzariaModuleStatus.upToDate;
+    otzaria.currentVersion = '0.9.96';
+    otzaria.latestVersion = '0.9.96';
+    otzaria.hasChannelChoice = true;
+    otzaria.stableVersion = '0.9.96';
+    otzaria.prereleaseVersion = '0.9.97';
+    otzaria.launchPath = r'C:\Program Files\Otzaria\otzaria.exe';
+    await pumpScreen(tester, otzariaPage());
+
+    expect(find.byKey(ShellKeys.appChannel), findsNothing);
+    await openAdvanced(tester);
+    expect(find.byKey(ShellKeys.appChannel), findsOneWidget);
+    expect(find.byKey(ShellKeys.appReinstall), findsOneWidget);
+    expect(find.text(p.appLocationTitle), findsOneWidget);
+    expect(find.text(path.dirname(otzaria.launchPath!)), findsOneWidget);
+    expect(find.text(p.appSourceTitle), findsOneWidget);
+    expect(find.text(otzaria.mirrorDir), findsOneWidget);
+  });
+
+  testWidgets('דף הספרייה: כל שורות המתקדם נגישות', (tester) async {
+    final p = stringsOf().pages;
+    library
+      ..status = LibraryModuleStatus.upToDate
+      ..dbPath = r'C:\otzariaooks\seforim.db'
+      ..personalUpdateMode = true
+      ..pendingReindex = const ExternalUpdateNoticeData(
+        route: ExternalUpdateNotice.routeDelta,
+        booksTouched: {3},
+        dbVersion: 42,
+      );
+    var settingsOpened = 0;
+    await pumpScreen(
+      tester,
+      LibraryScreen(
+        library: library,
+        otzariaIsRunning: false,
+        onCloseOtzaria: () async => true,
+        isDownloading: false,
+        onProcessStateChanged: () async => false,
+        onRequestReindex: () async {},
+        onGoToSettings: () => settingsOpened++,
+      ),
+    );
+    await openAdvanced(tester);
+    for (final key in [
+      ShellKeys.libraryLocation,
+      ShellKeys.libraryReindex,
+      ShellKeys.libraryFull,
+      ShellKeys.libraryPersonal,
+      ShellKeys.librarySource,
+    ]) {
+      expect(find.byKey(key), findsOneWidget, reason: '$key');
+    }
+    expect(find.text(r'C:\otzariaooks\seforim.db'), findsOneWidget);
+    expect(find.text(stringsOf().libraryScreen.personalVersionTitle),
+        findsOneWidget);
+    // "עדכון למחשב מסוים" מופעל בהגדרות — השורה מובילה לשם.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(ShellKeys.libraryPersonal),
+        matching: find.byType(ActionButton),
+      ),
+    );
+    expect(settingsOpened, 1);
+    expect(find.textContaining(p.libPersonalOn), findsWidgets);
+  });
+
+  testWidgets('הספרייה לא נמצאה — בחירת מיקום או קובץ, בלי שום עדכון', (
+    tester,
+  ) async {
+    final p = stringsOf().pages;
+    library.status = LibraryModuleStatus.needsManualPath;
+    await pumpScreen(tester, libraryPage(onUpdateHere: () {}));
+
+    expect(find.text(p.libNotFoundTitle), findsOneWidget);
+    expect(find.text(p.libNotFoundBody), findsOneWidget);
+    expect(
+      tester.widget<ActionButton>(find.byKey(ShellKeys.statusPrimary)).text,
+      p.libPickFolderButton,
+    );
+    expect(find.text(stringsOf().libraryScreen.pickDbButton), findsOneWidget);
+    expect(find.text(p.libUpdateButton), findsNothing);
+  });
+
+  testWidgets('כונן מוגן: רישום המחשב לעדכון אישי מושבת, עם הסבר', (
+    tester,
+  ) async {
+    library.personalUpdateMode = true;
+    await pumpScreen(tester, libraryPage(readOnly: true));
+    await openAdvanced(tester);
+
+    expect(
+      find.textContaining(stringsOf().pages.libPersonalReadOnly),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<ActionButton>(
+            find.widgetWithText(
+              ActionButton,
+              stringsOf().libraryScreen.personalVersionButton,
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('קבצים חסרים בכונן — הודעה מעל הכרטיס', (tester) async {
+    library
+      ..status = LibraryModuleStatus.upToDate
+      ..mirroredCompanions = {CompanionAsset.talmud}
+      ..unavailableCompanions = {CompanionAsset.talmud};
+    await pumpScreen(tester, libraryPage());
+    expect(find.text(stringsOf().pages.libMissingFilesTitle), findsOneWidget);
   });
 }

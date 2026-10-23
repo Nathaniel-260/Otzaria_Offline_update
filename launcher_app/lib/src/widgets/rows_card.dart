@@ -27,6 +27,7 @@ class AppRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.label,
+    this.below,
   });
 
   final String title;
@@ -37,6 +38,9 @@ class AppRow extends StatelessWidget {
 
   /// שורת סיכום: תווית קטנה מעל ערך 16 במקום כותרת 14/600.
   final String? label;
+
+  /// מתחת לפירוט — למשל נתיב ([PathText]).
+  final Widget? below;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +67,7 @@ class AppRow extends StatelessWidget {
             style: AppTextStyles.rowSub.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
+        if (below != null) ...[const SizedBox(height: 4), below!],
       ],
     );
     final row = ConstrainedBox(

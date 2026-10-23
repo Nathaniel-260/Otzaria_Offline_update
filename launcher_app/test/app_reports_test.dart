@@ -16,9 +16,9 @@ import 'package:launcher_app/src/screens/app_report/app_report_dialog.dart';
 import 'package:launcher_app/src/screens/app_report/app_report_form.dart';
 import 'package:launcher_app/src/screens/app_report/app_report_images_section.dart';
 import 'package:launcher_app/src/screens/app_report/app_report_preview_section.dart';
+import 'package:launcher_app/src/screens/app_report/app_reports_panel.dart';
 import 'package:launcher_app/src/screens/app_report/app_reports_settings_card.dart';
 import 'package:launcher_app/src/screens/app_report/crash_prompt_dialog.dart';
-import 'package:launcher_app/src/screens/app_report/reports_management_dialog.dart';
 import 'package:launcher_app/src/services/file_reveal.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
@@ -446,7 +446,8 @@ void main() {
       final service = _MemoryService()..pending.add(_report('p1'));
       final settings = _MemorySettings();
       final reports = _controller(service, settings: settings);
-      await tester.pumpWidget(wrap(AppReportsSettingsCard(reports: reports)));
+      await tester.pumpWidget(
+          wrap(AppReportsSettingsCard(reports: reports, onOpenReports: () {})));
       await reports.refresh();
       await tester.pumpAndSettle();
 
@@ -479,7 +480,7 @@ void main() {
       final reports = _controller(service);
       await _open(
         tester,
-        (_) => ReportsManagementDialog(
+        (_) => _PanelDialog(
           reports: reports,
           openUrl: (url) async {
             opened.add(url);
@@ -488,12 +489,13 @@ void main() {
         ),
       );
 
-      expect(find.text(t.pendingCount(2)), findsOneWidget);
+      expect(find.text(stringsOf().pages.repOwnPending(2)), findsOneWidget);
       expect(find.text('ראשון'), findsOneWidget);
 
       final firstTile = find.byKey(const ValueKey('app-report-pending-p1'));
       await tester.tap(
-        find.descendant(of: firstTile, matching: find.text(t.deleteButton)),
+        find.descendant(
+            of: firstTile, matching: find.byTooltip(t.deleteButton)),
       );
       await tester.pumpAndSettle();
       expect(service.pending.map((r) => r.reportId), ['p2']);
@@ -501,7 +503,7 @@ void main() {
 
       final second = find.byKey(const ValueKey('app-report-pending-p2'));
       await tester.tap(
-        find.descendant(of: second, matching: find.text(t.sendOneButton)),
+        find.descendant(of: second, matching: find.byTooltip(t.sendOneButton)),
       );
       await tester.pumpAndSettle();
       expect(service.pending, isEmpty);
@@ -830,7 +832,7 @@ void main() {
       final service = _MemoryService()..pending.add(_report('p1'));
       await _open(
         tester,
-        (_) => ReportsManagementDialog(reports: _controller(service)),
+        (_) => _PanelDialog(reports: _controller(service)),
       );
 
       service.flushOutcome = const FlushOutcome(sent: 4, capped: true);
@@ -936,7 +938,7 @@ void main() {
       final service = _MemoryService()..pending.add(_report('p1'));
       await _open(
         tester,
-        (_) => ReportsManagementDialog(reports: _controller(service)),
+        (_) => _PanelDialog(reports: _controller(service)),
       );
       return service;
     }
@@ -987,7 +989,7 @@ void main() {
       final before = service.pendingListCalls;
       final tile = find.byKey(const ValueKey('app-report-pending-p1'));
       await tester.tap(
-        find.descendant(of: tile, matching: find.text(t.sendOneButton)),
+        find.descendant(of: tile, matching: find.byTooltip(t.sendOneButton)),
       );
       await tester.pumpAndSettle();
       expect(find.text(t.notPendingSnack), findsOneWidget);
@@ -1008,8 +1010,7 @@ void main() {
             builder: (context) => ActionButtonProbe(
               onPressed: () => showDialog<void>(
                 context: context,
-                builder: (_) =>
-                    ReportsManagementDialog(reports: _controller(service)),
+                builder: (_) => _PanelDialog(reports: _controller(service)),
               ),
             ),
           ),
@@ -1202,4 +1203,25 @@ class _ThrowingDetector extends UncleanExitDetector {
   @override
   Future<CrashCandidate?> detectPreviousCrash() async =>
       throw StateError('isolate failed');
+}
+
+/// הפאנל שבדף הדיווחים, בתוך חלון — כדי שהבדיקות ייפתחו כמו קודם.
+class _PanelDialog extends StatelessWidget {
+  const _PanelDialog({
+    required this.reports,
+    this.openUrl = _neverOpens,
+  });
+
+  final AppReportsController reports;
+  final Future<bool> Function(String url) openUrl;
+
+  static Future<bool> _neverOpens(String _) async => false;
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: AppReportsPanel(reports: reports, openUrl: openUrl),
+        ),
+      );
 }

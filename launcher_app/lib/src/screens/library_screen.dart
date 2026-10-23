@@ -4,13 +4,17 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../controllers/library_module_controller.dart';
 import '../flows/library_flows.dart';
+import '../services/byte_size.dart';
 import '../services/native_file_dialogs.dart';
 import '../services/timestamps.dart';
+import '../shell/shell_keys.dart';
+import '../theme/theme_exports.dart';
 import '../widgets/screen_body.dart';
 import '../widgets/widgets_exports.dart';
 
-/// מסך עדכון הספרייה — מציג את ה-DB שזוהה בפועל ומחיל עליו עדכון מהתיקייה
-/// שלצד התוכנה. אין כאן בחירת מקור: המקור תמיד אותה תיקייה.
+/// דף "הספרייה": כרטיס מצב עם פעולה אחת, הסכמה לחיפוש החכם, מה חדש,
+/// ומתקדם — מיקום, בניית החיפוש מחדש, הספרייה המלאה, עדכון למחשב מסוים
+/// והתיקייה שבכונן. ההחלה עצמה רצה במסך המשימה ("עדכון כאן", הספרייה בלבד).
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({
     super.key,
@@ -22,28 +26,41 @@ class LibraryScreen extends StatelessWidget {
     required this.onRequestReindex,
     required this.onGoToSettings,
     this.onGrantSemanticConsent,
+    this.onUpdateHere,
+    this.onInstallFull,
+    this.busy = false,
+    this.readOnly = false,
   });
 
   final LibraryModuleController library;
   final bool otzariaIsRunning;
   final bool isDownloading;
 
-  /// בודקת מחדש אם אוצריא פתוחה ומחזירה את התוצאה הטרייה — ראו
-  /// [_confirmUpdate].
+  /// בודקת מחדש אם אוצריא פתוחה — "בדוק שוב" מרענן גם את האזהרה.
   final Future<bool> Function() onProcessStateChanged;
 
-  /// מבקשת מאוצריא הפתוחה להיסגר ומחזירה אם היא אכן נסגרה — הכפתור שלצד
-  /// האזהרה, שמסיר את מה שחוסם את עדכון המסד.
+  /// מבקשת מאוצריא הפתוחה להיסגר ומחזירה אם היא אכן נסגרה.
   final Future<bool> Function() onCloseOtzaria;
 
-  /// מוסרת לאוצריא את בקשת עדכון אינדקס החיפוש. יושבת ב-`AppSession` כי
-  /// המסירה עוברת דרך קובץ ההרצה של אוצריא, שמודול האפליקציה מכיר.
+  /// מוסרת לאוצריא את בקשת בניית החיפוש. יושבת ב-`AppSession` כי המסירה
+  /// עוברת דרך קובץ ההרצה של אוצריא, שמודול האפליקציה מכיר.
   final Future<void> Function() onRequestReindex;
 
-  /// מעבירה למסך ההגדרות — שם מכבים "עדכון אישי". ראו
-  /// [LibraryModuleStatus.personalTargetElsewhere].
+  /// "עדכון למחשב מסוים" מופעל ומכובה בהגדרות.
   final VoidCallback onGoToSettings;
   final Future<void> Function()? onGrantSemanticConsent;
+
+  /// עדכון או התקנה של הספרייה במסך המשימה.
+  final VoidCallback? onUpdateHere;
+
+  /// הספרייה המלאה שבכונן, במקום עדכון שנכשל — באותו מסך משימה.
+  final VoidCallback? onInstallFull;
+
+  /// משימה ארוכה רצה במקום אחר.
+  final bool busy;
+
+  /// כונן מוגן: אי אפשר לרשום אליו את המחשב הזה.
+  final bool readOnly;
 
   bool get _isBusy =>
       library.isApplying ||
@@ -52,208 +69,461 @@ class LibraryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.strings.libraryScreen;
-
+    final c = library;
+    final t = context.strings.pages;
+    if (c.status == LibraryModuleStatus.needsManualPath) {
+      return ScreenBody(children: [_notFoundCard(context)]);
+    }
     return ScreenBody(
-      title: t.title,
       children: [
-        _stateCard(context),
-        _sourceCard(context),
+        ..._notices(context),
+        _statusCard(context),
+        if (c.semanticPending || c.semanticConsentGranted) ...[
+          SectionLabel(t.libSemanticSection),
+          _consentCard(context),
+        ],
+        if (c.changesNotes.isNotEmpty) ...[
+          SectionLabel(context.strings.libraryScreen.changesTitle),
+          _changesCard(context),
+        ],
+        AdvancedSection(
+          key: ShellKeys.pageAdvanced,
+          title: t.advancedTitle,
+          summary: t.libAdvancedSummary,
+          child: _advanced(context),
+        ),
       ],
     );
   }
 
-  // ── מצב המסד ──────────────────────────────────────────────────────────────
+  // ── הודעות מעל הכרטיס ─────────────────────────────────────────────────────
 
-  Widget _stateCard(BuildContext context) {
+  List<Widget> _notices(BuildContext context) {
     final c = library;
-    final t = context.strings.libraryScreen;
-
-    return SettingsCard(
-      title: t.stateCardTitle,
-      actions: [
-        RecheckButton(onPressed: _isBusy ? null : _recheck),
-        // ההתאוששות אחרי כשל דלתא — מוצגת רק אז, וכשיש מסד מלא במראה.
-        if (c.canRetryWithFullDownload)
-          ActionButton.neutral(
-            text: t.fullDownloadInsteadButton,
-            icon: FluentIcons.arrow_download_24_regular,
-            onPressed: _isBusy ? null : () => _confirmFullDownload(context),
-          ),
-        ActionButton.recommended(
-          text: t.installUpdateButton,
-          icon: FluentIcons.database_arrow_right_24_regular,
-          isLoading: c.status == LibraryModuleStatus.updating,
-          onPressed: c.status == LibraryModuleStatus.updateAvailable && !_isBusy
-              ? () => _confirmUpdate(context)
-              : null,
+    final t = context.strings.pages;
+    final s = context.strings.libraryScreen;
+    final g = context.strings.guide;
+    final domain = AppL10n.strings.libraryDomain;
+    const warning = IconTile(
+      icon: FluentIcons.warning_24_regular,
+      tone: IconTileTone.error,
+    );
+    return [
+      // רשומה במראה שהקובץ שלה לא נסע לכונן — בלי זה היא נעלמת לגמרי.
+      if (c.unavailableCompanions.isNotEmpty)
+        NoticeBanner(
+          kind: NoticeKind.warning,
+          leading: warning,
+          title: t.libMissingFilesTitle,
+          body: domain.companionsMissingFromMirror(c.unavailableCompanionNames),
         ),
-      ],
-      children: [
-        if (c.semanticConsentRequired)
-          SettingsActionTile.text(
-            icon: FluentIcons.info_24_regular,
-            title: context.strings.libraryDomain.companionSemanticName,
-            subtitle: context.strings.libraryDomain.semanticConsentRequired,
-            actions: [
-              ActionButton.recommended(
-                text: context.strings.libraryDomain.semanticConsentConfirm,
-                onPressed: _isBusy ? null : onGrantSemanticConsent,
-              ),
-            ],
-          ),
-        InfoStatusRow(
-          icon: FluentIcons.database_24_regular,
-          title: t.stateRowTitle,
-          kind: libraryStatusKind(c.status),
-          label: libraryStatusLabel(context, c),
+      // כונן שלא נשא אף נלווה נראה בדיוק כמו "הכול מעודכן" (issue #33).
+      if (c.mirrorLacksCompanions)
+        NoticeBanner(
+          kind: NoticeKind.warning,
+          leading: warning,
+          title: t.libMissingFilesTitle,
+          body: domain.companionsAbsentFromMirror,
         ),
-        // כשאין עדיין מסד, האריח מציג את **יעד ההתקנה** ולא "לא נמצא": שם
-        // ינחתו הספרים, וזו ההזדמנות לשנות את המיקום לפני שהם יורדים.
-        // הנתיב עצמו אינו מוצג — הוא ארוך, ומעתיקים אותו בכפתור.
-        SettingsActionTile.text(
-          icon: FluentIcons.document_24_regular,
-          title: c.dbPath == null ? t.installTargetTitle : t.dbFileTitle,
-          subtitle: c.dbPath == null && c.installTargetPath == null
-              ? t.dbFileMissing
-              : null,
+      if (c.status == LibraryModuleStatus.personalTargetElsewhere)
+        NoticeBanner(
+          leading: const IconTile(
+            icon: FluentIcons.person_24_regular,
+            tone: IconTileTone.quiet,
+          ),
+          title: s.personalOtherMachineTitle,
+          body: s.personalOtherMachineSubtitle(
+            c.personalFromVersion?.toString() ??
+                context.strings.common.unknownValue,
+          ),
           actions: [
-            if (c.dbPath ?? c.installTargetPath case final path?)
-              CopyPathButton(path: path),
-            if (c.dbPath == null)
-              ActionButton.neutral(
-                text: t.pickInstallDirButton,
-                icon: FluentIcons.folder_add_24_regular,
-                onPressed: _isBusy ? null : () => _pickInstallDir(context),
-              ),
             ActionButton.neutral(
-              text: t.pickDbButton,
-              icon: FluentIcons.folder_open_24_regular,
-              onPressed: _isBusy ? null : () => _pickDbFile(context),
+              text: s.personalOtherMachineCaptureButton,
+              onPressed: _isBusy || readOnly
+                  ? null
+                  : () => _capturePersonalVersion(context),
+            ),
+            ActionButton.ghost(
+              text: s.personalOtherMachineSettingsButton,
+              onPressed: onGoToSettings,
             ),
           ],
         ),
-        SettingsActionTile.text(
-          icon: FluentIcons.number_symbol_24_regular,
-          title: t.localVersionTitle,
-          subtitle:
-              c.localVersion?.toString() ?? context.strings.common.unknownValue,
-          subtitleLtr: c.localVersion != null,
+      if (otzariaIsRunning)
+        NoticeBanner(
+          kind: NoticeKind.banner,
+          leading: const IconTile(icon: FluentIcons.warning_24_regular),
+          title: s.otzariaRunningTitle,
+          body: g.otzariaOpenBody,
+          actions: [CloseOtzariaButton(onClose: onCloseOtzaria)],
         ),
-        SettingsActionTile.text(
-          icon: FluentIcons.folder_24_regular,
-          title: t.targetVersionTitle,
-          subtitle: c.targetVersion?.toString() ??
-              (c.status == LibraryModuleStatus.needsDownload
-                  ? t.targetVersionNothingDownloaded
-                  : t.targetVersionUnknown),
-          subtitleLtr: c.targetVersion != null,
+    ];
+  }
+
+  // ── כרטיס המצב ────────────────────────────────────────────────────────────
+
+  Widget _chip(BuildContext context) {
+    final c = library;
+    final t = context.strings.pages;
+    final g = context.strings.guide;
+    final (kind, label) = switch (c.status) {
+      LibraryModuleStatus.idle || LibraryModuleStatus.checking => (
+          StatusKind.working,
+          g.chipChecking
         ),
-        // רשומה במראה שהקובץ שלה לא נסע לכונן. אינה הצעה — ולכן היא הייתה
-        // נעלמת לגמרי בלי השורה הזו.
-        if (c.unavailableCompanions.isNotEmpty)
-          SettingsActionTile.text(
-            icon: FluentIcons.warning_24_regular,
-            title: t.updateRouteNoteTitle,
-            subtitle: AppL10n.strings.libraryDomain
-                .companionsMissingFromMirror(c.unavailableCompanionNames),
-          ),
-        // כונן שלא נשא אף נלווה נראה בדיוק כמו "הכול מעודכן" (issue #33).
-        if (c.mirrorLacksCompanions)
-          SettingsActionTile.text(
-            icon: FluentIcons.warning_24_regular,
-            title: t.updateRouteNoteTitle,
-            subtitle: AppL10n.strings.libraryDomain.companionsAbsentFromMirror,
+      LibraryModuleStatus.updating => (StatusKind.working, g.chipUpdating),
+      LibraryModuleStatus.error => (StatusKind.error, g.chipAttention),
+      LibraryModuleStatus.updateAvailable when c.isFreshInstall => (
+          StatusKind.updateAvailable,
+          g.chipReadyToInstall,
+        ),
+      LibraryModuleStatus.updateAvailable when c.companionsOnly => (
+          StatusKind.updateAvailable,
+          t.libChipCompanions(c.pendingCompanionNames),
+        ),
+      LibraryModuleStatus.updateAvailable => (
+          StatusKind.updateAvailable,
+          t.chipUpdateOnDrive,
+        ),
+      LibraryModuleStatus.upToDate => (StatusKind.ok, t.chipUpToDate),
+      LibraryModuleStatus.needsDownload => (
+          StatusKind.needsAction,
+          g.chipNotOnDrive,
+        ),
+      LibraryModuleStatus.needsManualPath => (
+          StatusKind.needsAction,
+          t.libNotFoundTitle,
+        ),
+      LibraryModuleStatus.personalTargetElsewhere => (
+          StatusKind.needsAction,
+          t.libChipOtherMachine,
+        ),
+    };
+    return StatusChip(kind: kind, label: label);
+  }
+
+  Widget _statusCard(BuildContext context) {
+    final c = library;
+    final t = context.strings.pages;
+    final s = context.strings.libraryScreen;
+    final updating = c.status == LibraryModuleStatus.updating;
+    final canUpdate = c.status == LibraryModuleStatus.updateAvailable;
+    final downloadedAt = c.lastDownloadedAt;
+    final local = c.localVersion;
+    final target = c.targetVersion;
+    final sub = AppTextStyles.rowSub.copyWith(
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+
+    return StatusCard(
+      icon: FluentIcons.library_24_regular,
+      title: context.strings.guide.tileLibrary,
+      chip: _chip(context),
+      values: [
+        StatusValue(
+          label: t.onThisComputer,
+          value: local != null
+              ? t.libVersion(local)
+              : c.isFreshInstall
+                  ? t.libNotInstalled
+                  : context.strings.common.unknownValue,
+        ),
+        StatusValue(
+          label: t.onTheDrive,
+          value: target != null
+              ? t.libVersion(target)
+              : c.status == LibraryModuleStatus.needsDownload
+                  ? t.nothingYet
+                  : context.strings.common.unknownValue,
+          meta: target != null && downloadedAt != null
+              ? t.downloadedOn(formatDate(downloadedAt))
+              : null,
+        ),
+      ],
+      extra: [
+        if (updating) libraryApplyProgressRow(context, c),
+        if (c.errorMessage case final error?)
+          InfoErrorRow(
+            message: error,
+            onRetry: _isBusy ? null : c.checkForUpdate,
           ),
         // הורדה של מסד שלם במקום קובצי עדכון היא הפרש של שלוש סדרי גודל,
         // ולכן הסיבה נאמרת ולא נשארת בלוג בלבד.
-        if (c.updateRouteNote case final note?)
-          SettingsActionTile.text(
-            icon: FluentIcons.info_24_regular,
-            title: t.updateRouteNoteTitle,
-            subtitle: note,
+        if (c.updateRouteNote case final note?) Text(note, style: sub),
+      ],
+      actions: [
+        if (canUpdate)
+          ActionButton.recommended(
+            key: ShellKeys.statusPrimary,
+            text: c.isFreshInstall ? t.libInstallButton : t.libUpdateButton,
+            onPressed: _isBusy || busy ? null : onUpdateHere,
           ),
-        if (otzariaIsRunning)
-          SettingsActionTile.text(
-            icon: FluentIcons.warning_24_regular,
-            title: t.otzariaRunningTitle,
-            subtitle: t.otzariaRunningSubtitle,
-            actions: [CloseOtzariaButton(onClose: onCloseOtzaria)],
+        // ההתאוששות אחרי כשל עדכון — גם כאן, ולא רק במתקדם.
+        if (c.canRetryWithFullDownload)
+          ActionButton.neutral(
+            text: s.fullDownloadInsteadButton,
+            onPressed: _isBusy || busy ? null : onInstallFull,
           ),
-        if (c.changesNotes.isNotEmpty)
-          SettingsActionTile.text(
-            icon: FluentIcons.news_24_regular,
-            title: t.changesTitle,
-            subtitle: [
-              c.changesNotesApplied
-                  ? t.changesAppliedSubtitle('${c.changesNotesVersion}')
-                  : t.changesPendingSubtitle('${c.changesNotesVersion}'),
-              if (c.changesNotesPartial)
-                t.changesPartial(c.changesNotes.length, c.changesNotesRange),
-            ].join('\n'),
-            actions: [
-              ActionButton.neutral(
-                text: t.changesButton,
-                icon: FluentIcons.document_text_24_regular,
-                onPressed: () => showLibraryChangesDialog(context, c),
-              ),
-            ],
-          ),
-        // האינדקס של אוצריא אינו יודע שהמסד התחלף מתחתיו, ולכן חיפוש בספר
-        // שהשתנה מחזיר תוכן ישן עד שהבקשה נמסרת.
-        if (c.hasPendingReindex)
-          SettingsActionTile.text(
-            icon: FluentIcons.search_24_regular,
-            title: t.reindexTitle,
-            subtitle: t.reindexPendingSubtitle,
-            actions: [
-              ActionButton.recommended(
-                text: t.reindexButton,
-                icon: FluentIcons.play_24_regular,
-                onPressed: _isBusy ? null : onRequestReindex,
-              ),
-            ],
-          ),
-        // המראה של מחשב אחר. מידע, לא שגיאה — ראו
-        // [LibraryModuleStatus.personalTargetElsewhere].
-        if (c.status == LibraryModuleStatus.personalTargetElsewhere)
-          SettingsActionTile.text(
-            icon: FluentIcons.person_24_regular,
-            title: t.personalOtherMachineTitle,
-            subtitle: t.personalOtherMachineSubtitle(
-              c.personalFromVersion?.toString() ??
-                  context.strings.common.unknownValue,
+      ],
+      endActions: [RecheckButton(onPressed: _isBusy ? null : _recheck)],
+    );
+  }
+
+  Widget _notFoundCard(BuildContext context) {
+    final t = context.strings.pages;
+    return StatusCard(
+      icon: FluentIcons.library_24_regular,
+      quiet: true,
+      title: t.libNotFoundTitle,
+      subtitle: t.libNotFoundBody,
+      actions: [
+        ActionButton.recommended(
+          key: ShellKeys.statusPrimary,
+          text: t.libPickFolderButton,
+          icon: FluentIcons.folder_open_24_regular,
+          onPressed: _isBusy ? null : () => _pickInstallDir(context),
+        ),
+        ActionButton.ghost(
+          text: context.strings.libraryScreen.pickDbButton,
+          onPressed: _isBusy ? null : () => _pickDbFile(context),
+        ),
+      ],
+      endActions: [RecheckButton(onPressed: _isBusy ? null : _recheck)],
+    );
+  }
+
+  /// "בדוק שוב" מרענן גם את מצב התהליך — האזהרה "אוצריא פתוחה" באותו דף.
+  Future<void> _recheck() async {
+    await onProcessStateChanged();
+    await library.checkForUpdate();
+  }
+
+  // ── חיפוש חכם ─────────────────────────────────────────────────────────────
+
+  Widget _consentCard(BuildContext context) {
+    final c = library;
+    final t = context.strings.pages;
+    final cs = Theme.of(context).colorScheme;
+    final granted = c.semanticConsentGranted;
+    return Container(
+      key: ShellKeys.libraryConsent,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: BoxDecoration(
+        color: AppSurfaces.card(context),
+        borderRadius: AppTokens.borderRadiusAll,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const IconTile(icon: FluentIcons.sparkle_24_regular),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      t.libSemanticTitle,
+                      style: AppTextStyles.rowValue.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: AppTextStyles.semibold,
+                      ),
+                    ),
+                    if (granted)
+                      StatusChip(
+                        kind: StatusKind.ok,
+                        label: t.libSemanticActive,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  granted ? t.libSemanticActiveBody : t.libSemanticBody,
+                  style: AppTextStyles.body.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                if (!granted) ...[
+                  const SizedBox(height: 14),
+                  ActionButton.neutral(
+                    text: t.libSemanticGrant,
+                    onPressed: _isBusy ? null : onGrantSemanticConsent,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    t.libSemanticClosedNote,
+                    style: AppTextStyles.meta.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            actions: [
-              ActionButton.neutral(
-                text: t.personalOtherMachineCaptureButton,
-                icon: FluentIcons.database_search_24_regular,
-                onPressed:
-                    _isBusy ? null : () => _capturePersonalVersion(context),
-              ),
-              ActionButton.neutral(
-                text: t.personalOtherMachineSettingsButton,
-                icon: FluentIcons.settings_24_regular,
-                onPressed: onGoToSettings,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── מה חדש ────────────────────────────────────────────────────────────────
+
+  /// הרשימה עצמה יכולה למנות אלפי ספרים — היא נפתחת בחלון משלה.
+  Widget _changesCard(BuildContext context) {
+    final c = library;
+    final s = context.strings.libraryScreen;
+    return NewsCard(
+      items: [
+        c.changesNotesApplied
+            ? s.changesAppliedSubtitle('${c.changesNotesVersion}')
+            : s.changesPendingSubtitle('${c.changesNotesVersion}'),
+        if (c.changesNotesPartial)
+          s.changesPartial(c.changesNotes.length, c.changesNotesRange),
+      ],
+      footer: ActionButton.ghost(
+        text: s.changesButton,
+        icon: FluentIcons.document_text_24_regular,
+        size: ActionButtonSize.sm,
+        onPressed: () => showLibraryChangesDialog(context, c),
+      ),
+    );
+  }
+
+  // ── מתקדם ─────────────────────────────────────────────────────────────────
+
+  Widget _advanced(BuildContext context) {
+    final c = library;
+    final t = context.strings.pages;
+    final s = context.strings.libraryScreen;
+    final common = context.strings.common;
+    final location = c.dbPath ?? c.installTargetPath;
+    final fullSize = c.fullDownloadFallbackSize;
+    final downloadedAt = c.lastDownloadedAt;
+
+    return RowsCard(
+      children: [
+        // בלי מסד מוצג **יעד ההתקנה**: שם ינחתו הספרים, וזו ההזדמנות לשנות.
+        AppRow(
+          key: ShellKeys.libraryLocation,
+          title: c.dbPath == null ? s.installTargetTitle : t.libLocationTitle,
+          subtitle: location == null ? s.dbFileMissing : null,
+          below: location == null ? null : PathText(location),
+          trailing: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (c.dbPath == null)
+                ActionButton.ghost(
+                  text: s.pickInstallDirButton,
+                  icon: FluentIcons.folder_open_24_regular,
+                  onPressed: _isBusy ? null : () => _pickInstallDir(context),
+                ),
+              ActionButton.ghost(
+                text: s.pickDbButton,
+                icon: FluentIcons.document_24_regular,
+                onPressed: _isBusy ? null : () => _pickDbFile(context),
               ),
             ],
           ),
-        if (c.errorMessage != null)
-          InfoErrorRow(
-            message: c.errorMessage!,
-            onRetry: _isBusy ? null : c.checkForUpdate,
+        ),
+        // האינדקס של אוצריא אינו יודע שהמסד התחלף מתחתיו — הבקשה נמסרת רק
+        // כשאוצריא השאירה סימון.
+        if (c.hasPendingReindex)
+          AppRow(
+            key: ShellKeys.libraryReindex,
+            title: s.reindexTitle,
+            subtitle: s.reindexPendingSubtitle,
+            trailing: ActionButton.neutral(
+              text: s.reindexButton,
+              onPressed: _isBusy ? null : onRequestReindex,
+            ),
           ),
-        if (c.status == LibraryModuleStatus.updating)
-          libraryApplyProgressRow(context, c),
+        AppRow(
+          key: ShellKeys.libraryFull,
+          title: t.libFullTitle,
+          subtitle: c.canRetryWithFullDownload
+              ? t.libFullBody(
+                  fullSize != null && fullSize > 0
+                      ? formatBytes(fullSize)
+                      : common.unknownValue,
+                )
+              : t.libFullUnavailable,
+          trailing: ActionButton.neutral(
+            text: s.fullDownloadInsteadButton,
+            onPressed: c.canRetryWithFullDownload && !_isBusy && !busy
+                ? onInstallFull
+                : null,
+          ),
+        ),
+        AppRow(
+          key: ShellKeys.libraryPersonal,
+          title: t.libPersonalTitle,
+          subtitle: [
+            c.personalUpdateMode ? t.libPersonalOn : t.libPersonalOff,
+            t.libPersonalSettingsNote,
+          ].join(' · '),
+          trailing: ActionButton.ghost(
+            text: s.personalOtherMachineSettingsButton,
+            onPressed: onGoToSettings,
+          ),
+        ),
+        // רק במצב אישי: זו נקודת המוצא של ההורדה, והיא נרשמת אך ורק כאן.
+        if (c.personalUpdateMode)
+          AppRow(
+            title: s.personalVersionTitle,
+            subtitle: [
+              c.personalFromVersion != null
+                  ? s.personalVersionRecorded('${c.personalFromVersion}')
+                  : s.personalVersionMissing,
+              if (readOnly) t.libPersonalReadOnly,
+            ].join('\n'),
+            trailing: ActionButton.neutral(
+              text: s.personalVersionButton,
+              onPressed: _isBusy || readOnly
+                  ? null
+                  : () => _capturePersonalVersion(context),
+            ),
+          ),
+        if (c.personalUpdateMode && c.personalDownloadNote != null)
+          AppRow(
+            title: s.downloadNoteTitle,
+            subtitle: switch (c.personalDownloadNote!) {
+              LibraryPersonalDownloadNote.fromRecordedVersion =>
+                s.downloadNotePersonal('${c.personalFromVersion}'),
+              LibraryPersonalDownloadNote.versionUnknown =>
+                s.downloadNotePersonalUnknownVersion,
+              LibraryPersonalDownloadNote.upToDate =>
+                s.downloadNotePersonalUpToDate('${c.personalFromVersion}'),
+            },
+          ),
+        AppRow(
+          key: ShellKeys.librarySource,
+          title: t.libSourceTitle,
+          subtitle: [
+            _mirrorContent(context),
+            if (downloadedAt != null)
+              '${common.lastDownloaded}: ${formatTimestamp(downloadedAt)}',
+          ].join('\n'),
+          below: PathText(c.mirrorDir),
+          trailing: CopyPathButton(path: c.mirrorDir),
+        ),
       ],
     );
   }
 
-  /// "בדוק שוב" מרענן גם את מצב התהליך: האזהרה "אוצריא פתוחה" יושבת באותו
-  /// כרטיס, ולחיצה על הכפתור שמתחתיה אמורה לרענן גם אותה.
-  Future<void> _recheck() async {
-    await onProcessStateChanged();
-    await library.checkForUpdate();
+  String _mirrorContent(BuildContext context) {
+    final c = library;
+    final s = context.strings.libraryScreen;
+    return switch (c.status) {
+      LibraryModuleStatus.needsDownload => s.mirrorEmpty,
+      LibraryModuleStatus.error when c.localDbUnreadable => s.mirrorNotChecked,
+      LibraryModuleStatus.error => s.mirrorUnreadable,
+      _ => c.targetVersion != null
+          ? s.mirrorHasVersion('${c.targetVersion}')
+          : s.mirrorPresent,
+    };
   }
 
   Future<void> _pickDbFile(BuildContext context) async {
@@ -268,8 +538,7 @@ class LibraryScreen extends StatelessWidget {
     UiSnack.showSuccess(t.dbPathUpdatedSnack);
   }
 
-  /// בחירת התיקייה שאליה תותקן ספרייה חדשה — הדרך לשנות את יעד ההתקנה לפני
-  /// שהיא מתחילה.
+  /// התיקייה שאליה תותקן ספרייה חדשה, או שבה היא יושבת עכשיו.
   Future<void> _pickInstallDir(BuildContext context) async {
     final t = context.strings.libraryScreen;
     final dir = await NativeFileDialogs.pickDirectory(
@@ -300,103 +569,8 @@ class LibraryScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmUpdate(BuildContext context) => confirmLibraryUpdate(
-        context,
-        library: library,
-        dialogTitle: (strings) => strings.libraryScreen.updateDialogTitle,
-        isOtzariaRunning: onProcessStateChanged,
-        onRequestReindex: onRequestReindex,
-      );
-
-  Future<void> _confirmFullDownload(BuildContext context) =>
-      confirmLibraryFullDownload(
-        context,
-        library: library,
-        isOtzariaRunning: onProcessStateChanged,
-        onRequestReindex: onRequestReindex,
-      );
-
-  // ── התיקייה שממנה מעדכנים ─────────────────────────────────────────────────
-
-  Widget _sourceCard(BuildContext context) {
-    final c = library;
-    final t = context.strings.libraryScreen;
-
-    return SettingsCard(
-      title: t.sourceCardTitle,
-      hint: t.sourceCardHint,
-      children: [
-        // הנתיב עצמו אינו מוצג — הוא קבוע, ארוך, ומה שעושים איתו זה להעתיק.
-        SettingsActionTile.text(
-          icon: FluentIcons.folder_24_regular,
-          title: t.sourceDirTitle,
-          actions: [CopyPathButton(path: c.mirrorDir)],
-        ),
-        InfoStatusRow(
-          icon: FluentIcons.arrow_download_24_regular,
-          title: t.mirrorContentTitle,
-          kind: switch (c.status) {
-            LibraryModuleStatus.needsDownload => StatusKind.needsAction,
-            LibraryModuleStatus.error when c.localDbUnreadable =>
-              StatusKind.unknown,
-            LibraryModuleStatus.error => StatusKind.error,
-            _ => StatusKind.ok,
-          },
-          label: switch (c.status) {
-            LibraryModuleStatus.needsDownload => t.mirrorEmpty,
-            LibraryModuleStatus.error when c.localDbUnreadable =>
-              t.mirrorNotChecked,
-            LibraryModuleStatus.error => t.mirrorUnreadable,
-            _ => c.targetVersion != null
-                ? t.mirrorHasVersion('${c.targetVersion}')
-                : t.mirrorPresent,
-          },
-        ),
-        if (c.lastDownloadedAt != null)
-          SettingsActionTile.text(
-            icon: FluentIcons.history_24_regular,
-            title: context.strings.common.lastDownloaded,
-            subtitle: formatTimestamp(c.lastDownloadedAt!),
-          ),
-        // רק במצב אישי: זו נקודת המוצא של ההורדה, והיא נרשמת אך ורק כאן —
-        // התוכנה אינה קוראת את גרסת המסד מעצמה.
-        if (c.personalUpdateMode)
-          SettingsActionTile.text(
-            icon: FluentIcons.person_24_regular,
-            title: t.personalVersionTitle,
-            subtitle: c.personalFromVersion != null
-                ? t.personalVersionRecorded('${c.personalFromVersion}')
-                : t.personalVersionMissing,
-            actions: [
-              ActionButton.neutral(
-                text: t.personalVersionButton,
-                icon: FluentIcons.database_search_24_regular,
-                onPressed:
-                    _isBusy ? null : () => _capturePersonalVersion(context),
-              ),
-            ],
-          ),
-        if (c.personalUpdateMode && c.personalDownloadNote != null)
-          SettingsActionTile.text(
-            icon: FluentIcons.info_24_regular,
-            title: t.downloadNoteTitle,
-            subtitle: switch (c.personalDownloadNote!) {
-              LibraryPersonalDownloadNote.fromRecordedVersion =>
-                t.downloadNotePersonal('${c.personalFromVersion}'),
-              LibraryPersonalDownloadNote.versionUnknown =>
-                t.downloadNotePersonalUnknownVersion,
-              LibraryPersonalDownloadNote.upToDate =>
-                t.downloadNotePersonalUpToDate('${c.personalFromVersion}'),
-              LibraryPersonalDownloadNote.mirrorRepaired =>
-                t.downloadNotePersonalMirrorRepaired,
-            },
-          ),
-      ],
-    );
-  }
-
-  /// קוראת את גרסת המסד של המחשב הזה ורושמת אותה. הדיווח הוא snack ולא שדה
-  /// מצב: לחיצה שלא מצאה מסד היא מידע חד-פעמי, לא תקלה שנשארת על המסך.
+  /// קוראת את גרסת המסד של המחשב הזה ורושמת אותה. snack ולא שדה מצב:
+  /// לחיצה שלא מצאה מסד היא מידע חד-פעמי, לא תקלה שנשארת בדף.
   Future<void> _capturePersonalVersion(BuildContext context) async {
     final t = context.strings.libraryScreen;
     final captured = await library.capturePersonalVersion();
@@ -407,7 +581,8 @@ class LibraryScreen extends StatelessWidget {
       );
     } else {
       UiSnack.showError(
-          library.personalCaptureError ?? t.personalVersionNotFoundSnack);
+        library.personalCaptureError ?? t.personalVersionNotFoundSnack,
+      );
     }
   }
 }

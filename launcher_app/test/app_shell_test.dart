@@ -21,12 +21,14 @@ import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
 import 'package:launcher_app/src/screens/faq/faq_dialog.dart';
 import 'package:launcher_app/src/screens/home/home_page.dart';
+import 'package:launcher_app/src/screens/launcher/launcher_update_page.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
 import 'package:launcher_app/src/screens/otzaria_screen.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_detail_view.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_sync_overlay.dart';
 import 'package:launcher_app/src/screens/plugins/plugins_screen.dart';
 import 'package:launcher_app/src/screens/reports_upload_section.dart';
+import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/screens/settings_screen.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/mirror_download_undo.dart';
@@ -668,6 +670,32 @@ void main() {
     testWidgets('בכונן כתיב יש "בדוק עכשיו" ליד "נבדק ב-"', (tester) async {
       await pumpShell(tester);
       expect(find.byKey(ShellKeys.checkNow), findsOneWidget);
+    });
+  });
+
+  group('דפי שלב 3 בתוך הגוף', () {
+    testWidgets('עדכון הכלי הזה: דף משנה עם פירור, וחזרה לבית', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      await navigatorOf(tester).select(ShellSection.launcher);
+      await tester.pump();
+
+      expect(find.byType(LauncherUpdatePage), findsOneWidget);
+      expect(find.text(stringsOf().pages.selfCrumb), findsOneWidget);
+      await back(tester);
+      expect(navigatorOf(tester).section, ShellSection.home);
+    });
+
+    testWidgets('דף הדיווחים נפתח גם כשאין מה לשלוח — מהניווט', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      expect(find.byKey(ShellKeys.tile(ShellSection.reports)), findsNothing);
+      await navigatorOf(tester).select(ShellSection.reports);
+      await tester.pump();
+      expect(find.byType(ReportsPage), findsOneWidget);
+      expect(find.text(stringsOf().pages.repNothingTitle), findsOneWidget);
     });
   });
 

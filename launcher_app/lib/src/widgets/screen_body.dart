@@ -3,15 +3,18 @@ import 'package:flutter/material.dart';
 import '../theme/theme_exports.dart';
 import 'sub_page_header.dart';
 
-/// גוף דף (`.page`): כותרת 20/600 ורשימת כרטיסים, ברוחב תוכן של עד 720
-/// וממורכז, עם ריפוד 28/24/40.
+/// גוף דף (`.page`): כותרת 20/600 עם הסבר אופציונלי (`.pagehead`) ורשימת
+/// כרטיסים, ברוחב תוכן של עד 720 וממורכז, עם ריפוד 28/24/40. דף שכרטיס
+/// המצב שלו נושא את השם — בלי [title].
 class ScreenBody extends StatelessWidget {
-  final String title;
+  final String? title;
+  final String? description;
   final List<Widget> children;
 
   const ScreenBody({
     super.key,
-    required this.title,
+    this.title,
+    this.description,
     required this.children,
   });
 
@@ -30,10 +33,29 @@ class ScreenBody extends StatelessWidget {
           padding: padding,
           children: [
             if (header != null) header,
-            Text(
-              title,
-              style: AppTextStyles.pageTitle.copyWith(color: cs.onSurface),
-            ),
+            if (title != null)
+              Padding(
+                padding: EdgeInsets.only(bottom: description != null ? 20 : 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title!,
+                      style:
+                          AppTextStyles.pageTitle.copyWith(color: cs.onSurface),
+                    ),
+                    if (description != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        description!,
+                        style: AppTextStyles.body.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ...children,
           ],
         ),
