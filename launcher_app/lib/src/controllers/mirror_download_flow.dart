@@ -47,6 +47,9 @@ abstract interface class MirrorDownloadHost {
   void downloadSnapshotFailed(Object error);
   void downloadCancelled({Object? revertError});
   void downloadEnded();
+
+  /// חריג שלא נתפס בזרימה — המסך עובר לכשל, ולא נשאר תקוע ב"מתכונן".
+  void downloadCrashed(Object error, StackTrace stackTrace);
   void downloadFinished({
     required List<MirrorComponent> failed,
     required List<MirrorComponent> skipped,
@@ -69,6 +72,7 @@ class MirrorDownloadFlow {
   bool _isDownloading = false;
   bool _cancelRequested = false;
   bool _isPreparing = false;
+  bool _abandonRequested = false;
   Future<void>? _run;
   Future<void>? _sweep;
   DownloadPlan? _plan;
@@ -91,13 +95,22 @@ class MirrorDownloadFlow {
   Future<void> downloadAll() async {
     if (_isPreparing) return;
     _isPreparing = true;
+    _abandonRequested = false;
     final run = _run = _downloadAll();
     try {
       await run;
+    } catch (error, stackTrace) {
+      if (host.isActive) host.downloadCrashed(error, stackTrace);
     } finally {
       _isPreparing = false;
       _run = null;
     }
+  }
+
+  /// "ביטול" לפני שההורדה התחילה: הזרימה חוזרת אחרי הבדיקה ברשת, בלי
+  /// לשאול ובלי להוריד.
+  void abandonPreparing() {
+    if (_isPreparing && !_isDownloading) _abandonRequested = true;
   }
 
   void requestCancel() {
@@ -121,7 +134,7 @@ class MirrorDownloadFlow {
     if (!s.hasSyncSelection || host.isBlocked) return;
 
     await host.refreshStaleOnlineChecks(s);
-    if (!host.isActive) return;
+    if (!host.isActive || _abandonRequested) return;
 
     final skipApp = DownloadPlan.shouldSkipApp(
       s,
@@ -134,7 +147,7 @@ class MirrorDownloadFlow {
       if (answer == null) return;
       includeSemanticSearch = answer;
     }
-    if (!host.isActive || host.isBlocked) return;
+    if (!host.isActive || host.isBlocked || _abandonRequested) return;
     final plan = DownloadPlan(
       skipApp: skipApp,
       includeSemanticSearch: includeSemanticSearch,

@@ -5,7 +5,6 @@ import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
 import 'package:launcher_app/src/controllers/app_reports_controller.dart';
-import 'package:launcher_app/src/controllers/download_plan.dart';
 import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/launcher_update_flow.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
@@ -21,6 +20,7 @@ import 'package:launcher_app/src/shell/app_session.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/shell/home_guidance_session.dart';
 import 'package:launcher_app/src/shell/session_prompts.dart';
+import 'package:launcher_app/src/shell/shell_tasks.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 
 import 'test_support.dart';
@@ -106,6 +106,22 @@ void main() {
 
     test('בלי בעיית הרשאות אין פס "הפעלה מחדש כמנהל"', () {
       expect(session().offersElevation, isFalse);
+    });
+
+    // נגזר מהמצב הנוכחי — לא מדגל שנלכד בכשל.
+    test('canRestartElevated עוקב אחרי הקונטרולרים, ו"לא עכשיו" רק בבית', () {
+      final s = session();
+      expect(s.canRestartElevated, isFalse);
+      s.library.needsElevation = true;
+      expect(s.canRestartElevated, Platform.isWindows);
+      s.dismissElevation();
+      expect(s.offersElevation, isFalse);
+      expect(s.canRestartElevated, Platform.isWindows);
+      s.library.status = LibraryModuleStatus.updating;
+      expect(s.canRestartElevated, isFalse);
+      s.library.status = LibraryModuleStatus.upToDate;
+      s.library.needsElevation = false;
+      expect(s.canRestartElevated, isFalse);
     });
 
     test('בלי קטלוג אין תוספים חדשים לפס, והביקור אינו נכשל', () async {
@@ -289,6 +305,33 @@ void main() {
       expect(s.exitPending, isTrue);
       expect(s.longTaskRunning, isTrue);
       expect(s.pluginSyncBlockedElsewhere, isFalse);
+    });
+
+    test('Ctrl+R/F5 לא רצים כשמסך משימה רץ, גם בלי משימה ארוכה', () async {
+      final s = session();
+      s.tasks.prepareDownload();
+      expect(s.longTaskRunning, isFalse);
+      // חוזר מיד, בלי לבדוק דבר — אחרת `_markChecked` היה רושם בדיקה.
+      await s.refreshFromKeyboard();
+      expect(s.lastCheckedAt, isNull);
+      expect(s.otzaria.status, isNot(OtzariaModuleStatus.checking));
+    });
+
+    // "נסה שוב" בלי מה להוריד: המסך שהסתיים לא נשאר תלוי בלי תגובה.
+    test('"נסה שוב" שהזרימה לא התחילה — המסך שהסתיים נסגר', () async {
+      final s = session();
+      await settings.update(settings.settings.copyWith(
+        syncApp: false,
+        syncPlugins: false,
+        syncLibrary: false,
+        personalUpdateMode: false,
+      ));
+      s.tasks
+        ..prepareDownload()
+        ..downloadFailed(const DownloadFailure(DownloadFailureKind.other));
+      expect(s.settings.settings.hasSyncSelection, isFalse);
+      await s.downloadAll();
+      expect(s.tasks.hasTask, isFalse);
     });
 
     test('שומר הסגירה שואל רק בזמן משימה, ומכבד את התשובה', () async {
@@ -478,19 +521,10 @@ class _FakePrompts implements SessionPrompts {
   Future<bool> confirmCancelDownload() async => false;
 
   @override
-  bool taskScreenShown = false;
-
-  @override
   Future<bool> confirmSemanticConsent() async => false;
 
   @override
   Future<bool> confirmLibraryReindex() async => false;
-
-  @override
-  void reportDownload({
-    required List<MirrorComponent> failed,
-    required List<MirrorComponent> skipped,
-  }) {}
 
   @override
   Future<void> uploadReports({

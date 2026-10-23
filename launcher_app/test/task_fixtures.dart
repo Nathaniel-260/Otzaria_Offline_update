@@ -37,6 +37,21 @@ final Map<String, DownloadTask> downloadScenarios = {
           '(OS Error 10054)',
     ),
   ),
+  'dlBlocked': const DownloadTask(
+    phase: DownloadTaskPhase.failed,
+    components: _all,
+    failure: DownloadFailure(
+      DownloadFailureKind.blocked,
+      components: [MirrorComponent.library],
+      details: 'library: HandshakeException: Handshake error in client '
+          '(OS Error: CERTIFICATE_VERIFY_FAILED: unable to get local issuer '
+          'certificate)',
+    ),
+  ),
+  'dlNothing': const DownloadTask(
+    phase: DownloadTaskPhase.done,
+    skipped: _all,
+  ),
   'dlShabbat': const DownloadTask(
     phase: DownloadTaskPhase.failed,
     components: _all,
@@ -91,6 +106,7 @@ final Map<String, UpdateHereTask> updateScenarios = {
   'otherUser': const UpdateHereTask(
     phase: UpdateHereTaskPhase.confirmElevatedOtherUser,
     stages: _update,
+    account: 'Admin',
   ),
   'close': const UpdateHereTask(
     phase: UpdateHereTaskPhase.closeOtzaria,
@@ -140,6 +156,58 @@ final Map<String, UpdateHereTask> updateScenarios = {
       PluginDelivery('לוח שנה עברי', PluginDeliveryState.sent),
       PluginDelivery('מזומנים', PluginDeliveryState.sent),
     ],
+  ),
+  'stoppedDone': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.done,
+    stages: _update,
+    stageIndex: 3,
+    libraryVersion: 27,
+    appVersion: '0.9.96',
+    outcomes: {
+      GuidanceItem.library: StageOutcome.done,
+      GuidanceItem.app: StageOutcome.stoppedWaiting,
+      GuidanceItem.plugins: StageOutcome.skipped,
+    },
+    plugins: _plugins,
+  ),
+  'pluginsMixed': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.done,
+    stages: [GuidanceItem.plugins],
+    stageIndex: 1,
+    outcomes: {GuidanceItem.plugins: StageOutcome.done},
+    plugins: [
+      PluginDelivery('לוח שנה עברי', PluginDeliveryState.sent),
+      PluginDelivery('מזומנים', PluginDeliveryState.failed),
+    ],
+  ),
+  'libraryNote': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.done,
+    stages: [GuidanceItem.app, GuidanceItem.library],
+    stageIndex: 2,
+    firstInstall: true,
+    appVersion: '0.10.4',
+    outcomes: {
+      GuidanceItem.app: StageOutcome.done,
+      GuidanceItem.library: StageOutcome.done,
+    },
+    libraryNote: 'אוצריא עוד לא מכוונת לספרייה החדשה — בחרו אותה בהגדרות '
+        'אוצריא.',
+  ),
+  'firstStopped': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.cancelledByUser,
+    stages: [GuidanceItem.app, GuidanceItem.library],
+    firstInstall: true,
+    appVersion: '0.10.4',
+    outcomes: {GuidanceItem.app: StageOutcome.stoppedWaiting},
+  ),
+  'wizardStillOpen': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.cancelledByUser,
+    stages: [GuidanceItem.library, GuidanceItem.app],
+    stageIndex: 1,
+    outcomes: {
+      GuidanceItem.library: StageOutcome.done,
+      GuidanceItem.app: StageOutcome.stillOpen,
+    },
   ),
   'wizardClosed': const UpdateHereTask(
     phase: UpdateHereTaskPhase.cancelledByUser,
@@ -204,6 +272,7 @@ Widget taskScenario(String name, {List<String>? calls}) {
         onRetry: () => call('retry'),
         onHome: () => call('home'),
         onHere: () => call('here'),
+        onCancelPreparing: () => call('cancel preparing'),
       ),
     );
   }
@@ -225,6 +294,14 @@ Widget taskScenario(String name, {List<String>? calls}) {
     ),
   );
 }
+
+/// [taskScenario] מתחת לפס בגובה שורת הכותרת — כמו בחלון האמיתי.
+Widget taskScenarioInWindow(String name, {List<String>? calls}) => Column(
+      children: [
+        const SizedBox(height: 36),
+        Expanded(child: taskScenario(name, calls: calls)),
+      ],
+    );
 
 List<String> get taskScenarioNames =>
     [...downloadScenarios.keys, ...updateScenarios.keys];

@@ -4,9 +4,14 @@ import '../controllers/download_plan.dart' show MirrorComponent;
 import 'shell_tasks.dart';
 
 final RegExp _network = RegExp(
-  r'SocketException|ClientException|HandshakeException|TimeoutException|'
+  r'SocketException|ClientException|TimeoutException|'
   r'Failed host lookup|Connection (reset|closed|refused|timed out|aborted)|'
   r'Network is unreachable',
+);
+
+/// התעודה נדחתה — בנטפרי וכדומה בלי תעודת המסנן. "נסה שוב" לבדו לא יעזור.
+final RegExp _blocked = RegExp(
+  r'HandshakeException|CERTIFICATE_VERIFY_FAILED|CertificateException',
 );
 
 /// מסווג את סוף ההורדה למסך הכשל. [errors] — ההודעה של כל רכיב שנכשל
@@ -41,6 +46,13 @@ DownloadFailure classifyDownloadFailure({
     for (final m in messages)
       if (!(shabbat && m.component == MirrorComponent.plugins)) m,
   ];
+  if (withoutShabbat.any((m) => _blocked.hasMatch(m.error))) {
+    return DownloadFailure(
+      DownloadFailureKind.blocked,
+      components: failed,
+      details: details,
+    );
+  }
   if (withoutShabbat.isNotEmpty &&
       withoutShabbat.every((m) => _network.hasMatch(m.error))) {
     return DownloadFailure(
@@ -60,11 +72,27 @@ DownloadFailure classifyDownloadFailure({
 }
 
 /// מזהה את הודעת "אין מספיק מקום" של מנוע הספרייה לפי התבנית המתורגמת
-/// עצמה, כך ששינוי בנוסח אינו שובר את הזיהוי.
+/// עצמה, כך ששינוי בנוסח אינו שובר את הזיהוי. המנוע זורק טקסט בלבד, ולכן
+/// נבדקות התבניות של כל השפות — החלפת שפה אחרי הכשל לא תפספס אותו.
 ({String needed, String free})? parseNotEnoughSpace(String error) {
+  for (final language in AppLanguage.values) {
+    final space = _parseNotEnoughSpace(
+      error,
+      AppL10n.stringsFor(language).libraryDomain,
+    );
+    if (space != null) return space;
+  }
+  return null;
+}
+
+({String needed, String free})? _parseNotEnoughSpace(
+  String error,
+  LibraryDomainStrings strings,
+) {
   const marks = ['\u0001', '\u0002', '\u0003'];
-  final template = AppL10n.strings.libraryDomain
-      .mirrorNotEnoughDiskSpace(marks[0], marks[1], marks[2]);
+  final template =
+      strings.mirrorNotEnoughDiskSpace(marks[0], marks[1], marks[2]);
+
   final pattern = StringBuffer();
   var rest = template;
   final groups = <String>[];

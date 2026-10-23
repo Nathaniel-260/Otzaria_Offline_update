@@ -201,6 +201,14 @@ class _FakeDownloadHost implements MirrorDownloadHost {
   @override
   void downloadEnded() => log.add('ended');
 
+  Object? crashed;
+
+  @override
+  void downloadCrashed(Object error, StackTrace stackTrace) {
+    log.add('crashed');
+    crashed = error;
+  }
+
   @override
   void downloadFinished({
     required List<MirrorComponent> failed,
@@ -324,6 +332,29 @@ void main() {
       ];
 
   group('MirrorDownloadFlow', () {
+    test('חריג באמצע — מדווח למארח, והזרימה משתחררת', () async {
+      host.onRefresh = (_) async => throw StateError('boom');
+      await flow.downloadAll();
+      expect(log, ['refresh', 'crashed']);
+      expect(host.crashed, isA<StateError>());
+      expect(flow.isPreparing, isFalse);
+      expect(flow.isDownloading, isFalse);
+    });
+
+    test('"ביטול" ב"מתכונן" — חוזרים אחרי הבדיקה ברשת בלי לשאול ולהוריד',
+        () async {
+      library.shouldOfferSemanticDownload = true;
+      host.onRefresh = (_) async => flow.abandonPreparing();
+      await flow.downloadAll();
+      expect(log, ['refresh']);
+      expect(flow.isPreparing, isFalse);
+
+      // ההורדה הבאה אינה יורשת את הביטול.
+      host.onRefresh = null;
+      await flow.downloadAll();
+      expect(log, contains('capture'));
+    });
+
     test('runs every component in order and ends with one sweep', () async {
       await flow.downloadAll();
 
@@ -566,10 +597,15 @@ void main() {
     test('a component that throws still releases the download state', () async {
       app.onDownload = () async => throw StateError('boom');
 
-      await expectLater(flow.downloadAll(), throwsStateError);
+      // החריג מגיע למארח (מסך כשל), לא כחריג שאיש אינו מחכה לו.
+      await flow.downloadAll();
 
       expect(flow.isDownloading, isFalse);
-      expect(log.last, 'changed downloading=false cancelling=false');
+      expect(log.sublist(log.length - 2), [
+        'changed downloading=false cancelling=false',
+        'crashed',
+      ]);
+      expect(host.crashed, isA<StateError>());
       app.onDownload = null;
       await flow.downloadAll();
       expect(componentsRun().where((c) => c == 'app'), hasLength(2));

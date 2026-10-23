@@ -213,6 +213,13 @@ void main() {
       expect(released, isTrue);
     });
 
+    test('"מתכונן" פעמיים — אותה משימה, בלי חריג', () {
+      tasks.prepareDownload();
+      final first = tasks.current;
+      tasks.prepareDownload();
+      expect(tasks.current, same(first));
+    });
+
     test('בלי שלבים אין משימה', () {
       expect(() => tasks.startUpdateHere(const []), throwsArgumentError);
     });
@@ -240,6 +247,39 @@ void main() {
       final message = AppL10n.strings.libraryDomain
           .mirrorNotEnoughDiskSpace('/drive', '2 GB', '1 GB');
       expect(parseNotEnoughSpace(message), (needed: '2 GB', free: '1 GB'));
+    });
+
+    // המנוע זורק טקסט בשפה שהייתה פעילה; החלפת שפה אחרי הכשל לא תפספס.
+    test('חוסר מקום מזוהה גם כשהשפה הוחלפה אחרי הכשל', () {
+      final hebrew = const HebrewStrings()
+          .libraryDomain
+          .mirrorNotEnoughDiskSpace('E:\\mirror', '1.2 GB', '0.4 GB');
+      AppL10n.use(AppLanguage.english);
+      addTearDown(() => AppL10n.use(AppLanguage.hebrew));
+      expect(
+        parseNotEnoughSpace('Bad state: $hebrew'),
+        (needed: '1.2 GB', free: '0.4 GB'),
+      );
+      final failure = classifyDownloadFailure(
+        failed: const [MirrorComponent.library],
+        errors: {MirrorComponent.library: hebrew},
+        shabbat: false,
+      );
+      expect(failure.kind, DownloadFailureKind.diskSpace);
+    });
+
+    test('תעודה שנדחתה (נטפרי) — "מסנן", לא "אין אינטרנט"', () {
+      final failure = classifyDownloadFailure(
+        failed: const [MirrorComponent.library],
+        errors: const {
+          MirrorComponent.library: 'HandshakeException: Handshake error in '
+              'client (OS Error: CERTIFICATE_VERIFY_FAILED: unable to get '
+              'local issuer certificate)',
+        },
+        shabbat: false,
+      );
+      expect(failure.kind, DownloadFailureKind.blocked);
+      expect(failure.details, contains('CERTIFICATE_VERIFY_FAILED'));
     });
 
     test('ניתוק רשת — רגוע, עם הפרטים הטכניים', () {

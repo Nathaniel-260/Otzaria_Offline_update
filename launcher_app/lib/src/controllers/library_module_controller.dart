@@ -171,6 +171,10 @@ class LibraryModuleController extends ChangeNotifier
   /// שאינו מתאים למסד שלו נשאר תקוע לנצח (issue #19).
   bool canRetryWithFullDownload = false;
 
+  /// ההחלה האחרונה הגיעה לסופה — המסד הוחלף. [errorMessage] שנשאר אחריה
+  /// הוא הערה (מיקום שצריך לכוון, קובץ נלווה שנכשל), לא כשל.
+  bool lastApplyCompleted = false;
+
   /// הכשל האחרון היה "אין הרשאה" — ראו [Elevation]. `AppSession` מציע על סמך
   /// זה להפעיל מחדש כמנהל, ולכן זה נדלק בכשל ונכבה בכל ניסיון חדש.
   bool needsElevation = false;
@@ -798,6 +802,7 @@ class LibraryModuleController extends ChangeNotifier
   Future<void> _apply({required bool useFullDownloadFallback}) async {
     if (_applying) return;
     _applying = true;
+    lastApplyCompleted = false;
     final inFlight = _checkInFlight;
     if (inFlight != null) {
       notifyListeners();
@@ -882,6 +887,7 @@ class LibraryModuleController extends ChangeNotifier
       } finally {
         _applying = false;
       }
+      lastApplyCompleted = true;
       AppLogger.instance.info(
         'החלת העדכון הסתיימה, נלווים שנכשלו=${companionFailures.length}',
       );

@@ -8,7 +8,6 @@ abstract final class ShellKeys {
   static const hero = ValueKey('home.hero');
   static const heroPrimary = ValueKey('home.hero.primary');
   static const heroSecondary = ValueKey('home.hero.secondary');
-  static const heroCancel = ValueKey('home.hero.cancel');
   static const eyebrow = ValueKey('home.eyebrow');
   static const heroChecking = ValueKey('home.hero.checking');
 

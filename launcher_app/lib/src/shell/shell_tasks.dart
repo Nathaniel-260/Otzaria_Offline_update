@@ -16,8 +16,16 @@ enum UpdateHereTaskPhase {
   failed,
 }
 
-/// למה ההורדה נכשלה — קובע את התג ואת הנוסח של מסך הכשל.
-enum DownloadFailureKind { network, shabbat, diskSpace, snapshot, other }
+/// למה ההורדה נכשלה — קובע את התג ואת הנוסח של מסך הכשל. [blocked] — החיבור
+/// המאובטח נדחה (תעודה), לרוב בגלל מסנן אינטרנט.
+enum DownloadFailureKind {
+  network,
+  blocked,
+  shabbat,
+  diskSpace,
+  snapshot,
+  other
+}
 
 class DownloadFailure {
   const DownloadFailure(
@@ -47,6 +55,9 @@ enum StageOutcome {
 
   /// "הפסק להמתין" לאשף — לא ידוע אם ההתקנה הסתיימה.
   stoppedWaiting,
+
+  /// האשף עדיין רץ אחרי הזמן הקצוב — ההתקנה עשויה עוד להסתיים.
+  stillOpen,
 
   /// לא נדרש בסוף (למשל הספרייה אחרי התקנה ראשונה), או נדחה לפעם אחרת.
   skipped,
@@ -128,17 +139,23 @@ final class UpdateHereTask extends ShellTask {
   const UpdateHereTask({
     required this.phase,
     required this.stages,
+    this.id = 0,
     this.stageIndex = 0,
     this.firstInstall = false,
     this.appVersion,
     this.libraryVersion,
+    this.libraryMinutes,
+    this.account,
     this.outcomes = const {},
+    this.libraryNote,
     this.plugins = const [],
     this.closeAfterWizard = false,
     this.stopWaitingRequested = false,
     this.failure,
   });
 
+  /// מזהה ההרצה — מסירה שנמשכת אחרי הסיום לא תכתוב על הרצה חדשה.
+  final int id;
   final UpdateHereTaskPhase phase;
 
   /// סדר ההתקנה — ראו `UpdateHereFlow.stagesFor`.
@@ -149,7 +166,16 @@ final class UpdateHereTask extends ShellTask {
   final bool firstInstall;
   final String? appVersion;
   final int? libraryVersion;
+
+  /// אומדן ההחלה של הספרייה, בדקות, כשידוע.
+  final ({int low, int high})? libraryMinutes;
+
+  /// החשבון שהכלי רץ בו כמנהל — במסך "משתמש אחר", כשידוע.
+  final String? account;
   final Map<GuidanceItem, StageOutcome> outcomes;
+
+  /// הספרייה הותקנה, אבל עם הערה (למשל מיקום שצריך לכוון באוצריא).
+  final String? libraryNote;
   final List<PluginDelivery> plugins;
 
   /// הסגירה נדרשת אחרי האשף (שפתח את אוצריא), לא לפני ההתחלה.
@@ -173,19 +199,24 @@ final class UpdateHereTask extends ShellTask {
     UpdateHereTaskPhase? phase,
     int? stageIndex,
     Map<GuidanceItem, StageOutcome>? outcomes,
+    String? libraryNote,
     List<PluginDelivery>? plugins,
     bool? closeAfterWizard,
     bool? stopWaitingRequested,
     UpdateFailure? failure,
   }) =>
       UpdateHereTask(
+        id: id,
         phase: phase ?? this.phase,
         stages: stages,
         stageIndex: stageIndex ?? this.stageIndex,
         firstInstall: firstInstall,
         appVersion: appVersion,
         libraryVersion: libraryVersion,
+        libraryMinutes: libraryMinutes,
+        account: account,
         outcomes: outcomes ?? this.outcomes,
+        libraryNote: libraryNote ?? this.libraryNote,
         plugins: plugins ?? this.plugins,
         closeAfterWizard: closeAfterWizard ?? this.closeAfterWizard,
         stopWaitingRequested: stopWaitingRequested ?? this.stopWaitingRequested,
@@ -200,6 +231,7 @@ class ShellTasks extends ChangeNotifier {
   Completer<bool?>? _question;
   Completer<bool>? _decision;
   Completer<void>? _finishNow;
+  int _lastUpdateId = 0;
 
   ShellTask? get current => _current;
   bool get hasTask => _current != null;
@@ -224,8 +256,13 @@ class ShellTasks extends ChangeNotifier {
   // ── הורדה לכונן ──
 
   /// ההורדה מתכוננת (בדיקה ברשת של מה שהתיישן). מחליף משימה שהסתיימה —
-  /// "נסה שוב" ו"הורד שוב" מתחילים מכאן בלי לחזור לבית בדרך.
+  /// "נסה שוב" ו"הורדה מחדש" מתחילים מכאן בלי לחזור לבית בדרך. כבר מתכונן
+  /// — אין שינוי.
   void prepareDownload() {
+    final task = _current;
+    if (task is DownloadTask && task.phase == DownloadTaskPhase.preparing) {
+      return;
+    }
     _requireIdle();
     _set(const DownloadTask(phase: DownloadTaskPhase.preparing));
   }
@@ -282,30 +319,44 @@ class ShellTasks extends ChangeNotifier {
 
   // ── עדכון במחשב הזה ──
 
-  void startUpdateHere(
+  /// מחזיר את מזהה ההרצה — ראו [isCurrentUpdate].
+  int startUpdateHere(
     List<GuidanceItem> stages, {
     bool firstInstall = false,
     String? appVersion,
     int? libraryVersion,
+    ({int low, int high})? libraryMinutes,
+    String? account,
     List<String> pluginNames = const [],
   }) {
     _requireIdle();
     if (stages.isEmpty) throw ArgumentError.value(stages, 'stages');
     _finishNow = Completer<void>();
+    final id = ++_lastUpdateId;
     _set(UpdateHereTask(
+      id: id,
       phase: UpdateHereTaskPhase.running,
       stages: List.unmodifiable(stages),
       firstInstall: firstInstall,
       appVersion: appVersion,
       libraryVersion: libraryVersion,
+      libraryMinutes: libraryMinutes,
+      account: account,
       plugins: [
         for (final name in pluginNames)
           PluginDelivery(name, PluginDeliveryState.waiting),
       ],
     ));
+    return id;
   }
 
-  /// "הותקנה על ידי משתמש אחר" — `true` = "המשך בכל זאת".
+  /// "עדכון כאן" [id] עדיין מוצג (גם אם הסתיים) — ולא הרצה חדשה שהחליפה אותו.
+  bool isCurrentUpdate(int id) => switch (_current) {
+        UpdateHereTask(id: final current) => current == id,
+        _ => false,
+      };
+
+  /// "הכלי פועל כמנהל בחשבון אחר" — `true` = "המשך בכל זאת".
   Future<bool> askOtherUser() =>
       _ask(UpdateHereTaskPhase.confirmElevatedOtherUser);
 
@@ -335,12 +386,21 @@ class ShellTasks extends ChangeNotifier {
     ));
   }
 
-  void stageFinished(GuidanceItem stage, StageOutcome outcome) {
+  /// [note] — הספרייה הותקנה, אבל יש מה לומר עליה.
+  void stageFinished(GuidanceItem stage, StageOutcome outcome, {String? note}) {
     final task = _updateTask();
     _set(task._copy(
       outcomes: {...task.outcomes, stage: outcome},
       stageIndex: task.stages.indexOf(stage) + 1,
+      libraryNote: note,
     ));
+  }
+
+  /// השלב נעצר במקומו (האשף עוד פתוח / הפסקנו להמתין) — בלי לעבור הלאה,
+  /// כדי שמסך הסיום ידבר על השלב הזה ולא על הבא.
+  void stageStopped(GuidanceItem stage, StageOutcome outcome) {
+    final task = _updateTask();
+    _set(task._copy(outcomes: {...task.outcomes, stage: outcome}));
   }
 
   void pluginDeliveries(List<PluginDelivery> rows) =>

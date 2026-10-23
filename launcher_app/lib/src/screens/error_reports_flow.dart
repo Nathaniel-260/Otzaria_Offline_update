@@ -36,6 +36,7 @@ Future<DriveCollectOutcome> collectReportsToDrive(
   final feedbackCount = await searchFeedback?.pendingToOffer() ?? 0;
   if ((count > 0 && disclosedReports <= 0) ||
       (feedbackCount > 0 && disclosedSearchRecords <= 0)) {
+    UiSnack.show(s.collectDisclosureRefreshedSnack);
     return DriveCollectOutcome.disclosureStale;
   }
   if (count + feedbackCount <= 0) return DriveCollectOutcome.nothing;

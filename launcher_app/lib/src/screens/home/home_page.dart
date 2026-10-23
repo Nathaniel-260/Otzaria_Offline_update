@@ -22,7 +22,6 @@ class HomeActions {
     this.onDownload = _noop,
     this.onLaunch = _noop,
     this.onRecheck = _noop,
-    this.onCancelDownload = _noop,
     this.onOpenSection = _noopSection,
     this.onOpenSettings = _noop,
     this.onHelp = _noop,
@@ -40,7 +39,6 @@ class HomeActions {
   final VoidCallback onDownload;
   final VoidCallback onLaunch;
   final VoidCallback onRecheck;
-  final VoidCallback onCancelDownload;
   final ValueChanged<ShellSection> onOpenSection;
   final VoidCallback onOpenSettings;
   final VoidCallback onHelp;
@@ -53,7 +51,7 @@ class HomeActions {
   /// "פרטים ועדכון" בשורת הכלי — דף "עדכון הכלי הזה".
   final VoidCallback onOpenLauncherUpdate;
 
-  /// "הצג התקדמות" בגיבור של משימה רצה — מסך המשימה או הדף שבו היא רצה.
+  /// "הצג התקדמות" בגיבור של התקנה שרצה מחוץ למסך משימה — הדף שבו היא רצה.
   final VoidCallback onShowProgress;
 }
 
@@ -633,22 +631,12 @@ class _Hero extends StatelessWidget {
               onPressed: actions.onShowProgress,
             );
         return switch (m.task) {
+          // ההורדה מוצגת במסך המשימה, שמכסה את הבית; כאן רק למקרה ביניים.
           HomeTask.downloading => (
               title: g.taskDownloadingTitle,
               body: g.taskDownloadingBody,
               pills: _downloadPills(context),
-              // הביטול עצמו נשאל בדו-שיח (`confirmCancelDownload`).
-              actions: [
-                showProgress(),
-                ActionButton.neutral(
-                  key: ShellKeys.heroCancel,
-                  text: m.cancellingDownload
-                      ? context.strings.home.cancelDownloadPending
-                      : context.strings.common.cancel,
-                  onPressed:
-                      m.cancellingDownload ? null : actions.onCancelDownload,
-                ),
-              ],
+              actions: const [],
               notes: const [],
             ),
           HomeTask.installingApp => (

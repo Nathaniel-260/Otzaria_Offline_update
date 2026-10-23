@@ -28,7 +28,11 @@ class AppRow extends StatelessWidget {
     this.onTap,
     this.label,
     this.below,
+    this.dense = false,
   });
+
+  /// שורת סיכום בחלון צר: 44 במקום 56.
+  final bool dense;
 
   final String title;
   final String? subtitle;
@@ -71,9 +75,11 @@ class AppRow extends StatelessWidget {
       ],
     );
     final row = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: AppTokens.rowMinHeight),
+      constraints: BoxConstraints(
+        minHeight: dense ? 44 : AppTokens.rowMinHeight,
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: dense ? 4 : 12),
         child: Row(
           children: [
             if (leading != null) ...[leading!, const SizedBox(width: 14)],

@@ -15,10 +15,17 @@ enum AppInstallOutcome {
   failed,
 }
 
+/// איך נגמרה החלת הספרייה. ההצלחה נקבעת מהגרסה שהותקנה, לא מהיעדר הודעה:
+/// [appliedWithNote] — המסד הוחלף, אבל יש מה לומר (מיקום, קובץ נלווה).
+enum LibraryApplyResult { applied, appliedWithNote, failed }
+
 abstract interface class UpdateHereApp {
   bool get isInstalled;
   bool get hasUpdateAvailable;
   bool get elevatedAsOtherUser;
+
+  /// שם החשבון שהכלי רץ בו כמנהל, כשידוע.
+  String? get adminAccount;
   String? get versionToInstall;
   String? get errorMessage;
   bool get needsElevation;
@@ -35,17 +42,21 @@ abstract interface class UpdateHereLibrary {
   bool get isFreshInstall;
   bool get hasUpdateAvailable;
   int? get targetVersion;
+
+  /// אחרי [LibraryApplyResult.appliedWithNote] — ההערה עצמה.
   String? get errorMessage;
   bool get needsElevation;
 
   /// בכונן יש ספרייה מלאה שאפשר להתקין במקום עדכון שנכשל.
   bool get canApplyFull;
 
-  /// `true` — הספרייה מעודכנת אחרי ההחלה.
-  Future<bool> apply();
+  /// האומדן לתוכנית שתוחל, בדקות, כשידוע.
+  ({int low, int high})? applyEstimate({bool full = false});
+
+  Future<LibraryApplyResult> apply();
 
   /// כמו [apply], מהספרייה המלאה שבכונן.
-  Future<bool> applyFull();
+  Future<LibraryApplyResult> applyFull();
   Future<void> recheck();
 }
 
@@ -53,7 +64,8 @@ abstract interface class UpdateHerePlugins {
   /// שמות התוספים שאפשר למסור לאוצריא עכשיו.
   List<String> get deliverableUpdates;
 
-  /// מוסר אותם אחד אחד; [onRow] מקבל את מצב כל השורות אחרי כל שינוי.
+  /// מוסר אותם אחד אחד. [onRow] נקרא **מיד** עם כל השורות כ"ממתין" — היעד
+  /// מחושב כאן, ולא ברגע שהמשימה נפתחה — ואחר כך אחרי כל שינוי.
   Future<void> deliver(void Function(List<PluginDelivery> rows) onRow);
 }
 
@@ -72,7 +84,8 @@ abstract interface class UpdateHereHost {
 
 /// "עדכון אוצריא במחשב הזה" כמסך משימה. **עדכון**: הספרייה, התוכנה ואז
 /// מסירת התוספים — כמו `AutoInstallFlow`. **התקנה ראשונה**: התוכנה ואז
-/// הספרייה, ולעולם בלי תוספים. אוצריא נסגרת רק אחרי "סגירה והמשך".
+/// הספרייה, ולעולם בלי תוספים. אוצריא נסגרת רק אחרי "סגירה והמשך" — חוץ
+/// מאחרי האשף בהתקנה ראשונה, שפתח אותה בעצמו.
 class UpdateHereFlow {
   UpdateHereFlow({
     required this.app,
@@ -119,38 +132,63 @@ class UpdateHereFlow {
   bool _canInstallApp(bool reinstall) =>
       app.hasUpdateAvailable || (reinstall && app.canReinstall);
 
-  /// `false` — אין מה להתקין, והמשימה לא נפתחה.
+  /// `false` — אין מה להתקין, והמשימה לא נפתחה. חריג באמצע מעביר את
+  /// המשימה לכשל: משימה רצה חוסמת את Esc ואת הסרגל, ובלי זה אין ממנה יציאה.
   Future<bool> run(
     List<GuidanceItem> items, {
     bool reinstallApp = false,
     bool fullLibrary = false,
   }) async {
-    final first = !app.isInstalled;
     final stages = stagesFor(
       items,
       reinstallApp: reinstallApp,
       fullLibrary: fullLibrary,
     );
     if (stages.isEmpty) return false;
-    _tasks.startUpdateHere(
+    final hasApp = stages.contains(GuidanceItem.app);
+    final hasLibrary = stages.contains(GuidanceItem.library);
+    final id = _tasks.startUpdateHere(
       stages,
-      firstInstall: first,
-      appVersion:
-          stages.contains(GuidanceItem.app) ? app.versionToInstall : null,
-      libraryVersion:
-          stages.contains(GuidanceItem.library) ? library.targetVersion : null,
+      firstInstall: !app.isInstalled,
+      appVersion: hasApp ? app.versionToInstall : null,
+      libraryVersion: hasLibrary ? library.targetVersion : null,
+      libraryMinutes:
+          hasLibrary ? library.applyEstimate(full: fullLibrary) : null,
+      account: hasApp && app.elevatedAsOtherUser ? app.adminAccount : null,
       pluginNames: stages.contains(GuidanceItem.plugins)
           ? plugins.deliverableUpdates
           : const [],
     );
+    try {
+      await _run(
+        id,
+        stages,
+        first: !app.isInstalled,
+        reinstallApp: reinstallApp,
+        fullLibrary: fullLibrary,
+      );
+    } catch (error) {
+      _failIfRunning(id, error);
+    }
+    return true;
+  }
+
+  Future<void> _run(
+    int id,
+    List<GuidanceItem> stages, {
+    required bool first,
+    required bool reinstallApp,
+    required bool fullLibrary,
+  }) async {
     if (stages.contains(GuidanceItem.app) && app.elevatedAsOtherUser) {
-      if (!await _tasks.askOtherUser()) return _abandon();
-      if (!host.isActive) return true;
+      final go = await _tasks.askOtherUser();
+      if (!host.isActive) return;
+      if (!go) return _tasks.abandonUpdate();
     }
 
     var ranAny = false;
     for (final stage in stages) {
-      if (!host.isActive) return true;
+      if (!host.isActive) return;
       final keepGoing = switch (stage) {
         GuidanceItem.library => await _library(
             first: first,
@@ -162,26 +200,33 @@ class UpdateHereFlow {
             ranAny: ranAny,
             reinstall: reinstallApp,
           ),
-        GuidanceItem.plugins => await _plugins(),
+        GuidanceItem.plugins => await _plugins(id),
       };
-      if (keepGoing == null) return _abandon();
-      if (!keepGoing) return true;
+      if (!host.isActive) return;
+      if (keepGoing == null) return _tasks.abandonUpdate();
+      if (!keepGoing) return;
       ranAny = true;
     }
-    if (host.isActive) _tasks.updateDone();
-    return true;
+    _tasks.updateDone();
   }
 
-  bool _abandon() {
-    _tasks.abandonUpdate();
-    return true;
+  void _failIfRunning(int id, Object error) {
+    if (!host.isActive || !_tasks.isCurrentUpdate(id)) return;
+    final task = _tasks.current! as UpdateHereTask;
+    if (task.isFinished) return;
+    _tasks.updateFailed(UpdateFailure(
+      task.currentStage ?? task.stages.first,
+      message: '$error',
+    ));
   }
 
   /// `null` — המשתמש ביטל לפני ששום דבר רץ.
   Future<bool?> _ensureClosed({required bool ranAny}) async {
     while (await host.isOtzariaRunning()) {
       if (!host.isActive) return false;
-      if (!await _tasks.askToCloseOtzaria()) {
+      final close = await _tasks.askToCloseOtzaria();
+      if (!host.isActive) return false;
+      if (!close) {
         if (!ranAny) return null;
         _tasks.updateCancelledByUser();
         return false;
@@ -200,6 +245,7 @@ class UpdateHereFlow {
     if (first) {
       // מיקום המסד נגזר ממה שהאשף בחר — בודקים מחדש אחרי ההתקנה.
       await library.recheck();
+      if (!host.isActive) return false;
       if (!library.hasUpdateAvailable) {
         _tasks.stageFinished(GuidanceItem.library, StageOutcome.skipped);
         return true;
@@ -208,7 +254,9 @@ class UpdateHereFlow {
       if (await host.isOtzariaRunning() && !await host.closeOtzaria()) {
         while (await host.isOtzariaRunning()) {
           if (!host.isActive) return false;
-          if (!await _tasks.askToCloseOtzaria(afterWizard: true)) {
+          final close = await _tasks.askToCloseOtzaria(afterWizard: true);
+          if (!host.isActive) return false;
+          if (!close) {
             _tasks.stageFinished(GuidanceItem.library, StageOutcome.skipped);
             return true;
           }
@@ -222,9 +270,9 @@ class UpdateHereFlow {
     }
     if (!host.isActive) return false;
     _tasks.stageRunning(GuidanceItem.library);
-    final ok = await (full ? library.applyFull() : library.apply());
+    final result = await (full ? library.applyFull() : library.apply());
     if (!host.isActive) return false;
-    if (!ok) {
+    if (result == LibraryApplyResult.failed) {
       _tasks.updateFailed(UpdateFailure(
         GuidanceItem.library,
         message: library.errorMessage,
@@ -232,7 +280,13 @@ class UpdateHereFlow {
       ));
       return false;
     }
-    _tasks.stageFinished(GuidanceItem.library, StageOutcome.done);
+    _tasks.stageFinished(
+      GuidanceItem.library,
+      StageOutcome.done,
+      note: result == LibraryApplyResult.appliedWithNote
+          ? library.errorMessage
+          : null,
+    );
     return true;
   }
 
@@ -259,12 +313,23 @@ class UpdateHereFlow {
         _tasks.stageFinished(GuidanceItem.app, StageOutcome.done);
         return true;
       case AppInstallOutcome.stillOpen when stopped:
-        _tasks.stageFinished(GuidanceItem.app, StageOutcome.stoppedWaiting);
         // בהתקנה ראשונה אין התקנה ודאית שהספרייה יכולה להיתלות בה.
-        if (!first) return true;
-        _tasks.updateCancelledByUser();
+        if (first) {
+          _tasks
+            ..stageStopped(GuidanceItem.app, StageOutcome.stoppedWaiting)
+            ..updateCancelledByUser();
+          return false;
+        }
+        _tasks.stageFinished(GuidanceItem.app, StageOutcome.stoppedWaiting);
+        return true;
+      case AppInstallOutcome.stillOpen:
+        if (first && app.isInstalled) await library.recheck();
+        if (!host.isActive) return false;
+        _tasks
+          ..stageStopped(GuidanceItem.app, StageOutcome.stillOpen)
+          ..updateCancelledByUser();
         return false;
-      case AppInstallOutcome.cancelled || AppInstallOutcome.stillOpen:
+      case AppInstallOutcome.cancelled:
         if (first && app.isInstalled) await library.recheck();
         if (host.isActive) _tasks.updateCancelledByUser();
         return false;
@@ -278,16 +343,30 @@ class UpdateHereFlow {
     }
   }
 
-  Future<bool> _plugins() async {
+  Future<bool> _plugins(int id) async {
+    // האשף אולי עוד מעתיק קבצים: otzaria:// היה פותח את הגרסה הישנה.
+    final task = _tasks.current;
+    if (task is UpdateHereTask &&
+        task.outcomes[GuidanceItem.app] == StageOutcome.stoppedWaiting) {
+      _tasks.stageFinished(GuidanceItem.plugins, StageOutcome.skipped);
+      return true;
+    }
     _tasks.stageRunning(GuidanceItem.plugins);
     final delivery = plugins.deliver((rows) {
-      if (host.isActive && _tasks.current is UpdateHereTask) {
+      if (host.isActive && _tasks.isCurrentUpdate(id)) {
         _tasks.pluginDeliveries(rows);
       }
     });
     await Future.any([delivery, _tasks.finishRequested]);
     if (!host.isActive) return false;
-    _tasks.stageFinished(GuidanceItem.plugins, StageOutcome.done);
+    final rows = switch (_tasks.current) {
+      UpdateHereTask(:final plugins) => plugins,
+      _ => const <PluginDelivery>[],
+    };
+    _tasks.stageFinished(
+      GuidanceItem.plugins,
+      rows.isEmpty ? StageOutcome.skipped : StageOutcome.done,
+    );
     return true;
   }
 

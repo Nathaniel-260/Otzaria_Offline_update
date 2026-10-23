@@ -464,53 +464,27 @@ void main() {
       expect(find.textContaining(g.autoInstallSkippedLead), findsNothing);
     });
 
-    testWidgets('בזמן הורדה: מד, וכפתור ביטול שמבקש את הביטול פעם אחת', (
+    // הביטול וההתקדמות במסך המשימה, שמכסה את הבית בזמן הורדה.
+    testWidgets('בזמן הורדה: מד, בלי "הצג התקדמות" ובלי ביטול', (
       tester,
     ) async {
-      var cancels = 0;
-      HomeViewModel downloading({bool cancelling = false}) => HomeViewModel(
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
             guidance: deriveHomeGuidance(
               const GuidanceFacts(longTaskRunning: true),
             ),
             task: HomeTask.downloading,
-            cancellingDownload: cancelling,
-          );
-      await pumpScreen(
-        tester,
-        HomePage(
-          model: downloading(),
-          actions: HomeActions(onCancelDownload: () => cancels++),
+          ),
           taskProgress: const Text('progress-slot'),
         ),
       );
 
       expect(find.text(g.taskDownloadingTitle), findsOneWidget);
       expect(find.text('progress-slot'), findsOneWidget);
-      // כפתור רגיל "ביטול", לא אדום: האישור עצמו בדו-שיח של המסגרת.
-      final button = tester.widget<ActionButton>(
-        find.byKey(ShellKeys.heroCancel),
-      );
-      expect(button.text, he.common.cancel);
-      expect(
-        find.descendant(
-          of: find.byKey(ShellKeys.heroCancel),
-          matching: find.byType(FilledButton),
-        ),
-        findsOneWidget,
-      );
-      expect(button.icon, isNull);
-      await tester.tap(find.byKey(ShellKeys.heroCancel));
-      expect(cancels, 1);
-
-      await pumpScreen(
-        tester,
-        HomePage(model: downloading(cancelling: true)),
-      );
-      final cancel = tester.widget<ActionButton>(
-        find.byKey(ShellKeys.heroCancel),
-      );
-      expect(cancel.text, he.home.cancelDownloadPending);
-      expect(cancel.onPressed, isNull);
+      expect(find.byKey(ShellKeys.heroShowProgress), findsNothing);
+      expect(find.text(he.common.cancel), findsNothing);
     });
   });
 

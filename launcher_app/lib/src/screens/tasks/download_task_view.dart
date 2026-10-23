@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 
@@ -51,11 +53,15 @@ class DownloadTaskActions {
     required this.onRetry,
     required this.onHome,
     required this.onHere,
+    this.onCancelPreparing,
   });
 
   /// התשובה לשאלת החיפוש החכם; `null` = חזרה.
   final ValueChanged<bool?> onAnswer;
   final VoidCallback onCancel;
+
+  /// "ביטול" ב"מתכונן להורדה" — הבדיקה ברשת יכולה להימשך.
+  final VoidCallback? onCancelPreparing;
   final VoidCallback onRetry;
   final VoidCallback onHome;
 
@@ -89,7 +95,8 @@ class DownloadTaskView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => switch (task.phase) {
         DownloadTaskPhase.question => _SemanticQuestion(actions: actions),
-        DownloadTaskPhase.preparing => const _Preparing(),
+        DownloadTaskPhase.preparing =>
+          _Preparing(onCancel: actions.onCancelPreparing),
         DownloadTaskPhase.running => _DownloadProgress(
             components: task.components,
             progress: progress,
@@ -156,6 +163,16 @@ class DownloadTaskView extends StatelessWidget {
     final details = failure.details;
     final tech = [if (details != null) TechDetails(text: details)];
     return switch (failure.kind) {
+      DownloadFailureKind.blocked => TaskResult(
+          badge: const ResultBadge(
+            kind: ResultBadgeKind.calm,
+            icon: FluentIcons.shield_error_24_regular,
+          ),
+          title: t.filterTitle,
+          body: t.filterBody(name),
+          extra: tech,
+          actions: [retry, home],
+        ),
       DownloadFailureKind.network => TaskResult(
           badge: const ResultBadge(
             kind: ResultBadgeKind.calm,
@@ -219,6 +236,7 @@ class DownloadTaskView extends StatelessWidget {
   Widget _done(BuildContext context) {
     final t = context.strings.task;
     final cs = Theme.of(context).colorScheme;
+    final narrow = TaskFrame.isNarrow(context);
     final skipped = task.skipped
         .where((c) => !task.components.contains(c))
         .map((c) => componentName(context, c))
@@ -282,15 +300,16 @@ class DownloadTaskView extends StatelessWidget {
         icon: FluentIcons.checkmark_24_regular,
       ),
       title: t.doneTitle,
-      body: t.doneBody,
+      body: task.components.isEmpty ? t.doneNothingBody : t.doneBody,
       extra: [
         if (task.components.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          SizedBox(height: narrow ? 12 : 20),
           RowsCard(
             children: [
               for (final c in task.components)
                 AppRow(
-                  leading: IconTile(icon: componentIcon(c)),
+                  dense: narrow,
+                  leading: componentTile(c),
                   label: componentName(context, c),
                   title: value(c) ?? t.stageDone(null),
                 ),
@@ -314,7 +333,11 @@ class DownloadTaskView extends StatelessWidget {
               hint: t.whatNowEjectHint,
             ),
             GuideStep(number: 2, text: t.whatNowConnect),
-            GuideStep(number: 3, text: t.whatNowOpen),
+            GuideStep(
+              number: 3,
+              text: t.whatNowOpen(context.strings.shell.appTitle),
+              strong: context.strings.shell.appTitle,
+            ),
           ],
         ),
       ],
@@ -347,6 +370,24 @@ IconData componentIcon(MirrorComponent c) => switch (c) {
       MirrorComponent.plugins => FluentIcons.puzzle_piece_24_regular,
     };
 
+/// אריח הרכיב: לתוכנה — לוגו אוצריא, כמו בבית.
+IconTile componentTile(
+  MirrorComponent c, {
+  IconTileSize size = IconTileSize.md,
+  IconTileTone tone = IconTileTone.tonal,
+}) =>
+    c == MirrorComponent.app
+        ? IconTile(
+            size: size,
+            tone: tone,
+            child: Image.asset(
+              'assets/images/otzaria_logo.png',
+              width: IconTile.glyphOf(size),
+              height: IconTile.glyphOf(size),
+            ),
+          )
+        : IconTile(icon: componentIcon(c), size: size, tone: tone);
+
 class _SemanticQuestion extends StatefulWidget {
   const _SemanticQuestion({required this.actions});
 
@@ -376,11 +417,7 @@ class _SemanticQuestionState extends State<_SemanticQuestion> {
       ),
       child: Column(
         children: [
-          TaskHeading(
-            title: t.semanticTitle,
-            body: t.semanticBody,
-            hint: t.semanticHint,
-          ),
+          TaskHeading(title: t.semanticTitle, body: t.semanticBody),
           const SizedBox(height: 24),
           OptionCard(
             icon: FluentIcons.search_24_regular,
@@ -405,12 +442,23 @@ class _SemanticQuestionState extends State<_SemanticQuestion> {
 }
 
 class _Preparing extends StatelessWidget {
-  const _Preparing();
+  const _Preparing({this.onCancel});
+
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
     final t = context.strings.task;
     return TaskFrame(
+      start: onCancel == null ? null : const SizedBox.shrink(),
+      endMinWidth: 120,
+      end: onCancel == null
+          ? null
+          : ActionButton.neutral(
+              key: ShellKeys.taskCancel,
+              text: context.strings.common.cancel,
+              onPressed: onCancel,
+            ),
       child: Column(
         children: [
           TaskHeading(title: t.preparingTitle, body: t.preparingBody),
@@ -447,14 +495,33 @@ class _DownloadProgressState extends State<_DownloadProgress> {
   late final TransferRateMeter _meter = TransferRateMeter(clock: widget.clock);
   MirrorComponent? _measuring;
 
-  /// הגודל האחרון שנראה לכל רכיב — לשורה "ירד · X" אחרי שעבר.
+  /// הגודל האחרון שנראה לכל רכיב — לשורה "הושלם · X" אחרי שעבר.
   final Map<MirrorComponent, int> _sizes = {};
+
+  /// בלי דיווחים אין בנייה מחדש — והמהירות הייתה נשארת קפואה.
+  late final Timer _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => setState(() {}),
+    );
+  }
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = context.strings.task;
     return TaskFrame(
       start: const SizedBox.shrink(),
+      endMinWidth: 120,
       end: ActionButton.neutral(
         key: ShellKeys.taskCancel,
         text: widget.cancelling ? t.cancelling : context.strings.common.cancel,
@@ -470,6 +537,7 @@ class _DownloadProgressState extends State<_DownloadProgress> {
   Widget _content(BuildContext context, DownloadSnapshot s) {
     final t = context.strings.task;
     final cs = Theme.of(context).colorScheme;
+    final narrow = TaskFrame.isNarrow(context);
     final components = widget.components;
     final current = s.current;
     if (current != _measuring) {
@@ -484,16 +552,36 @@ class _DownloadProgressState extends State<_DownloadProgress> {
     }
     final index = current == null ? -1 : components.indexOf(current);
     final fraction = s.fraction?.clamp(0.0, 1.0);
+    // הפס הכללי מונוטוני: מה שהסתיים ועוד החלק של הנוכחי, ולא חזרה ל-0%
+    // בכל רכיב.
+    final overall = components.isEmpty || index < 0
+        ? null
+        : (index + (fraction ?? 0)) / components.length;
     final rate = _meter.bytesPerSecond;
     final left = total != null && total > 0 ? _meter.remaining(total) : null;
     final shown = current ?? components.firstOrNull;
+    final sizeOfCurrent =
+        total != null && total > 0 ? formatBytes(total) : null;
+    final String speedLine;
+    if (rate != null) {
+      speedLine = [
+        formatRate(rate),
+        if (left != null)
+          left.inSeconds < 60
+              ? t.lessThanMinuteLeft
+              : t.minutesLeft((left.inSeconds / 60).ceil()),
+      ].join(' · ');
+    } else {
+      speedLine = _meter.isStalled ? t.speedStalled : t.speedPending;
+    }
 
     return Column(
       children: [
         TaskHeading(title: t.downloadingTitle, body: t.downloadingBody),
-        const SizedBox(height: 24),
+        SizedBox(height: narrow ? 16 : 24),
         Text(
-          fraction == null ? '…' : '${(fraction * 100).floor()}%',
+          overall == null ? '…' : '${(overall * 100).floor()}%',
+          key: const ValueKey('task.download.percent'),
           textDirection: TextDirection.ltr,
           style: AppTextStyles.percent.copyWith(color: cs.primary),
         ),
@@ -509,35 +597,40 @@ class _DownloadProgressState extends State<_DownloadProgress> {
           ),
         ],
         const SizedBox(height: 16),
-        AppProgressBar(value: fraction),
-        if (rate != null) ...[
-          const SizedBox(height: 16),
-          Text(
-            [
-              t.transferRate(formatBytes(rate.round())),
-              if (left != null) t.minutesLeft((left.inSeconds / 60).ceil()),
-            ].join(' · '),
-            style: AppTextStyles.small.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
-        if (current != null && received != null && total != null && total > 0)
-          Padding(
-            padding: EdgeInsets.only(top: rate == null ? 16 : 4),
-            child: Text(
-              t.bytesLine(
-                componentName(context, current),
-                formatBytes(received),
-                formatBytes(total),
-              ),
-              style: AppTextStyles.small.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ),
-        const SizedBox(height: 24),
+        AppProgressBar(value: overall),
+        // שתי השורות תמיד במקומן — בלי קפיצה של הכרטיס בכל מעבר רכיב.
+        const SizedBox(height: 16),
+        Text(
+          speedLine,
+          key: const ValueKey('task.download.speed'),
+          style: AppTextStyles.small.copyWith(color: cs.onSurfaceVariant),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          current != null && received != null && sizeOfCurrent != null
+              ? t.bytesLine(
+                  componentName(context, current),
+                  formatBytes(received),
+                  sizeOfCurrent,
+                )
+              : ' ',
+          key: const ValueKey('task.download.bytes'),
+          style: AppTextStyles.small.copyWith(color: cs.onSurfaceVariant),
+        ),
+        SizedBox(height: narrow ? 16 : 24),
         RowsCard(
           children: [
             for (final (i, c) in components.indexed)
               StageRow(
-                icon: componentIcon(c),
+                icon: c == MirrorComponent.app ? null : componentIcon(c),
+                tileChild: c == MirrorComponent.app
+                    ? Image.asset(
+                        'assets/images/otzaria_logo.png',
+                        width: 18,
+                        height: 18,
+                      )
+                    : null,
+                compact: narrow,
                 title: componentName(context, c),
                 state: i < index
                     ? StageState.done
@@ -549,10 +642,15 @@ class _DownloadProgressState extends State<_DownloadProgress> {
                         _sizes[c] == null ? null : formatBytes(_sizes[c]!),
                       )
                     : i == index
-                        ? (fraction == null
-                            ? null
-                            : '${(fraction * 100).floor()}%')
-                        : t.stageWaiting,
+                        ? [
+                            if (fraction != null)
+                              '${(fraction * 100).floor()}%',
+                            if (sizeOfCurrent != null) sizeOfCurrent,
+                          ].join(' · ')
+                        : [
+                            t.stageWaiting,
+                            if (_sizes[c] case final size?) formatBytes(size),
+                          ].join(' · '),
               ),
           ],
         ),

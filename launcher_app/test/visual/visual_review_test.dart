@@ -122,11 +122,16 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase2b': _phase2aStates,
   // הדפים מצולמים מהקונטרולרים — ראו `page_<scenario>`.
   'phase3': _phase2aStates,
+  // תיקוני 2b: מסכי המשימה שוב, והבית (היחידות הלטיניות).
+  'phase2b2': const [],
 };
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
 Set<String> get _homeScenarioPhases =>
-    const {'phase2a', 'phase2a2', 'phase2a3'};
+    const {'phase2a', 'phase2a2', 'phase2a3', 'phase2b2'};
+
+/// מסכי המשימה מצולמים מהמודל — ראו `task_<scenario>`.
+const _taskPhases = {'phase2b', 'phase2b2'};
 
 /// דף הדיווחים עם כרטיס האיסוף — המונים מגיעים מהסשן, ולכן מצולם מהווידג'ט.
 const _reportsVariants = {
@@ -239,6 +244,7 @@ void main() {
         WidgetsApp.debugAllowBannerOverride = false;
         try {
           useViewSize(tester, size);
+          AppL10n.use(AppLanguage.hebrew);
           await tester.pumpWidget(
             RepaintBoundary(
               key: boundary,
@@ -282,11 +288,13 @@ void main() {
   for (final scenario in taskScenarioNames) {
     for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
       testWidgets('$_phase/task_$scenario$suffix',
-          skip: !_enabled || _phase != 'phase2b', (tester) async {
+          skip: !_enabled || !_taskPhases.contains(_phase), (tester) async {
         await tester.runAsync(loadVisualFonts);
         WidgetsApp.debugAllowBannerOverride = false;
         try {
           useViewSize(tester, size);
+          // `formatBytes` קורא את השפה הגלובלית — בלי זה היחידות באנגלית.
+          AppL10n.use(AppLanguage.hebrew);
           await tester.pumpWidget(
             RepaintBoundary(
               key: boundary,
@@ -385,7 +393,8 @@ void main() {
     ]) {
       for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
         final file = '$name${advanced ? '_advanced' : ''}$suffix';
-        testWidgets('$_phase/page_$file', skip: !_enabled || _phase != 'phase3',
+        testWidgets('$_phase/page_$file',
+            skip: !_enabled || !{'phase3', 'phase2b2'}.contains(_phase),
             (tester) async {
           await tester.runAsync(loadVisualFonts);
           WidgetsApp.debugAllowBannerOverride = false;

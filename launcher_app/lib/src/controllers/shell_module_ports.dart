@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:plugins_manager/plugins_manager.dart' show StorePlugin;
 
 import '../flows/update_here_flow.dart';
@@ -49,6 +51,11 @@ class OtzariaModulePort
 
   @override
   bool get elevatedAsOtherUser => _otzaria.elevatedAsOtherUser;
+
+  /// התהליך רץ בחשבון המנהל, ולכן זה שמו.
+  @override
+  String? get adminAccount =>
+      Platform.isWindows ? Platform.environment['USERNAME'] : null;
 
   @override
   String? get versionToInstall => _otzaria.latestVersion;
@@ -139,20 +146,28 @@ class LibraryModulePort
   bool get canApplyFull => _library.canRetryWithFullDownload;
 
   @override
-  Future<bool> apply() async {
+  ({int low, int high})? applyEstimate({bool full = false}) =>
+      _library.applyEstimateFor(fullDownload: full);
+
+  @override
+  Future<LibraryApplyResult> apply() async {
     await _library.update();
-    return _appliedCleanly;
+    return _applyResult;
   }
 
   @override
-  Future<bool> applyFull() async {
+  Future<LibraryApplyResult> applyFull() async {
     await _library.updateWithFullDownload();
-    return _appliedCleanly;
+    return _applyResult;
   }
 
-  bool get _appliedCleanly =>
-      _library.status == LibraryModuleStatus.upToDate &&
-      _library.errorMessage == null;
+  /// `_apply` משאיר הודעה גם אחרי החלה מוצלחת (מיקום שצריך לכוון, קובץ
+  /// נלווה שנכשל) — מה שקובע הוא שההחלה הגיעה לסופה.
+  LibraryApplyResult get _applyResult => !_library.lastApplyCompleted
+      ? LibraryApplyResult.failed
+      : _library.errorMessage == null
+          ? LibraryApplyResult.applied
+          : LibraryApplyResult.appliedWithNote;
 }
 
 class PluginsModulePort implements PluginsMirrorModule, UpdateHerePlugins {
@@ -190,6 +205,7 @@ class PluginsModulePort implements PluginsMirrorModule, UpdateHerePlugins {
 
   @override
   Future<void> deliver(void Function(List<PluginDelivery> rows) onRow) async {
+    // אחרי שלב התוכנה הרשימה עשויה להשתנות (canDirectInstall תלוי בגרסה).
     final targets = _plugins.deliverableUpdates;
     final states = {
       for (final plugin in targets) plugin.id: PluginDeliveryState.waiting,
@@ -198,6 +214,8 @@ class PluginsModulePort implements PluginsMirrorModule, UpdateHerePlugins {
           for (final StorePlugin plugin in targets)
             PluginDelivery(plugin.name, states[plugin.id]!),
         ];
+    onRow(rows());
+    if (targets.isEmpty) return;
     await _plugins.deliverUpdates(
       plugins: targets,
       onDelivered: (plugin, result) {

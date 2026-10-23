@@ -1,5 +1,6 @@
 import 'app_language.dart';
 import 'app_strings.dart';
+import 'plural.dart';
 
 /// עברית — ברירת המחדל. הנוסח כאן הוא המקור; האנגלית היא תרגום חופשי שלו.
 class HebrewStrings extends AppStrings {
@@ -178,8 +179,6 @@ class _Home extends HomeStrings {
   @override
   String get cancelDownloadButton => 'ביטול ההורדה';
   @override
-  String get cancelDownloadPending => 'מבטל...';
-  @override
   String get cancelDownloadDialogTitle => 'לבטל את ההורדה?';
   @override
   String get cancelDownloadPrompt =>
@@ -187,24 +186,6 @@ class _Home extends HomeStrings {
       'יישאר במקומו.';
   @override
   String get cancelDownloadKeepGoing => 'המשך בהורדה';
-  @override
-  String get downloadCancelledSnack => 'ההורדה בוטלה, ומה שירד בה נמחק';
-  @override
-  String get downloadSnapshotFailedSnack =>
-      'ההורדה לא התחילה: לא ניתן היה לשמור את מצב המראה לפני ההורדה, ולכן ביטול לא היה יכול לשחזר אותו';
-  @override
-  String get downloadCancelRevertFailedSnack =>
-      'ההורדה בוטלה, אך מחיקת מה שירד בה נכשלה. ייתכנו קבצים חלקיים במראה';
-  @override
-  String downloadSkippedSnack(String components) =>
-      'דולג על $components — אין בהם שום דבר חדש ברשת';
-  @override
-  String downloadFailedSnack(String components) =>
-      'ההורדה של $components נכשלה. מה שכבר ירד נשמר — נסו שוב, ההורדה תמשיך '
-      'מהמקום שבו נעצרה';
-  @override
-  String get downloadDoneSnack => 'ההורדה הושלמה — התיקייה שלצד התוכנה מעודכנת';
-
   @override
   String get downloadingApp => 'מוריד את תוכנת אוצריא...';
   @override
@@ -227,8 +208,6 @@ class _Task extends TaskStrings {
   String get semanticBody =>
       'חיפוש חכם מוצא מקורות לפי המשמעות, גם כשהמילים שונות ממה שחיפשתם.';
   @override
-  String get semanticHint => 'אפשר לשנות את זה אחר כך בדף הספרייה.';
-  @override
   String get semanticNoTitle => 'לא, רק החיפוש הרגיל (מומלץ)';
   @override
   String get semanticNoBody => 'אפשר להוסיף חיפוש חכם בהורדה הבאה.';
@@ -238,7 +217,7 @@ class _Task extends TaskStrings {
   String get semanticYesTitle => 'כן, גם חיפוש חכם';
   @override
   String get semanticYesBody =>
-      'מתאים כשיש מקום בכונן. ההורדה תהיה ארוכה יותר.';
+      'הקבצים תופסים כמה ג׳יגה־בייט, וההורדה תהיה ארוכה יותר. השימוש בחיפוש החכם באוצריא מחייב הסכמה לאיסוף נתוני אימון; ההורדה אינה משנה את ההסכמה.';
   @override
   String get back => 'חזרה';
   @override
@@ -267,17 +246,25 @@ class _Task extends TaskStrings {
   @override
   String get stepPlugins => 'התוספים';
   @override
-  String transferRate(String perSecond) => '$perSecond בשנייה';
+  String minutesLeft(int minutes) => plural(
+        minutes,
+        one: 'נותרה דקה אחת',
+        two: 'נותרו שתי דקות',
+        many: 'נותרו $minutes דקות',
+      );
   @override
-  String minutesLeft(int minutes) =>
-      minutes == 1 ? 'נותרה 1 דקה' : 'נותרו $minutes דקות';
+  String get lessThanMinuteLeft => 'נותרה פחות מדקה';
+  @override
+  String get speedPending => 'מחשב מהירות…';
+  @override
+  String get speedStalled => 'ממתין לנתונים…';
   @override
   String bytesLine(String name, String done, String total) =>
       '$name: ירדו $done מתוך $total';
   @override
-  String stageDone(String? size) => size == null ? 'ירד' : 'ירד · $size';
+  String stageDone(String? size) => size == null ? 'הושלם' : 'הושלם · $size';
   @override
-  String get stageWaiting => 'ממתין';
+  String get stageWaiting => 'בהמשך';
   @override
   String get cancelling => 'מבטל…';
   @override
@@ -289,7 +276,7 @@ class _Task extends TaskStrings {
   String get cancelledRevertFailedBody =>
       'לא כל מה שירד הוסר מהכונן. הורדה חוזרת תמשיך ממנו.';
   @override
-  String get downloadAgain => 'הורד שוב';
+  String get downloadAgain => 'הורדה מחדש';
   @override
   String get backHome => 'חזרה לבית';
   @override
@@ -299,14 +286,21 @@ class _Task extends TaskStrings {
   @override
   String get doneBody => 'כל העדכונים ירדו ונשמרו בכונן.';
   @override
+  String get doneNothingBody =>
+      'באתר אוצריא אין עדכונים חדשים, ולכן לא ירד דבר. הכונן כבר מעודכן.';
+  @override
   String doneSkipped(String names) => '$names לא ירדו — באתר אין בהם חדש.';
   @override
   String doneAppValue(String version) => 'אוצריא $version';
   @override
   String doneLibraryValue(int version) => 'גרסה $version';
   @override
-  String donePluginsValue(int count) =>
-      count == 1 ? '1 תוסף בכונן' : '$count תוספים בכונן';
+  String donePluginsValue(int count) => plural(
+        count,
+        one: 'תוסף אחד בכונן',
+        two: 'שני תוספים בכונן',
+        many: '$count תוספים בכונן',
+      );
   @override
   String get donePluginsUpdated => 'חנות התוספים עודכנה';
   @override
@@ -318,8 +312,8 @@ class _Task extends TaskStrings {
   @override
   String get whatNowConnect => 'חברו אותו למחשב שבו לומדים עם אוצריא.';
   @override
-  String get whatNowOpen =>
-      'פתחו שם את "עדכוני אוצריא" מתוך הכונן, ולחצו "עדכון אוצריא במחשב הזה".';
+  String whatNowOpen(String toolName) =>
+      'פתחו שם את $toolName מתוך הכונן, ולחצו "עדכון אוצריא במחשב הזה".';
   @override
   String get updateHereToo => 'לעדכן גם במחשב הזה';
   @override
@@ -328,6 +322,11 @@ class _Task extends TaskStrings {
   String get finish => 'סיום';
   @override
   String get networkTitle => 'אין חיבור לאינטרנט';
+  @override
+  String get filterTitle => 'החיבור לאתר אוצריא נחסם';
+  @override
+  String filterBody(String name) =>
+      'ייתכן שמסנן האינטרנט (כמו נטפרי) חוסם את ההורדה של $name. מה שכבר ירד נשמר בכונן. אם זה חוזר, פנו לספק הסינון שלכם לאשר את אתר אוצריא, ואז לחצו "נסה שוב".';
   @override
   String networkBody(String name) =>
       'החיבור נקטע באמצע ההורדה של $name. מה שכבר ירד נשמר בכונן. בדקו את החיבור ולחצו "נסה שוב".';
@@ -339,7 +338,7 @@ class _Task extends TaskStrings {
   String get spaceTitle => 'אין מספיק מקום בכונן';
   @override
   String spaceBody(String needed, String free) =>
-      'נדרשים $needed ופנויים $free. פנו מקום בכונן ולחצו "נסה שוב" — מה שכבר ירד נשמר.';
+      'נדרשים \u2066$needed\u2069 ופנויים \u2066$free\u2069. פנו מקום בכונן ולחצו "נסה שוב" — מה שכבר ירד נשמר.';
   @override
   String get snapshotTitle => 'ההורדה לא התחילה';
   @override
@@ -359,13 +358,20 @@ class _Task extends TaskStrings {
   @override
   String get detailsCopied => 'הפרטים הועתקו';
   @override
-  String get otherUserTitle => 'אוצריא הותקנה על ידי משתמש אחר';
+  String get otherUserTitle => 'הכלי פועל כמנהל בחשבון אחר';
   @override
-  String get otherUserBody =>
-      'היא הותקנה כמנהל, בחשבון אחר. אם תמשיכו מהחשבון הזה, העדכון עלול ליצור התקנה שנייה במקום לעדכן את הקיימת.';
+  String otherUserBody({required bool firstInstall, String? account}) {
+    final who = account == null
+        ? 'הכלי הופעל כמנהל בשם חשבון אחר'
+        : 'הכלי הופעל כמנהל בשם החשבון \u2068$account\u2069';
+    return firstInstall
+        ? '$who, ולכן אוצריא תותקן בחשבון של המנהל ולא בחשבון שלכם.'
+        : '$who, ולכן העדכון ייכנס לחשבון של המנהל ולא לאוצריא שבחשבון שלכם.';
+  }
+
   @override
   String get otherUserHint =>
-      'מומלץ להתחבר לחשבון שהתקין את אוצריא ולעדכן משם, או להפעיל את הכלי כמנהל.';
+      'מומלץ לסגור את הכלי ולפתוח אותו שוב בלי "הפעל כמנהל".';
   @override
   String get continueAnyway => 'המשך בכל זאת';
   @override
@@ -404,7 +410,10 @@ class _Task extends TaskStrings {
   String get appWizardBody =>
       'אשף ההתקנה של אוצריא נפתח בחלון נפרד. בסופו אוצריא תיפתח מעצמה, והכלי ימשיך לבד.';
   @override
-  String get libraryBody => 'כמה דקות, וזה מוכן.';
+  String libraryBody(int? lowMinutes, int? highMinutes) =>
+      lowMinutes == null || highMinutes == null
+          ? 'זה עשוי להימשך זמן מה, לפי גודל העדכון ומהירות המחשב.'
+          : 'צפוי כ-$lowMinutes עד $highMinutes דקות, לפי מהירות המחשב.';
   @override
   String get pluginsBody =>
       'הכלי שולח את התוספים לאוצריא, אחד אחד. את ההתקנה מאשרים בחלון של אוצריא.';
@@ -420,6 +429,8 @@ class _Task extends TaskStrings {
   String get appStoppedWaiting =>
       'הפסקנו להמתין · בדקו בדף התוכנה אם ההתקנה הסתיימה';
   @override
+  String get appSkipped => 'לא נדרשה התקנה';
+  @override
   String get stopWaiting => 'הפסק להמתין';
   @override
   String get libraryFull => 'הספרייה המלאה';
@@ -432,12 +443,26 @@ class _Task extends TaskStrings {
   @override
   String get librarySkipped => 'לא הותקנה עכשיו — אפשר להתקין אחר כך מדף הבית';
   @override
-  String pluginsWaiting(int count) =>
-      count == 1 ? '1 תוסף · יישלח לאוצריא' : '$count תוספים · יישלחו לאוצריא';
+  String pluginsWaiting(int count) => plural(
+        count,
+        one: 'תוסף אחד · יישלח לאוצריא',
+        two: 'שני תוספים · יישלחו לאוצריא',
+        many: '$count תוספים · יישלחו לאוצריא',
+      );
   @override
   String get pluginsCurrent => 'אשרו כל תוסף בחלון של אוצריא';
   @override
   String get pluginsSent => 'נשלחו לאוצריא — אשרו שם כל תוסף';
+  @override
+  String pluginsSentNames(String names) => 'נשלחו: $names';
+  @override
+  String pluginsNotSent(String names) =>
+      'לא נשלחו: $names — אפשר לנסות מדף התוספים';
+  @override
+  String pluginsStillSending(String names) => 'עוד נשלחים: $names';
+  @override
+  String get pluginsAfterInstall =>
+      'לא נשלחו — שלחו אותם מדף התוספים אחרי שההתקנה תסתיים';
   @override
   String get pluginRowSent => 'נשלח לאוצריא';
   @override
@@ -451,17 +476,46 @@ class _Task extends TaskStrings {
   @override
   String get updatedTitle => 'אוצריא מעודכנת';
   @override
-  String doneHereBody(
-          {required bool firstInstall,
-          required bool withLibrary,
-          required bool plugins}) =>
+  String doneHereBody({
+    required bool firstInstall,
+    required bool app,
+    required bool library,
+    required bool plugins,
+  }) {
+    if (firstInstall) {
+      return library
+          ? 'אוצריא והספרייה מותקנות במחשב הזה ומוכנות ללימוד. אפשר לנתק את הכונן.'
+          : 'אוצריא מותקנת במחשב הזה. אפשר לנתק את הכונן.';
+    }
+    final done = app && library
+        ? 'התוכנה והספרייה עודכנו.'
+        : app
+            ? 'תוכנת אוצריא עודכנה.'
+            : library
+                ? 'הספרייה עודכנה.'
+                : null;
+    return [
+      if (done != null) done,
+      if (plugins) 'התוספים מחכים לאישור שלכם באוצריא.',
+      'אפשר לנתק את הכונן.',
+    ].join(' ');
+  }
+
+  @override
+  String get stoppedWaitingTitle => 'הפסקנו להמתין לאשף ההתקנה';
+  @override
+  String stoppedWaitingBody(
+          {required bool firstInstall, required bool libraryDone}) =>
       firstInstall
-          ? (withLibrary
-              ? 'אוצריא והספרייה מותקנות במחשב הזה ומוכנות ללימוד. אפשר לנתק את הכונן.'
-              : 'אוצריא מותקנת במחשב הזה. אפשר לנתק את הכונן.')
-          : plugins
-              ? 'מה שהיה בעדכון הותקן, והתוספים מחכים לאישור שלכם באוצריא. אפשר לנתק את הכונן.'
-              : 'כל מה שהיה בעדכון הותקן במחשב הזה. אפשר לנתק את הכונן.';
+          ? 'אם האשף עדיין פתוח, סיימו בו. אחר כך בדקו בדף התוכנה שאוצריא הותקנה, ומשם אפשר להתקין גם את הספרייה.'
+          : libraryDone
+              ? 'הספרייה עודכנה. סיימו את ההתקנה בחלון האשף, ובדקו בדף התוכנה שאוצריא עודכנה. אל תנתקו את הכונן עד שהאשף יסתיים.'
+              : 'סיימו את ההתקנה בחלון האשף, ובדקו בדף התוכנה שאוצריא עודכנה. אל תנתקו את הכונן עד שהאשף יסתיים.';
+  @override
+  String get wizardStillOpenTitle => 'אשף ההתקנה עדיין פתוח';
+  @override
+  String get wizardStillOpenBody =>
+      'סיימו את ההתקנה בחלון האשף, ואז בדקו שוב בדף התוכנה. אל תנתקו את הכונן עד שהאשף יסתיים.';
   @override
   String get reindexTitle => 'כדאי לבנות מחדש את החיפוש';
   @override
@@ -489,11 +543,28 @@ class _Task extends TaskStrings {
   @override
   String get libraryFailedTitle => 'עדכון הספרייה נכשל';
   @override
+  String get libraryInstallFailedTitle => 'התקנת הספרייה נכשלה';
+  @override
   String get appFailedTitle => 'התקנת אוצריא נכשלה';
   @override
   String get libraryFailedKeep => 'אוצריא ממשיכה לעבוד עם הספרייה הקודמת.';
   @override
   String get appFailedKeep => 'אוצריא נשארה בגרסה הקודמת.';
+  @override
+  String get permissionFailedTitle => 'העדכון נכשל';
+  @override
+  String get permissionAppBody =>
+      'אין לכלי הרשאה לעדכן את אוצריא, כי היא מותקנת לכל המשתמשים במחשב.';
+  @override
+  String get permissionLibraryBody =>
+      'אין לכלי הרשאה לשנות את התיקייה שבה נמצאת הספרייה.';
+  @override
+  String get elevateTitle => 'הפעלה מחדש כמנהל';
+  @override
+  String get elevateBody =>
+      'הכלי ייפתח מחדש עם הרשאות מנהל, ואז אפשר לנסות שוב.';
+  @override
+  String get elevateButton => 'הפעלה מחדש כמנהל';
   @override
   String get toLibraryPage => 'לדף הספרייה';
   @override
@@ -2347,11 +2418,13 @@ class _Units extends UnitStrings {
   @override
   String progressOf(String received, String total) => '$received מתוך $total';
   @override
-  String kilobytes(String amount) => '$amount ק״ב';
+  String kilobytes(String amount) => '\u2066$amount\u00a0KB\u2069';
   @override
-  String megabytes(String amount) => '$amount מ״ב';
+  String megabytes(String amount) => '\u2066$amount\u00a0MB\u2069';
   @override
-  String gigabytes(String amount) => '$amount ג״ב';
+  String gigabytes(String amount) => '\u2066$amount\u00a0GB\u2069';
+  @override
+  String perSecond(String size) => '\u2066$size/s\u2069';
 }
 
 class _LibraryDomain extends LibraryDomainStrings {
@@ -3804,6 +3877,9 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String collectFailedSnack(String error) => 'איסוף הדיווחים נכשל: $error';
   @override
+  String get collectDisclosureRefreshedSnack =>
+      'נמצא מידע נוסף לאיסוף — עיינו בפירוט שמעל הכפתור ולחצו שוב.';
+  @override
   String get collectOtzariaOpenSnack =>
       'אוצריא פתוחה, ולכן הדיווחים לא נאספו. השאלה תחזור כשאוצריא תיסגר';
   @override
@@ -4066,12 +4142,13 @@ class _AppReports extends AppReportsStrings {
   String get removeImageTooltip => 'הסרת התמונה';
   @override
   String imageTooLarge(int megabytes) =>
-      'תמונה גדולה מ-$megabytes MB לא צורפה.';
+      'תמונה גדולה מ-\u2066$megabytes\u00a0MB\u2069 לא צורפה.';
   @override
   String tooManyImages(int count) => 'ניתן לצרף עד $count תמונות לדיווח.';
   @override
   String imagesTotalTooLarge(int megabytes) =>
-      'הגודל הכולל של התמונות מוגבל ל-$megabytes MB.';
+      'הגודל הכולל של התמונות מוגבל ל-\u2066$megabytes\u00a0MB\u2069.';
+
   @override
   String get imageReadFailed => 'לא ניתן היה לקרוא את התמונה.';
 

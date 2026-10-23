@@ -38,8 +38,10 @@ import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/app_session.dart';
+import 'package:launcher_app/src/shell/home_guidance.dart' show GuidanceItem;
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_navigator.dart';
+import 'package:launcher_app/src/shell/shell_tasks.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
@@ -984,35 +986,44 @@ void main() {
       expect(nav.section, ShellSection.home);
     });
 
-    testWidgets('סוף ההורדה נאמר במסך המשימה, ולא בהודעה צפה', (tester) async {
-      final snacks = <String>[];
-      final previousPrint = debugPrint;
-      debugPrint = (String? message, {int? wrapWidth}) {
-        if (message?.startsWith('UiSnack') ?? false) snacks.add(message!);
-      };
-      addTearDown(() => debugPrint = previousPrint);
+    testWidgets('בזמן משימה רצה גלגל השיניים מושבת למראה, ובסיום חוזר',
+        (tester) async {
       await pumpShell(tester);
-      final state = tester.state(find.byType(AppShell)) as dynamic;
       final s = sessionOf(tester);
+      bool toolsEnabled() =>
+          tester.widget<AppTitleBar>(find.byType(AppTitleBar)).toolsEnabled;
+      expect(toolsEnabled(), isTrue);
       s.tasks.downloadRunning(const [MirrorComponent.app]);
       await tester.pump();
-      expect(state.taskScreenShown, isTrue);
-      state.reportDownload(
-        failed: const <MirrorComponent>[],
-        skipped: const <MirrorComponent>[],
-      );
-      expect(snacks, isEmpty);
-
+      expect(toolsEnabled(), isFalse);
       s.tasks.downloadDone();
-      s.tasks.dismiss();
       await tester.pump();
-      expect(state.taskScreenShown, isFalse);
-      state.reportDownload(
-        failed: const <MirrorComponent>[],
-        skipped: const <MirrorComponent>[],
+      expect(toolsEnabled(), isTrue);
+    });
+
+    testWidgets('באנר המנהל במסך הכשל נגזר מהמצב, לא מדגל הכשל',
+        (tester) async {
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      s.tasks
+        ..startUpdateHere(const [GuidanceItem.library])
+        ..updateFailed(const UpdateFailure(
+          GuidanceItem.library,
+          message: 'Access is denied',
+          needsElevation: true,
+        ));
+      await tester.pump();
+      // הדגל בכשל לבדו אינו מספיק: restartElevated היה חוזר בשקט.
+      expect(find.byKey(ShellKeys.taskElevation), findsNothing);
+
+      s.library.needsElevation = true;
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      s.library.notifyListeners();
+      await tester.pump();
+      expect(
+        find.byKey(ShellKeys.taskElevation),
+        Platform.isWindows ? findsOneWidget : findsNothing,
       );
-      debugPrint = previousPrint;
-      expect(snacks.single, contains(stringsOf().home.downloadDoneSnack));
     });
 
     testWidgets('השאלה על החיפוש החכם — "חזרה" סוגרת בלי להוריד',
@@ -1035,6 +1046,7 @@ void main() {
       expect(source,
           contains('onDownload: () => unawaited(_session.downloadAll()),'));
       expect(source, contains('onShowProgress: _showProgress,'));
+      expect(source, isNot(contains('onCancelDownload')));
       expect(
         source,
         contains(
@@ -1086,7 +1098,13 @@ void main() {
       _appSessionSource(),
       'Future<void> refreshFromKeyboard()',
     );
-    expect(body, contains('if (longTaskRunning) return;'));
+    expect(body, contains('if (longTaskRunning || tasks.isRunning) return;'));
+    // גם הצעת הדיווחים אינה קופצת מעל מסך משימה.
+    final offers = _appSessionSource().substring(
+      _appSessionSource().indexOf('late final ReportOfferCoordinator _offers'),
+      _appSessionSource().indexOf('bool get isDownloading =>'),
+    );
+    expect(offers, contains('tasks.isRunning'));
   });
 
   group('חיווט הזרימות שהוצאו מהמסגרת', () {
@@ -1697,7 +1715,7 @@ void main() {
     String restartBody() =>
         _methodBody(source, 'Future<void> restartElevated() async {');
     final offers = source.substring(
-      source.indexOf('bool get offersElevation =>'),
+      source.indexOf('bool get canRestartElevated =>'),
       source.indexOf('Future<void> restartElevated()'),
     );
 

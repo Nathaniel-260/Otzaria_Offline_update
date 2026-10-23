@@ -573,9 +573,13 @@ feeds `hasOnlineUpdate`; its failure blocks the skip via `onlineProofError`.
 `ShellTasks` (`shell/shell_tasks.dart`) is the host's UI side: the smart-search
 question (`confirmSemanticSearch` returns `null` for "back" — nothing is captured or
 downloaded), progress, "cancelled", "drive is ready" and an in-window failure
-(`classifyDownloadFailure`: network/Shabbat/no space are calm, the rest red). A
+(`classifyDownloadFailure`: network/filter/Shabbat/no space are calm, the rest red;
+a rejected certificate is "filter", not "no internet" — retry alone will not help, and
+the no-space message is matched against every language's template). A
 cancel reverts the drive, so the screen says "the drive is as before", never "what
 was downloaded is kept" — that is true only after a *failure*, which keeps parts.
+Ctrl+R/F5 and report offers also check `tasks.isRunning`; do **not** fold it into
+`longTaskRunning` — the download's own `isBlocked` reads that and would stop itself.
 
 **Cancelling a download deletes what *that* download brought.** "Cancel" (behind the
 warning dialog) appears only while a download runs, and
@@ -2141,8 +2145,6 @@ stay in the queue. App attachments travel in the outbox, not the sent history.
 
 **Check Otzaria is closed before counting and before collecting; recount on closure.**
 Writing under its open `user_state.db` can break its transactions (2026-10-13).
-`markDeclined` keeps a count threshold even when the queue shrinks, until a
-collection brings reports (else new ones stay hidden); retry only above it.
 Offers also run with auto-check off, never on read-only drives, and
 wait for dialogs and tasks, including 3s after launcher-initiated closure.
 `ReportOfferCoordinator`, `AppSession._onChange`, `collectReportsToDrive`,

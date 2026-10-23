@@ -56,11 +56,25 @@ void main() {
     expect(meter.bytesPerSecond, closeTo(1000, 0.001));
   });
 
-  test('דיווח חוזר של אותו מונה אינו מאט את המדידה', () {
+  // המהירות נמדדת עד עכשיו: שנייה בלי בייטים היא שנייה איטית יותר.
+  test('דיווח חוזר של אותו מונה — המהירות יורדת, לא קופאת', () {
     at(0, 0);
     at(2, 2000);
-    at(3, 2000);
-    expect(meter.bytesPerSecond, closeTo(1000, 0.001));
+    at(4, 2000);
+    expect(meter.bytesPerSecond, closeTo(500, 0.001));
+  });
+
+  test('בלי בייט חדש כמה שניות — תקוע, בלי מהירות ובלי זמן', () {
+    at(0, 0);
+    at(2, 2000);
+    expect(meter.isStalled, isFalse);
+    now = now.add(const Duration(seconds: 6));
+    expect(meter.isStalled, isTrue);
+    expect(meter.bytesPerSecond, isNull);
+    expect(meter.remaining(10000), isNull);
+    at(9, 3000);
+    expect(meter.isStalled, isFalse);
+    expect(meter.bytesPerSecond, isNotNull);
   });
 
   test('איפוס', () {

@@ -64,7 +64,6 @@ class HomeViewModel {
     this.newPlugins = const [],
     this.canLaunch = false,
     this.task = HomeTask.other,
-    this.cancellingDownload = false,
     this.isCheckingOnline = false,
     this.checkingNow = false,
     this.checkBlocked = false,
@@ -124,7 +123,6 @@ class HomeViewModel {
   final List<String> newPlugins;
   final bool canLaunch;
   final HomeTask task;
-  final bool cancellingDownload;
   final bool isCheckingOnline;
 
   /// "בדוק עכשיו" רץ (מקומית ואז ברשת) — מחוון במקום הקישור.
@@ -225,7 +223,6 @@ HomeViewModel homeViewModelOf(AppSession s) {
         HomeTask.updatingLibrary,
       _ => HomeTask.other,
     },
-    cancellingDownload: s.isCancellingDownload,
     isCheckingOnline: s.isCheckingOnline,
     checkingNow: s.isCheckingNow,
     checkBlocked: s.checkNowBlocked,

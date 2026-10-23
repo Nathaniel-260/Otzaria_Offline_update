@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/theme_exports.dart';
+import 'task_frame.dart';
 
 enum ResultBadgeKind { ok, error, calm }
 
@@ -31,14 +32,16 @@ class ResultBadge extends StatelessWidget {
           cs.onSecondaryContainer,
         ),
     };
+    // חלון צר: 56/48 (`.win.narrow .badge`).
+    final narrow = TaskFrame.isNarrow(context);
     return Container(
-      width: 72,
-      height: 72,
+      width: narrow ? 56 : 72,
+      height: narrow ? 56 : 72,
       alignment: Alignment.center,
       decoration: BoxDecoration(shape: BoxShape.circle, color: ring),
       child: Container(
-        width: 64,
-        height: 64,
+        width: narrow ? 48 : 64,
+        height: narrow ? 48 : 64,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
@@ -47,7 +50,7 @@ class ResultBadge extends StatelessWidget {
               ? Border.all(color: cs.onSurfaceVariant, width: 2)
               : null,
         ),
-        child: Icon(icon, size: 32, color: glyph),
+        child: Icon(icon, size: narrow ? 26 : 32, color: glyph),
       ),
     );
   }

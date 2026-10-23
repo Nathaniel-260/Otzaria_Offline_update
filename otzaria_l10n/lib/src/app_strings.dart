@@ -134,25 +134,9 @@ abstract class HomeStrings {
   /// ביטול ההורדה שרצה — מוצג רק בזמנה. הביטול **מוחק** את מה שההורדה הזו
   /// הביאה, ולכן הוא עובר דרך דיאלוג אזהרה.
   String get cancelDownloadButton;
-  String get cancelDownloadPending;
   String get cancelDownloadDialogTitle;
   String get cancelDownloadPrompt;
   String get cancelDownloadKeepGoing;
-  String get downloadCancelledSnack;
-  String get downloadSnapshotFailedSnack;
-  String get downloadCancelRevertFailedSnack;
-
-  /// אילו רכיבים ההורדה דילגה עליהם, כי הבדיקה הוכיחה שאין בהם חדש.
-  String downloadSkippedSnack(String components);
-
-  /// אילו רכיבים ההורדה שלהם נכשלה. בלי זה מד ההתקדמות פשוט נעלם, והמשתמש
-  /// נשאר עם כונן חסר וללא סימן שמשהו קרה.
-  String downloadFailedSnack(String components);
-
-  /// סוף הורדה שהצליחה. בלעדיה ההורדה — שאורכת עשרות דקות — נגמרה בכך שמד
-  /// ההתקדמות פשוט נעלם מהמסך.
-  String get downloadDoneSnack;
-
   String get downloadingApp;
   String get downloadingLibrary;
   String get downloadingPlugins;
@@ -170,7 +154,6 @@ abstract class TaskStrings {
 
   String get semanticTitle;
   String get semanticBody;
-  String get semanticHint;
   String get semanticNoTitle;
   String get semanticNoBody;
   String get semanticNoSize;
@@ -189,8 +172,16 @@ abstract class TaskStrings {
   String get stepApp;
   String get stepLibrary;
   String get stepPlugins;
-  String transferRate(String perSecond);
+
+  /// הזמן שנותר, מדקה אחת ומעלה; מתחת לדקה — [lessThanMinuteLeft].
   String minutesLeft(int minutes);
+  String get lessThanMinuteLeft;
+
+  /// לפני שיש מספיק מדידה למהירות.
+  String get speedPending;
+
+  /// לא הגיע דיווח זמן מה — לא מציגים מהירות קפואה.
+  String get speedStalled;
   String bytesLine(String name, String done, String total);
   String stageDone(String? size);
   String get stageWaiting;
@@ -203,6 +194,9 @@ abstract class TaskStrings {
   String get backToHomePage;
   String get doneTitle;
   String get doneBody;
+
+  /// לא ירד דבר — באתר אין חדש באף רכיב.
+  String get doneNothingBody;
   String doneSkipped(String names);
   String doneAppValue(String version);
   String doneLibraryValue(int version);
@@ -212,11 +206,17 @@ abstract class TaskStrings {
   String get whatNowEject;
   String get whatNowEjectHint;
   String get whatNowConnect;
-  String get whatNowOpen;
+
+  /// [toolName] מודגש במסך.
+  String whatNowOpen(String toolName);
   String get updateHereToo;
   String get installHereToo;
   String get finish;
   String get networkTitle;
+
+  /// החיבור המאובטח נדחה (תעודה) — לרוב מסנן אינטרנט, ו"נסה שוב" לא יעזור לבד.
+  String get filterTitle;
+  String filterBody(String name);
   String networkBody(String name);
   String get shabbatTitle;
   String get shabbatBody;
@@ -230,8 +230,10 @@ abstract class TaskStrings {
   String get hideTechDetails;
   String get copyDetails;
   String get detailsCopied;
+
+  /// הכלי רץ כמנהל בחשבון אחר — ההתקנה תיכנס לפרופיל של המנהל.
   String get otherUserTitle;
-  String get otherUserBody;
+  String otherUserBody({required bool firstInstall, String? account});
   String get otherUserHint;
   String get continueAnyway;
   String get closeTitle;
@@ -249,13 +251,16 @@ abstract class TaskStrings {
   String get sendingPlugins;
   String get appWizardFirstBody;
   String get appWizardBody;
-  String get libraryBody;
+
+  /// [lowMinutes]–[highMinutes] — האומדן לתוכנית, כשידוע.
+  String libraryBody(int? lowMinutes, int? highMinutes);
   String get pluginsBody;
   String get keepDrive;
   String appVersion(String version);
   String appInstalled(String version);
   String get appWizardOpen;
   String get appStoppedWaiting;
+  String get appSkipped;
   String get stopWaiting;
   String get libraryFull;
   String libraryVersion(int version);
@@ -265,16 +270,35 @@ abstract class TaskStrings {
   String pluginsWaiting(int count);
   String get pluginsCurrent;
   String get pluginsSent;
+  String pluginsSentNames(String names);
+  String pluginsNotSent(String names);
+  String pluginsStillSending(String names);
+
+  /// "הפסק להמתין" לאשף — התוספים לא נשלחים לגרסה שאולי עוד לא הותקנה.
+  String get pluginsAfterInstall;
   String get pluginRowSent;
   String get pluginRowWaiting;
   String get pluginRowFailed;
   String get finishWithoutWaiting;
   String get installedTitle;
   String get updatedTitle;
-  String doneHereBody(
-      {required bool firstInstall,
-      required bool withLibrary,
-      required bool plugins});
+
+  /// בנוי ממה שבאמת הושלם: [app], [library], [plugins] (נשלחו).
+  String doneHereBody({
+    required bool firstInstall,
+    required bool app,
+    required bool library,
+    required bool plugins,
+  });
+
+  /// אחרי "הפסק להמתין": לא ידוע אם ההתקנה הסתיימה.
+  String get stoppedWaitingTitle;
+  String stoppedWaitingBody(
+      {required bool firstInstall, required bool libraryDone});
+
+  /// האשף עוד רץ אחרי הזמן הקצוב — ההתקנה עשויה עוד להסתיים.
+  String get wizardStillOpenTitle;
+  String get wizardStillOpenBody;
   String get reindexTitle;
   String get reindexBody;
   String get reindexButton;
@@ -285,9 +309,19 @@ abstract class TaskStrings {
   String get stoppedTitle;
   String get stoppedBody;
   String get libraryFailedTitle;
+  String get libraryInstallFailedTitle;
   String get appFailedTitle;
   String get libraryFailedKeep;
   String get appFailedKeep;
+
+  /// כשל הרשאות: גוף ידידותי; ההודעה הגולמית בפרטים הטכניים.
+  String get permissionFailedTitle;
+  String get permissionAppBody;
+  String get permissionLibraryBody;
+  String get elevateTitle;
+  String get elevateBody;
+  String get elevateButton;
+
   String get toLibraryPage;
   String get toAppPage;
   String get showProgress;
@@ -1310,11 +1344,14 @@ abstract class UnitStrings {
   String bytes(int count);
   String progressOf(String received, String total);
 
-  /// יחידות הגודל הגדולות. הן מופיעות בשורת ההתקדמות של הורדה של ~1GB —
-  /// הטקסט הנקרא ביותר בתוכנה — ולכן אינן יכולות להישאר קבועות באנגלית.
+  /// KB/MB/GB לטיניות בשתי השפות, כמו במוקאפ. בעברית הצירוף מבודד (LRI…PDI)
+  /// עם רווח קשיח — אחרת ה-bidi מציג "MB 403".
   String kilobytes(String amount);
   String megabytes(String amount);
   String gigabytes(String amount);
+
+  /// [size] — גודל מעוצב: "6.8 MB/s".
+  String perSecond(String size);
 }
 
 // ── הודעות מחבילות הספרייה (השורש + library_manager) ─────────────────────────
@@ -2119,6 +2156,9 @@ abstract class ErrorReportsStrings {
   String collectFailedSnack(String error);
 
   String get collectOtzariaOpenSnack;
+
+  /// הגילוי שמעל הכפתור רוענן בלחיצה — יש בו מידע שלא הוצג קודם.
+  String get collectDisclosureRefreshedSnack;
 
   String get legacyReportsDialogTitle;
   String get legacyReportsDialogContent;

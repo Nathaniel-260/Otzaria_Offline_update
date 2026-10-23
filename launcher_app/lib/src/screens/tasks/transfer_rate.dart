@@ -14,6 +14,9 @@ class TransferRateMeter {
   /// פחות משנייה של מדידה אינה אומרת דבר על המהירות.
   static const Duration minSpan = Duration(seconds: 1);
 
+  /// בלי בייט חדש זמן כזה — ההורדה תקועה, ואין מהירות להציג.
+  static const Duration stallAfter = Duration(seconds: 5);
+
   /// [bytes] — כמה ירד עד עכשיו. ירידה במונה היא קובץ או רכיב חדש: מתחילים
   /// למדוד מחדש.
   void add(int bytes) {
@@ -28,14 +31,18 @@ class TransferRateMeter {
 
   void reset() => _samples.clear();
 
-  /// בייטים לשנייה, או `null` עד שיש מספיק מדידה.
+  /// היו מדידות, אבל שום בייט לא הגיע כבר [stallAfter].
+  bool get isStalled =>
+      _samples.isNotEmpty && _clock().difference(_samples.last.at) > stallAfter;
+
+  /// בייטים לשנייה עד **עכשיו** (לא עד הדגימה האחרונה — אחרת עצירה מציגה
+  /// את המהירות האחרונה לנצח), או `null` עד שיש מספיק מדידה או כשתקוע.
   double? get bytesPerSecond {
-    if (_samples.length < 2) return null;
+    if (_samples.length < 2 || isStalled) return null;
     final first = _samples.first;
-    final last = _samples.last;
-    final span = last.at.difference(first.at);
+    final span = _clock().difference(first.at);
     if (span < minSpan) return null;
-    final bytes = last.bytes - first.bytes;
+    final bytes = _samples.last.bytes - first.bytes;
     if (bytes <= 0) return null;
     return bytes * Duration.microsecondsPerSecond / span.inMicroseconds;
   }

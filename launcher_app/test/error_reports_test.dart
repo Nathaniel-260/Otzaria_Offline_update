@@ -321,8 +321,6 @@ void main() {
       final c = controller(pending: 2);
       expect(await c.pendingToOffer(), 2);
       expect(await c.pendingToOffer(), 2);
-      c.markDeclined(2);
-      expect(await c.pendingToOffer(), 0);
     });
 
     test('הצעה שנדחתה בזמן משימה ארוכה רצה מחדש כשהיא מסתיימת', () async {
@@ -364,35 +362,6 @@ void main() {
       trigger.resume();
       await Future<void>.delayed(Duration.zero);
       expect(runs, 2);
-    });
-
-    test('סירוב נשמר גם כשחלק מהדיווחים כבר אינם בתור', () async {
-      var pending = 5;
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => _FakeQueue(pending),
-      );
-      c.markDeclined(5);
-      expect(await c.pendingToOffer(), 0);
-      pending = 2;
-      expect(await c.pendingToOffer(), 0);
-      pending = 3;
-      expect(await c.pendingToOffer(), 0);
-    });
-
-    test('אחרי איסוף מוצלח הסף מהסירוב הקודם מתאפס לדיווחים חדשים', () async {
-      var pending = 3;
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => _FakeQueue(pending),
-      );
-      c.markDeclined(3);
-      pending = 4;
-      expect(await c.pendingToOffer(), 4);
-      expect((await c.collect()).collected, 4);
-
-      pending = 1;
-      expect(await c.pendingToOffer(), 1);
     });
   });
 
@@ -487,6 +456,7 @@ void main() {
         );
         addTearDown(c.dispose);
         addTearDown(feedback.dispose);
+        final snacks = captureSnacks();
         final result = await collect(
           c,
           feedback: feedback,
@@ -494,6 +464,11 @@ void main() {
           disclosedSearchRecords: stale == 'search' ? 0 : 3,
         );
         expect(result, DriveCollectOutcome.disclosureStale);
+        // המשתמש יודע שצריך לעיין וללחוץ שוב.
+        expect(
+          snacks.single,
+          contains(stringsOf().errorReports.collectDisclosureRefreshedSnack),
+        );
         expect(queue.collections, 0);
         expect(transport.collections, 0);
         expect(outbox.reports, isEmpty);

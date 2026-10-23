@@ -14,9 +14,13 @@ class TaskFrame extends StatelessWidget {
     this.end,
     this.center = false,
     this.wide = false,
+    this.endMinWidth = 160,
   });
 
   final Widget child;
+
+  /// 160 לפעולה הראשית; 120 לכפתור משני כמו "ביטול" (`.task-foot .btn-tonal`).
+  final double endMinWidth;
   final Widget? start;
   final Widget? end;
 
@@ -24,21 +28,30 @@ class TaskFrame extends StatelessWidget {
   final bool center;
   final bool wide;
 
-  static const EdgeInsets _mainPadding = EdgeInsets.fromLTRB(24, 32, 24, 24);
+  /// חלון צר (`.win.narrow`) — אותו סף כמו בבית (`HomePage.narrowWidth`).
+  static const double narrowWidth = 800;
+
+  static bool isNarrow(BuildContext context) =>
+      MediaQuery.sizeOf(context).width <= narrowWidth;
+
+  static EdgeInsets mainPadding(BuildContext context) => isNarrow(context)
+      ? const EdgeInsets.fromLTRB(24, 20, 24, 16)
+      : const EdgeInsets.fromLTRB(24, 32, 24, 24);
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final padding = mainPadding(context);
     return Column(
       children: [
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) => SingleChildScrollView(
-              padding: _mainPadding,
+              padding: padding,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
                   minHeight: center
-                      ? (constraints.maxHeight - _mainPadding.vertical)
+                      ? (constraints.maxHeight - padding.vertical)
                           .clamp(0, double.infinity)
                       : 0,
                 ),
@@ -74,7 +87,7 @@ class TaskFrame extends StatelessWidget {
                     const Spacer(),
                     if (end != null)
                       ConstrainedBox(
-                        constraints: const BoxConstraints(minWidth: 160),
+                        constraints: BoxConstraints(minWidth: endMinWidth),
                         child: end,
                       ),
                   ],
@@ -90,19 +103,25 @@ class TaskFrame extends StatelessWidget {
 enum StageState { done, current, waiting }
 
 /// שורת שלב במסך משימה (`.stage-row`): אריח, שם, פירוט, וסימן מצב — ✓,
-/// טבעת מסתובבת או עיגול ריק.
+/// טבעת מסתובבת או עיגול ריק; [mark] מחליף אותו (מנעול כשממתינים למשתמש).
 class StageRow extends StatelessWidget {
   const StageRow({
     super.key,
-    required this.icon,
+    this.icon,
+    this.tileChild,
     required this.title,
     required this.state,
     this.detail,
     this.extra,
+    this.mark,
     this.compact = false,
   });
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// במקום [icon] — לוגו אוצריא בשורת התוכנה.
+  final Widget? tileChild;
+  final Widget? mark;
 
   /// מתחת לפירוט: פס דק, קישור או רשימת מסירות.
   final Widget? extra;
@@ -117,30 +136,31 @@ class StageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final waiting = state == StageState.waiting;
-    final mark = switch (state) {
-      StageState.done => Icon(
-          FluentIcons.checkmark_circle_24_filled,
-          size: 22,
-          color: cs.primary,
-        ),
-      StageState.current => SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: cs.primary,
-            backgroundColor: cs.secondaryContainer,
-          ),
-        ),
-      StageState.waiting => Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: cs.outline, width: 2),
-          ),
-        ),
-    };
+    final mark = this.mark ??
+        switch (state) {
+          StageState.done => Icon(
+              FluentIcons.checkmark_circle_24_filled,
+              size: 22,
+              color: cs.primary,
+            ),
+          StageState.current => SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: cs.primary,
+                backgroundColor: cs.secondaryContainer,
+              ),
+            ),
+          StageState.waiting => Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: cs.outline, width: 2),
+              ),
+            ),
+        };
     return ConstrainedBox(
       constraints: BoxConstraints(minHeight: compact ? 48 : 60),
       child: Padding(
@@ -154,6 +174,7 @@ class StageRow extends StatelessWidget {
               icon: icon,
               size: IconTileSize.sm,
               tone: waiting ? IconTileTone.quiet : IconTileTone.tonal,
+              child: tileChild,
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -185,7 +206,7 @@ class StageRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 14),
-            mark,
+            SizedBox(width: 22, child: Center(heightFactor: 1, child: mark)),
           ],
         ),
       ),

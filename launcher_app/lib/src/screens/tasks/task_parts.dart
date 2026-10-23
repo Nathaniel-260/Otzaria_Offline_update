@@ -45,6 +45,8 @@ class TaskHeading extends StatelessWidget {
 }
 
 /// דף תוצאה (`resPage`): תג, כותרת, גוף, תוספת, ועמודת פעולות ברוחב 352.
+/// בחלון צר הפעולות קבועות בתחתית (`.win.narrow .res-actions`), כדי שהפעולה
+/// הראשית תיראה בלי גלילה.
 class TaskResult extends StatelessWidget {
   const TaskResult({
     super.key,
@@ -66,35 +68,71 @@ class TaskResult extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return TaskFrame(
-      center: true,
-      wide: wide,
-      child: Column(
-        children: [
-          badge,
-          const SizedBox(height: 20),
-          Text(
-            title,
+    final narrow = TaskFrame.isNarrow(context);
+    final content = Column(
+      children: [
+        badge,
+        SizedBox(height: narrow ? 12 : 20),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.pageTitle.copyWith(color: cs.onSurface),
+        ),
+        const SizedBox(height: 10),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Text(
+            body,
             textAlign: TextAlign.center,
-            style: AppTextStyles.pageTitle.copyWith(color: cs.onSurface),
+            style: AppTextStyles.body.copyWith(color: cs.onSurfaceVariant),
           ),
-          const SizedBox(height: 10),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Text(
-              body,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.body.copyWith(color: cs.onSurfaceVariant),
+        ),
+        ...extra,
+      ],
+    );
+    final buttons = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (i, action) in actions.indexed) ...[
+          if (i > 0) const SizedBox(height: 8),
+          SizedBox(width: 352, child: action),
+        ],
+      ],
+    );
+    if (!narrow) {
+      return TaskFrame(
+        center: true,
+        wide: wide,
+        child: Column(
+          children: [content, const SizedBox(height: 24), buttons],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: TaskFrame.mainPadding(context),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: wide ? 560 : 460),
+                child: content,
+              ),
             ),
           ),
-          ...extra,
-          const SizedBox(height: 24),
-          for (final (i, action) in actions.indexed) ...[
-            if (i > 0) const SizedBox(height: 8),
-            SizedBox(width: 352, child: action),
-          ],
-        ],
-      ),
+        ),
+        Container(
+          key: const ValueKey('task.result.actions'),
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          decoration: BoxDecoration(
+            color: AppSurfaces.panelBackground(context),
+            border: Border(top: BorderSide(color: cs.outlineVariant)),
+          ),
+          child: buttons,
+        ),
+      ],
     );
   }
 }
@@ -137,7 +175,7 @@ class _TechDetailsState extends State<TechDetails> {
               ),
               child: SelectableText(
                 widget.text,
-                textDirection: TextDirection.ltr,
+                textDirection: textDirectionOf(widget.text),
                 style: TextStyle(
                   fontFamily: 'Consolas',
                   fontSize: 12,
@@ -162,6 +200,19 @@ class _TechDetailsState extends State<TechDetails> {
       ),
     );
   }
+}
+
+final RegExp _rtlChar = RegExp('[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]');
+final RegExp _ltrChar = RegExp('[A-Za-z\u00C0-\u024F]');
+
+/// הכיוון לפי התו החזק הראשון — "library: Bad state: אין מספיק מקום" הוא
+/// LTR, והודעה עברית מקומית היא RTL, ופיסוק לא מתהפך באף אחת.
+TextDirection textDirectionOf(String text) {
+  final rtl = _rtlChar.firstMatch(text)?.start;
+  final ltr = _ltrChar.firstMatch(text)?.start;
+  if (rtl == null) return TextDirection.ltr;
+  if (ltr == null) return TextDirection.rtl;
+  return rtl < ltr ? TextDirection.rtl : TextDirection.ltr;
 }
 
 /// "אל תנתקו את הכונן עד הסוף" (`.keep`).
@@ -247,11 +298,15 @@ class GuideStep extends StatelessWidget {
     required this.number,
     required this.text,
     this.hint,
+    this.strong,
   });
 
   final int number;
   final String text;
   final String? hint;
+
+  /// חלק מ-[text] שמודגש — למשל שם הכלי.
+  final String? strong;
 
   @override
   Widget build(BuildContext context) {
@@ -281,8 +336,8 @@ class GuideStep extends StatelessWidget {
           Expanded(
             child: Text.rich(
               TextSpan(
-                text: text,
                 children: [
+                  ..._spans(),
                   if (hint != null)
                     TextSpan(
                       text: ' $hint',
@@ -298,6 +353,20 @@ class GuideStep extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  List<InlineSpan> _spans() {
+    final bold = strong;
+    final at = bold == null ? -1 : text.indexOf(bold);
+    if (bold == null || at < 0) return [TextSpan(text: text)];
+    return [
+      TextSpan(text: text.substring(0, at)),
+      TextSpan(
+        text: bold,
+        style: const TextStyle(fontWeight: AppTextStyles.semibold),
+      ),
+      TextSpan(text: text.substring(at + bold.length)),
+    ];
   }
 }
 

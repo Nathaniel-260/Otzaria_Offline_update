@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/download_plan.dart';
 import 'package:launcher_app/src/screens/tasks/download_task_view.dart';
+import 'package:launcher_app/src/screens/tasks/task_parts.dart';
 import 'package:launcher_app/src/services/byte_size.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_tasks.dart';
@@ -23,6 +24,11 @@ void main() {
 
   ResultBadge badge(WidgetTester tester) =>
       tester.widget<ResultBadge>(find.byType(ResultBadge));
+
+  String? line(WidgetTester tester, String key) =>
+      tester.widget<Text>(find.byKey(ValueKey(key))).data;
+
+  String? percent(WidgetTester tester) => line(tester, 'task.download.percent');
 
   group('שאלת החיפוש החכם', () {
     testWidgets('המומלץ מסומן מראש, ו"התחלת ההורדה" עונה "לא"', (tester) async {
@@ -74,7 +80,9 @@ void main() {
           );
         }),
       );
-      expect(find.text('42%'), findsWidgets);
+      // הגדול כולל: רכיב אחד שהסתיים ועוד 42% מהשני; הרכיב בשורה שלו.
+      expect(percent(tester), '47%');
+      expect(find.text('42%'), findsOneWidget);
       expect(find.text(t.downloadingStep(t.stepLibrary, 2, 3)), findsOneWidget);
       final rows = tester.widgetList<StageRow>(find.byType(StageRow)).toList();
       expect(rows.map((r) => r.state), [
@@ -90,7 +98,8 @@ void main() {
       progress.value++;
       await tester.pump();
       expect(parentBuilds, 1);
-      expect(find.text('90%'), findsWidgets);
+      expect(percent(tester), '96%');
+      expect(find.text('90%'), findsOneWidget);
       expect(find.text(t.downloadingStep(t.stepPlugins, 3, 3)), findsOneWidget);
       expect(
         tester.widgetList<StageRow>(find.byType(StageRow)).last.state,
@@ -127,22 +136,71 @@ void main() {
           ),
         ),
       );
-      expect(find.textContaining(t.transferRate('')), findsNothing);
+      // שתי השורות במקומן כבר עכשיו — בלי קפיצה כשהמהירות מגיעה.
+      expect(line(tester, 'task.download.speed'), t.speedPending);
+      final top = tester.getTopLeft(find.byType(RowsCard)).dy;
 
       now = now.add(const Duration(seconds: 2));
       received = 20 * mb;
       progress.value++;
       await tester.pump();
-      final rate = t.transferRate(formatBytes(10 * mb));
-      expect(find.text('$rate · ${t.minutesLeft(1)}'), findsOneWidget);
       expect(
-        find.text(t.bytesLine(
+        line(tester, 'task.download.speed'),
+        '${formatRate(10.0 * mb)} · ${t.lessThanMinuteLeft}',
+      );
+      expect(
+        line(tester, 'task.download.bytes'),
+        t.bytesLine(
           t.componentLibrary,
           formatBytes(20 * mb),
           formatBytes(100 * mb),
-        )),
-        findsOneWidget,
+        ),
       );
+      expect(tester.getTopLeft(find.byType(RowsCard)).dy, top);
+      expect(find.text('20% · ${formatBytes(100 * mb)}'), findsOneWidget);
+
+      // תקוע: בלי דיווחים, אחרי כמה שניות — "ממתין לנתונים" ולא ערך קפוא.
+      now = now.add(const Duration(seconds: 10));
+      await tester.pump(const Duration(seconds: 1));
+      expect(line(tester, 'task.download.speed'), t.speedStalled);
+    });
+
+    testWidgets('זמן שנותר: "נותרו שתי דקות", לא "1 דקה" ולא "0 דקות"',
+        (tester) async {
+      final progress = ValueNotifier(0);
+      var now = DateTime(2026, 10, 23);
+      const mb = 1024 * 1024;
+      var received = 0;
+      await pumpScreen(
+        tester,
+        DownloadTaskView(
+          task: downloadScenarios['download']!,
+          progress: progress,
+          clock: () => now,
+          snapshot: () => DownloadSnapshot(
+            current: MirrorComponent.library,
+            fraction: received / (1000 * mb),
+            received: received,
+            total: 1000 * mb,
+          ),
+          actions: DownloadTaskActions(
+            onAnswer: (_) {},
+            onCancel: () {},
+            onRetry: () {},
+            onHome: () {},
+            onHere: () {},
+          ),
+        ),
+      );
+      now = now.add(const Duration(seconds: 10));
+      received = 100 * mb; // 10 MB/s, נותרו 90 שניות
+      progress.value++;
+      await tester.pump();
+      expect(
+        line(tester, 'task.download.speed'),
+        '${formatRate(10.0 * mb)} · ${t.minutesLeft(2)}',
+      );
+      expect(t.minutesLeft(2), 'נותרו שתי דקות');
     });
 
     testWidgets('בזמן ביטול — הכפתור מושבת ואומר "מבטל"', (tester) async {
@@ -169,7 +227,7 @@ void main() {
     });
   });
 
-  testWidgets('בוטלה: הכונן חזר כמו שהיה, ו"הורד שוב"', (tester) async {
+  testWidgets('בוטלה: הכונן חזר כמו שהיה, ו"הורדה מחדש"', (tester) async {
     await show(tester, 'cancelled');
     expect(find.text(t.cancelledTitle), findsOneWidget);
     expect(find.text(t.cancelledBody), findsOneWidget);
@@ -212,6 +270,12 @@ void main() {
       expect(find.text(t.donePluginsValue(12)), findsOneWidget);
       expect(find.text(t.whatNow), findsOneWidget);
       expect(find.text(t.whatNowConnect), findsOneWidget);
+      expect(find.text(t.doneBody), findsOneWidget);
+      // "עדכוני אוצריא" מודגש בשלב 3.
+      final step = tester.widget<GuideStep>(
+        find.byWidgetPredicate((w) => w is GuideStep && w.number == 3),
+      );
+      expect(step.strong, stringsOf().shell.appTitle);
       await tester.tap(find.text(t.updateHereToo));
       await tester.tap(find.text(t.backToHomePage));
       expect(calls, ['here', 'home']);
@@ -267,6 +331,15 @@ void main() {
       expect(calls, ['retry']);
     });
 
+    testWidgets('תעודה שנדחתה: מסנן אינטרנט, רגוע, "נסה שוב"', (tester) async {
+      await show(tester, 'dlBlocked');
+      expect(find.text(t.filterTitle), findsOneWidget);
+      expect(find.text(t.filterBody(t.stepLibrary)), findsOneWidget);
+      expect(find.text(t.networkTitle), findsNothing);
+      expect(badge(tester).kind, ResultBadgeKind.calm);
+      expect(find.text(stringsOf().common.retry), findsOneWidget);
+    });
+
     testWidgets('שבת: רגוע, ובלי "נסה שוב"', (tester) async {
       await show(tester, 'dlShabbat');
       expect(find.text(t.shabbatTitle), findsOneWidget);
@@ -288,6 +361,29 @@ void main() {
       expect(find.text(t.otherTitle(t.stepLibrary)), findsOneWidget);
       expect(find.text(t.otherBody), findsOneWidget);
       expect(badge(tester).kind, ResultBadgeKind.error);
+    });
+  });
+
+  group('תיקוני QA של 2b', () {
+    testWidgets('"מתכונן להורדה" — יש "ביטול"', (tester) async {
+      await show(tester, 'preparing');
+      expect(find.text(t.preparingTitle), findsOneWidget);
+      await tester.tap(find.byKey(ShellKeys.taskCancel));
+      expect(calls, ['cancel preparing']);
+    });
+
+    testWidgets('לא ירד דבר — לא "כל העדכונים ירדו"', (tester) async {
+      await show(tester, 'dlNothing');
+      expect(find.text(t.doneNothingBody), findsOneWidget);
+      expect(find.text(t.doneBody), findsNothing);
+    });
+
+    testWidgets('בלי שאלת "אפשר לשנות בדף הספרייה", ועם הגילוי על ההסכמה',
+        (tester) async {
+      await show(tester, 'semantic');
+      expect(find.textContaining('בדף הספרייה'), findsNothing);
+      expect(find.text(t.semanticYesBody), findsOneWidget);
+      expect(t.semanticYesBody, contains('נתוני אימון'));
     });
   });
 }

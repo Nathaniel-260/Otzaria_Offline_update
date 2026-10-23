@@ -17,6 +17,8 @@ class _App implements UpdateHereApp {
   @override
   bool elevatedAsOtherUser = false;
   @override
+  String? adminAccount;
+  @override
   String? versionToInstall = '0.9.96';
   @override
   String? errorMessage;
@@ -29,12 +31,14 @@ class _App implements UpdateHereApp {
   Completer<void>? gate;
   int installs = 0;
   int stops = 0;
+  Object? throws;
 
   @override
   Future<AppInstallOutcome> installWithWizard() async {
     installs++;
     log.add('app');
     await gate?.future;
+    if (throws case final error?) throw error;
     if (outcome == AppInstallOutcome.installed) {
       isInstalled = true;
       hasUpdateAvailable = false;
@@ -68,6 +72,10 @@ class _Library implements UpdateHereLibrary {
   bool canApplyFull = false;
 
   bool succeeds = true;
+
+  /// ההחלה הצליחה, אבל `_apply` השאיר הודעה (מיקום שצריך לכוון).
+  String? noteAfterApply;
+  ({int low, int high})? estimate;
   int fullApplies = 0;
   bool availableAfterRecheck = true;
   int applies = 0;
@@ -75,20 +83,31 @@ class _Library implements UpdateHereLibrary {
   void Function()? onApply;
 
   @override
-  Future<bool> apply() async {
+  ({int low, int high})? applyEstimate({bool full = false}) => estimate;
+
+  LibraryApplyResult get _result {
+    if (!succeeds) return LibraryApplyResult.failed;
+    errorMessage = noteAfterApply;
+    return noteAfterApply == null
+        ? LibraryApplyResult.applied
+        : LibraryApplyResult.appliedWithNote;
+  }
+
+  @override
+  Future<LibraryApplyResult> apply() async {
     applies++;
     log.add('library');
     onApply?.call();
     if (succeeds) hasUpdateAvailable = false;
-    return succeeds;
+    return _result;
   }
 
   @override
-  Future<bool> applyFull() async {
+  Future<LibraryApplyResult> applyFull() async {
     fullApplies++;
     log.add('library-full');
     if (succeeds) canApplyFull = false;
-    return succeeds;
+    return _result;
   }
 
   @override
@@ -108,13 +127,27 @@ class _Plugins implements UpdateHerePlugins {
   List<String> deliverableUpdates = const [];
   Completer<void>? gate;
 
+  /// מה שהפורט מחשב ברגע המסירה; `null` — כמו [deliverableUpdates].
+  List<String>? targetsAtDelivery;
+  final failing = <String>{};
+
   @override
   Future<void> deliver(void Function(List<PluginDelivery> rows) onRow) async {
     log.add('plugins');
+    final targets = targetsAtDelivery ?? deliverableUpdates;
+    onRow([
+      for (final name in targets)
+        PluginDelivery(name, PluginDeliveryState.waiting),
+    ]);
     await gate?.future;
     onRow([
-      for (final name in deliverableUpdates)
-        PluginDelivery(name, PluginDeliveryState.sent),
+      for (final name in targets)
+        PluginDelivery(
+          name,
+          failing.contains(name)
+              ? PluginDeliveryState.failed
+              : PluginDeliveryState.sent,
+        ),
     ]);
   }
 }
@@ -304,7 +337,8 @@ void main() {
       expect(task()!.failure!.needsElevation, isTrue);
     });
 
-    test('"הפסק להמתין" לאשף — השלב נגמר, והתוספים ממשיכים', () async {
+    // otzaria:// בזמן שהאשף אולי עוד מעתיק היה פותח את הגרסה הישנה.
+    test('"הפסק להמתין" לאשף — השלב נגמר, והתוספים אינם נשלחים', () async {
       app
         ..gate = Completer<void>()
         ..outcome = AppInstallOutcome.stillOpen;
@@ -315,16 +349,21 @@ void main() {
       flow.stopWaiting();
       await run;
       expect(app.stops, 1);
-      expect(task()!.outcomes[GuidanceItem.app], StageOutcome.stoppedWaiting);
-      expect(log, ['app', 'plugins']);
+      expect(task()!.outcomes, {
+        GuidanceItem.app: StageOutcome.stoppedWaiting,
+        GuidanceItem.plugins: StageOutcome.skipped,
+      });
+      expect(log, ['app']);
       expect(task()!.phase, UpdateHereTaskPhase.done);
     });
 
-    test('האשף עוד פתוח בלי שביקשו להפסיק — לא נקרא הצלחה', () async {
+    test('האשף עוד פתוח בלי שביקשו להפסיק — לא נקרא הצלחה ולא "נסגר"',
+        () async {
       app.outcome = AppInstallOutcome.stillOpen;
       await flow.run(const [GuidanceItem.app]);
       expect(task()!.phase, UpdateHereTaskPhase.cancelledByUser);
-      expect(task()!.outcomes, isEmpty);
+      expect(task()!.outcomes, {GuidanceItem.app: StageOutcome.stillOpen});
+      expect(task()!.stageIndex, 0);
     });
 
     test('תוספים אחרונים, ורק כשיש מה למסור; בלי לסגור את אוצריא', () async {
@@ -491,6 +530,132 @@ void main() {
       expect(library.applies, 0);
       expect(library.fullApplies, 1);
       expect(task()!.phase, UpdateHereTaskPhase.done);
+    });
+  });
+
+  group('תיקוני QA של 2b', () {
+    test('ספרייה שהוחלה עם הערה — סיום עם ההערה, לא כשל', () async {
+      library.noteAfterApply = 'צריך לכוון את אוצריא לספרייה';
+      await flow.run(both);
+      expect(task()!.phase, UpdateHereTaskPhase.done);
+      expect(task()!.failure, isNull);
+      expect(task()!.outcomes[GuidanceItem.library], StageOutcome.done);
+      expect(task()!.libraryNote, 'צריך לכוון את אוצריא לספרייה');
+      expect(log, ['library', 'app']);
+    });
+
+    test('ספרייה שהוחלה בלי הערה — בלי הערה', () async {
+      await flow.run(const [GuidanceItem.library]);
+      expect(task()!.libraryNote, isNull);
+    });
+
+    test('אומדן ההחלה והחשבון נשמרים במשימה', () async {
+      library.estimate = (low: 3, high: 12);
+      app
+        ..elevatedAsOtherUser = true
+        ..adminAccount = 'Admin';
+      final run = flow.run(both);
+      await settle();
+      expect(task()!.libraryMinutes, (low: 3, high: 12));
+      expect(task()!.account, 'Admin');
+      host.tasks.respond(true);
+      await run;
+    });
+
+    test('"הפסק להמתין" בהתקנה ראשונה — נשאר על התוכנה, לא "אוצריא פתוחה"',
+        () async {
+      app
+        ..isInstalled = false
+        ..gate = Completer<void>()
+        ..outcome = AppInstallOutcome.stillOpen;
+      library.isFreshInstall = true;
+      final run = flow.run(both);
+      await settle();
+      flow.stopWaiting();
+      await run;
+      expect(task()!.phase, UpdateHereTaskPhase.cancelledByUser);
+      expect(task()!.stageIndex, 0);
+      expect(task()!.stages[task()!.stageIndex], GuidanceItem.app);
+      expect(task()!.outcomes, {GuidanceItem.app: StageOutcome.stoppedWaiting});
+      expect(library.applies, 0);
+    });
+
+    test('היעד של המסירה נקבע ברגע המסירה, לא בפתיחת המשימה', () async {
+      plugins
+        ..deliverableUpdates = const ['לוח', 'מזומנים']
+        ..targetsAtDelivery = const ['לוח'];
+      await flow.run(const [GuidanceItem.plugins]);
+      expect(task()!.plugins.map((p) => p.name), ['לוח']);
+      expect(task()!.outcomes[GuidanceItem.plugins], StageOutcome.done);
+    });
+
+    test('יעד שהתרוקן — השלב מדולג, ולא "נשלחו"', () async {
+      plugins
+        ..deliverableUpdates = const ['לוח']
+        ..targetsAtDelivery = const [];
+      await flow.run(const [GuidanceItem.plugins]);
+      expect(task()!.plugins, isEmpty);
+      expect(task()!.outcomes[GuidanceItem.plugins], StageOutcome.skipped);
+    });
+
+    test('תוסף שלא נשלח נשאר "נכשל" במשימה', () async {
+      plugins
+        ..deliverableUpdates = const ['לוח', 'מזומנים']
+        ..failing.add('מזומנים');
+      await flow.run(const [GuidanceItem.plugins]);
+      expect(
+        {for (final p in task()!.plugins) p.name: p.state},
+        {
+          'לוח': PluginDeliveryState.sent,
+          'מזומנים': PluginDeliveryState.failed,
+        },
+      );
+    });
+
+    test('מסירה ישנה אינה כותבת על משימה חדשה', () async {
+      final oldGate = Completer<void>();
+      plugins
+        ..deliverableUpdates = const ['לוח']
+        ..gate = oldGate;
+      final first = flow.run(const [GuidanceItem.plugins]);
+      await settle();
+      host.tasks.finishWithoutWaiting();
+      await first;
+      final oldId = task()!.id;
+      host.tasks.dismiss();
+
+      plugins.gate = null;
+      await flow.run(const [GuidanceItem.library]);
+      expect(task()!.id, isNot(oldId));
+      final before = task()!.plugins;
+
+      // המסירה הישנה מסתיימת רק עכשיו — ודיווח השורות שלה אינו נכתב.
+      oldGate.complete();
+      await settle();
+      expect(task()!.plugins, same(before));
+      expect(task()!.plugins, isEmpty);
+    });
+
+    test('run שזורק — המשימה עוברת לכשל ולא נתקעת', () async {
+      app.throws = StateError('boom');
+      await flow.run(const [GuidanceItem.app]);
+      expect(task()!.phase, UpdateHereTaskPhase.failed);
+      expect(task()!.failure!.stage, GuidanceItem.app);
+      expect(task()!.failure!.message, contains('boom'));
+      expect(host.tasks.isRunning, isFalse);
+    });
+
+    test('הסשן פורק בזמן שאלה — הזרימה אינה נוגעת במשימה', () async {
+      host.running = true;
+      final run = flow.run(both);
+      await settle();
+      expect(task()!.phase, UpdateHereTaskPhase.closeOtzaria);
+      host.isActive = false;
+      host.tasks.respond(false);
+      await run;
+      // בלי _abandon/updateCancelledByUser על notifier מפורק.
+      expect(task()!.phase, UpdateHereTaskPhase.running);
+      expect(library.applies, 0);
     });
   });
 }

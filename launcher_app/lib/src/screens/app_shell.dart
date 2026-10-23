@@ -10,7 +10,6 @@ import 'package:path/path.dart' as p;
 
 import '../controllers/app_reports_controller.dart';
 import '../controllers/download_plan.dart';
-import '../controllers/download_summary.dart';
 import '../controllers/launcher_update_flow.dart';
 import '../controllers/plugins_module_controller.dart' show PluginsModuleStatus;
 import '../flows/library_flows.dart' show showLibraryChangesDialog;
@@ -293,9 +292,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   }
 
   @override
-  bool get taskScreenShown => _navigator.showsTask;
-
-  @override
   Future<bool> confirmSemanticConsent() {
     final t = context.strings.libraryDomain;
     return showTwoActionsDialog(
@@ -315,31 +311,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       content: t.reindexDialogContent,
       confirmText: t.reindexDialogConfirm,
     );
-  }
-
-  @override
-  void reportDownload({
-    required List<MirrorComponent> failed,
-    required List<MirrorComponent> skipped,
-  }) {
-    if (taskScreenShown) return;
-    final t = context.strings;
-    String label(MirrorComponent component) => switch (component) {
-          MirrorComponent.app => t.guide.tileApp,
-          MirrorComponent.library => t.guide.tileLibrary,
-          MirrorComponent.plugins => t.guide.tilePlugins,
-        };
-    final failedLabels = [for (final c in failed) label(c)];
-    final skippedLabels = [for (final c in skipped) label(c)];
-
-    switch (summarizeDownload(failed: failedLabels, skipped: skippedLabels)) {
-      case DownloadSummary.failed:
-        UiSnack.show(t.home.downloadFailedSnack(failedLabels.join(', ')));
-      case DownloadSummary.skipped:
-        UiSnack.show(t.home.downloadSkippedSnack(skippedLabels.join(', ')));
-      case DownloadSummary.done:
-        UiSnack.showSuccess(t.home.downloadDoneSnack);
-    }
   }
 
   @override
@@ -418,9 +389,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           ? () => unawaited(_session.restartElevated())
           : null;
 
-  /// "הצג התקדמות": מסך המשימה, או הדף שבו רצה הפעולה.
+  /// "הצג התקדמות": הדף שבו רצה פעולה שמחוץ למסך משימה (התקנה אוטומטית,
+  /// כפתור בדף). הורדה תמיד מוצגת במסך המשימה, ולכן אין לה כפתור כזה.
   void _showProgress() {
-    if (_session.tasks.hasTask) return _navigator.showTask();
     final section = switch (homeViewModelOf(_session).task) {
       HomeTask.installingApp => ShellSection.otzaria,
       HomeTask.updatingLibrary => ShellSection.library,
@@ -449,7 +420,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     onDownload: () => unawaited(_session.downloadAll()),
     onLaunch: () => unawaited(_session.otzaria.launch()),
     onRecheck: () => unawaited(_session.checkNow()),
-    onCancelDownload: () => unawaited(_session.cancelDownload()),
     onOpenSection: (section) => unawaited(_goTo(section)),
     onOpenSettings: () => unawaited(_goTo(ShellSection.settings)),
     onHelp: _openHelp,
@@ -673,7 +643,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             onSettings: () => unawaited(_goTo(ShellSection.settings)),
             activeTool:
                 section == ShellSection.settings ? TitleBarTool.settings : null,
-            toolsEnabled: !_session.exitPending,
+            // משימה רצה אינה נעזבת — גלגל השיניים והעזרה מושבתים גם למראה.
+            toolsEnabled: !_session.exitPending &&
+                !(_navigator.showsTask && _session.tasks.isRunning),
             showWindowButtons: widget.showWindowButtons,
           ),
           Expanded(
@@ -797,6 +769,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             onRetry: () => unawaited(s.downloadAll()),
             onHome: _dismissTask,
             onHere: _updateHere,
+            onCancelPreparing: s.abandonPreparingDownload,
           ),
         );
       case UpdateHereTask():
@@ -827,8 +800,12 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             onReindex: library.hasPendingReindex
                 ? () => unawaited(s.deliverLibraryReindex())
                 : null,
+            // נגזר מהמצב הנוכחי: דגל הכשל לבדו היה משאיר כפתור ש-
+            // restartElevated מתעלם ממנו.
             onRestartElevated:
-                (failure?.needsElevation ?? false) ? _restartElevated : null,
+                (failure?.needsElevation ?? false) && s.canRestartElevated
+                    ? () => unawaited(s.restartElevated())
+                    : null,
             onLibraryChanges: library.changesNotesApplied &&
                     library.changesNotes.isNotEmpty
                 ? () => unawaited(showLibraryChangesDialog(context, library))

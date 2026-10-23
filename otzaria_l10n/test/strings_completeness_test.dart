@@ -138,6 +138,11 @@ const _selectorArgs = {
 };
 const _noHebrewLettersInHebrew = {
   'common.emptyValue',
+  // יחידות הגודל לטיניות גם בעברית, כמו במוקאפ — רק מבודדות בכיוון.
+  'units.kilobytes',
+  'units.megabytes',
+  'units.gigabytes',
+  'units.perSecond',
   'libraryDomain.applyStageElapsed',
   'settings.languageEnglish',
   'plugins.localFileDescription',
@@ -146,6 +151,26 @@ const _noHebrewLettersInHebrew = {
   'customApps.kindNsis',
   'customApps.kindMsi',
 };
+
+/// מונים שהיחיד שלהם מנוסח במילים ("תוסף אחד"), לפי `plural`. ב-1 הפלט חייב
+/// להיות שונה מהפלט ב-2 ובלי אף מונה כמספר; ב-0, 2 ו-1000 הספרה עדיין חובה.
+/// חריג שאינו רשום כאן נופל — כך מונה שנבלע עדיין נתפס.
+const _spelledOne = {
+  'task.minutesLeft#0',
+  'task.donePluginsValue#0',
+  'task.pluginsWaiting#0',
+};
+
+/// הזוגי העברי ("שתי דקות") — אותו כלל ב-2, בעברית בלבד.
+const _spelledTwoInHebrew = {
+  'task.minutesLeft#0',
+  'task.donePluginsValue#0',
+  'task.pluginsWaiting#0',
+};
+
+/// המונה כמספר עומד בפני עצמו — "1" בתוך "ARG1" אינו נחשב.
+bool _hasNumber(String value, int n) =>
+    RegExp('(?<![\\w.])$n(?![\\w.])').hasMatch(value);
 
 void main() {
   tearDown(() => AppL10n.use(AppLanguage.hebrew));
@@ -244,9 +269,10 @@ void main() {
     }
   });
 
-  test('שדות עם מונה מחזירים טקסט תקין גם ב-0, 1 ו-2', () {
+  test('שדות עם מונה מחזירים טקסט תקין גם ב-0, 1, 2 ו-1000', () {
     // ריבוי באנגלית מסתעף על 1; אפס ואחד הם בדיוק המקומות שנשכחים.
     for (final strings in [const HebrewStrings(), const EnglishStrings()]) {
+      final hebrew = strings is HebrewStrings;
       final root = reflect(strings);
       for (final sectionGetter in _sectionGetters()) {
         final sectionType = sectionGetter.returnType as ClassMirror;
@@ -257,8 +283,10 @@ void main() {
             (p) => MirrorSystem.getName(p.type.simpleName) == 'int',
           );
           if (!hasInt) continue;
+          final path = '${MirrorSystem.getName(sectionGetter.simpleName)}.'
+              '${MirrorSystem.getName(member.simpleName)}';
 
-          for (final count in [0, 1, 2]) {
+          String valueAt(int count) {
             final positional = <Object?>[];
             final named = <Symbol, Object?>{};
             for (var i = 0; i < member.parameters.length; i++) {
@@ -272,16 +300,34 @@ void main() {
                 positional.add(value);
               }
             }
-            final value = section
+            return section
                 .invoke(member.simpleName, positional, named)
                 .reflectee as String;
-            expect(
-              value.trim(),
-              isNotEmpty,
-              reason: '${MirrorSystem.getName(member.simpleName)}($count)',
-            );
-            expect(value, contains('$count'),
-                reason: '${MirrorSystem.getName(member.simpleName)}($count)');
+          }
+
+          final byCount = {
+            for (final n in [0, 1, 2, 1000]) n: valueAt(n)
+          };
+          for (final MapEntry(key: count, value: value) in byCount.entries) {
+            final reason = '$path($count) = $value';
+            expect(value.trim(), isNotEmpty, reason: reason);
+            final spelled = switch (count) {
+              1 => _spelledOne.any((key) => key.startsWith('$path#')),
+              2 => hebrew &&
+                  _spelledTwoInHebrew.any((key) => key.startsWith('$path#')),
+              _ => false,
+            };
+            if (!spelled) {
+              expect(value, contains('$count'), reason: reason);
+              continue;
+            }
+            final others = byCount.keys.where((n) => n != count);
+            for (final other in others) {
+              expect(value, isNot(byCount[other]), reason: reason);
+            }
+            for (final n in byCount.keys) {
+              expect(_hasNumber(value, n), isFalse, reason: reason);
+            }
           }
         }
       }

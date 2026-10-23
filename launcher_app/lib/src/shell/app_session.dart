@@ -284,7 +284,8 @@ class AppSession extends ChangeNotifier {
   );
 
   late final ReportOfferCoordinator _offers = ReportOfferCoordinator(
-    isTaskRunning: () => exitWouldInterrupt || _downloads.isPreparing,
+    isTaskRunning: () =>
+        exitWouldInterrupt || _downloads.isPreparing || tasks.isRunning,
     isActive: () => isActive,
     prepare: _prepareOffer,
     runDialog: prompts.runDialog,
@@ -478,14 +479,16 @@ class AppSession extends ChangeNotifier {
       _otzaria.needsElevation ||
       _launcherUpdate.needsElevation;
 
-  /// הפס "הפעלה מחדש כמנהל": רק ב-Windows, ולא בזמן פעולה שיציאה קוטעת.
-  /// "לא עכשיו" מסתיר אותו עד סוף ההרצה.
-  bool get offersElevation =>
+  /// [restartElevated] יפעל עכשיו: רק ב-Windows, כשיש כשל הרשאות, ולא
+  /// בזמן פעולה שיציאה קוטעת.
+  bool get canRestartElevated =>
       Platform.isWindows &&
       _needsElevation &&
       !_elevationPending &&
-      !_elevationDismissed &&
       !exitWouldInterrupt;
+
+  /// הפס "הפעלה מחדש כמנהל" בבית. "לא עכשיו" מסתיר אותו עד סוף ההרצה.
+  bool get offersElevation => canRestartElevated && !_elevationDismissed;
 
   void dismissElevation() => _update(() => _elevationDismissed = true);
 
@@ -736,10 +739,19 @@ class AppSession extends ChangeNotifier {
     return true;
   }
 
+  /// המסך עובר ל"מתכונן" מיד — גם מ"נסה שוב" במסך שהסתיים, וגם כשניקוי
+  /// קודם עוד רץ. זרימה שחזרה בלי להתחיל סוגרת אותו.
   Future<void> downloadAll() async {
     if (_blockedByReadOnly() || tasks.isRunning) return;
+    tasks.prepareDownload();
     await _downloads.downloadAll();
     if (isActive) tasks.abandonDownload();
+  }
+
+  /// "ביטול" ב"מתכונן להורדה": המסך נסגר, והזרימה עוצרת אחרי הבדיקה ברשת.
+  void abandonPreparingDownload() {
+    _downloads.abandonPreparing();
+    tasks.abandonDownload();
   }
 
   /// "עדכון אוצריא במחשב הזה" / "התקנת אוצריא" — מסך המשימה.
@@ -878,7 +890,9 @@ class AppSession extends ChangeNotifier {
 
   /// Ctrl+R/F5: קורא מחדש מה מותקן ומה יש על הכונן, בלי ההצעות של העלייה.
   Future<void> refreshFromKeyboard() async {
-    if (longTaskRunning) return;
+    // לא `longTaskRunning` עצמו: `isBlocked` של ההורדה נשען עליו, והיה
+    // עוצר את ההורדה של המשימה עצמה.
+    if (longTaskRunning || tasks.isRunning) return;
     await _launcherFlow.checkMirror();
     if (!isActive) return;
     await _otzaria.checkForUpdate();
@@ -909,7 +923,7 @@ class _SessionDownloadHost implements MirrorDownloadHost {
 
   @override
   Future<void> refreshStaleOnlineChecks(AppSettings s) {
-    // מכאן ההורדה בטוח מתחילה (או שואלת) — מסך המשימה נפתח כבר עכשיו.
+    // מכאן ההורדה בטוח מתחילה (או שואלת) — מסך המשימה כבר פתוח.
     _session.tasks.prepareDownload();
     return _session._refreshStaleOnlineChecks(s);
   }
@@ -939,9 +953,6 @@ class _SessionDownloadHost implements MirrorDownloadHost {
     _session.tasks.downloadFailed(
       DownloadFailure(DownloadFailureKind.snapshot, details: '$error'),
     );
-    if (!_session.prompts.taskScreenShown) {
-      UiSnack.show(AppL10n.strings.home.downloadSnapshotFailedSnack);
-    }
   }
 
   @override
@@ -951,16 +962,24 @@ class _SessionDownloadHost implements MirrorDownloadHost {
           .info('revert after cancelled download failed: $revertError');
     }
     _session.tasks.downloadCancelled(revertFailed: revertError != null);
-    if (_session.prompts.taskScreenShown) return;
-    UiSnack.show(
-      revertError == null
-          ? AppL10n.strings.home.downloadCancelledSnack
-          : AppL10n.strings.home.downloadCancelRevertFailedSnack,
-    );
   }
 
   @override
   void downloadEnded() {}
+
+  @override
+  void downloadCrashed(Object error, StackTrace stackTrace) {
+    AppLogger.instance.error('ההורדה נעצרה בחריג', error, stackTrace);
+    final task = _session.tasks.current;
+    if (task is! DownloadTask ||
+        task.isFinished ||
+        task.phase == DownloadTaskPhase.question) {
+      return;
+    }
+    _session.tasks.downloadFailed(
+      DownloadFailure(DownloadFailureKind.other, details: '$error'),
+    );
+  }
 
   @override
   void downloadFinished({
@@ -982,7 +1001,6 @@ class _SessionDownloadHost implements MirrorDownloadHost {
         shabbat: s._plugins.shabbatNotice != null,
       ));
     }
-    s.prompts.reportDownload(failed: failed, skipped: skipped);
   }
 }
 

@@ -44,7 +44,7 @@ class UpdateHereActions {
   /// `null` — אין בקשת אינדוקס שממתינה.
   final VoidCallback? onReindex;
 
-  /// `null` — הכשל אינו על הרשאות, או שאי אפשר להרים כאן.
+  /// `null` — הכשל אינו על הרשאות, או שהסשן לא יכבד הפעלה מחדש עכשיו.
   final VoidCallback? onRestartElevated;
 
   /// `null` — אין "מה חדש" לספרייה שהותקנה.
@@ -98,7 +98,10 @@ class UpdateHereTaskView extends StatelessWidget {
           const _BigTile(child: Icon(FluentIcons.person_24_regular, size: 32)),
           TaskHeading(
             title: t.otherUserTitle,
-            body: t.otherUserBody,
+            body: t.otherUserBody(
+              firstInstall: task.firstInstall,
+              account: task.account,
+            ),
             hint: t.otherUserHint,
           ),
         ],
@@ -137,9 +140,11 @@ class UpdateHereTaskView extends StatelessWidget {
 
   Widget _running(BuildContext context) {
     final t = context.strings.task;
+    final narrow = TaskFrame.isNarrow(context);
     final stage = task.currentStage;
     final closing = task.phase == UpdateHereTaskPhase.closeOtzaria;
     final first = task.firstInstall;
+    final minutes = task.libraryMinutes;
     final (title, body) = closing
         ? (t.closeTitle, t.closeAfterWizardBody)
         : switch (stage) {
@@ -149,7 +154,7 @@ class UpdateHereTaskView extends StatelessWidget {
               ),
             GuidanceItem.library => (
                 first ? t.installingLibrary : t.updatingLibrary,
-                t.libraryBody,
+                t.libraryBody(minutes?.low, minutes?.high),
               ),
             GuidanceItem.plugins || null => (t.sendingPlugins, t.pluginsBody),
           };
@@ -189,11 +194,11 @@ class UpdateHereTaskView extends StatelessWidget {
           TaskHeading(title: title, body: body),
           if (stage == GuidanceItem.library && !closing)
             const KeepDriveNotice(),
-          const SizedBox(height: 24),
+          SizedBox(height: narrow ? 16 : 24),
           RowsCard(
             children: [
               for (final (i, s) in task.stages.indexed)
-                _stageRow(context, s, i, closing: closing),
+                _stageRow(context, s, i, closing: closing, compact: narrow),
             ],
           ),
         ],
@@ -206,6 +211,7 @@ class UpdateHereTaskView extends StatelessWidget {
     GuidanceItem stage,
     int i, {
     required bool closing,
+    required bool compact,
   }) {
     final t = context.strings.task;
     final cs = Theme.of(context).colorScheme;
@@ -220,15 +226,17 @@ class UpdateHereTaskView extends StatelessWidget {
     switch (stage) {
       case GuidanceItem.app:
         return StageRow(
-          icon: FluentIcons.desktop_24_regular,
+          tileChild: _logo(18),
           title: t.componentApp,
           state: state,
+          compact: compact,
           detail: switch (state) {
-            StageState.done => outcome == StageOutcome.stoppedWaiting
-                ? t.appStoppedWaiting
-                : version == null
-                    ? t.stageDone(null)
-                    : t.appInstalled(version),
+            StageState.done => switch (outcome) {
+                StageOutcome.stoppedWaiting => t.appStoppedWaiting,
+                StageOutcome.skipped => t.appSkipped,
+                _ =>
+                  version == null ? t.stageDone(null) : t.appInstalled(version),
+              },
             StageState.current => t.appWizardOpen,
             StageState.waiting =>
               version == null ? null : t.appVersion(version),
@@ -253,11 +261,7 @@ class UpdateHereTaskView extends StatelessWidget {
               : null,
         );
       case GuidanceItem.library:
-        final detail = task.firstInstall
-            ? t.libraryFull
-            : task.libraryVersion == null
-                ? null
-                : t.libraryVersion(task.libraryVersion!);
+        final detail = _libraryDetail(context);
         if (state == StageState.current && !closing) {
           return ListenableBuilder(
             listenable: libraryProgress,
@@ -270,6 +274,7 @@ class UpdateHereTaskView extends StatelessWidget {
                 icon: FluentIcons.library_24_regular,
                 title: t.componentLibrary,
                 state: state,
+                compact: compact,
                 detail: [if (pct != null) pct, if (detail != null) detail]
                     .join(' · '),
                 extra: Column(
@@ -296,6 +301,15 @@ class UpdateHereTaskView extends StatelessWidget {
           icon: FluentIcons.library_24_regular,
           title: t.componentLibrary,
           state: state,
+          compact: compact,
+          // ממתינים למשתמש, לא עובדים — מנעול ולא טבעת מסתובבת.
+          mark: state == StageState.current && closing
+              ? Icon(
+                  FluentIcons.lock_closed_20_regular,
+                  size: 20,
+                  color: cs.onSurfaceVariant,
+                )
+              : null,
           detail: switch (state) {
             StageState.done => outcome == StageOutcome.skipped
                 ? t.librarySkipped
@@ -309,8 +323,11 @@ class UpdateHereTaskView extends StatelessWidget {
           icon: FluentIcons.puzzle_piece_24_regular,
           title: t.componentPlugins,
           state: state,
+          compact: compact,
           detail: switch (state) {
-            StageState.done => t.pluginsSent,
+            StageState.done => outcome == StageOutcome.skipped
+                ? t.pluginsAfterInstall
+                : t.pluginsSent,
             StageState.current => t.pluginsCurrent,
             StageState.waiting => t.pluginsWaiting(task.plugins.length),
           },
@@ -321,72 +338,123 @@ class UpdateHereTaskView extends StatelessWidget {
     }
   }
 
+  String? _libraryDetail(BuildContext context) {
+    final t = context.strings.task;
+    return task.firstInstall
+        ? t.libraryFull
+        : task.libraryVersion == null
+            ? null
+            : t.libraryVersion(task.libraryVersion!);
+  }
+
   Widget _done(BuildContext context) {
     final t = context.strings.task;
     final g = context.strings.guide;
     final cs = Theme.of(context).colorScheme;
-    final plugins = task.stages.contains(GuidanceItem.plugins);
-    final libraryInstalled =
-        task.outcomes[GuidanceItem.library] == StageOutcome.done;
-    final version =
-        task.appVersion == null ? null : displayVersion(task.appVersion!);
-    String rowValue(GuidanceItem s) => switch (s) {
-          GuidanceItem.app => task.outcomes[s] == StageOutcome.stoppedWaiting
-              ? t.appStoppedWaiting
-              : version == null
-                  ? t.stageDone(null)
-                  : t.doneAppValue(version),
-          GuidanceItem.library => task.outcomes[s] == StageOutcome.skipped
-              ? t.librarySkipped
-              : task.firstInstall
-                  ? t.libraryFull
-                  : task.libraryVersion == null
-                      ? t.componentLibrary
-                      : t.libraryVersion(task.libraryVersion!),
-          GuidanceItem.plugins => task.plugins.map((p) => p.name).join(', '),
-        };
-    return TaskResult(
-      badge: const ResultBadge(
-        kind: ResultBadgeKind.ok,
-        icon: FluentIcons.checkmark_24_regular,
-      ),
-      title: task.firstInstall ? t.installedTitle : t.updatedTitle,
-      body: t.doneHereBody(
-        firstInstall: task.firstInstall,
-        withLibrary: libraryInstalled,
-        plugins: plugins,
-      ),
-      extra: [
-        const SizedBox(height: 20),
-        RowsCard(
-          children: [
-            for (final s in task.stages)
-              AppRow(
-                leading: IconTile(
-                  icon: switch (s) {
-                    GuidanceItem.app => FluentIcons.desktop_24_regular,
-                    GuidanceItem.library => FluentIcons.library_24_regular,
-                    GuidanceItem.plugins => FluentIcons.puzzle_piece_24_regular,
-                  },
-                ),
-                label: switch (s) {
-                  GuidanceItem.app => t.componentApp,
-                  GuidanceItem.library => t.componentLibrary,
-                  GuidanceItem.plugins => t.componentPlugins,
-                },
-                title: rowValue(s),
-                subtitle: s == GuidanceItem.plugins ? t.pluginsSent : null,
-                trailing: Icon(
-                  s == GuidanceItem.plugins
-                      ? FluentIcons.send_24_regular
-                      : FluentIcons.checkmark_circle_24_filled,
-                  size: 22,
-                  color: cs.primary,
-                ),
+    final narrow = TaskFrame.isNarrow(context);
+    final outcomes = task.outcomes;
+    final appDone = outcomes[GuidanceItem.app] == StageOutcome.done;
+    final libraryDone = outcomes[GuidanceItem.library] == StageOutcome.done;
+    final stoppedWaiting =
+        outcomes[GuidanceItem.app] == StageOutcome.stoppedWaiting;
+    final rows = task.plugins;
+    final sent = rows.any((p) => p.state != PluginDeliveryState.failed);
+    final pluginsSent = task.stages.contains(GuidanceItem.plugins) &&
+        outcomes[GuidanceItem.plugins] == StageOutcome.done &&
+        sent;
+
+    Widget doneMark() => Icon(
+          FluentIcons.checkmark_circle_24_filled,
+          size: 22,
+          color: cs.primary,
+        );
+    Widget quietMark(IconData icon) =>
+        Icon(icon, size: 22, color: cs.onSurfaceVariant);
+
+    AppRow row(GuidanceItem s) {
+      final outcome = outcomes[s];
+      final (title, subtitle, mark) = switch (s) {
+        GuidanceItem.app => switch (outcome) {
+            StageOutcome.stoppedWaiting => (
+                t.appStoppedWaiting,
+                null,
+                quietMark(FluentIcons.clock_24_regular),
               ),
-          ],
-        ),
-        if (actions.onReindex != null && !task.firstInstall)
+            StageOutcome.skipped => (
+                t.appSkipped,
+                null,
+                quietMark(FluentIcons.subtract_circle_24_regular),
+              ),
+            _ => (
+                task.appVersion == null
+                    ? t.stageDone(null)
+                    : t.doneAppValue(displayVersion(task.appVersion!)),
+                null,
+                doneMark(),
+              ),
+          },
+        GuidanceItem.library => outcome == StageOutcome.skipped
+            ? (
+                t.librarySkipped,
+                null,
+                quietMark(FluentIcons.subtract_circle_24_regular),
+              )
+            : (
+                _libraryDetail(context) ?? t.componentLibrary,
+                task.libraryNote,
+                task.libraryNote == null
+                    ? doneMark()
+                    : quietMark(FluentIcons.warning_24_regular),
+              ),
+        GuidanceItem.plugins => _pluginsRow(context, outcome, quietMark),
+      };
+      return AppRow(
+        dense: narrow,
+        leading: s == GuidanceItem.app
+            ? IconTile(child: _logo(24))
+            : IconTile(
+                icon: s == GuidanceItem.library
+                    ? FluentIcons.library_24_regular
+                    : FluentIcons.puzzle_piece_24_regular,
+              ),
+        label: switch (s) {
+          GuidanceItem.app => t.componentApp,
+          GuidanceItem.library => t.componentLibrary,
+          GuidanceItem.plugins => t.componentPlugins,
+        },
+        title: title,
+        subtitle: subtitle,
+        trailing: mark,
+      );
+    }
+
+    final (title, body) = stoppedWaiting
+        ? (
+            t.stoppedWaitingTitle,
+            t.stoppedWaitingBody(firstInstall: false, libraryDone: libraryDone),
+          )
+        : (
+            task.firstInstall ? t.installedTitle : t.updatedTitle,
+            t.doneHereBody(
+              firstInstall: task.firstInstall,
+              app: appDone,
+              library: libraryDone,
+              plugins: pluginsSent,
+            ),
+          );
+    return TaskResult(
+      badge: ResultBadge(
+        kind: stoppedWaiting ? ResultBadgeKind.calm : ResultBadgeKind.ok,
+        icon: stoppedWaiting
+            ? FluentIcons.clock_24_regular
+            : FluentIcons.checkmark_24_regular,
+      ),
+      title: title,
+      body: body,
+      extra: [
+        SizedBox(height: narrow ? 12 : 20),
+        RowsCard(children: [for (final s in task.stages) row(s)]),
+        if (actions.onReindex != null && !task.firstInstall && libraryDone)
           TaskGuide(
             children: [
               Row(
@@ -431,21 +499,88 @@ class UpdateHereTaskView extends StatelessWidget {
           ),
         ],
       ],
-      actions: [
-        ActionButton.recommended(
-          key: ShellKeys.taskPrimary,
-          text: plugins ? t.toOtzaria : g.launchButton,
-          size: ActionButtonSize.lg,
-          autofocus: true,
-          expand: true,
-          onPressed: actions.onLaunch,
-        ),
-        ActionButton.ghost(
-          text: t.backToHomePage,
-          expand: true,
-          onPressed: actions.onHome,
-        ),
-      ],
+      actions: stoppedWaiting
+          ? [
+              ActionButton.recommended(
+                key: ShellKeys.taskPrimary,
+                text: t.toAppPage,
+                size: ActionButtonSize.lg,
+                autofocus: true,
+                expand: true,
+                onPressed: () => actions.onOpenPage(GuidanceItem.app),
+              ),
+              ActionButton.ghost(
+                text: t.backToHomePage,
+                expand: true,
+                onPressed: actions.onHome,
+              ),
+            ]
+          : [
+              ActionButton.recommended(
+                key: ShellKeys.taskPrimary,
+                text: pluginsSent ? t.toOtzaria : g.launchButton,
+                size: ActionButtonSize.lg,
+                autofocus: true,
+                expand: true,
+                onPressed: actions.onLaunch,
+              ),
+              ActionButton.ghost(
+                text: t.backToHomePage,
+                expand: true,
+                onPressed: actions.onHome,
+              ),
+            ],
+    );
+  }
+
+  /// שורת התוספים בסיום: רק מה שבאמת נשלח נקרא "נשלח".
+  (String, String?, Widget) _pluginsRow(
+    BuildContext context,
+    StageOutcome? outcome,
+    Widget Function(IconData) quietMark,
+  ) {
+    final t = context.strings.task;
+    final cs = Theme.of(context).colorScheme;
+    final rows = task.plugins;
+    if (rows.isEmpty) {
+      return (
+        t.appSkipped,
+        null,
+        quietMark(FluentIcons.subtract_circle_24_regular),
+      );
+    }
+    final names = rows.map((p) => p.name).join(', ');
+    if (outcome == StageOutcome.skipped) {
+      return (
+        names,
+        t.pluginsAfterInstall,
+        quietMark(FluentIcons.clock_24_regular),
+      );
+    }
+    String namesIn(PluginDeliveryState state) =>
+        rows.where((p) => p.state == state).map((p) => p.name).join(', ');
+    final sent = namesIn(PluginDeliveryState.sent);
+    final failed = namesIn(PluginDeliveryState.failed);
+    final waiting = namesIn(PluginDeliveryState.waiting);
+    if (failed.isEmpty && waiting.isEmpty) {
+      return (
+        names,
+        t.pluginsSent,
+        Icon(FluentIcons.send_24_regular, size: 22, color: cs.primary),
+      );
+    }
+    final subtitle = [
+      if (sent.isNotEmpty) t.pluginsSentNames(sent),
+      if (waiting.isNotEmpty) t.pluginsStillSending(waiting),
+      if (failed.isNotEmpty) t.pluginsNotSent(failed),
+    ].join(' · ');
+    return (
+      names,
+      subtitle,
+      failed.isNotEmpty
+          ? Icon(FluentIcons.dismiss_circle_24_regular,
+              size: 22, color: cs.error)
+          : quietMark(FluentIcons.clock_24_regular),
     );
   }
 
@@ -455,81 +590,54 @@ class UpdateHereTaskView extends StatelessWidget {
         ? task.stages[task.stageIndex]
         : null;
     final wizard = atStage == GuidanceItem.app;
+    final appOutcome = task.outcomes[GuidanceItem.app];
+    final libraryDone =
+        task.outcomes[GuidanceItem.library] == StageOutcome.done;
+    // לא ידוע אם ההתקנה הסתיימה — הבדיקה בדף התוכנה, לא "נסה שוב" שיפתח
+    // אשף נוסף מעל הפתוח.
+    final unknown = wizard &&
+        (appOutcome == StageOutcome.stoppedWaiting ||
+            appOutcome == StageOutcome.stillOpen);
+    final (title, body) = !wizard
+        ? (t.stoppedTitle, t.stoppedBody)
+        : switch (appOutcome) {
+            StageOutcome.stoppedWaiting => (
+                t.stoppedWaitingTitle,
+                t.stoppedWaitingBody(
+                  firstInstall: task.firstInstall,
+                  libraryDone: libraryDone,
+                ),
+              ),
+            StageOutcome.stillOpen => (
+                t.wizardStillOpenTitle,
+                t.wizardStillOpenBody,
+              ),
+            _ => (
+                t.wizardClosedTitle,
+                t.wizardClosedBody(
+                  firstInstall: task.firstInstall,
+                  libraryDone: libraryDone,
+                ),
+              ),
+          };
     return TaskResult(
-      badge: const ResultBadge(
+      badge: ResultBadge(
         kind: ResultBadgeKind.calm,
-        icon: FluentIcons.arrow_reset_24_regular,
+        icon: unknown
+            ? FluentIcons.clock_24_regular
+            : FluentIcons.arrow_reset_24_regular,
       ),
-      title: wizard ? t.wizardClosedTitle : t.stoppedTitle,
-      body: wizard
-          ? t.wizardClosedBody(
-              firstInstall: task.firstInstall,
-              libraryDone:
-                  task.outcomes[GuidanceItem.library] == StageOutcome.done,
-            )
-          : t.stoppedBody,
-      actions: [
-        ActionButton.recommended(
-          key: ShellKeys.taskPrimary,
-          text: context.strings.common.retry,
-          icon: FluentIcons.arrow_clockwise_24_regular,
-          size: ActionButtonSize.lg,
-          autofocus: true,
-          expand: true,
-          onPressed: actions.onRetry,
-        ),
-        ActionButton.ghost(
-          text: t.backHome,
-          expand: true,
-          onPressed: actions.onHome,
-        ),
-      ],
-    );
-  }
-
-  Widget _failed(BuildContext context) {
-    final t = context.strings.task;
-    final e = context.strings.elevation;
-    final failure = task.failure ?? const UpdateFailure(GuidanceItem.library);
-    final library = failure.stage == GuidanceItem.library;
-    final message = failure.message?.trim();
-    final lines = message == null || message.isEmpty
-        ? const <String>[]
-        : message.split('\n');
-    final keep = library ? t.libraryFailedKeep : t.appFailedKeep;
-    final body = lines.isEmpty ? keep : '${lines.first} $keep';
-    final elevate = actions.onRestartElevated;
-    return TaskResult(
-      badge: const ResultBadge(
-        kind: ResultBadgeKind.error,
-        icon: FluentIcons.important_24_filled,
-      ),
-      title: library ? t.libraryFailedTitle : t.appFailedTitle,
+      title: title,
       body: body,
-      extra: [
-        if (elevate != null) ...[
-          const SizedBox(height: 16),
-          NoticeBanner(
-            key: ShellKeys.taskElevation,
-            kind: NoticeKind.banner,
-            leading:
-                const IconTile(icon: FluentIcons.shield_checkmark_24_regular),
-            title: e.bannerTitle,
-            body: e.bannerContent,
-          ),
-        ],
-        if (lines.length > 1) TechDetails(text: lines.skip(1).join('\n')),
-      ],
       actions: [
-        if (elevate != null)
+        if (unknown)
           ActionButton.recommended(
             key: ShellKeys.taskPrimary,
-            text: e.bannerConfirm,
-            icon: FluentIcons.shield_checkmark_24_regular,
+            text: t.toAppPage,
             size: ActionButtonSize.lg,
             autofocus: true,
             expand: true,
-            onPressed: elevate,
+            onPressed: () => actions.onOpenPage(GuidanceItem.app),
           )
         else
           ActionButton.recommended(
@@ -541,12 +649,6 @@ class UpdateHereTaskView extends StatelessWidget {
             expand: true,
             onPressed: actions.onRetry,
           ),
-        ActionButton.neutral(
-          key: ShellKeys.taskSecondary,
-          text: library ? t.toLibraryPage : t.toAppPage,
-          expand: true,
-          onPressed: () => actions.onOpenPage(failure.stage),
-        ),
         ActionButton.ghost(
           text: t.backHome,
           expand: true,
@@ -555,6 +657,105 @@ class UpdateHereTaskView extends StatelessWidget {
       ],
     );
   }
+
+  Widget _failed(BuildContext context) {
+    final t = context.strings.task;
+    final failure = task.failure ?? const UpdateFailure(GuidanceItem.library);
+    final library = failure.stage == GuidanceItem.library;
+    final elevate = actions.onRestartElevated;
+    final message = splitFailureMessage(failure.message);
+    final home = ActionButton.ghost(
+      text: t.backHome,
+      expand: true,
+      onPressed: actions.onHome,
+    );
+    if (elevate != null) {
+      final raw = failure.message?.trim();
+      return TaskResult(
+        badge: const ResultBadge(
+          kind: ResultBadgeKind.error,
+          icon: FluentIcons.important_24_filled,
+        ),
+        title: t.permissionFailedTitle,
+        body: library ? t.permissionLibraryBody : t.permissionAppBody,
+        extra: [
+          const SizedBox(height: 16),
+          NoticeBanner(
+            key: ShellKeys.taskElevation,
+            kind: NoticeKind.banner,
+            leading:
+                const IconTile(icon: FluentIcons.shield_checkmark_24_regular),
+            title: t.elevateTitle,
+            body: t.elevateBody,
+          ),
+          if (raw != null && raw.isNotEmpty) TechDetails(text: raw),
+        ],
+        actions: [
+          ActionButton.recommended(
+            key: ShellKeys.taskPrimary,
+            text: t.elevateButton,
+            icon: FluentIcons.shield_checkmark_24_regular,
+            size: ActionButtonSize.lg,
+            autofocus: true,
+            expand: true,
+            onPressed: elevate,
+          ),
+          home,
+        ],
+      );
+    }
+    final keep = library ? t.libraryFailedKeep : t.appFailedKeep;
+    final lead = message.body;
+    return TaskResult(
+      badge: const ResultBadge(
+        kind: ResultBadgeKind.error,
+        icon: FluentIcons.important_24_filled,
+      ),
+      title: library
+          ? (task.firstInstall
+              ? t.libraryInstallFailedTitle
+              : t.libraryFailedTitle)
+          : t.appFailedTitle,
+      body: lead == null ? keep : '$lead $keep',
+      extra: [
+        if (message.details case final details?) TechDetails(text: details),
+      ],
+      actions: [
+        ActionButton.recommended(
+          key: ShellKeys.taskPrimary,
+          text: context.strings.common.retry,
+          icon: FluentIcons.arrow_clockwise_24_regular,
+          size: ActionButtonSize.lg,
+          autofocus: true,
+          expand: true,
+          onPressed: actions.onRetry,
+        ),
+        ActionButton.neutral(
+          key: ShellKeys.taskSecondary,
+          text: library ? t.toLibraryPage : t.toAppPage,
+          expand: true,
+          onPressed: () => actions.onOpenPage(failure.stage),
+        ),
+        home,
+      ],
+    );
+  }
+}
+
+final RegExp _rawError = RegExp(
+  r'(Exception|Error)\b|errno|OS Error|Bad state|^\s*#\d',
+);
+
+/// מחלק הודעת כשל: שורה ראשונה מקומית לגוף, והשאר (או הכול, כשהשורה היא
+/// טקסט חריג שלא עבר לוקליזציה) ל"פרטים טכניים".
+({String? body, String? details}) splitFailureMessage(String? message) {
+  final text = message?.trim();
+  if (text == null || text.isEmpty) return (body: null, details: null);
+  final lines = text.split('\n');
+  final first = lines.first.trim();
+  if (_rawError.hasMatch(first)) return (body: null, details: text);
+  final rest = lines.skip(1).join('\n').trim();
+  return (body: first, details: rest.isEmpty ? null : rest);
 }
 
 Widget _logo(double size) => Image.asset(

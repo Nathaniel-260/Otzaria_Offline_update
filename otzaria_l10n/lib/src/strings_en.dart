@@ -1,5 +1,6 @@
 import 'app_language.dart';
 import 'app_strings.dart';
+import 'plural.dart';
 
 /// אנגלית — תרגום חופשי של הנוסח העברי, לא מילה במילה: אותה כוונה ואותו
 /// אורך בערך, בניסוח שנשמע טבעי לקורא אנגלית.
@@ -181,8 +182,6 @@ class _Home extends HomeStrings {
   @override
   String get cancelDownloadButton => 'Cancel download';
   @override
-  String get cancelDownloadPending => 'Cancelling…';
-  @override
   String get cancelDownloadDialogTitle => 'Cancel the download?';
   @override
   String get cancelDownloadPrompt =>
@@ -190,26 +189,6 @@ class _Home extends HomeStrings {
       'already held from earlier downloads stays where it is.';
   @override
   String get cancelDownloadKeepGoing => 'Keep downloading';
-  @override
-  String get downloadCancelledSnack =>
-      'The download was cancelled, and what it had fetched was deleted';
-  @override
-  String get downloadSnapshotFailedSnack =>
-      'The download did not start: the mirror state could not be saved beforehand, so a cancel could not restore it';
-  @override
-  String get downloadCancelRevertFailedSnack =>
-      'The download was cancelled, but deleting what it fetched failed. Partial files may remain in the mirror';
-  @override
-  String downloadSkippedSnack(String components) =>
-      'Skipped $components — nothing new for them online';
-  @override
-  String downloadFailedSnack(String components) =>
-      'Downloading $components failed. What already arrived is kept — try '
-      'again and the download will continue where it stopped';
-  @override
-  String get downloadDoneSnack =>
-      'Download complete — the folder next to the program is up to date';
-
   @override
   String get downloadingApp => 'Downloading the Otzaria Program…';
   @override
@@ -232,8 +211,6 @@ class _Task extends TaskStrings {
   String get semanticBody =>
       'Smart search finds sources by meaning, even when the words differ from what you searched for.';
   @override
-  String get semanticHint => 'You can change this later on the library page.';
-  @override
   String get semanticNoTitle => 'No, regular search only (recommended)';
   @override
   String get semanticNoBody => 'You can add smart search in the next download.';
@@ -243,7 +220,7 @@ class _Task extends TaskStrings {
   String get semanticYesTitle => 'Yes, smart search too';
   @override
   String get semanticYesBody =>
-      'Good when the drive has room. The download will take longer.';
+      'The files take a few gigabytes, and the download will take longer. Using smart search in Otzaria requires consent to training-data collection; downloading does not change that consent.';
   @override
   String get back => 'Back';
   @override
@@ -272,18 +249,24 @@ class _Task extends TaskStrings {
   @override
   String get stepPlugins => 'the plugins';
   @override
-  String transferRate(String perSecond) => '$perSecond per second';
+  String minutesLeft(int minutes) => plural(
+        minutes,
+        one: 'One minute left',
+        many: '$minutes minutes left',
+      );
   @override
-  String minutesLeft(int minutes) =>
-      minutes == 1 ? '1 minute left' : '$minutes minutes left';
+  String get lessThanMinuteLeft => 'Less than a minute left';
+  @override
+  String get speedPending => 'Measuring speed…';
+  @override
+  String get speedStalled => 'Waiting for data…';
   @override
   String bytesLine(String name, String done, String total) =>
       '$name: $done of $total downloaded';
   @override
-  String stageDone(String? size) =>
-      size == null ? 'Downloaded' : 'Downloaded · $size';
+  String stageDone(String? size) => size == null ? 'Done' : 'Done · $size';
   @override
-  String get stageWaiting => 'Waiting';
+  String get stageWaiting => 'Up next';
   @override
   String get cancelling => 'Cancelling…';
   @override
@@ -306,6 +289,9 @@ class _Task extends TaskStrings {
   String get doneBody =>
       'All the updates were downloaded and saved on the drive.';
   @override
+  String get doneNothingBody =>
+      'The Otzaria website has nothing new, so nothing was downloaded. The drive is already up to date.';
+  @override
   String doneSkipped(String names) =>
       '$names were not downloaded — nothing new on the website.';
   @override
@@ -313,8 +299,11 @@ class _Task extends TaskStrings {
   @override
   String doneLibraryValue(int version) => 'Version $version';
   @override
-  String donePluginsValue(int count) =>
-      count == 1 ? '1 plugin on the drive' : '$count plugins on the drive';
+  String donePluginsValue(int count) => plural(
+        count,
+        one: 'One plugin on the drive',
+        many: '$count plugins on the drive',
+      );
   @override
   String get donePluginsUpdated => 'The plugin store was updated';
   @override
@@ -327,8 +316,8 @@ class _Task extends TaskStrings {
   String get whatNowConnect =>
       'Connect it to the computer where you study with Otzaria.';
   @override
-  String get whatNowOpen =>
-      'Open "Otzaria Updates" from the drive there, and click "Update Otzaria on this computer".';
+  String whatNowOpen(String toolName) =>
+      'Open $toolName from the drive there, and click "Update Otzaria on this computer".';
   @override
   String get updateHereToo => 'Update this computer too';
   @override
@@ -337,6 +326,11 @@ class _Task extends TaskStrings {
   String get finish => 'Done';
   @override
   String get networkTitle => 'No internet connection';
+  @override
+  String get filterTitle => 'The connection to the Otzaria website was blocked';
+  @override
+  String filterBody(String name) =>
+      'An internet filter may be blocking the download of $name. What was already downloaded is saved on the drive. If it happens again, ask your filtering provider to allow the Otzaria website, then click "Try again".';
   @override
   String networkBody(String name) =>
       'The connection dropped while downloading $name. What was already downloaded is saved on the drive. Check the connection and click "Try again".';
@@ -370,13 +364,21 @@ class _Task extends TaskStrings {
   @override
   String get detailsCopied => 'Details copied';
   @override
-  String get otherUserTitle => 'Otzaria was installed by another user';
+  String get otherUserTitle =>
+      'This tool runs as an administrator of another account';
   @override
-  String get otherUserBody =>
-      'It was installed as an administrator, in another account. If you continue from this account, the update may create a second installation instead of updating the existing one.';
+  String otherUserBody({required bool firstInstall, String? account}) {
+    final who = account == null
+        ? 'This tool was started as an administrator under another account'
+        : 'This tool was started as the administrator account $account';
+    return firstInstall
+        ? '$who, so Otzaria would be installed for that administrator and not for you.'
+        : '$who, so the update would go to that administrator and not to the Otzaria in your account.';
+  }
+
   @override
   String get otherUserHint =>
-      'It is best to sign in to the account that installed Otzaria and update from there, or to run this tool as an administrator.';
+      'It is best to close this tool and open it again without "Run as administrator".';
   @override
   String get continueAnyway => 'Continue anyway';
   @override
@@ -416,7 +418,10 @@ class _Task extends TaskStrings {
   String get appWizardBody =>
       'The Otzaria setup wizard opened in a separate window. At its end Otzaria opens by itself, and this tool continues by itself.';
   @override
-  String get libraryBody => 'A few minutes, and it is ready.';
+  String libraryBody(int? lowMinutes, int? highMinutes) => lowMinutes == null ||
+          highMinutes == null
+      ? 'This may take a while, depending on the update and the computer.'
+      : 'Expected to take about $lowMinutes to $highMinutes minutes, depending on the computer.';
   @override
   String get pluginsBody =>
       'This tool sends the plugins to Otzaria one by one. You approve the installation in the Otzaria window.';
@@ -432,6 +437,8 @@ class _Task extends TaskStrings {
   String get appStoppedWaiting =>
       'Stopped waiting · check on the app page whether the installation finished';
   @override
+  String get appSkipped => 'No installation was needed';
+  @override
   String get stopWaiting => 'Stop waiting';
   @override
   String get libraryFull => 'The full library';
@@ -445,13 +452,25 @@ class _Task extends TaskStrings {
   String get librarySkipped =>
       'Not installed now — you can install it later from the home page';
   @override
-  String pluginsWaiting(int count) => count == 1
-      ? '1 plugin · will be sent to Otzaria'
-      : '$count plugins · will be sent to Otzaria';
+  String pluginsWaiting(int count) => plural(
+        count,
+        one: 'One plugin · will be sent to Otzaria',
+        many: '$count plugins · will be sent to Otzaria',
+      );
   @override
   String get pluginsCurrent => 'Approve each plugin in the Otzaria window';
   @override
   String get pluginsSent => 'Sent to Otzaria — approve each plugin there';
+  @override
+  String pluginsSentNames(String names) => 'Sent: $names';
+  @override
+  String pluginsNotSent(String names) =>
+      'Not sent: $names — you can retry from the plugins page';
+  @override
+  String pluginsStillSending(String names) => 'Still being sent: $names';
+  @override
+  String get pluginsAfterInstall =>
+      'Not sent — send them from the plugins page after the installation finishes';
   @override
   String get pluginRowSent => 'Sent to Otzaria';
   @override
@@ -466,17 +485,46 @@ class _Task extends TaskStrings {
   @override
   String get updatedTitle => 'Otzaria is up to date';
   @override
-  String doneHereBody(
-          {required bool firstInstall,
-          required bool withLibrary,
-          required bool plugins}) =>
+  String doneHereBody({
+    required bool firstInstall,
+    required bool app,
+    required bool library,
+    required bool plugins,
+  }) {
+    if (firstInstall) {
+      return library
+          ? 'Otzaria and the library are installed on this computer and ready for study. You can disconnect the drive.'
+          : 'Otzaria is installed on this computer. You can disconnect the drive.';
+    }
+    final done = app && library
+        ? 'The app and the library were updated.'
+        : app
+            ? 'The Otzaria app was updated.'
+            : library
+                ? 'The library was updated.'
+                : null;
+    return [
+      if (done != null) done,
+      if (plugins) 'The plugins are waiting for your approval in Otzaria.',
+      'You can disconnect the drive.',
+    ].join(' ');
+  }
+
+  @override
+  String get stoppedWaitingTitle => 'Stopped waiting for the setup wizard';
+  @override
+  String stoppedWaitingBody(
+          {required bool firstInstall, required bool libraryDone}) =>
       firstInstall
-          ? (withLibrary
-              ? 'Otzaria and the library are installed on this computer and ready for study. You can disconnect the drive.'
-              : 'Otzaria is installed on this computer. You can disconnect the drive.')
-          : plugins
-              ? 'The update was installed, and the plugins are waiting for your approval in Otzaria. You can disconnect the drive.'
-              : 'Everything in the update was installed on this computer. You can disconnect the drive.';
+          ? 'If the wizard is still open, finish it. Then check on the app page that Otzaria was installed; you can install the library from there too.'
+          : libraryDone
+              ? 'The library was updated. Finish the installation in the wizard window, and check on the app page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.'
+              : 'Finish the installation in the wizard window, and check on the app page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.';
+  @override
+  String get wizardStillOpenTitle => 'The setup wizard is still open';
+  @override
+  String get wizardStillOpenBody =>
+      'Finish the installation in the wizard window, then check the app page again. Do not disconnect the drive until the wizard finishes.';
   @override
   String get reindexTitle => 'Rebuilding search is recommended';
   @override
@@ -504,12 +552,29 @@ class _Task extends TaskStrings {
   @override
   String get libraryFailedTitle => 'The library update failed';
   @override
+  String get libraryInstallFailedTitle => 'Installing the library failed';
+  @override
   String get appFailedTitle => 'Installing Otzaria failed';
   @override
   String get libraryFailedKeep =>
       'Otzaria keeps working with the previous library.';
   @override
   String get appFailedKeep => 'Otzaria stayed on the previous version.';
+  @override
+  String get permissionFailedTitle => 'The update failed';
+  @override
+  String get permissionAppBody =>
+      'This tool is not allowed to update Otzaria, because it is installed for all users of the computer.';
+  @override
+  String get permissionLibraryBody =>
+      'This tool is not allowed to change the folder that holds the library.';
+  @override
+  String get elevateTitle => 'Restart as administrator';
+  @override
+  String get elevateBody =>
+      'This tool will reopen with administrator rights, and then you can try again.';
+  @override
+  String get elevateButton => 'Restart as administrator';
   @override
   String get toLibraryPage => 'To the library page';
   @override
@@ -2486,6 +2551,8 @@ class _Units extends UnitStrings {
   String megabytes(String amount) => '$amount MB';
   @override
   String gigabytes(String amount) => '$amount GB';
+  @override
+  String perSecond(String size) => '$size/s';
 }
 
 class _LibraryDomain extends LibraryDomainStrings {
@@ -4067,6 +4134,9 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String collectFailedSnack(String error) =>
       'Collecting the reports failed: $error';
+  @override
+  String get collectDisclosureRefreshedSnack =>
+      'More data to collect was found — review the details above the button and click again.';
   @override
   String get collectOtzariaOpenSnack =>
       'Otzaria is open, so the reports were not collected. You will be asked '
