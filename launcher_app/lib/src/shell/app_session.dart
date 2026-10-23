@@ -743,6 +743,14 @@ class AppSession extends ChangeNotifier {
   /// קודם עוד רץ. זרימה שחזרה בלי להתחיל סוגרת אותו.
   Future<void> downloadAll() async {
     if (_blockedByReadOnly() || tasks.isRunning) return;
+    if (!settings.settings.hasSyncSelection) {
+      prompts.notifyNoSyncSelection();
+      return;
+    }
+    if (longTaskRunning || _launcherUpdate.isDownloading) {
+      UiSnack.show(AppL10n.strings.guide.downloadBusySnack);
+      return;
+    }
     final request = ++_downloadRequest;
     tasks.prepareDownload();
     await _downloads.downloadAll();
@@ -969,10 +977,15 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   void downloadEnded() {}
 
   @override
-  void downloadCrashed(Object error, StackTrace stackTrace) {
+  void downloadCrashed(
+    Object error,
+    StackTrace stackTrace, {
+    bool abandoned = false,
+  }) {
     AppLogger.instance.error('ההורדה נעצרה בחריג', error, stackTrace);
     final task = _session.tasks.current;
-    if (task is! DownloadTask ||
+    if (abandoned ||
+        task is! DownloadTask ||
         task.isFinished ||
         task.phase == DownloadTaskPhase.question) {
       return;

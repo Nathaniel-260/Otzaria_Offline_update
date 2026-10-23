@@ -946,6 +946,27 @@ void main() {
       }
       expect(calls, ['download', 'help']);
     });
+
+    testWidgets('"הורדה" במסך הפתיחה מושבתת בזמן בדיקה ברשת, כמו בבית',
+        (tester) async {
+      final first = homeScenario('first');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: first.guidance,
+            online: true,
+            isCheckingOnline: true,
+          ),
+        ),
+      );
+      expect(
+        tester
+            .widget<ActionButton>(find.byKey(ShellKeys.welcomePrimary))
+            .onPressed,
+        isNull,
+      );
+    });
   });
 
   group('המדים קוראים רק מ-progress', () {

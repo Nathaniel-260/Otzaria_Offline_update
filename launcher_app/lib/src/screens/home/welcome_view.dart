@@ -16,6 +16,7 @@ class WelcomeView extends StatelessWidget {
     required this.onDownload,
     required this.onHelp,
     required this.onToggleLanguage,
+    this.busy = false,
     this.notices = const [],
     this.links = const [],
   });
@@ -23,6 +24,9 @@ class WelcomeView extends StatelessWidget {
   /// אין מכאן הורדה: אין אינטרנט, או שהכונן מוגן.
   final bool offline;
   final bool narrow;
+
+  /// בדיקה ברשת רצה — "הורדה" ממתינה לה, כמו בבית.
+  final bool busy;
   final VoidCallback onDownload;
   final VoidCallback onHelp;
   final VoidCallback onToggleLanguage;
@@ -112,7 +116,7 @@ class WelcomeView extends StatelessWidget {
                 icon: FluentIcons.arrow_download_24_regular,
                 size: ActionButtonSize.lg,
                 autofocus: true,
-                onPressed: onDownload,
+                onPressed: busy ? null : onDownload,
               ),
             ),
             Text(

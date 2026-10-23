@@ -372,9 +372,12 @@ Hebrew is the source, English a free translation of it.
   `otzaria_l10n/test/strings_completeness_test.dart`, which otherwise demands the digit.
 - **Sizes go through `formatBytes` / `formatRate`** (`services/byte_size.dart`): in
   Hebrew the number and Latin unit sit inside LRI…PDI with a non-breaking space, GB
-  with one decimal, MB whole. A size typed into Hebrew text uses the same form
-  (`otzaria_l10n/test/units_format_test.dart`). The log and "copy details" drop those
-  marks through `withoutBidiMarks`, so a search for "403 MB" finds them.
+  with one decimal, MB whole. A size typed into text uses the same form: in Hebrew
+  number and unit together in one isolate, in English "1.5 GB". A unit without a
+  number is a word ("כמה ג׳יגה־בייט", "tens of megabytes"), never "GB" alone
+  (`otzaria_l10n/test/units_format_test.dart`). The log, "copy details" and a manual
+  copy from the technical details drop those marks through `withoutBidiMarks`, so a
+  search for "403 MB" finds them.
 
 ---
 

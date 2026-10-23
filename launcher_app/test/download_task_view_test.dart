@@ -154,6 +154,56 @@ void main() {
       expect(line(tester, 'task.download.speed'), ' ');
     });
 
+    testWidgets(
+        'הספרייה עוברת מספירת קבצים לבייטים — האחוז ממשיך לעלות, לא עומד',
+        (tester) async {
+      final progress = ValueNotifier(0);
+      var snapshot = const DownloadSnapshot(
+        current: MirrorComponent.library,
+        fraction: 0.9,
+      );
+      await pumpScreen(
+        tester,
+        DownloadTaskView(
+          task: downloadScenarios['download']!,
+          progress: progress,
+          snapshot: () => snapshot,
+          actions: DownloadTaskActions(
+            onAnswer: (_) {},
+            onCancel: () {},
+            onRetry: () {},
+            onHome: () {},
+            onHere: () {},
+          ),
+        ),
+      );
+      Future<String?> at(double fraction) async {
+        snapshot = DownloadSnapshot(
+          current: MirrorComponent.library,
+          fraction: fraction,
+        );
+        progress.value++;
+        await tester.pump();
+        return percent(tester);
+      }
+
+      expect(percent(tester), '63%');
+      // ספירת הקבצים הגיעה ל-0.9, והבייטים מתחילים מ-0.05.
+      expect(await at(0.05), '63%');
+      expect(await at(0.5), '64%');
+      expect(await at(0.8), '65%');
+      expect(await at(1), '66%');
+      // רכיב חדש מתחיל מחדש בלי ירושה מהקודם.
+      snapshot = const DownloadSnapshot(
+        current: MirrorComponent.plugins,
+        fraction: 0.5,
+      );
+      progress.value++;
+      await tester.pump();
+      expect(percent(tester), '83%');
+      expect(find.text('50%'), findsOneWidget);
+    });
+
     testWidgets('מהירות וזמן שנותר אחרי שנייה של מדידה', (tester) async {
       final progress = ValueNotifier(0);
       var now = DateTime(2026, 10, 23);

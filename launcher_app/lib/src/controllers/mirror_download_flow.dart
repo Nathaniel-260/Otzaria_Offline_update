@@ -49,7 +49,12 @@ abstract interface class MirrorDownloadHost {
   void downloadEnded();
 
   /// חריג שלא נתפס בזרימה — המסך עובר לכשל, ולא נשאר תקוע ב"מתכונן".
-  void downloadCrashed(Object error, StackTrace stackTrace);
+  /// [abandoned]: הזרימה בוטלה, והמסך שפתוח עכשיו שייך לבקשה אחרת.
+  void downloadCrashed(
+    Object error,
+    StackTrace stackTrace, {
+    bool abandoned = false,
+  });
   void downloadFinished({
     required List<MirrorComponent> failed,
     required List<MirrorComponent> skipped,
@@ -73,6 +78,7 @@ class MirrorDownloadFlow {
   bool _cancelRequested = false;
   bool _isPreparing = false;
   bool _abandonRequested = false;
+  int _abandonCount = 0;
   Future<void>? _run;
   Future<void>? _sweep;
   DownloadPlan? _plan;
@@ -97,8 +103,12 @@ class MirrorDownloadFlow {
       // "ביטול" ואז "הורדה" לפני שהזרימה שבוטלה חזרה: מחכים לה ומתחילים מחדש.
       final abandoned = _run;
       if (!_abandonRequested || abandoned == null) return;
+      final abandonCount = _abandonCount;
       await abandoned.then((_) {}, onError: (_) {});
-      if (_isPreparing || !host.isActive) return;
+      // "ביטול" נוסף בזמן ההמתנה מבטל גם את הבקשה הזו.
+      if (_isPreparing || !host.isActive || abandonCount != _abandonCount) {
+        return;
+      }
     }
     _isPreparing = true;
     _abandonRequested = false;
@@ -106,7 +116,9 @@ class MirrorDownloadFlow {
     try {
       await run;
     } catch (error, stackTrace) {
-      if (host.isActive) host.downloadCrashed(error, stackTrace);
+      if (host.isActive) {
+        host.downloadCrashed(error, stackTrace, abandoned: _abandonRequested);
+      }
     } finally {
       _isPreparing = false;
       _run = null;
@@ -116,7 +128,9 @@ class MirrorDownloadFlow {
   /// "ביטול" לפני שההורדה התחילה: הזרימה חוזרת אחרי הבדיקה ברשת, בלי
   /// לשאול ובלי להוריד.
   void abandonPreparing() {
-    if (_isPreparing && !_isDownloading) _abandonRequested = true;
+    if (!_isPreparing || _isDownloading) return;
+    _abandonRequested = true;
+    _abandonCount++;
   }
 
   void requestCancel() {

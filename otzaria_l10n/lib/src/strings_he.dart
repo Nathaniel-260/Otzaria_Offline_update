@@ -217,7 +217,7 @@ class _Task extends TaskStrings {
   String get semanticYesTitle => 'כן, גם חיפוש חכם';
   @override
   String get semanticYesBody =>
-      'הקבצים תופסים כמה \u2066GB\u2069, וההורדה תהיה ארוכה יותר. השימוש בחיפוש החכם באוצריא מחייב הסכמה לאיסוף נתוני אימון; ההורדה אינה משנה את ההסכמה.';
+      'הקבצים תופסים כמה ג׳יגה־בייט, וההורדה תהיה ארוכה יותר. השימוש בחיפוש החכם באוצריא מחייב הסכמה לאיסוף נתוני אימון; ההורדה אינה משנה את ההסכמה.';
   @override
   String get back => 'חזרה';
   @override
@@ -911,6 +911,9 @@ class _Guide extends GuidanceStrings {
   @override
   String get noSyncSelectionNote => 'בהגדרות לא נבחר שום דבר להוריד.';
   @override
+  String get downloadBusySnack =>
+      'משימה אחרת רצה עכשיו. אפשר להוריד כשהיא תסתיים.';
+  @override
   String get changeInSettingsLink => 'שינוי';
   @override
   String get chooseInSettingsLink => 'לבחירה בהגדרות';
@@ -1440,8 +1443,8 @@ class _Settings extends SettingsScreenStrings {
   String get personalModeDialogTitle => 'להפעיל עדכון אישי?';
   @override
   String get personalModeDialogContent =>
-      'ההורדה תביא רק את קובצי העדכון מהגרסה שמותקנת אצלך ומעלה — עשרות \u2066MB\u2069 '
-      'במקום כמה \u2066GB\u2069.\n\n'
+      'ההורדה תביא רק את קובצי העדכון מהגרסה שמותקנת אצלך ומעלה — עשרות מגה־בייט '
+      'במקום כמה ג׳יגה־בייט.\n\n'
       'התוכנה אינה קוראת את גרסת המסד מעצמה: במסך הספרייה יש ללחוץ על '
       '"זהה את גרסת המסד שלי", וזאת דווקא במחשב שאוצריא שלכם מותקנת בו. '
       'הלחיצה נשמרת על הכונן ונוסעת איתו למחשב המקוון, כך שאוצריא שמותקנת '

@@ -496,6 +496,9 @@ abstract class GuidanceStrings {
     required bool plugins,
   });
   String get noSyncSelectionNote;
+
+  /// "הורדה" בזמן שמשימה אחרת (או הורדת עדכון של הכלי) רצה.
+  String get downloadBusySnack;
   String get changeInSettingsLink;
   String get chooseInSettingsLink;
   String get libraryRetryNote;

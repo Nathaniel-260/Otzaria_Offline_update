@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/screens/tasks/task_parts.dart';
 import 'package:launcher_app/src/screens/tasks/update_here_task_view.dart';
@@ -6,6 +8,7 @@ import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_tasks.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import 'task_fixtures.dart';
 import 'test_harness.dart';
@@ -381,48 +384,124 @@ void main() {
     });
   });
 
+  group('העתקה מהפרטים הטכניים', () {
+    const raw = 'library: חסר מקום — נדרשים \u20661.5\u00a0GB\u2069';
+    const clean = 'library: חסר מקום — נדרשים 1.5 GB';
+    late List<String?> copied;
+
+    Future<void> open(WidgetTester tester) async {
+      copied = [];
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied.add((call.arguments as Map)['text'] as String?);
+        }
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+      await pumpScreen(
+        tester,
+        const Material(child: TechDetails(text: raw)),
+        size: const Size(800, 600),
+      );
+      await tester.tap(find.text(t.techDetails));
+      await tester.pump();
+      await tester.tap(find.byType(SelectableText));
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+    }
+
+    testWidgets('Ctrl+C על הסימון — בלי תווי הבידוד', (tester) async {
+      await open(tester);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      expect(copied, [clean]);
+    });
+
+    testWidgets('"העתקה" בתפריט הלחיצה הימנית — בלי תווי הבידוד',
+        (tester) async {
+      await open(tester);
+      await tester.tap(
+        find.byType(SelectableText),
+        buttons: kSecondaryMouseButton,
+      );
+      await tester.pumpAndSettle();
+      final context = tester.element(find.byType(SelectableText));
+      await tester.tap(
+          find.text(MaterialLocalizations.of(context).copyButtonLabel).last);
+      await tester.pump();
+      expect(copied, [clean]);
+    });
+  });
+
   group('חלון צר או נמוך', () {
     // 1000×580: מחשב נייד 1366×768 בהגדלה של 125% — רחב, אבל נמוך.
+    // 1000×720: גודל הפתיחה של החלון (`main.cpp`).
     const sizes = [
       Size(760, 560),
       Size(900, 560),
       Size(1000, 560),
       Size(801, 600),
       Size(1000, 580),
+      Size(1000, 700),
       Size(1000, 720),
+      Size(1000, 760),
+      Size(1366, 768),
+      Size(1000, 1000),
     ];
-    for (final size in sizes) {
-      for (final name in taskScenarioNames) {
-        testWidgets(
-            '$name ב-${size.width.toInt()}×${size.height.toInt()}: '
-            'הפעולה הראשית גלויה בלי גלילה', (tester) async {
-          await pumpScreen(tester, taskScenarioInWindow(name), size: size);
-          await tester.pump();
-          expect(tester.takeException(), isNull);
-          final primary = find.byKey(ShellKeys.taskPrimary);
-          if (primary.evaluate().isEmpty) return;
-          final rect = tester.getRect(primary);
-          expect(rect.top, greaterThanOrEqualTo(36), reason: name);
-          expect(rect.bottom, lessThanOrEqualTo(size.height), reason: name);
-        });
+    for (final language in AppLanguage.values) {
+      for (final size in sizes) {
+        for (final name in taskScenarioNames) {
+          testWidgets(
+              '$name ב-${size.width.toInt()}×${size.height.toInt()} '
+              '(${language.name}): הפעולה הראשית גלויה בלי גלילה',
+              (tester) async {
+            await pumpScreen(tester, taskScenarioInWindow(name),
+                size: size, language: language);
+            await tester.pump();
+            expect(tester.takeException(), isNull);
+            final primary = find.byKey(ShellKeys.taskPrimary);
+            final bar = find.byKey(const ValueKey('task.result.actions'));
+            // כל מסך תוצאה: הפעולות בפס הקבוע שבתחתית.
+            if (find.byType(TaskResult).evaluate().isNotEmpty) {
+              expect(bar, findsOneWidget, reason: name);
+              expect(tester.getRect(bar).bottom, size.height, reason: name);
+              expect(
+                find.descendant(of: bar, matching: primary),
+                findsOneWidget,
+                reason: name,
+              );
+            }
+            if (primary.evaluate().isEmpty) return;
+            final rect = tester.getRect(primary);
+            expect(rect.top, greaterThanOrEqualTo(36), reason: name);
+            expect(rect.bottom, lessThanOrEqualTo(size.height), reason: name);
+          });
+        }
       }
     }
 
-    testWidgets('בחלון רחב ונמוך פעולות התוצאה קבועות בתחתית', (tester) async {
-      await pumpScreen(
-        tester,
-        taskScenarioInWindow('installDone'),
-        size: const Size(1000, 580),
-      );
-      final bar = find.byKey(const ValueKey('task.result.actions'));
-      expect(bar, findsOneWidget);
-      expect(tester.getRect(bar).bottom, 580);
-      await pumpScreen(
-        tester,
-        taskScenarioInWindow('installDone'),
-        size: const Size(1000, 800),
-      );
-      expect(find.byKey(const ValueKey('task.result.actions')), findsNothing);
+    testWidgets('פעולות התוצאה קבועות בתחתית בכל גודל, והתוכן ממורכז מעליהן',
+        (tester) async {
+      for (final size in const [Size(1000, 580), Size(1000, 1000)]) {
+        await pumpScreen(
+          tester,
+          taskScenarioInWindow('installDone'),
+          size: size,
+        );
+        final bar = find.byKey(const ValueKey('task.result.actions'));
+        expect(bar, findsOneWidget);
+        expect(tester.getRect(bar).bottom, size.height);
+      }
+      // בחלון גבוה התג לא נצמד לראש: התוכן ממורכז בשטח שמעל הפס.
+      final badgeTop = tester.getRect(find.byType(ResultBadge)).top;
+      expect(badgeTop, greaterThan(36 + 40));
     });
 
     testWidgets('שורות השלב קומפקטיות, והתג 56', (tester) async {

@@ -24,14 +24,14 @@ class TaskFrame extends StatelessWidget {
   final Widget? start;
   final Widget? end;
 
-  /// מרכז אנכי — דפי תוצאה.
+  /// מרכז אנכי — מסכי שאלה קצרים.
   final bool center;
   final bool wide;
 
   /// חלון צר (`.win.narrow`) — אותו סף כמו בבית (`HomePage.narrowWidth`).
   static const double narrowWidth = 800;
 
-  /// חלון נמוך: גם ברוחב מלא הפעולה הראשית של דף התוצאה נדחקת מתחת לקו.
+  /// חלון נמוך: ריווח, תג ושורות שלב קטנים יותר גם ברוחב מלא.
   static const double shortHeight = 700;
 
   /// פריסה קומפקטית (`.win.narrow`): חלון צר או נמוך.

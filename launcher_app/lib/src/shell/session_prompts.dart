@@ -21,6 +21,9 @@ abstract interface class SessionPrompts {
 
   Future<bool> confirmCancelDownload();
 
+  /// "הורדה" כשבהגדרות לא נבחר שום רכיב: הודעה, ומעבר להגדרות.
+  void notifyNoSyncSelection();
+
   Future<bool> confirmClose({required bool downloading});
 
   Future<bool> confirmSemanticConsent();

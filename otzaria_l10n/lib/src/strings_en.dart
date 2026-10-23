@@ -944,6 +944,9 @@ class _Guide extends GuidanceStrings {
   String get noSyncSelectionNote =>
       'Nothing is selected for download in the settings.';
   @override
+  String get downloadBusySnack =>
+      'Another task is running. You can download once it finishes.';
+  @override
   String get changeInSettingsLink => 'Change';
   @override
   String get chooseInSettingsLink => 'Choose in settings';
@@ -1499,7 +1502,7 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get personalModeDialogContent =>
       'The download will bring only the update files from the version you '
-      'already have onwards — tens of MB instead of several gigabytes.\n\n'
+      'already have onwards — tens of megabytes instead of several gigabytes.\n\n'
       'This program never reads your database version on its own: on the '
       'library screen, press "Detect my database version" — on the computer '
       'where your Otzaria is installed. The result is stored on the drive and '

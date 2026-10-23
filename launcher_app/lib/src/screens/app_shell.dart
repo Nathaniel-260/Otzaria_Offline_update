@@ -265,6 +265,12 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   }
 
   @override
+  void notifyNoSyncSelection() {
+    UiSnack.show(AppL10n.strings.guide.noSyncSelectionNote);
+    unawaited(_goTo(ShellSection.settings));
+  }
+
+  @override
   Future<bool> confirmCancelDownload() {
     final t = context.strings.home;
     return showWarningDialog(

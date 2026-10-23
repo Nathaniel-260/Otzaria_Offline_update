@@ -89,6 +89,7 @@ class HomePage extends StatelessWidget {
             key: ShellKeys.welcome,
             offline: model.readOnly || model.online == false,
             narrow: narrow,
+            busy: model.isCheckingOnline,
             notices: [..._driveNotices(context), ..._notices(context)],
             links: _welcomeLinks(context),
             onDownload: actions.onDownload,

@@ -331,8 +331,8 @@ void main() {
       expect(s.otzaria.status, isNot(OtzariaModuleStatus.checking));
     });
 
-    // "נסה שוב" בלי מה להוריד: המסך שהסתיים לא נשאר תלוי בלי תגובה.
-    test('"נסה שוב" שהזרימה לא התחילה — המסך שהסתיים נסגר', () async {
+    test('"הורדה" בלי בחירה בהגדרות — הודעה ומעבר להגדרות, בלי "מתכונן"',
+        () async {
       final s = session();
       await settings.update(settings.settings.copyWith(
         syncApp: false,
@@ -340,32 +340,46 @@ void main() {
         syncLibrary: false,
         personalUpdateMode: false,
       ));
+      expect(s.settings.settings.hasSyncSelection, isFalse);
+      await s.downloadAll();
+      expect(prompts.calls, ['noSyncSelection']);
+      expect(s.tasks.hasTask, isFalse);
+
+      // גם מ"נסה שוב" במסך שהסתיים: המסך נשאר, וההודעה מסבירה למה.
+      prompts.calls.clear();
       s.tasks
         ..prepareDownload()
         ..downloadFailed(const DownloadFailure(DownloadFailureKind.other));
-      expect(s.settings.settings.hasSyncSelection, isFalse);
       await s.downloadAll();
+      expect(prompts.calls, ['noSyncSelection']);
+      expect(
+          (s.tasks.current! as DownloadTask).phase, DownloadTaskPhase.failed);
+    });
+
+    test('"הורדה" בזמן שמשימה אחרת רצה — לא נפתח "מתכונן" שנסגר בשקט', () {
+      final s = session();
+      s.otzaria.status = OtzariaModuleStatus.installing;
+      unawaited(s.downloadAll());
       expect(s.tasks.hasTask, isFalse);
     });
 
-    test('"ביטול" ואז "הורדה" — הבקשה שבוטלה לא סוגרת את המסך החדש', () async {
+    test(
+        '"ביטול", "הורדה" ו"ביטול" שוב — הבקשה שבוטלה לא סוגרת את המסך '
+        'החדש, והביטול השני נשמר', () async {
       final s = session();
-      // בלי בחירה הזרימות חוזרות מיד, בלי רשת ובלי הורדה.
-      await settings.update(settings.settings.copyWith(
-        syncApp: false,
-        syncPlugins: false,
-        syncLibrary: false,
-        personalUpdateMode: false,
-      ));
       final abandoned = s.downloadAll();
       s.abandonPreparingDownload();
       expect(s.tasks.hasTask, isFalse);
 
       final again = s.downloadAll();
       expect(s.tasks.hasTask, isTrue);
+      s.abandonPreparingDownload();
+      expect(s.tasks.hasTask, isFalse);
+
       await abandoned;
-      expect(s.tasks.hasTask, isTrue);
       await again;
+      expect(s.tasks.hasTask, isFalse);
+      expect(s.longTaskRunning, isFalse);
     });
 
     test('שומר הסגירה שואל רק בזמן משימה, ומכבד את התשובה', () async {
@@ -553,6 +567,9 @@ class _FakePrompts implements SessionPrompts {
 
   @override
   Future<bool> confirmCancelDownload() async => false;
+
+  @override
+  void notifyNoSyncSelection() => calls.add('noSyncSelection');
 
   @override
   Future<bool> confirmSemanticConsent() async => false;

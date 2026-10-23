@@ -204,8 +204,12 @@ class _FakeDownloadHost implements MirrorDownloadHost {
   Object? crashed;
 
   @override
-  void downloadCrashed(Object error, StackTrace stackTrace) {
-    log.add('crashed');
+  void downloadCrashed(
+    Object error,
+    StackTrace stackTrace, {
+    bool abandoned = false,
+  }) {
+    log.add(abandoned ? 'crashed abandoned' : 'crashed');
     crashed = error;
   }
 
@@ -740,6 +744,45 @@ void main() {
       await abandoned;
       await again;
       expect(log.where((e) => e == 'refresh'), hasLength(2));
+      expect(componentsRun(), hasLength(4));
+    });
+
+    test('"ביטול", "הורדה" ו"ביטול" שוב לפני שהראשונה חזרה — נשאר מבוטל',
+        () async {
+      final refreshGate = Completer<void>();
+      host.onRefresh = (_) => refreshGate.future;
+      final abandoned = flow.downloadAll();
+      flow.abandonPreparing();
+      final again = flow.downloadAll();
+      flow.abandonPreparing();
+
+      host.onRefresh = null;
+      refreshGate.complete();
+      await abandoned;
+      await again;
+      expect(log, ['refresh']);
+      expect(flow.isPreparing, isFalse);
+
+      // הביטול אינו נשאר תלוי: ההורדה הבאה רצה.
+      await flow.downloadAll();
+      expect(componentsRun(), hasLength(4));
+    });
+
+    test('חריג בזרימה שבוטלה — מדווח כמבוטל, לא ככשל של הבקשה החדשה', () async {
+      final refreshGate = Completer<void>();
+      host.onRefresh = (_) async {
+        await refreshGate.future;
+        throw StateError('boom');
+      };
+      final abandoned = flow.downloadAll();
+      flow.abandonPreparing();
+      final again = flow.downloadAll();
+
+      refreshGate.complete();
+      await abandoned;
+      expect(log, ['refresh', 'crashed abandoned']);
+      host.onRefresh = null;
+      await again;
       expect(componentsRun(), hasLength(4));
     });
   });

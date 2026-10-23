@@ -496,6 +496,12 @@ class _DownloadProgressState extends State<_DownloadProgress> {
   MirrorComponent? _measuring;
   double? _peak;
 
+  // [_smoothed]: החלק של הרכיב הנוכחי שכבר הוצג, ומאיפה נפרס ההמשך.
+  MirrorComponent? _smoothFor;
+  double _shownPart = 0;
+  double _base = 0;
+  double _from = 0;
+
   /// הגודל האחרון שנראה לכל רכיב — לשורה "הושלם · X" אחרי שעבר.
   final Map<MirrorComponent, int> _sizes = {};
 
@@ -535,6 +541,23 @@ class _DownloadProgressState extends State<_DownloadProgress> {
     );
   }
 
+  /// הספרייה עוברת מספירת קבצים לבייטים, והחלק שמדווח קופץ אחורה (0.9 →
+  /// 0.05). ההמשך נפרס על מה שנשאר מעל מה שכבר הוצג — בלי לעמוד ובלי לרדת.
+  double? _smoothed(MirrorComponent? current, double? fraction) {
+    if (current != _smoothFor) {
+      _smoothFor = current;
+      _shownPart = _base = _from = 0;
+    }
+    if (fraction == null) return null;
+    if (_from >= 1) return _shownPart;
+    var part = _base + (fraction - _from) / (1 - _from) * (1 - _base);
+    if (part < _shownPart) {
+      _base = part = _shownPart;
+      _from = fraction;
+    }
+    return _shownPart = part.clamp(0.0, 1.0);
+  }
+
   Widget _content(BuildContext context, DownloadSnapshot s) {
     final t = context.strings.task;
     final cs = Theme.of(context).colorScheme;
@@ -552,7 +575,7 @@ class _DownloadProgressState extends State<_DownloadProgress> {
       if (total != null && total > 0) _sizes[current] = total;
     }
     final index = current == null ? -1 : components.indexOf(current);
-    final fraction = s.fraction?.clamp(0.0, 1.0);
+    final fraction = _smoothed(current, s.fraction?.clamp(0.0, 1.0));
     // הפס הכללי מונוטוני: מה שהסתיים ועוד החלק של הנוכחי. רכיב שמפסיק לדווח
     // חלק (הספרייה בלי סכום ידוע) לא מוריד את מה שכבר הוצג.
     final computed = components.isEmpty || index < 0

@@ -46,8 +46,8 @@ class TaskHeading extends StatelessWidget {
 }
 
 /// דף תוצאה (`resPage`): תג, כותרת, גוף, תוספת, ועמודת פעולות ברוחב 352.
-/// בחלון צר או נמוך הפעולות קבועות בתחתית (`.win.narrow .res-actions`), כדי שהפעולה
-/// הראשית תיראה בלי גלילה.
+/// הפעולות קבועות בתחתית בכל גודל חלון, כדי שהפעולה הראשית תיראה בלי גלילה;
+/// בחלון רחב וגבוה התוכן ממורכז מעליהן.
 class TaskResult extends StatelessWidget {
   const TaskResult({
     super.key,
@@ -100,25 +100,27 @@ class TaskResult extends StatelessWidget {
         ],
       ],
     );
-    if (!narrow) {
-      return TaskFrame(
-        center: true,
-        wide: wide,
-        child: Column(
-          children: [content, const SizedBox(height: 24), buttons],
-        ),
-      );
-    }
+    final padding = TaskFrame.mainPadding(context);
     return Column(
       children: [
         Expanded(
-          child: SingleChildScrollView(
-            padding: TaskFrame.mainPadding(context),
-            child: Align(
-              alignment: Alignment.topCenter,
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: padding,
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: wide ? 560 : 460),
-                child: content,
+                constraints: BoxConstraints(
+                  minHeight: narrow
+                      ? 0
+                      : (constraints.maxHeight - padding.vertical)
+                          .clamp(0, double.infinity),
+                ),
+                child: Align(
+                  alignment: narrow ? Alignment.topCenter : Alignment.center,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: wide ? 560 : 460),
+                    child: content,
+                  ),
+                ),
               ),
             ),
           ),
@@ -150,6 +152,15 @@ class TechDetails extends StatefulWidget {
 
 class _TechDetailsState extends State<TechDetails> {
   bool _open = false;
+  TextSelection _selection = const TextSelection.collapsed(offset: -1);
+
+  /// סימון והעתקה ידניים (Ctrl+C או התפריט) — בלי תווי הבידוד של הגדלים.
+  void _copySelection() {
+    if (!_selection.isValid || _selection.isCollapsed) return;
+    Clipboard.setData(ClipboardData(
+      text: withoutBidiMarks(_selection.textInside(widget.text)),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -174,13 +185,45 @@ class _TechDetailsState extends State<TechDetails> {
                 color: AppSurfaces.card(context),
                 borderRadius: AppTokens.borderRadiusAll,
               ),
-              child: SelectableText(
-                widget.text,
-                textDirection: textDirectionOf(widget.text),
-                style: TextStyle(
-                  fontFamily: 'Consolas',
-                  fontSize: 12,
-                  color: cs.onSurfaceVariant,
+              child: Shortcuts(
+                shortcuts: const {
+                  SingleActivator(LogicalKeyboardKey.keyC, control: true):
+                      _CopyCleanIntent(),
+                  SingleActivator(LogicalKeyboardKey.keyC, meta: true):
+                      _CopyCleanIntent(),
+                  SingleActivator(LogicalKeyboardKey.insert, control: true):
+                      _CopyCleanIntent(),
+                },
+                child: Actions(
+                  actions: {
+                    _CopyCleanIntent: CallbackAction<_CopyCleanIntent>(
+                      onInvoke: (_) => _copySelection(),
+                    ),
+                  },
+                  child: SelectableText(
+                    widget.text,
+                    textDirection: textDirectionOf(widget.text),
+                    onSelectionChanged: (selection, _) =>
+                        _selection = selection,
+                    contextMenuBuilder: (context, editable) =>
+                        AdaptiveTextSelectionToolbar.buttonItems(
+                      anchors: editable.contextMenuAnchors,
+                      buttonItems: [
+                        for (final item in editable.contextMenuButtonItems)
+                          item.type == ContextMenuButtonType.copy
+                              ? item.copyWith(onPressed: () {
+                                  _copySelection();
+                                  editable.hideToolbar();
+                                })
+                              : item,
+                      ],
+                    ),
+                    style: TextStyle(
+                      fontFamily: 'Consolas',
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -202,6 +245,10 @@ class _TechDetailsState extends State<TechDetails> {
       ),
     );
   }
+}
+
+class _CopyCleanIntent extends Intent {
+  const _CopyCleanIntent();
 }
 
 final RegExp _rtlChar = RegExp('[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]');
