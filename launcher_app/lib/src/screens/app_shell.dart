@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import '../controllers/app_reports_controller.dart';
 import '../controllers/download_plan.dart';
 import '../controllers/launcher_update_flow.dart';
+import '../controllers/otzaria_module_controller.dart' show OtzariaModuleStatus;
 import '../controllers/plugins_module_controller.dart' show PluginsModuleStatus;
 import '../flows/library_flows.dart' show showLibraryChangesDialog;
 import '../services/app_paths.dart';
@@ -381,7 +382,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   Future<void> _openLauncherFolder() async {
     final dir = _session.launcherUpdate.mirrorDir;
     if (await FileReveal.revealDirectory(dir)) return;
-    UiSnack.show(dir);
+    UiSnack.show(AppL10n.strings.shell.folderPathFallback(dir));
   }
 
   VoidCallback? get _restartElevated =>
@@ -437,7 +438,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     final s = _session;
     return ListenableBuilder(
       // מוני הדיווחים והשליחה אינם מעירים את הסשן כולו.
-      listenable: Listenable.merge([s.errorReports, s.searchFeedback]),
+      listenable: Listenable.merge([
+        s.errorReports,
+        s.searchFeedback,
+        if (s.appReports != null) s.appReports!,
+      ]),
       builder: (context, _) {
         final model = homeViewModelOf(s);
         return HomePage(
@@ -466,7 +471,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       ShellSection.library => g.tileLibrary,
       ShellSection.plugins => g.tilePlugins,
       ShellSection.customApps => g.tileCustomApps,
-      ShellSection.reports => g.tileReports,
+      ShellSection.reports => context.strings.pages.repCrumb,
       ShellSection.settings => context.strings.settings.title,
       ShellSection.help => context.strings.shell.helpTooltip,
       ShellSection.launcher => context.strings.pages.selfCrumb,
@@ -561,6 +566,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onGrantSemanticConsent: s.grantSemanticConsent,
           busy: s.longTaskRunning,
           readOnly: widget.readOnly,
+          appInstalled: s.otzaria.currentVersion != null,
+          appInstallable:
+              s.otzaria.status == OtzariaModuleStatus.updateAvailable,
           onUpdateHere: () => _updateOnly(GuidanceItem.library),
           onInstallFull: () =>
               _updateOnly(GuidanceItem.library, fullLibrary: true),

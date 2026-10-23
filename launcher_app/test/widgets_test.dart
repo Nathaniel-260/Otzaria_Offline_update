@@ -390,7 +390,7 @@ void main() {
       await tester.pumpWidget(
         wrap(
           ActionButton.neutral(
-            text: he.common.recheck,
+            text: he.guide.recheckButton,
             icon: FluentIcons.arrow_sync_24_regular,
             spinning: true,
             onPressed: () {},
@@ -398,7 +398,7 @@ void main() {
         ),
       );
 
-      expect(find.text(he.common.recheck), findsOneWidget);
+      expect(find.text(he.guide.recheckButton), findsOneWidget);
       expect(
         find.ancestor(
           of: find.byType(RtlIcon),
@@ -434,7 +434,7 @@ void main() {
     /// האם הכפתור שבפנים מבקש סיבוב כרגע.
     bool spinningOf(WidgetTester tester) => tester
         .widget<ActionButton>(
-          find.widgetWithText(ActionButton, he.common.recheck),
+          find.widgetWithText(ActionButton, he.guide.recheckButton),
         )
         .spinning;
 
@@ -445,7 +445,7 @@ void main() {
       );
 
       expect(spinningOf(tester), isFalse);
-      await tester.tap(find.text(he.common.recheck));
+      await tester.tap(find.text(he.guide.recheckButton));
       await tester.pump();
 
       expect(checks, 1);
@@ -468,9 +468,9 @@ void main() {
         wrap(RecheckButton(onPressed: () async => checks++)),
       );
 
-      await tester.tap(find.text(he.common.recheck));
+      await tester.tap(find.text(he.guide.recheckButton));
       await tester.pump();
-      await tester.tap(find.text(he.common.recheck));
+      await tester.tap(find.text(he.guide.recheckButton));
       await tester.pump();
 
       expect(checks, 1);
@@ -483,7 +483,7 @@ void main() {
       expect(
         tester
             .widget<ActionButton>(
-              find.widgetWithText(ActionButton, he.common.recheck),
+              find.widgetWithText(ActionButton, he.guide.recheckButton),
             )
             .onPressed,
         isNull,
@@ -577,7 +577,7 @@ void main() {
               SettingsActionTile.path(
                 title: he.pages.libLocationTitle,
                 path: r'C:\אוצריא\seforim.db',
-                placeholder: he.libraryScreen.dbFileMissing,
+                placeholder: he.pages.libLocationNone,
               ),
             ],
           ),
@@ -604,7 +604,7 @@ void main() {
               SettingsActionTile.path(
                 title: he.pages.libLocationTitle,
                 path: null,
-                placeholder: he.libraryScreen.dbFileMissing,
+                placeholder: he.pages.libLocationNone,
               ),
             ],
           ),
@@ -612,7 +612,7 @@ void main() {
       );
 
       final subtitle = tester.widget<Text>(
-        find.text(he.libraryScreen.dbFileMissing),
+        find.text(he.pages.libLocationNone),
       );
       expect(subtitle.textDirection, isNull);
     });
@@ -1407,7 +1407,7 @@ void main() {
               icon: FluentIcons.folder_24_regular,
               title: he.pages.libLocationTitle,
               path: r'C:\Users\דוגמה\AppData\Roaming\otzaria\books\seforim.db',
-              placeholder: he.libraryScreen.dbFileMissing,
+              placeholder: he.pages.libLocationNone,
             ),
           ],
         ),

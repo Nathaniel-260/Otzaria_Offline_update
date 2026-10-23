@@ -66,25 +66,21 @@ class OtzariaScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = otzaria;
     final t = context.strings.pages;
-    final hasUpdate = c.status == OtzariaModuleStatus.updateAvailable;
     final drive = c.latestVersion;
     return ScreenBody(
       children: [
-        if (otzariaIsRunning && hasUpdate && _installed)
-          _runningNotice(context),
+        if (otzariaIsRunning && _installed) _runningNotice(context),
         _statusCard(context),
         if (drive != null &&
-            c.status != OtzariaModuleStatus.installedIsNewer) ...[
+            c.status != OtzariaModuleStatus.installedIsNewer &&
+            ReleaseNotesCard.hasNotes(c.latestReleaseNotes)) ...[
           SectionLabel(t.appWhatsNew(displayVersion(drive))),
-          ReleaseNotesCard(
-            markdown: c.latestReleaseNotes,
-            emptyText: context.strings.appScreen.whatsNewEmpty,
-          ),
+          ReleaseNotesCard(markdown: c.latestReleaseNotes),
         ],
         AdvancedSection(
           key: ShellKeys.pageAdvanced,
           title: t.advancedTitle,
-          summary: t.appAdvancedSummary,
+          summary: t.appAdvancedSummary(channel: c.hasChannelChoice),
           child: _advanced(context),
         ),
       ],
@@ -107,10 +103,11 @@ class OtzariaScreen extends StatelessWidget {
     final t = context.strings.pages;
     final g = context.strings.guide;
     final (kind, label) = switch (c.status) {
-      OtzariaModuleStatus.idle || OtzariaModuleStatus.checking => (
-          StatusKind.working,
-          g.chipChecking
+      OtzariaModuleStatus.idle => (
+          StatusKind.unknown,
+          context.strings.common.notCheckedYet,
         ),
+      OtzariaModuleStatus.checking => (StatusKind.working, g.chipChecking),
       OtzariaModuleStatus.installing => (
           StatusKind.working,
           c.installStage ?? g.chipInstalling,
@@ -194,8 +191,25 @@ class OtzariaScreen extends StatelessWidget {
       ],
       extra: [
         if (_installing) _installingProgress(context),
-        if (c.errorMessage case final error?)
-          InfoErrorRow(message: error, onRetry: c.checkForUpdate),
+        // "בדוק שוב" שבכרטיס הוא הניסיון החוזר — בלי כפתור שני לאותה פעולה.
+        if (c.errorMessage case final error?) InfoErrorRow(message: error),
+        if (c.status == OtzariaModuleStatus.installedIsNewer &&
+            c.awaitsNewerInSelectedChannel)
+          Text(
+            key: ShellKeys.appAwaitsNewer,
+            t.appAwaitsNewer(stable: !c.preferPrerelease),
+            style: AppTextStyles.rowSub.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        if (busy && !_installing)
+          Text(
+            key: ShellKeys.pageBusyNote,
+            t.pageBusyNote,
+            style: AppTextStyles.rowSub.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         if (!_installed && drive == null && !_installing)
           Text(
             t.appNeedsDownloadNote,
@@ -301,7 +315,7 @@ class OtzariaScreen extends StatelessWidget {
           subtitle: downloadedAt == null
               ? null
               : '${context.strings.common.lastDownloaded}: '
-                  '${formatTimestamp(downloadedAt)}',
+                  '${formatDate(downloadedAt)}',
           below: PathText(c.mirrorDir),
           trailing: CopyPathButton(path: c.mirrorDir),
         ),

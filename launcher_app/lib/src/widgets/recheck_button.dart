@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_strings_scope.dart';
 import 'action_buttons.dart';
 
-/// כפתור "בדיקה מחדש" משותף למסכים. הבדיקה מקומית ונגמרת לרוב בתוך פריים,
+/// כפתור "בדוק שוב" משותף למסכים — אותה מילה כמו בבית. הבדיקה מקומית ונגמרת לרוב בתוך פריים,
 /// ולכן הסמל מסתובב לפחות [_minSpin] — בלי זה הלחיצה נראית כאילו לא קרה כלום.
 class RecheckButton extends StatefulWidget {
   const RecheckButton({super.key, required this.onPressed});
@@ -38,7 +38,7 @@ class _RecheckButtonState extends State<RecheckButton> {
 
   @override
   Widget build(BuildContext context) => ActionButton.ghost(
-        text: context.strings.common.recheck,
+        text: context.strings.guide.recheckButton,
         icon: FluentIcons.arrow_sync_24_regular,
         spinning: _spinning,
         onPressed: widget.onPressed == null ? null : _run,

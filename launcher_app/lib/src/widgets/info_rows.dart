@@ -104,8 +104,8 @@ class InfoProgressRow extends StatelessWidget {
   /// שניהם על אותה שורה גרמו לכיתוב לקפוץ ביניהם.
   final String? secondaryStage;
 
-  /// אזהרה שנשארת על המסך לאורך הפעולה, בצבע error — לפעולה שקטיעה שלה
-  /// מזיקה. null כשאין.
+  /// הנחיה שנשארת על המסך לאורך הפעולה — לפעולה שקטיעה שלה מזיקה. מצב
+  /// תקין, ולכן לא בצבע שגיאה. null כשאין.
   final String? warning;
 
   const InfoProgressRow({
@@ -172,10 +172,8 @@ class InfoProgressRow extends StatelessWidget {
             const SizedBox(height: AppTokens.spaceXS),
             Text(
               warning!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-                fontWeight: FontWeight.bold,
-              ),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ],

@@ -56,6 +56,7 @@ class HomeViewModel {
     this.customAppsUnannounced = false,
     this.reportsToSend = 0,
     this.reportsToCollect = 0,
+    this.toolReportsPending = 0,
     this.reportsSending = false,
     this.reportsIntro = false,
     this.autoInstallSkipped = false,
@@ -113,6 +114,9 @@ class HomeViewModel {
   final bool customAppsUnannounced;
   final int reportsToSend;
   final int reportsToCollect;
+
+  /// דיווחים של הכלי עצמו שממתינים בתור — נשלחים מדף הדיווחים.
+  final int toolReportsPending;
   final bool reportsSending;
   final bool reportsIntro;
   final bool autoInstallSkipped;
@@ -143,7 +147,10 @@ class HomeViewModel {
 
   /// גם בכונן מוגן: הדיווחים שבו נאמרים, אף שאי אפשר לשלוח אותם מכאן.
   bool get showsReportsTile =>
-      reportsToSend > 0 || reportsToCollect > 0 || reportsSending;
+      reportsToSend > 0 ||
+      reportsToCollect > 0 ||
+      toolReportsPending > 0 ||
+      reportsSending;
 
   bool get showsNewPlugins =>
       newPlugins.isNotEmpty &&
@@ -204,6 +211,7 @@ HomeViewModel homeViewModelOf(AppSession s) {
     customAppsUnannounced: customApps.unannouncedApps.isNotEmpty,
     reportsToSend: s.errorReports.outboxCount + s.searchFeedback.outboxCount,
     reportsToCollect: s.reportsToCollect,
+    toolReportsPending: s.appReports?.pendingCount ?? 0,
     reportsSending: s.uploadingReports ||
         s.errorReports.isUploading ||
         s.searchFeedback.isUploading,

@@ -91,8 +91,6 @@ class _Common extends CommonStrings {
   @override
   String get launch => 'Open';
   @override
-  String get recheck => 'Check Again';
-  @override
   String get notCheckedYet => 'Not checked yet';
   @override
   String get checking => 'Checking…';
@@ -131,6 +129,9 @@ class _Shell extends ShellStrings {
   String get otzariaLogoLabel => 'Otzaria';
   @override
   String logPathFallback(String path) => 'Activity log: $path';
+  @override
+  String folderPathFallback(String path) =>
+      'Could not open the folder. It is here: $path';
   @override
   String get closeWhileBusyTitle => 'Close in the middle of this?';
   @override
@@ -177,7 +178,7 @@ class _Home extends HomeStrings {
 
   @override
   String get doNotRemoveDriveWarning =>
-      'Note! Do not remove the USB drive until the update is finished.';
+      'Do not disconnect the drive until the update finishes.';
 
   @override
   String get cancelDownloadButton => 'Cancel download';
@@ -614,8 +615,16 @@ class _Pages extends PageStrings {
   @override
   String appWhatsNew(String version) => "What's new in Otzaria $version";
   @override
-  String get appAdvancedSummary =>
-      'Beta version, reinstall, install location and the drive folder';
+  String appAwaitsNewer({required bool stable}) => stable
+      ? 'A beta version newer than the stable one on the drive is installed here. You will move to the stable version when a stable version newer than the installed one comes out.'
+      : 'A stable version newer than the beta on the drive is installed here. You will move to the beta version when a beta newer than the installed one comes out.';
+  @override
+  String get pageBusyNote =>
+      'Another task is running now, so the actions here wait for it to finish.';
+  @override
+  String appAdvancedSummary({required bool channel}) => channel
+      ? 'Beta version, reinstall, install location and the drive folder'
+      : 'Reinstall, install location and the drive folder';
   @override
   String get appChannelTitle => 'Which version to install';
   @override
@@ -636,8 +645,11 @@ class _Pages extends PageStrings {
   @override
   String get libSemanticSection => 'Smart search';
   @override
-  String get libAdvancedSummary =>
-      'Library location, rebuilding search, the full library and an update for a specific computer';
+  String libAdvancedSummary({required bool reindex}) => reindex
+      ? 'Library location, rebuilding search, the full library, an update for '
+          'a specific computer and the drive folder'
+      : 'Library location, the full library, an update for a specific '
+          'computer and the drive folder';
   @override
   String get libMissingFilesTitle =>
       'Some library files did not reach the drive';
@@ -653,6 +665,17 @@ class _Pages extends PageStrings {
   @override
   String get libInstallButton => 'Install the library';
   @override
+  String get libInstallWithAppButton => 'Install Otzaria and the Library';
+  @override
+  String get libInstallWithAppNote =>
+      'Otzaria is not installed on this computer yet. The program installs first, then the library.';
+  @override
+  String get libInstallNeedsApp =>
+      'Otzaria is not installed on this computer, and the program is not on the drive. To install the library, first download the program on a computer with internet.';
+  @override
+  String get libUpdateNeedsApp =>
+      'Otzaria is not installed on this computer. Install it first on the program page, and then the library can be installed here.';
+  @override
   String get libUpdateButton => 'Update the library';
   @override
   String get libNotFoundTitle =>
@@ -666,7 +689,10 @@ class _Pages extends PageStrings {
   String get libSemanticTitle => 'Search by meaning';
   @override
   String get libSemanticBody =>
-      'Smart search finds sources even when the words differ from what you searched for. Its files are already on the drive, but to install it you need to agree that Otzaria keeps what you searched for and what helped you, and sends it to Otzaria to improve search.';
+      'Smart search finds sources even when the words differ from what you '
+      'searched for. To turn it on, you need to agree that Otzaria keeps your '
+      'search words and which results helped you. This tool passes them to '
+      'the developers through the drive, together with the reports.';
   @override
   String get libSemanticGrant => 'I agree, turn it on';
   @override
@@ -680,10 +706,26 @@ class _Pages extends PageStrings {
   @override
   String get libLocationTitle => 'Library location on this computer';
   @override
+  String get libLocationNone => 'No location chosen yet';
+  @override
+  String get libLocationReadOnly =>
+      'The drive is write-protected, so the library location cannot be changed here.';
+  @override
   String get libFullTitle => 'The full library instead of an update';
   @override
   String libFullBody(String size) =>
       'The regular update failed. You can install the full library from the drive instead ($size). It takes longer, and needs no internet.';
+  @override
+  String get libFullBodyNoSize =>
+      'The regular update failed. You can install the full library from the drive instead. It takes longer, and needs no internet.';
+  @override
+  String libFullMeta({String? size, int? lowMinutes, int? highMinutes}) => [
+        size == null
+            ? 'The full library on the drive'
+            : 'The full library on the drive: $size',
+        if (lowMinutes != null && highMinutes != null)
+          'about $lowMinutes to $highMinutes minutes',
+      ].join(' · ');
   @override
   String get libFullUnavailable =>
       'Possible only after a regular update failed, when the drive has a full library.';
@@ -731,17 +773,26 @@ class _Pages extends PageStrings {
       ? '1 report is already saved on the drive.'
       : '$count are already saved on the drive.';
   @override
-  String repLockedShort({required bool driveFull}) => driveFull
-      ? 'Reports cannot be saved on a full drive'
-      : 'Reports cannot be saved on a write-protected drive';
-  @override
-  String get repNothingTitle => 'No reports waiting';
+  String get repNothingTitle => 'No reports from Otzaria waiting';
   @override
   String get repSendButton => 'Send now';
+  @override
+  String repSendStoredButton(int count) => plural(count,
+      one: 'Send the report on the drive',
+      many: 'Send the $count reports on the drive');
   @override
   String get repWhatIsSent => 'What is sent?';
   @override
   String repOwnPending(int count) => 'Reports from this tool waiting ($count)';
+  @override
+  String get repOwnTitle => 'Reports about this tool';
+  @override
+  String get repOwnEmpty => 'There are no reports about this tool yet.';
+  @override
+  String get repOwnReadOnly =>
+      'The drive is write-protected, so reports cannot be sent or deleted here, and no new report can be written.';
+  @override
+  String get repCrumb => 'Reports';
   @override
   String get repProblemSection => 'Something not working in this tool?';
   @override
@@ -776,6 +827,11 @@ class _Pages extends PageStrings {
   @override
   String get selfErrorTitle => 'Updating the tool did not succeed';
   @override
+  String get selfDownloadFailed =>
+      'Downloading the new version failed. The internet connection may have dropped.';
+  @override
+  String get selfInstallFailed => 'Installing the new version did not succeed.';
+  @override
   String get selfErrorKeepsWorking =>
       'The current version keeps working as usual.';
   @override
@@ -792,8 +848,6 @@ class _Pages extends PageStrings {
       'The drive is write-protected, so the new version cannot be downloaded to it.';
   @override
   String selfWhatsNew(String version) => "What's new in $version";
-  @override
-  String get selfWhatsNewEmpty => 'There is no description for this version.';
 }
 
 class _Guide extends GuidanceStrings {
@@ -1012,7 +1066,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get chipUpdating => 'Updating...';
   @override
-  String get chipAttention => 'Needs a look';
+  String get chipAttention => 'Something went wrong';
   @override
   String get chipLibraryUpToDate => 'Up to date';
   @override
@@ -1115,14 +1169,13 @@ class _Guide extends GuidanceStrings {
     required int reports,
     required int searchRecords,
   }) =>
-      'Waiting in Otzaria to be collected: ${[
+      'Otzaria has ${[
         if (reports > 0 || searchRecords <= 0)
-          reports == 1 ? '1 report' : '$reports reports',
+          plural(reports, one: '1 new report', many: '$reports new reports'),
         if (searchRecords > 0)
-          searchRecords == 1
-              ? '1 search record'
-              : '$searchRecords search records',
-      ].join(' · ')}';
+          plural(searchRecords,
+              one: '1 search record', many: '$searchRecords search records'),
+      ].join(' and ')} waiting';
   @override
   String get reportsCollectBody =>
       'Collecting copies them to the drive, so they can be sent from here or '
@@ -1132,8 +1185,8 @@ class _Guide extends GuidanceStrings {
       'Reports: what you wrote, your email address if you gave it, excerpts '
       'from the app log, technical details about the computer and Otzaria '
       '(such as versions and the operating system), screenshots and images '
-      'you attached, and for a crash report you approved — also the app '
-      'memory dump.';
+      'you attached, and for a crash report you approved — also a copy of '
+      'the app memory at the moment of the crash.';
   @override
   String get reportsDisclosureSearch =>
       'Smart search records, collected with your consent: search usage data, '
@@ -1149,15 +1202,14 @@ class _Guide extends GuidanceStrings {
   String get reportsCollectButton => 'Collect from Otzaria';
   @override
   String get reportsNothing =>
-      'No reports are waiting to be collected or sent.';
+      'When something does not work in Otzaria, the report will show up here.';
   @override
   String reportsLockedNote({required bool driveFull}) => driveFull
       ? 'The drive is full, so reports cannot be collected to it, and the ones '
-          'on it cannot be sent (sending deletes them from the drive). Free '
-          'up space and open the tool again.'
+          'on it cannot be sent. Free up space and open the tool again.'
       : 'The drive is write-protected, so reports cannot be collected to it, '
-          'and the ones on it cannot be sent (sending deletes them from the '
-          'drive). Move the lock switch and open the tool again.';
+          'and the ones on it cannot be sent. Move the lock switch and open '
+          'the tool again.';
 }
 
 class _AppScreen extends AppScreenStrings {
@@ -1200,18 +1252,11 @@ class _AppScreen extends AppScreenStrings {
 
   @override
   String get reinstallButton => 'Reinstall';
-
-  @override
-  String get whatsNewEmpty =>
-      'This version has no release notes, or no version has been downloaded '
-      'yet.';
 }
 
 class _LibraryScreen extends LibraryScreenStrings {
   const _LibraryScreen();
 
-  @override
-  String get dbFileMissing => 'Not found — please select a file';
   @override
   String get pickDbButton => 'Choose the library file';
   @override
@@ -1220,9 +1265,7 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get dbPathUpdatedSnack => 'The database location was updated';
 
   @override
-  String get installTargetTitle => 'The library will be installed to';
-  @override
-  String get pickInstallDirButton => 'Choose an install location';
+  String get pickInstallDirButton => 'Choose Folder';
   @override
   String get pickInstallDirDialogTitle =>
       'Choose the folder the library will be installed to';
@@ -1239,16 +1282,12 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get customLocationConfirm => 'Continue with this location';
 
   @override
-  String get otzariaRunningTitle => 'Otzaria is open';
-
-  @override
   String get updatingProgress => 'Updating the database…';
   @override
   String get changesTitle => "What's new in the library";
   @override
   String changesPendingSubtitle(String version) =>
-      'Books added and changed up to version $version, which this update '
-      'will install.';
+      'The update adds and fixes books up to version $version.';
   @override
   String changesAppliedSubtitle(String version) =>
       'Books added and changed up to version $version, which is now '
@@ -2471,9 +2510,8 @@ class _LauncherUpdate extends LauncherUpdateStrings {
       'waits for the download or install that is running right now.';
   @override
   String get installUnavailableNotice =>
-      'The version is ready, but the executable to replace was not found in '
-      'this run. The downloaded file sits in the mirror\\launcher folder '
-      'beside the program and can be swapped in by hand.';
+      'Close the tool, copy the new file from the folder below, and put it in '
+      "place of the tool's old file.";
 
   @override
   String get whatsNewHeading => "What's new:";
@@ -3198,18 +3236,19 @@ class _LibraryDomain extends LibraryDomainStrings {
       'library location screen.';
   @override
   String companionsMissingFromMirror(String names) =>
-      'Companion files listed in the mirror but missing from it: $names';
+      'Missing on the drive: $names. The download was probably interrupted. '
+      'To get it, download again on a computer with internet. The rest of '
+      'the update will install as usual.';
   @override
   String get companionsAbsentFromMirror =>
-      'The drive carries no companion files (Talmud Bavli, catalog, '
-      'dictionary), so they will not be installed. Check for updates and '
-      'download again on the online computer.';
+      'The drive does not have the Talmud Bavli, the catalog and the '
+      'dictionary, so they will not be installed. To get them, download '
+      'again on a computer with internet.';
 
   @override
   String applyDownloadingPatch(String step) => 'Downloading the update$step…';
   @override
-  String applyApplyingPatch(String step) =>
-      'Applying the update to the database$step…';
+  String applyApplyingPatch(String step) => 'Updating the library$step…';
   @override
   String applyPatchStage(String stage, String step) {
     switch (stage) {
@@ -4142,13 +4181,12 @@ class _ErrorReports extends ErrorReportsStrings {
       'Otzaria is open, so the reports were not collected. You will be asked '
       'again once Otzaria is closed';
   @override
-  String get legacyReportsDialogTitle => 'Old reports that were not migrated';
+  String get legacyReportsDialogTitle =>
+      'Old reports found that cannot be sent';
   @override
   String get legacyReportsDialogContent =>
-      'This computer still has reports saved by an old version of Otzaria, in '
-      'a format the current Otzaria no longer migrates. Otzaria Offline Update '
-      'therefore cannot collect them either.\n\n'
-      'All other reports are collected and sent as usual.';
+      'An old version of Otzaria saved them in a form that is no longer sent. '
+      'All other reports are sent as usual.';
 
   @override
   String get introDialogTitle => 'Reports to Otzaria and plugin developers';
@@ -4253,7 +4291,7 @@ class _AppReports extends AppReportsStrings {
   @override
   String get crashModeNever => 'Never';
   @override
-  String get manageTileTitle => 'Your reports';
+  String get manageTileTitle => 'Your reports, and reporting a problem';
   @override
   String manageTileSubtitle(int pending, int sent) => pending == 0
       ? 'No reports waiting · $sent sent'
@@ -4263,15 +4301,13 @@ class _AppReports extends AppReportsStrings {
 
   @override
   String get manageDialogIntro =>
-      'Reports about problems in this app. A report becomes a public issue on '
-      'GitHub; diagnostic files are visible to the developers only. A report '
-      'that could not be sent is kept and sent once there is a connection.';
+      'Reports about this tool itself. The description is published on the '
+      "developers' site where anyone can read it; diagnostic files are "
+      'visible to the developers only.';
   @override
-  String get pendingEmpty => 'No reports are waiting right now';
+  String get sendNowButton => 'Send';
   @override
-  String get sendNowButton => 'Send now';
-  @override
-  String get clearPendingButton => 'Clear reports';
+  String get clearPendingButton => 'Delete All';
   @override
   String get sendOneButton => 'Send';
   @override
@@ -4281,12 +4317,10 @@ class _AppReports extends AppReportsStrings {
   @override
   String get sentSectionTitle => 'Sent reports';
   @override
-  String get sentEmpty => 'No reports have been sent yet';
-  @override
   String sentSummary(int shown, int total) =>
       shown == total ? '$total sent' : '$total sent; showing the latest $shown';
   @override
-  String get clearSentButton => 'Clear all history';
+  String get clearSentButton => 'Clear History';
   @override
   String openIssueButton(int? number) =>
       number == null ? 'Open on GitHub' : 'Open issue #$number';

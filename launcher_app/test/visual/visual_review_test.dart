@@ -124,6 +124,8 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase3': _phase2aStates,
   // תיקוני 2b: מסכי המשימה שוב, והבית (היחידות הלטיניות).
   'phase2b2': const [],
+  // תיקוני 3: הדפים בלבד, כולל המצבים שחסרו.
+  'phase3b': const [],
 };
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
@@ -394,7 +396,8 @@ void main() {
       for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
         final file = '$name${advanced ? '_advanced' : ''}$suffix';
         testWidgets('$_phase/page_$file',
-            skip: !_enabled || !{'phase3', 'phase2b2'}.contains(_phase),
+            skip: !_enabled ||
+                !{'phase3', 'phase2b2', 'phase3b'}.contains(_phase),
             (tester) async {
           await tester.runAsync(loadVisualFonts);
           WidgetsApp.debugAllowBannerOverride = false;
@@ -405,7 +408,7 @@ void main() {
             final crumb = switch (name.split('_').first) {
               'otzaria' => stringsOf().guide.tileApp,
               'library' => stringsOf().guide.tileLibrary,
-              'reports' => stringsOf().guide.tileReports,
+              'reports' => stringsOf().pages.repCrumb,
               _ => stringsOf().pages.selfCrumb,
             };
             await tester.pumpWidget(

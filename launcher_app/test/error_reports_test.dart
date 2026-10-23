@@ -375,7 +375,7 @@ void main() {
 
   test('ניסוח יחיד בעברית: פועל וספירה', () {
     final pages = stringsOf().pages;
-    expect(pages.repWaitingTitle(1), contains('ממתין'));
+    expect(pages.repWaitingTitle(1), startsWith('1 דיווח ממתין'));
     expect(pages.repWaitingTitle(2), startsWith('2 דיווחים ממתינים'));
     final library = stringsOf().libraryDomain;
     expect(
@@ -785,7 +785,7 @@ void main() {
         expect(guide.reportsDisclosureReports,
             contains(he ? 'צילומי מסך' : 'screenshots'));
         expect(guide.reportsDisclosureReports,
-            contains(he ? 'תמונת הזיכרון' : 'memory dump'));
+            contains(he ? 'זיכרון התוכנה ברגע הקריסה' : 'app memory'));
         // רק תמונות אפשר לצרף, והפרטים הטכניים נוסעים עם הדיווח.
         expect(guide.reportsDisclosureReports,
             contains(he ? 'תמונות שצירפתם' : 'images you attached'));
@@ -836,6 +836,7 @@ void main() {
       ErrorReportsController reports, {
       bool readOnly = false,
       Future<void> Function()? onUpload,
+      int toCollect = 0,
     }) =>
         ReportsPage(
           readOnly: readOnly,
@@ -849,10 +850,37 @@ void main() {
           ]),
           isUploadingAll: false,
           busy: false,
-          reportsToCollect: 0,
+          reportsToCollect: toCollect,
           onCollect: () {},
           onUpload: onUpload ?? () async {},
         );
+
+    // מחשב מקוון עם דיווחים בכונן ועוד באוצריא: שולחים בלי לאסוף קודם.
+    testWidgets('יש מה לאסוף וגם מה לשלוח — שני הכפתורים, השליחה רק כשמחובר',
+        (tester) async {
+      outbox
+        ..add('a')
+        ..add('b');
+      final c = controller();
+      await c.refreshOutbox();
+      var uploads = 0;
+      await pumpScreen(
+        tester,
+        home(c, toCollect: 3, onUpload: () async => uploads++),
+      );
+      expect(find.byKey(ShellKeys.reportsCollect), findsOneWidget);
+      expect(
+        find.text(stringsOf().pages.repSendStoredButton(2)),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(ShellKeys.reportsSend));
+      expect(uploads, 1);
+
+      otzaria.onlineCheckError = 'no network';
+      await pumpScreen(tester, home(c, toCollect: 3));
+      expect(find.byKey(ShellKeys.reportsCollect), findsOneWidget);
+      expect(find.byKey(ShellKeys.reportsSend), findsNothing);
+    });
 
     testWidgets('הכפתור מעלה את הדיווחים בלבד, והסיכום הוא שלהם בלבד',
         (tester) async {

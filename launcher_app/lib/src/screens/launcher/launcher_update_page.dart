@@ -47,17 +47,15 @@ class LauncherUpdatePage extends StatelessWidget {
         final c = controller;
         final ready = c.hasUpdateReady;
         final version = ready ? c.downloadedVersion : c.onlineUpdateVersion;
+        final notes = ready ? c.downloadedWhatsNew : c.onlineWhatsNew;
         return ScreenBody(
           title: t.selfTitle,
           description: t.selfDescription,
           children: [
             _statusCard(context),
-            if (version != null) ...[
+            if (version != null && ReleaseNotesCard.hasNotes(notes)) ...[
               SectionLabel(t.selfWhatsNew(version)),
-              ReleaseNotesCard(
-                markdown: ready ? c.downloadedWhatsNew : c.onlineWhatsNew,
-                emptyText: t.selfWhatsNewEmpty,
-              ),
+              ReleaseNotesCard(markdown: notes),
             ],
           ],
         );
@@ -80,6 +78,11 @@ class LauncherUpdatePage extends StatelessWidget {
     final size = online ? c.onlineRelease?.sizeBytes : null;
 
     final (kind, label) = switch (c.status) {
+      // מה שקורה נאמר בשורת ההתקדמות; השבב אומר מה יש.
+      LauncherUpdateStatus.downloading when version != null => (
+          StatusKind.updateAvailable,
+          t.selfChipOnline(version),
+        ),
       LauncherUpdateStatus.downloading => (
           StatusKind.working,
           g.launcherDownloading,
@@ -94,6 +97,10 @@ class LauncherUpdatePage extends StatelessWidget {
           t.selfChipOnline(version),
         ),
       LauncherUpdateStatus.error => (StatusKind.error, g.chipAttention),
+      LauncherUpdateStatus.idle => (
+          StatusKind.unknown,
+          context.strings.common.notCheckedYet,
+        ),
       _ => (StatusKind.ok, t.selfChipUpToDate),
     };
 
@@ -210,16 +217,32 @@ class LauncherUpdatePage extends StatelessWidget {
               tone: IconTileTone.error,
             ),
             title: t.selfErrorTitle,
-            body: '$error\n${t.selfErrorKeepsWorking}',
+            // הסיבה הטכנית (סטטוס, חריג) נשארת בפרטים וביומן.
+            body: '${ready ? t.selfInstallFailed : t.selfDownloadFailed}\n'
+                '${t.selfErrorKeepsWorking}',
+            actions: [
+              ActionButton.ghost(
+                text: context.strings.common.errorDetailsButton,
+                size: ActionButtonSize.sm,
+                onPressed: () => showSingleActionDialog(
+                  context: context,
+                  title: context.strings.common.errorDetailsTitle,
+                  content: error,
+                  confirmText: context.strings.common.close,
+                ),
+              ),
+            ],
           ),
         if (manual)
           NoticeBanner(
+            kind: NoticeKind.inCard,
             leading: const IconTile(
               icon: FluentIcons.info_24_regular,
               size: IconTileSize.sm,
             ),
             title: t.selfManualTitle,
             body: u.installUnavailableNotice,
+            below: PathText(c.mirrorDir),
           ),
         if (online && readOnly) Text(t.selfReadOnly, style: sub),
         if (busy && (ready || online)) Text(u.busyNotice, style: sub),

@@ -130,6 +130,10 @@ class OtzariaModuleController extends ChangeNotifier
   /// שתי הגרסאות יושבות בתיקייה — רק אז מוצגת למשתמש בחירת ערוץ.
   bool hasChannelChoice = false;
 
+  /// המותקנת היא הגרסה של הערוץ השני, חדשה מזו שנבחרה — ממתינים לגרסה
+  /// חדשה יותר בערוץ שנבחר, ולא מתקינים ישנה.
+  bool awaitsNewerInSelectedChannel = false;
+
   /// על הכונן יושבת חבילת FULL (~2GB) מגרסה ישנה של הלאנצ'ר. ההורדה הבאה
   /// מוחקת אותה, ולכן זה גם מה שמחייב את מודול התוכנה לרוץ אפילו כשאין
   /// גרסה חדשה — אחרת "אין מה להוריד" היה משאיר אותה שם לנצח.
@@ -427,6 +431,7 @@ class OtzariaModuleController extends ChangeNotifier
       stableVersion = check.stableRelease?.tagName;
       prereleaseVersion = check.prereleaseRelease?.tagName;
       hasChannelChoice = check.hasChannelChoice;
+      awaitsNewerInSelectedChannel = check.awaitsNewerInSelectedChannel;
       hasStaleFullPackage =
           check.hasStaleFullPackage || check.mirrorLacksArchitectures;
       isRunning = check.isOtzariaRunning;

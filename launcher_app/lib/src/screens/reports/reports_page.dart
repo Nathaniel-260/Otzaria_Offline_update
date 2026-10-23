@@ -79,7 +79,12 @@ class ReportsPage extends StatelessWidget {
           listenable: listenable,
           builder: (context, _) => _statusCard(context),
         ),
-        if (reports != null) AppReportsPanel(reports: reports),
+        if (reports != null)
+          AppReportsPanel(
+            reports: reports,
+            connection: connection,
+            readOnly: readOnly,
+          ),
         if (reports != null) ...[
           SectionLabel(t.repProblemSection),
           RowsCard(
@@ -90,8 +95,8 @@ class ReportsPage extends StatelessWidget {
                   icon: FluentIcons.person_feedback_24_regular,
                 ),
                 title: t.repProblemTitle,
-                subtitle: t.repProblemBody,
-                onTap: () => _openForm(context, reports),
+                subtitle: readOnly ? t.repOwnReadOnly : t.repProblemBody,
+                onTap: readOnly ? null : () => _openForm(context, reports),
               ),
             ],
           ),
@@ -201,15 +206,23 @@ class ReportsPage extends StatelessWidget {
                     searchRecords: searchRecordsToCollect,
                   )
                 : t.repNothingTitle,
-        subtitle: g.reportsLockedNote(driveFull: driveFull),
         // בלי גילוי אין כפתור איסוף — גם לא מושבת.
-        actions: [
-          Text(t.repLockedShort(driveFull: driveFull), style: sub),
-        ],
+        subtitle: g.reportsLockedNote(driveFull: driveFull),
       );
     }
 
+    final sendButton = ActionButton.recommended(
+      key: ShellKeys.reportsSend,
+      text: t.repSendButton,
+      icon: FluentIcons.send_24_regular,
+      onPressed: busy || onUpload == null ? null : () => onUpload!(),
+    );
+    final busyNote = busy
+        ? Text(key: ShellKeys.pageBusyNote, t.pageBusyNote, style: sub)
+        : null;
+
     if (collecting > 0) {
+      final canSend = waiting > 0 && connection == true;
       return StatusCard(
         icon: FluentIcons.arrow_upload_24_regular,
         title: g.reportsCollectTitle(
@@ -228,14 +241,15 @@ class ReportsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (reportsToCollect > 0)
-                  _bullet(g.reportsDisclosureReports, sub),
+                  NewsBullet(g.reportsDisclosureReports, style: sub),
                 if (searchRecordsToCollect > 0)
-                  _bullet(g.reportsDisclosureSearch, sub),
+                  NewsBullet(g.reportsDisclosureSearch, style: sub),
                 const SizedBox(height: 6),
                 Text(g.reportsDisclosureStorage, style: sub),
               ],
             ),
           ),
+          if (busyNote != null) busyNote,
         ],
         actions: [
           ActionButton.recommended(
@@ -244,6 +258,14 @@ class ReportsPage extends StatelessWidget {
             icon: FluentIcons.arrow_upload_24_regular,
             onPressed: busy ? null : onCollect,
           ),
+          // מה שכבר בכונן נשלח גם בלי לאסוף קודם.
+          if (canSend)
+            ActionButton.neutral(
+              key: ShellKeys.reportsSend,
+              text: t.repSendStoredButton(waiting),
+              icon: FluentIcons.send_24_regular,
+              onPressed: busy || onUpload == null ? null : () => onUpload!(),
+            ),
         ],
       );
     }
@@ -253,16 +275,12 @@ class ReportsPage extends StatelessWidget {
         icon: FluentIcons.send_24_regular,
         title: t.repWaitingTitle(waiting),
         subtitle: t.repWaitingBody(withSearch: waitingFeedback > 0),
+        extra: [if (busyNote != null) busyNote],
         actions: [
-          ActionButton.recommended(
-            key: ShellKeys.reportsSend,
-            text: t.repSendButton,
-            icon: FluentIcons.send_24_regular,
-            onPressed: busy || onUpload == null ? null : () => onUpload!(),
-          ),
+          sendButton,
           ActionButton.ghost(
             text: t.repWhatIsSent,
-            onPressed: () => _showDisclosure(
+            onPressed: () => showReportsDisclosure(
               context,
               reports: waitingReports > 0,
               search: waitingFeedback > 0,
@@ -298,33 +316,23 @@ class ReportsPage extends StatelessWidget {
       subtitle: g.reportsNothing,
     );
   }
+}
 
-  Future<void> _showDisclosure(
-    BuildContext context, {
-    required bool reports,
-    required bool search,
-  }) {
-    final g = context.strings.guide;
-    return showSingleActionDialog(
-      context: context,
-      title: context.strings.pages.repWhatIsSent,
-      content: [
-        if (reports) g.reportsDisclosureReports,
-        if (search) g.reportsDisclosureSearch,
-        g.reportsDisclosureStorage,
-      ].join('\n\n'),
-      confirmText: context.strings.common.close,
-    );
-  }
-
-  Widget _bullet(String text, TextStyle style) => Padding(
-        padding: const EdgeInsetsDirectional.only(top: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('•  ', style: style),
-            Expanded(child: Text(text, style: style)),
-          ],
-        ),
-      );
+/// "מה נשלח?" — הגילוי המלא, גם מדף הדיווחים וגם לפני ההסכמה לחיפוש החכם.
+Future<void> showReportsDisclosure(
+  BuildContext context, {
+  required bool reports,
+  required bool search,
+}) {
+  final g = context.strings.guide;
+  return showSingleActionDialog(
+    context: context,
+    title: context.strings.pages.repWhatIsSent,
+    content: [
+      if (reports) g.reportsDisclosureReports,
+      if (search) g.reportsDisclosureSearch,
+      g.reportsDisclosureStorage,
+    ].join('\n\n'),
+    confirmText: context.strings.common.close,
+  );
 }

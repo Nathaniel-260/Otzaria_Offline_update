@@ -19,7 +19,7 @@ class NewsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final item in items) _NewsItem(item),
+            for (final item in items) NewsBullet(item),
             if (footer != null) ...[const SizedBox(height: 8), footer!],
           ],
         ),
@@ -27,16 +27,13 @@ class NewsCard extends StatelessWidget {
 }
 
 /// הערות גרסה ב-Markdown: רשימת נקודות פשוטה מוצגת כ-[NewsCard], וכל
-/// מבנה אחר כ-Markdown מלא.
+/// מבנה אחר כ-Markdown מלא. בלי הערות לא מציגים כלום — גם לא את הכותרת.
 class ReleaseNotesCard extends StatelessWidget {
-  const ReleaseNotesCard({
-    super.key,
-    required this.markdown,
-    required this.emptyText,
-  });
+  const ReleaseNotesCard({super.key, required this.markdown});
 
   final String? markdown;
-  final String emptyText;
+
+  static bool hasNotes(String? markdown) => markdown?.trim().isNotEmpty == true;
 
   static final _bullet = RegExp(r'^[*\-+]\s+(.*)$');
 
@@ -56,7 +53,7 @@ class ReleaseNotesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = markdown?.trim() ?? '';
-    if (data.isEmpty) return NewsCard(items: [emptyText]);
+    if (data.isEmpty) return const SizedBox.shrink();
     final bullets = bulletsOf(data);
     if (bullets != null) return NewsCard(items: bullets);
     return _NewsFrame(
@@ -82,10 +79,14 @@ class _NewsFrame extends StatelessWidget {
       );
 }
 
-class _NewsItem extends StatelessWidget {
-  const _NewsItem(this.text);
+/// שורה ברשימה: נקודה בצבע הזוהר ואחריה הטקסט — אותה צורה בכל רשימה בכלי.
+class NewsBullet extends StatelessWidget {
+  const NewsBullet(this.text, {super.key, this.style});
 
   final String text;
+
+  /// ברירת המחדל — גוף הטקסט בצבע הראשי.
+  final TextStyle? style;
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +109,7 @@ class _NewsItem extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: AppTextStyles.body.copyWith(color: cs.onSurface),
+              style: style ?? AppTextStyles.body.copyWith(color: cs.onSurface),
             ),
           ),
         ],

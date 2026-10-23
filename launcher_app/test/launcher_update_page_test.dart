@@ -60,16 +60,44 @@ void main() {
   });
 
   testWidgets('גרסה באתר — מה חדש בדף, ו"הורדה והפעלה מחדש"', (tester) async {
-    c.onlineRelease = _release;
+    c.onlineRelease = const LauncherRelease(
+      tagName: 'v99.1.2',
+      name: 'v99.1.2',
+      assetName: 'OtzariaUpdates.exe',
+      downloadUrl: 'https://example.invalid/OtzariaUpdates.exe',
+      sizeBytes: 38 * 1024 * 1024,
+      changelog: '## 99.1.2\n- תיקון בהורדה',
+    );
     await pumpScreen(tester, page());
 
     expect(find.text(p.selfChipOnline('99.1.2')), findsOneWidget);
     expect(find.text(p.selfWhatsNew('99.1.2')), findsOneWidget);
-    expect(find.text(p.selfWhatsNewEmpty), findsOneWidget);
+    expect(
+      find.textContaining('תיקון בהורדה', findRichText: true),
+      findsOneWidget,
+    );
     expect(find.textContaining('38'), findsWidgets);
     expect(primary(tester).text, p.selfDownloadButton);
     await tester.tap(find.byKey(ShellKeys.statusPrimary));
     expect(calls, ['download']);
+  });
+
+  // כותרת "מה חדש" בלי תוכן מטעה — בלי הערות אין גם כותרת.
+  testWidgets('גרסה בלי תיאור — אין "מה חדש" בכלל', (tester) async {
+    c.onlineRelease = _release;
+    await pumpScreen(tester, page());
+
+    expect(find.text(p.selfChipOnline('99.1.2')), findsOneWidget);
+    expect(find.text(p.selfWhatsNew('99.1.2')), findsNothing);
+    expect(find.byType(ReleaseNotesCard), findsNothing);
+  });
+
+  testWidgets('טרם נבדק — לא "מעודכן"', (tester) async {
+    c.status = LauncherUpdateStatus.idle;
+    await pumpScreen(tester, page());
+
+    expect(find.text(stringsOf().common.notCheckedYet), findsOneWidget);
+    expect(find.text(p.selfChipUpToDate), findsNothing);
   });
 
   testWidgets('כונן מוגן — ההורדה מושבתת, עם הסבר', (tester) async {
@@ -117,21 +145,30 @@ void main() {
       find.text(stringsOf().launcherUpdate.installUnavailableNotice),
       findsOneWidget,
     );
+    // הנתיב מוצג בנפרד, לא בתוך המשפט.
+    expect(find.text(c.mirrorDir), findsOneWidget);
     expect(primary(tester).text, p.selfOpenFolder);
     await tester.tap(find.byKey(ShellKeys.statusPrimary));
     expect(calls, ['folder']);
   });
 
-  testWidgets('כשל — הסבר רגוע, הפרטים, ו"נסה שוב"', (tester) async {
+  testWidgets('כשל — הסבר רגוע, הסיבה הטכנית בפרטים, ו"נסה שוב"', (
+    tester,
+  ) async {
     c
       ..onlineRelease = _release
       ..status = LauncherUpdateStatus.error
-      ..errorMessage = 'Connection reset';
+      ..errorMessage = 'סטטוס 503';
     await pumpScreen(tester, page());
     expect(find.text(p.selfErrorTitle), findsOneWidget);
-    expect(find.textContaining('Connection reset'), findsOneWidget);
+    expect(find.textContaining(p.selfDownloadFailed), findsOneWidget);
     expect(find.textContaining(p.selfErrorKeepsWorking), findsOneWidget);
+    expect(find.textContaining('503'), findsNothing);
     expect(primary(tester).text, stringsOf().common.retry);
+
+    await tester.tap(find.text(stringsOf().common.errorDetailsButton));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('503'), findsOneWidget);
   });
 
   testWidgets('הרשאות מנהל — "הפעלה מחדש כמנהל" ראשי', (tester) async {
@@ -160,6 +197,8 @@ void main() {
       ..downloadTotal = 100;
     await pumpScreen(tester, page());
     expect(find.text(p.selfDownloading(38)), findsOneWidget);
+    // השבב אומר מה יש; ההורדה נאמרת רק בשורת ההתקדמות.
+    expect(find.text(p.selfChipOnline('99.1.2')), findsOneWidget);
     expect(find.byType(AppProgressBar), findsOneWidget);
     expect(find.byKey(ShellKeys.statusPrimary), findsNothing);
   });

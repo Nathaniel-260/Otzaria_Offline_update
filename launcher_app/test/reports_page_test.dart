@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
+import 'package:launcher_app/src/widgets/widgets_exports.dart';
 
 import 'test_harness.dart';
 
@@ -15,13 +16,14 @@ void main() {
     bool driveFull = false,
     bool legacy = false,
     VoidCallback? onDismissLegacy,
+    bool busy = false,
   }) =>
       ReportsPage(
         errorReports: null,
         searchFeedback: null,
         connection: null,
         isUploadingAll: false,
-        busy: false,
+        busy: busy,
         reportsToCollect: reports,
         onCollect: () {},
         onUpload: null,
@@ -42,17 +44,16 @@ void main() {
     expect(find.byKey(ShellKeys.reportsSend), findsNothing);
   });
 
-  testWidgets('כונן מוגן — אין איסוף, ונאמר למה', (tester) async {
+  testWidgets('כונן מוגן — אין איסוף, ונאמר למה פעם אחת', (tester) async {
     await pumpScreen(tester, page(reports: 3, readOnly: true));
     expect(find.byKey(ShellKeys.reportsCollect), findsNothing);
-    expect(find.text(p.repLockedShort(driveFull: false)), findsOneWidget);
     expect(find.text(g.reportsLockedNote(driveFull: false)), findsOneWidget);
 
     await pumpScreen(
       tester,
       page(reports: 3, readOnly: true, driveFull: true),
     );
-    expect(find.text(p.repLockedShort(driveFull: true)), findsOneWidget);
+    expect(find.text(g.reportsLockedNote(driveFull: true)), findsOneWidget);
   });
 
   testWidgets('דיווחים ישנים (Hive) — הודעה, ו"הבנתי" מסיר אותה', (
@@ -67,6 +68,17 @@ void main() {
     expect(find.text(t.legacyReportsDialogTitle), findsOneWidget);
     await tester.tap(find.text(t.introDialogConfirm));
     expect(dismissed, 1);
+  });
+
+  testWidgets('משימה רצה — האיסוף מושבת, ונאמר למה', (tester) async {
+    await pumpScreen(tester, page(reports: 2, busy: true));
+    expect(
+      tester
+          .widget<ActionButton>(find.byKey(ShellKeys.reportsCollect))
+          .onPressed,
+      isNull,
+    );
+    expect(find.text(p.pageBusyNote), findsOneWidget);
   });
 
   testWidgets('בלי דיווחי הכלי (בדיקות) — אין שורת "דיווח על בעיה"', (

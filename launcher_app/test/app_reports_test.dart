@@ -516,6 +516,58 @@ void main() {
     });
   });
 
+  group('הפאנל בדף הדיווחים', () {
+    final pages = stringsOf().pages;
+    final t = stringsOf().appReports;
+
+    testWidgets('אין דיווחים כלל — שורה אחת, בלי שני כרטיסים ריקים', (
+      tester,
+    ) async {
+      final reports = _controller(_MemoryService());
+      await _open(tester, (_) => _PanelDialog(reports: reports));
+
+      expect(find.text(pages.repOwnTitle), findsOneWidget);
+      expect(find.text(pages.repOwnEmpty), findsOneWidget);
+      expect(find.text(t.sentSectionTitle), findsNothing);
+      expect(find.text(t.manageDialogIntro), findsNothing);
+    });
+
+    testWidgets('בלי חיבור — אין כפתורי שליחה, והמחיקה נשארת', (tester) async {
+      final service = _MemoryService()..pending.add(_report('p1'));
+      final reports = _controller(service);
+      await _open(
+        tester,
+        (_) => _PanelDialog(reports: reports, connection: false),
+      );
+
+      expect(find.text(t.manageDialogIntro), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-reports-flush')), findsNothing);
+      expect(find.byTooltip(t.sendOneButton), findsNothing);
+      expect(find.byTooltip(t.deleteButton), findsOneWidget);
+    });
+
+    testWidgets('כונן מוגן — אין שליחה ואין מחיקה, ונאמר למה', (tester) async {
+      final service = _MemoryService()
+        ..pending.add(_report('p1'))
+        ..history.add(_report('s1'));
+      final reports = _controller(service);
+      await _open(
+        tester,
+        (_) => _PanelDialog(reports: reports, readOnly: true),
+      );
+
+      expect(find.text(pages.repOwnReadOnly), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-reports-flush')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('app-reports-clear-pending')),
+        findsNothing,
+      );
+      expect(
+          find.byKey(const ValueKey('app-reports-clear-sent')), findsNothing);
+      expect(find.byTooltip(t.deleteButton), findsNothing);
+    });
+  });
+
   group('runCrashCheck', () {
     late Directory tmp;
     setUp(() => tmp = Directory.systemTemp.createTempSync('launcher_crash_'));
@@ -1210,10 +1262,14 @@ class _PanelDialog extends StatelessWidget {
   const _PanelDialog({
     required this.reports,
     this.openUrl = _neverOpens,
+    this.connection = true,
+    this.readOnly = false,
   });
 
   final AppReportsController reports;
   final Future<bool> Function(String url) openUrl;
+  final bool? connection;
+  final bool readOnly;
 
   static Future<bool> _neverOpens(String _) async => false;
 
@@ -1221,7 +1277,12 @@ class _PanelDialog extends StatelessWidget {
   Widget build(BuildContext context) => Dialog(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: AppReportsPanel(reports: reports, openUrl: openUrl),
+          child: AppReportsPanel(
+            reports: reports,
+            openUrl: openUrl,
+            connection: connection,
+            readOnly: readOnly,
+          ),
         ),
       );
 }

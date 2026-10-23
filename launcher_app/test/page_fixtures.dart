@@ -22,6 +22,11 @@ import 'package:library_manager/library_manager.dart';
 /// מצב בונה קונטרולרים אמיתיים ומציב בהם שדות, בלי דיסק ובלי רשת.
 typedef PageScenario = Widget Function(String dataDir, SettingsController s);
 
+/// נתיבים עקביים לכל המצבים — כמו במחשב אמיתי, ולא "לא זוהתה התקנה".
+const _launchPath =
+    r'C:\Users\David\AppData\Local\Programs\otzaria\otzaria.exe';
+const _dbPath = r'C:\Users\David\AppData\Roaming\otzaria\books\seforim.db';
+
 OtzariaScreen _otzaria(
   String dir,
   SettingsController s,
@@ -30,6 +35,7 @@ OtzariaScreen _otzaria(
 }) {
   final c = OtzariaModuleController(dataDir: dir);
   setup(c);
+  if (c.currentVersion != null) c.launchPath ??= _launchPath;
   return OtzariaScreen(
     otzaria: c,
     settings: s,
@@ -44,9 +50,12 @@ LibraryScreen _library(
   String dir,
   void Function(LibraryModuleController c) setup, {
   bool running = false,
+  bool appInstalled = true,
+  bool appInstallable = false,
 }) {
   final c = LibraryModuleController(dataDir: dir);
   setup(c);
+  if (c.localVersion != null) c.dbPath ??= _dbPath;
   return LibraryScreen(
     library: c,
     otzariaIsRunning: running,
@@ -58,6 +67,8 @@ LibraryScreen _library(
     onGrantSemanticConsent: () async {},
     onUpdateHere: () {},
     onInstallFull: () {},
+    appInstalled: appInstalled,
+    appInstallable: appInstallable,
   );
 }
 
@@ -81,6 +92,18 @@ final Map<String, PageScenario> pageScenarios = {
           ..status = OtzariaModuleStatus.installedIsNewer
           ..currentVersion = '0.10.5'
           ..latestVersion = '0.10.4';
+      }),
+  // מותקנת ניסיונית חדשה, והערוץ שנבחר יציב — ממתינים ליציבה חדשה.
+  'otzaria_awaits': (d, s) => _otzaria(d, s, (c) {
+        c
+          ..status = OtzariaModuleStatus.installedIsNewer
+          ..currentVersion = '0.10.5-beta'
+          ..latestVersion = '0.10.4'
+          ..stableVersion = '0.10.4'
+          ..prereleaseVersion = '0.10.5-beta'
+          ..hasChannelChoice = true
+          ..awaitsNewerInSelectedChannel = true
+          ..lastDownloadedAt = DateTime(2026, 10, 18);
       }),
   'otzaria_notinstalled': (d, s) => _otzaria(d, s, (c) {
         c
@@ -151,33 +174,79 @@ final Map<String, PageScenario> pageScenarios = {
           ..localVersion = 27
           ..targetVersion = 31
           ..canRetryWithFullDownload = true
+          ..lastDownloadedAt = DateTime(2026, 10, 18)
           ..errorMessage = 'העדכון נכשל: קובץ העדכון אינו מתאים לספרייה';
       }),
+  // המצב האישי קודם למצב: ה-setter שלו מריץ בדיקה כשהמצב אינו idle.
   'library_elsewhere': (d, s) => _library(d, (c) {
         c
-          ..status = LibraryModuleStatus.personalTargetElsewhere
           ..personalUpdateMode = true
+          ..status = LibraryModuleStatus.personalTargetElsewhere
           ..personalFromVersion = 27
-          ..localVersion = 25;
+          ..localVersion = 25
+          ..targetVersion = 31
+          ..lastDownloadedAt = DateTime(2026, 10, 18);
       }),
+  // אוצריא לא מותקנת, והתוכנה בכונן — התקנה מלאה, והדף אומר זאת מראש.
+  'library_withapp': (d, s) => _library(
+        d,
+        (c) {
+          c
+            ..status = LibraryModuleStatus.updateAvailable
+            ..isFreshInstall = true
+            ..targetVersion = 31
+            ..installTargetPath = _dbPath
+            ..mirroredCompanions = {CompanionAsset.talmud}
+            ..lastDownloadedAt = DateTime(2026, 10, 18);
+        },
+        appInstalled: false,
+        appInstallable: true,
+      ),
+  'library_needsapp': (d, s) => _library(
+        d,
+        (c) {
+          c
+            ..status = LibraryModuleStatus.updateAvailable
+            ..isFreshInstall = true
+            ..targetVersion = 31
+            ..installTargetPath = _dbPath
+            ..mirroredCompanions = {CompanionAsset.talmud}
+            ..lastDownloadedAt = DateTime(2026, 10, 18);
+        },
+        appInstalled: false,
+      ),
   'library_updating': (d, s) => _library(d, (c) {
         c
           ..status = LibraryModuleStatus.updating
           ..localVersion = 27
           ..targetVersion = 31
-          ..stageText = 'מחיל עדכון 3 מתוך 7'
+          ..stageText = 'מעדכן את הספרייה (3/7)...'
           ..applyProgress = 0.42;
       }),
-  'reports_collect': (d, s) => _reports(d, toCollect: 3, waiting: 9),
+  'reports_collect': (d, s) =>
+      _reports(d, toCollect: 3, waiting: 9, connection: false, own: true),
+  // מקוון, ויש גם מה לאסוף — השליחה של מה שבכונן באותו כרטיס.
+  'reports_collect_online': (d, s) =>
+      _reports(d, toCollect: 3, waiting: 9, connection: true, own: true),
   'reports_online': (d, s) =>
       _reports(d, waiting: 12, connection: true, legacy: true, own: true),
-  'reports_offline': (d, s) => _reports(d, waiting: 9, connection: false),
+  'reports_offline': (d, s) =>
+      _reports(d, waiting: 9, connection: false, own: true),
   'reports_readonly': (d, s) =>
-      _reports(d, toCollect: 3, waiting: 9, readOnly: true),
+      _reports(d, toCollect: 3, waiting: 9, readOnly: true, own: true),
+  'reports_busy': (d, s) => _reports(
+        d,
+        toCollect: 3,
+        waiting: 9,
+        connection: true,
+        own: true,
+        busy: true,
+      ),
   'reports_sending': (d, s) => _reports(
         d,
         waiting: 12,
         connection: true,
+        own: true,
         progress: const ReportUploadProgress(
           total: 12,
           done: 7,
@@ -185,7 +254,9 @@ final Map<String, PageScenario> pageScenarios = {
         ),
       ),
   'reports_nothing': (d, s) => _reports(d, own: true),
-  'self_online': (d, s) => _self(d, (c) => c.onlineRelease = _release),
+  'reports_nothing_empty': (d, s) => _reports(d, own: true, ownEmpty: true),
+  'self_online': (d, s) => _self(d, (c) => c.onlineRelease = _releaseNotes),
+  'self_idle': (d, s) => _self(d, (c) => c.status = LauncherUpdateStatus.idle),
   'self_ready': (d, s) => _self(d, (c) {
         c
           ..status = LauncherUpdateStatus.readyToInstall
@@ -226,8 +297,10 @@ final Map<String, PageScenario> pageScenarios = {
 /// מצבים שמצולמים גם עם "מתקדם" פתוח.
 const advancedScenarios = {
   'otzaria_uptodate',
+  'otzaria_awaits',
   'library_update',
   'library_fullafterfail',
+  'library_withapp',
 };
 
 const _release = LauncherRelease(
@@ -237,6 +310,17 @@ const _release = LauncherRelease(
   downloadUrl: 'https://example.invalid/OtzariaUpdates.exe',
   sizeBytes: 38 * 1024 * 1024,
   changelog: null,
+);
+
+const _releaseNotes = LauncherRelease(
+  tagName: 'v99.1.2',
+  name: 'v99.1.2',
+  assetName: 'OtzariaUpdates.exe',
+  downloadUrl: 'https://example.invalid/OtzariaUpdates.exe',
+  sizeBytes: 38 * 1024 * 1024,
+  changelog: '## 99.1.2\n'
+      '- ההורדה ממשיכה מהמקום שבו נעצרה\n'
+      '- דף הדיווחים מראה גם את הדיווחים על הכלי',
 );
 
 LauncherUpdatePage _self(
@@ -263,6 +347,8 @@ ReportsPage _reports(
   bool readOnly = false,
   bool legacy = false,
   bool own = false,
+  bool ownEmpty = false,
+  bool busy = false,
   ReportUploadProgress? progress,
 }) {
   final errors = ErrorReportsController(
@@ -279,19 +365,34 @@ ReportsPage _reports(
     searchFeedback: null,
     connection: connection,
     isUploadingAll: progress != null,
-    busy: false,
+    busy: busy,
     reportsToCollect: toCollect,
     onCollect: () {},
     onUpload: () async {},
     readOnly: readOnly,
     legacyNotice: legacy,
     onDismissLegacy: () {},
-    appReports: own ? _appReports() : null,
+    appReports: own ? _appReports(empty: ownEmpty) : null,
   );
 }
 
-AppReportsController _appReports() {
-  final service = _ShotService()
+AppReportsController _appReports({bool empty = false}) {
+  final service = _ShotService();
+  if (!empty) _fillShotService(service);
+  return AppReportsController(
+    service: service,
+    collector: _NoCollector(),
+    settings: _ShotSettings(),
+    logsDirectory: '',
+    redactor: AppReportRedactor(environment: const {}),
+    appVersion: '3.2.0',
+    host: 'PC',
+    isProcessAlive: (_) => false,
+  );
+}
+
+void _fillShotService(_ShotService service) {
+  service
     ..pending.addAll([
       _report('p1', 'ההורדה נעצרת ב-40%', DateTime(2026, 10, 21)),
       _report('p2', 'הכלי נסגר בפתיחת דף התוספים', DateTime(2026, 10, 19)),
@@ -304,16 +405,6 @@ AppReportsController _appReports() {
             'issues/812',
       ),
     );
-  return AppReportsController(
-    service: service,
-    collector: _NoCollector(),
-    settings: _ShotSettings(),
-    logsDirectory: '',
-    redactor: AppReportRedactor(environment: const {}),
-    appVersion: '3.2.0',
-    host: 'PC',
-    isProcessAlive: (_) => false,
-  );
 }
 
 AppReport _report(String id, String title, DateTime at) => AppReport(

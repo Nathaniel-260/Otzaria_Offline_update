@@ -11,6 +11,7 @@ import '../shell/shell_keys.dart';
 import '../theme/theme_exports.dart';
 import '../widgets/screen_body.dart';
 import '../widgets/widgets_exports.dart';
+import 'reports/reports_page.dart' show showReportsDisclosure;
 
 /// דף "הספרייה": כרטיס מצב עם פעולה אחת, הסכמה לחיפוש החכם, מה חדש,
 /// ומתקדם — מיקום, בניית החיפוש מחדש, הספרייה המלאה, עדכון למחשב מסוים
@@ -30,6 +31,8 @@ class LibraryScreen extends StatelessWidget {
     this.onInstallFull,
     this.busy = false,
     this.readOnly = false,
+    this.appInstalled = true,
+    this.appInstallable = false,
   });
 
   final LibraryModuleController library;
@@ -59,8 +62,13 @@ class LibraryScreen extends StatelessWidget {
   /// משימה ארוכה רצה במקום אחר.
   final bool busy;
 
-  /// כונן מוגן: אי אפשר לרשום אליו את המחשב הזה.
+  /// כונן מוגן: אי אפשר לרשום אליו את המחשב הזה או לשנות את המיקום.
   final bool readOnly;
+
+  /// אוצריא מותקנת במחשב הזה. בלעדיה "עדכון כאן" מתקין קודם את התוכנה —
+  /// ורק כשהיא בכונן ([appInstallable]) והספרייה עוד לא מותקנת.
+  final bool appInstalled;
+  final bool appInstallable;
 
   bool get _isBusy =>
       library.isApplying ||
@@ -89,7 +97,7 @@ class LibraryScreen extends StatelessWidget {
         AdvancedSection(
           key: ShellKeys.pageAdvanced,
           title: t.advancedTitle,
-          summary: t.libAdvancedSummary,
+          summary: t.libAdvancedSummary(reindex: c.hasPendingReindex),
           child: _advanced(context),
         ),
       ],
@@ -153,7 +161,7 @@ class LibraryScreen extends StatelessWidget {
         NoticeBanner(
           kind: NoticeKind.banner,
           leading: const IconTile(icon: FluentIcons.warning_24_regular),
-          title: s.otzariaRunningTitle,
+          title: g.otzariaOpenTitle,
           body: g.otzariaOpenBody,
           actions: [CloseOtzariaButton(onClose: onCloseOtzaria)],
         ),
@@ -167,10 +175,11 @@ class LibraryScreen extends StatelessWidget {
     final t = context.strings.pages;
     final g = context.strings.guide;
     final (kind, label) = switch (c.status) {
-      LibraryModuleStatus.idle || LibraryModuleStatus.checking => (
-          StatusKind.working,
-          g.chipChecking
+      LibraryModuleStatus.idle => (
+          StatusKind.unknown,
+          context.strings.common.notCheckedYet,
         ),
+      LibraryModuleStatus.checking => (StatusKind.working, g.chipChecking),
       LibraryModuleStatus.updating => (StatusKind.working, g.chipUpdating),
       LibraryModuleStatus.error => (StatusKind.error, g.chipAttention),
       LibraryModuleStatus.updateAvailable when c.isFreshInstall => (
@@ -214,6 +223,16 @@ class LibraryScreen extends StatelessWidget {
     final sub = AppTextStyles.rowSub.copyWith(
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
+    final full = c.canRetryWithFullDownload;
+    final withApp = !appInstalled && appInstallable && c.isFreshInstall;
+    final blocked = _isBusy || busy;
+    final updateText = withApp
+        ? t.libInstallWithAppButton
+        : c.isFreshInstall
+            ? t.libInstallButton
+            : t.libUpdateButton;
+    final onUpdate =
+        blocked || (!appInstalled && !withApp) ? null : onUpdateHere;
 
     return StatusCard(
       icon: FluentIcons.library_24_regular,
@@ -242,27 +261,43 @@ class LibraryScreen extends StatelessWidget {
       ],
       extra: [
         if (updating) libraryApplyProgressRow(context, c),
-        if (c.errorMessage case final error?)
-          InfoErrorRow(
-            message: error,
-            onRetry: _isBusy ? null : c.checkForUpdate,
-          ),
+        // "בדוק שוב" שבכרטיס הוא הניסיון החוזר — בלי כפתור שני לאותה פעולה.
+        if (c.errorMessage case final error?) InfoErrorRow(message: error),
         // הורדה של מסד שלם במקום קובצי עדכון היא הפרש של שלוש סדרי גודל,
         // ולכן הסיבה נאמרת ולא נשארת בלוג בלבד.
         if (c.updateRouteNote case final note?) Text(note, style: sub),
+        if (canUpdate && withApp)
+          Text(
+            key: ShellKeys.libraryInstallNote,
+            t.libInstallWithAppNote,
+            style: sub,
+          )
+        else if ((canUpdate || full) && !appInstalled)
+          Text(
+            key: ShellKeys.libraryInstallNote,
+            appInstallable ? t.libUpdateNeedsApp : t.libInstallNeedsApp,
+            style: sub,
+          ),
+        if (full && appInstalled)
+          if (_fullMeta(context) case final meta?) Text(meta, style: sub),
+        if (busy && !updating)
+          Text(key: ShellKeys.pageBusyNote, t.pageBusyNote, style: sub),
       ],
       actions: [
         if (canUpdate)
+          full
+              ? ActionButton.neutral(text: updateText, onPressed: onUpdate)
+              : ActionButton.recommended(
+                  key: ShellKeys.statusPrimary,
+                  text: updateText,
+                  onPressed: onUpdate,
+                ),
+        // ההתאוששות אחרי כשל עדכון היא הפעולה הראשית של הדף.
+        if (full)
           ActionButton.recommended(
             key: ShellKeys.statusPrimary,
-            text: c.isFreshInstall ? t.libInstallButton : t.libUpdateButton,
-            onPressed: _isBusy || busy ? null : onUpdateHere,
-          ),
-        // ההתאוששות אחרי כשל עדכון — גם כאן, ולא רק במתקדם.
-        if (c.canRetryWithFullDownload)
-          ActionButton.neutral(
             text: s.fullDownloadInsteadButton,
-            onPressed: _isBusy || busy ? null : onInstallFull,
+            onPressed: blocked || !appInstalled ? null : onInstallFull,
           ),
       ],
       endActions: [RecheckButton(onPressed: _isBusy ? null : _recheck)],
@@ -276,19 +311,41 @@ class LibraryScreen extends StatelessWidget {
       quiet: true,
       title: t.libNotFoundTitle,
       subtitle: t.libNotFoundBody,
+      extra: [
+        if (readOnly)
+          Text(
+            t.libLocationReadOnly,
+            style: AppTextStyles.rowSub.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+      ],
       actions: [
         ActionButton.recommended(
           key: ShellKeys.statusPrimary,
           text: t.libPickFolderButton,
           icon: FluentIcons.folder_open_24_regular,
-          onPressed: _isBusy ? null : () => _pickInstallDir(context),
+          onPressed:
+              _isBusy || readOnly ? null : () => _pickInstallDir(context),
         ),
         ActionButton.ghost(
           text: context.strings.libraryScreen.pickDbButton,
-          onPressed: _isBusy ? null : () => _pickDbFile(context),
+          onPressed: _isBusy || readOnly ? null : () => _pickDbFile(context),
         ),
       ],
       endActions: [RecheckButton(onPressed: _isBusy ? null : _recheck)],
+    );
+  }
+
+  /// `null` כשלא ידועים לא הגודל ולא האומדן — אז האומדן נאמר רק בשלב.
+  String? _fullMeta(BuildContext context) {
+    final size = library.fullDownloadFallbackSize;
+    final minutes = library.applyEstimateFor(fullDownload: true);
+    if ((size == null || size <= 0) && minutes == null) return null;
+    return context.strings.pages.libFullMeta(
+      size: size != null && size > 0 ? formatBytes(size) : null,
+      lowMinutes: minutes?.low,
+      highMinutes: minutes?.high,
     );
   }
 
@@ -348,9 +405,24 @@ class LibraryScreen extends StatelessWidget {
                 ),
                 if (!granted) ...[
                   const SizedBox(height: 14),
-                  ActionButton.neutral(
-                    text: t.libSemanticGrant,
-                    onPressed: _isBusy ? null : onGrantSemanticConsent,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ActionButton.neutral(
+                        text: t.libSemanticGrant,
+                        onPressed: _isBusy ? null : onGrantSemanticConsent,
+                      ),
+                      ActionButton.ghost(
+                        key: ShellKeys.libraryConsentWhatIsSent,
+                        text: t.repWhatIsSent,
+                        onPressed: () => showReportsDisclosure(
+                          context,
+                          reports: false,
+                          search: true,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -407,8 +479,12 @@ class LibraryScreen extends StatelessWidget {
         // בלי מסד מוצג **יעד ההתקנה**: שם ינחתו הספרים, וזו ההזדמנות לשנות.
         AppRow(
           key: ShellKeys.libraryLocation,
-          title: c.dbPath == null ? s.installTargetTitle : t.libLocationTitle,
-          subtitle: location == null ? s.dbFileMissing : null,
+          title: t.libLocationTitle,
+          subtitle: readOnly
+              ? t.libLocationReadOnly
+              : location == null
+                  ? t.libLocationNone
+                  : null,
           below: location == null ? null : PathText(location),
           trailing: Wrap(
             spacing: 8,
@@ -418,12 +494,15 @@ class LibraryScreen extends StatelessWidget {
                 ActionButton.ghost(
                   text: s.pickInstallDirButton,
                   icon: FluentIcons.folder_open_24_regular,
-                  onPressed: _isBusy ? null : () => _pickInstallDir(context),
+                  onPressed: _isBusy || readOnly
+                      ? null
+                      : () => _pickInstallDir(context),
                 ),
               ActionButton.ghost(
                 text: s.pickDbButton,
                 icon: FluentIcons.document_24_regular,
-                onPressed: _isBusy ? null : () => _pickDbFile(context),
+                onPressed:
+                    _isBusy || readOnly ? null : () => _pickDbFile(context),
               ),
             ],
           ),
@@ -443,18 +522,17 @@ class LibraryScreen extends StatelessWidget {
         AppRow(
           key: ShellKeys.libraryFull,
           title: t.libFullTitle,
-          subtitle: c.canRetryWithFullDownload
-              ? t.libFullBody(
-                  fullSize != null && fullSize > 0
-                      ? formatBytes(fullSize)
-                      : common.unknownValue,
-                )
-              : t.libFullUnavailable,
+          subtitle: !c.canRetryWithFullDownload
+              ? t.libFullUnavailable
+              : fullSize != null && fullSize > 0
+                  ? t.libFullBody(formatBytes(fullSize))
+                  : t.libFullBodyNoSize,
           trailing: ActionButton.neutral(
             text: s.fullDownloadInsteadButton,
-            onPressed: c.canRetryWithFullDownload && !_isBusy && !busy
-                ? onInstallFull
-                : null,
+            onPressed:
+                c.canRetryWithFullDownload && !_isBusy && !busy && appInstalled
+                    ? onInstallFull
+                    : null,
           ),
         ),
         AppRow(
@@ -504,7 +582,7 @@ class LibraryScreen extends StatelessWidget {
           subtitle: [
             _mirrorContent(context),
             if (downloadedAt != null)
-              '${common.lastDownloaded}: ${formatTimestamp(downloadedAt)}',
+              '${common.lastDownloaded}: ${formatDate(downloadedAt)}',
           ].join('\n'),
           below: PathText(c.mirrorDir),
           trailing: CopyPathButton(path: c.mirrorDir),
@@ -519,7 +597,9 @@ class LibraryScreen extends StatelessWidget {
     return switch (c.status) {
       LibraryModuleStatus.needsDownload => s.mirrorEmpty,
       LibraryModuleStatus.error when c.localDbUnreadable => s.mirrorNotChecked,
-      LibraryModuleStatus.error => s.mirrorUnreadable,
+      // כשל בהחלה אינו כשל בקריאת הכונן — הגרסה שבו כבר ידועה.
+      LibraryModuleStatus.error when c.targetVersion == null =>
+        s.mirrorUnreadable,
       _ => c.targetVersion != null
           ? s.mirrorHasVersion('${c.targetVersion}')
           : s.mirrorPresent,

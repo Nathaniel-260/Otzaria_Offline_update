@@ -179,7 +179,8 @@ class LibraryModuleController extends ChangeNotifier
   /// זה להפעיל מחדש כמנהל, ולכן זה נדלק בכשל ונכבה בכל ניסיון חדש.
   bool needsElevation = false;
 
-  /// "צפוי כ-X עד Y דקות" לתוכנית שמאושרת עכשיו — בדיאלוג האישור בלבד.
+  /// "צפוי כ-X עד Y דקות" לתוכנית שתוחל — בשלב הספרייה של מסך המשימה,
+  /// וליד הכפתור של הספרייה המלאה.
   ({int low, int high})? applyEstimateFor({bool fullDownload = false}) =>
       libraryApplyMinutes(
         fullDownload

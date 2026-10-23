@@ -1791,7 +1791,12 @@ void main() {
       expect(listener, isNot(contains('notifyListeners')));
       expect(
         shellSource,
-        contains('Listenable.merge([s.errorReports, s.searchFeedback])'),
+        contains(
+          'Listenable.merge([\n'
+          '        s.errorReports,\n'
+          '        s.searchFeedback,\n'
+          '        if (s.appReports != null) s.appReports!,',
+        ),
       );
     });
   });

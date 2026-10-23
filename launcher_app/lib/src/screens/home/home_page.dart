@@ -1134,7 +1134,9 @@ class _Tiles extends StatelessWidget {
                         )
                       : (
                           StatusKind.updateAvailable,
-                          g.chipReportsToSend(m.reportsToSend),
+                          g.chipReportsToSend(
+                            m.reportsToSend + m.toolReportsPending,
+                          ),
                           FluentIcons.send_16_regular,
                         ),
         ),

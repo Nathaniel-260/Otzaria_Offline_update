@@ -279,6 +279,29 @@ void main() {
       expect(c.stableVersion, isNull);
       expect(c.status, OtzariaModuleStatus.updateAvailable);
     });
+
+    // החלטת המשתמש: מעבר ליציבה לא מתקין גרסה ישנה — מחכים ליציבה חדשה.
+    test('מותקנת ניסיונית חדשה ובוחרים יציבה — אין עדכון, ממתינים', () async {
+      writeAppMirror(stableTag: '1.0.0', prereleaseTag: '1.1.0-beta');
+      final install = Directory(p.join(tempDir.path, 'Otzaria'))
+        ..createSync(recursive: true);
+      final exe = File(p.join(install.path, 'otzaria.exe'))
+        ..writeAsStringSync('exe');
+      File(p.join(tempDir.path, 'otzaria_install_state.json'))
+          .writeAsStringSync(jsonEncode(OtzariaInstallState(
+        installedTagName: '1.1.0-beta',
+        installDir: install.path,
+        launchPath: exe.path,
+      ).toJson()));
+      final c = controllerFor();
+
+      await c.checkForUpdate();
+
+      expect(c.currentVersion, '1.1.0-beta');
+      expect(c.latestVersion, '1.0.0');
+      expect(c.status, OtzariaModuleStatus.installedIsNewer);
+      expect(c.awaitsNewerInSelectedChannel, isTrue);
+    });
   });
 
   group('התקנה ואימוץ', () {

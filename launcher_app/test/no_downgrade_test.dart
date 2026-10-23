@@ -1,10 +1,19 @@
 // החלטת המשתמש: אין "התקנת גרסה ישנה יותר" בשום מקום. כשהמחשב מעודכן יותר
-// מהכונן — מצב רגוע בלי פעולה (ראו screens_test). כאן: שום שריד בקוד ובמלל.
+// מהכונן — מצב רגוע בלי פעולה (ראו screens_test), וגם החלפת ערוץ אינה מורידה
+// גרסה (otzaria_controller_test). כאן: שום שריד בקוד ובמלל.
 
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+
+/// שמות קוד, ומחרוזת שמציעה להתקין גרסה ישנה — לא הערה שמזכירה זאת.
+final _forbidden = RegExp(
+  r'installOlder|_Install\.older'
+  r"|'[^'\n]*(?:להתקין גרסה ישנה|התקנת גרסה ישנה|לחזור לגרסה"
+  r"|install (?:an|the) older|Install the folder version)[^'\n]*'",
+  caseSensitive: false,
+);
 
 void main() {
   final appLib = Directory('lib');
@@ -18,13 +27,21 @@ void main() {
   test('אין מסלול התקנה של גרסה ישנה — לא בקוד ולא במחרוזות', () {
     final files = [...dartFiles(appLib), ...dartFiles(l10nLib)];
     expect(files, isNotEmpty);
-    final forbidden = RegExp(
-      r'installOlder|_Install\.older|נסיגת גרסה|Install the folder version',
-    );
     final offenders = [
       for (final file in files)
-        if (forbidden.hasMatch(file.readAsStringSync())) file.path,
+        if (_forbidden.hasMatch(file.readAsStringSync())) file.path,
     ];
     expect(offenders, isEmpty);
+  });
+
+  test('הבדיקה תופסת ניסוח חדש, ולא הערה תמימה', () {
+    expect(_forbidden.hasMatch("  String get x => 'התקנת גרסה ישנה יותר';"),
+        isTrue);
+    expect(
+      _forbidden.hasMatch("  String get x => 'Install an older version';"),
+      isTrue,
+    );
+    expect(_forbidden.hasMatch('  void installOlder() {}'), isTrue);
+    expect(_forbidden.hasMatch('// אין נסיגת גרסה, גם לא במעבר ערוץ'), isFalse);
   });
 }

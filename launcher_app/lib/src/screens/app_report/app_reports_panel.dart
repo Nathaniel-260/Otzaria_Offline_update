@@ -21,10 +21,18 @@ class AppReportsPanel extends StatefulWidget {
     super.key,
     required this.reports,
     this.openUrl = FileReveal.openGithubUrl,
+    this.connection,
+    this.readOnly = false,
   });
 
   final AppReportsController reports;
   final Future<bool> Function(String url) openUrl;
+
+  /// שליחה רק כשידוע שיש חיבור — כמו בכרטיס הראשי של הדף.
+  final bool? connection;
+
+  /// כונן מוגן: התור וההיסטוריה יושבים בו, ולכן אין שליחה ואין מחיקה.
+  final bool readOnly;
 
   @override
   State<AppReportsPanel> createState() => _AppReportsPanelState();
@@ -219,50 +227,68 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
   @override
   Widget build(BuildContext context) {
     final t = context.strings.appReports;
+    final pages = context.strings.pages;
     final cs = Theme.of(context).colorScheme;
     final pending = _pending;
     final meta = AppTextStyles.meta.copyWith(color: cs.onSurfaceVariant);
+    final canWrite = !widget.readOnly;
+    final canSend = canWrite && widget.connection == true;
+
+    if (pending == null) {
+      return const Padding(
+        padding: EdgeInsets.all(AppTokens.spaceMD),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    // שתי רשימות ריקות — שורה אחת, ולא שני כרטיסים ריקים.
+    if (pending.isEmpty && _sent.isEmpty && _sentTotal == 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SectionLabel(pages.repOwnTitle),
+          _emptyCard(context, pages.repOwnEmpty),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        SectionLabel(
-          context.strings.pages.repOwnPending(pending?.length ?? 0),
-          trailing: pending == null || pending.isEmpty
-              ? null
-              : Wrap(
-                  spacing: 4,
-                  children: [
-                    ActionButton.ghost(
-                      key: const ValueKey('app-reports-flush'),
-                      text: t.sendNowButton,
-                      icon: FluentIcons.send_24_regular,
-                      size: ActionButtonSize.sm,
-                      isLoading: _isFlushing,
-                      onPressed: _isFlushing ? null : _flush,
-                    ),
-                    ActionButton.warning(
-                      key: const ValueKey('app-reports-clear-pending'),
-                      text: t.clearPendingButton,
-                      size: ActionButtonSize.sm,
-                      onPressed: _isFlushing ? null : _clearPending,
-                    ),
-                  ],
-                ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Text(t.manageDialogIntro, style: meta),
-        ),
-        if (pending == null)
-          const Padding(
-            padding: EdgeInsets.all(AppTokens.spaceMD),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (pending.isEmpty)
-          _emptyCard(context, t.pendingEmpty)
-        else
+        if (pending.isNotEmpty) ...[
+          SectionLabel(
+            pages.repOwnPending(pending.length),
+            trailing: !canWrite
+                ? null
+                : Wrap(
+                    spacing: 4,
+                    children: [
+                      if (canSend)
+                        ActionButton.ghost(
+                          key: const ValueKey('app-reports-flush'),
+                          text: t.sendNowButton,
+                          icon: FluentIcons.send_24_regular,
+                          size: ActionButtonSize.sm,
+                          isLoading: _isFlushing,
+                          onPressed: _isFlushing ? null : _flush,
+                        ),
+                      ActionButton.warning(
+                        key: const ValueKey('app-reports-clear-pending'),
+                        text: t.clearPendingButton,
+                        size: ActionButtonSize.sm,
+                        onPressed: _isFlushing ? null : _clearPending,
+                      ),
+                    ],
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              canWrite ? t.manageDialogIntro : pages.repOwnReadOnly,
+              style: meta,
+            ),
+          ),
           RowsCard(
             children: [
               for (final report in pending)
@@ -284,87 +310,93 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
                         size: ActionButtonSize.sm,
                         onPressed: () => _showDetails(report, sent: false),
                       ),
-                      AppIconButton(
-                        icon: FluentIcons.send_24_regular,
-                        tooltip: t.sendOneButton,
-                        small: true,
-                        onPressed: _sendingReportId != null || _isFlushing
-                            ? null
-                            : () => _sendPending(report),
-                      ),
-                      AppIconButton(
-                        icon: FluentIcons.delete_24_regular,
-                        tooltip: t.deleteButton,
-                        small: true,
-                        danger: true,
-                        onPressed: _sendingReportId == report.reportId
-                            ? null
-                            : () => _deletePending(report),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        SectionLabel(
-          _sentTotal == 0
-              ? t.sentSectionTitle
-              : '${t.sentSectionTitle} · ${t.sentSummary(_sent.length, _sentTotal)}',
-          trailing: _sent.isEmpty && _sentTotal == 0
-              ? null
-              : ActionButton.ghost(
-                  key: const ValueKey('app-reports-clear-sent'),
-                  text: t.clearSentButton,
-                  size: ActionButtonSize.sm,
-                  onPressed: _clearSent,
-                ),
-        ),
-        if (_sent.isEmpty)
-          _emptyCard(context, t.sentEmpty)
-        else
-          RowsCard(
-            children: [
-              for (final report in _sent)
-                AppRow(
-                  key: ValueKey('app-report-sent-${report.reportId}'),
-                  leading: const IconTile(
-                    icon: FluentIcons.history_24_regular,
-                    size: IconTileSize.sm,
-                    tone: IconTileTone.quiet,
-                  ),
-                  title: report.title,
-                  subtitle: _summaryLine(t, report),
-                  trailing: Wrap(
-                    spacing: 2,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      ActionButton.ghost(
-                        text: t.detailsButton,
-                        size: ActionButtonSize.sm,
-                        onPressed: () => _showDetails(report, sent: true),
-                      ),
-                      if (report.issueUrl case final url? when url.isNotEmpty)
-                        ActionButton.ghost(
-                          key: ValueKey(
-                            'app-report-open-issue-${report.reportId}',
-                          ),
-                          text: t.openIssueButton(report.issueNumber),
-                          icon: FluentIcons.open_24_regular,
-                          size: ActionButtonSize.sm,
-                          onPressed: () => _openIssue(url),
+                      if (canSend)
+                        AppIconButton(
+                          icon: FluentIcons.send_24_regular,
+                          tooltip: t.sendOneButton,
+                          small: true,
+                          onPressed: _sendingReportId != null || _isFlushing
+                              ? null
+                              : () => _sendPending(report),
                         ),
-                      AppIconButton(
-                        icon: FluentIcons.delete_24_regular,
-                        tooltip: t.deleteButton,
-                        small: true,
-                        danger: true,
-                        onPressed: () => _deleteSent(report),
-                      ),
+                      if (canWrite)
+                        AppIconButton(
+                          icon: FluentIcons.delete_24_regular,
+                          tooltip: t.deleteButton,
+                          small: true,
+                          danger: true,
+                          onPressed: _sendingReportId == report.reportId
+                              ? null
+                              : () => _deletePending(report),
+                        ),
                     ],
                   ),
                 ),
             ],
           ),
+        ],
+        if (_sent.isNotEmpty || _sentTotal > 0) ...[
+          SectionLabel(
+            _sentTotal == 0
+                ? t.sentSectionTitle
+                : '${t.sentSectionTitle} · ${t.sentSummary(_sent.length, _sentTotal)}',
+            trailing: !canWrite
+                ? null
+                : ActionButton.ghost(
+                    key: const ValueKey('app-reports-clear-sent'),
+                    text: t.clearSentButton,
+                    size: ActionButtonSize.sm,
+                    onPressed: _clearSent,
+                  ),
+          ),
+          if (_sent.isEmpty)
+            _emptyCard(context, pages.repOwnEmpty)
+          else
+            RowsCard(
+              children: [
+                for (final report in _sent)
+                  AppRow(
+                    key: ValueKey('app-report-sent-${report.reportId}'),
+                    leading: const IconTile(
+                      icon: FluentIcons.history_24_regular,
+                      size: IconTileSize.sm,
+                      tone: IconTileTone.quiet,
+                    ),
+                    title: report.title,
+                    subtitle: _summaryLine(t, report),
+                    trailing: Wrap(
+                      spacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        ActionButton.ghost(
+                          text: t.detailsButton,
+                          size: ActionButtonSize.sm,
+                          onPressed: () => _showDetails(report, sent: true),
+                        ),
+                        if (report.issueUrl case final url? when url.isNotEmpty)
+                          ActionButton.ghost(
+                            key: ValueKey(
+                              'app-report-open-issue-${report.reportId}',
+                            ),
+                            text: t.openIssueButton(report.issueNumber),
+                            icon: FluentIcons.open_24_regular,
+                            size: ActionButtonSize.sm,
+                            onPressed: () => _openIssue(url),
+                          ),
+                        if (canWrite)
+                          AppIconButton(
+                            icon: FluentIcons.delete_24_regular,
+                            tooltip: t.deleteButton,
+                            small: true,
+                            danger: true,
+                            onPressed: () => _deleteSent(report),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+        ],
       ],
     );
   }

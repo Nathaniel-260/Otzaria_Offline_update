@@ -59,7 +59,6 @@ abstract class CommonStrings {
   String get install;
   String get update;
   String get launch;
-  String get recheck;
   String get notCheckedYet;
   String get checking;
   String get upToDate;
@@ -93,6 +92,7 @@ abstract class ShellStrings {
 
   /// נאמר כשלא ניתן לפתוח את תיקיית הלוגים בסייר הקבצים.
   String logPathFallback(String path);
+  String folderPathFallback(String path);
 
   String get closeWhileBusyTitle;
   String get closeWhileDownloadingPrompt;
@@ -346,7 +346,14 @@ abstract class PageStrings {
   String get appInstallButton;
   String get appNeedsDownloadNote;
   String appWhatsNew(String version);
-  String get appAdvancedSummary;
+
+  /// מותקנת הגרסה של הערוץ השני, חדשה מזו שנבחרה — לא מורידים גרסה.
+  String appAwaitsNewer({required bool stable});
+
+  /// כפתורים שמושבתים כי משימה ארוכה רצה במקום אחר.
+  String get pageBusyNote;
+
+  String appAdvancedSummary({required bool channel});
   String get appChannelTitle;
   String get appChannelBody;
   String get appReinstallTitle;
@@ -355,13 +362,17 @@ abstract class PageStrings {
   String get appLocationTitle;
   String get appSourceTitle;
   String get libSemanticSection;
-  String get libAdvancedSummary;
+  String libAdvancedSummary({required bool reindex});
   String get libMissingFilesTitle;
   String libChipCompanions(String names);
   String get libChipOtherMachine;
   String libVersion(int version);
   String get libNotInstalled;
   String get libInstallButton;
+  String get libInstallWithAppButton;
+  String get libInstallWithAppNote;
+  String get libInstallNeedsApp;
+  String get libUpdateNeedsApp;
   String get libUpdateButton;
   String get libNotFoundTitle;
   String get libNotFoundBody;
@@ -373,8 +384,14 @@ abstract class PageStrings {
   String get libSemanticActive;
   String get libSemanticActiveBody;
   String get libLocationTitle;
+  String get libLocationNone;
+  String get libLocationReadOnly;
   String get libFullTitle;
   String libFullBody(String size);
+  String get libFullBodyNoSize;
+
+  /// הגודל והאומדן של הספרייה המלאה, ליד הכפתור שמתקין אותה.
+  String libFullMeta({String? size, int? lowMinutes, int? highMinutes});
   String get libFullUnavailable;
   String get libPersonalTitle;
   String get libPersonalOn;
@@ -391,11 +408,19 @@ abstract class PageStrings {
   String get repUncheckedBody;
   String get repOnlyOnline;
   String repAlsoStored(int count);
-  String repLockedShort({required bool driveFull});
   String get repNothingTitle;
   String get repSendButton;
+
+  /// בכרטיס האיסוף — שליחת מה שכבר בכונן, בלי לאסוף קודם.
+  String repSendStoredButton(int count);
   String get repWhatIsSent;
   String repOwnPending(int count);
+  String get repOwnTitle;
+  String get repOwnEmpty;
+  String get repOwnReadOnly;
+
+  /// פירור הלחם של דף הדיווחים — קצר מהכותרת.
+  String get repCrumb;
   String get repProblemSection;
   String get repProblemTitle;
   String get repProblemBody;
@@ -411,6 +436,8 @@ abstract class PageStrings {
   String selfDownloading(int percent);
   String get selfInstalling;
   String get selfErrorTitle;
+  String get selfDownloadFailed;
+  String get selfInstallFailed;
   String get selfErrorKeepsWorking;
   String get selfManualTitle;
   String get selfOpenFolder;
@@ -418,7 +445,6 @@ abstract class PageStrings {
   String get selfAdminBody;
   String get selfReadOnly;
   String selfWhatsNew(String version);
-  String get selfWhatsNewEmpty;
 }
 
 // ── דף הבית: הכוונה לפי המצב ───────────────────────────────────────────────────
@@ -618,8 +644,6 @@ abstract class AppScreenStrings {
   /// התקנה חוזרת של אותה גרסה — מוצעת דווקא כשהכול מעודכן, כדי לתקן התקנה
   /// פגומה בלי להמתין לגרסה הבאה.
   String get reinstallButton;
-
-  String get whatsNewEmpty;
 }
 
 // ── מסך הספרייה ───────────────────────────────────────────────────────────────
@@ -627,22 +651,18 @@ abstract class AppScreenStrings {
 abstract class LibraryScreenStrings {
   const LibraryScreenStrings();
 
-  String get dbFileMissing;
   String get pickDbButton;
   String get pickDbDialogTitle;
   String get dbPathUpdatedSnack;
 
   /// בחירת המיקום שאליו תותקן ספרייה חדשה, וההסבר החובה כשהוא אינו מיקום
   /// שאוצריא מחפשת בו בעצמה.
-  String get installTargetTitle;
   String get pickInstallDirButton;
   String get pickInstallDirDialogTitle;
   String get installDirUpdatedSnack;
   String get customLocationDialogTitle;
   String customLocationPrompt(String dbPath);
   String get customLocationConfirm;
-
-  String get otzariaRunningTitle;
 
   String get updatingProgress;
 
@@ -2222,14 +2242,12 @@ abstract class AppReportsStrings {
 
   // ── חלון הניהול ──
   String get manageDialogIntro;
-  String get pendingEmpty;
   String get sendNowButton;
   String get clearPendingButton;
   String get sendOneButton;
   String get deleteButton;
   String get detailsButton;
   String get sentSectionTitle;
-  String get sentEmpty;
   String sentSummary(int shown, int total);
   String get clearSentButton;
 

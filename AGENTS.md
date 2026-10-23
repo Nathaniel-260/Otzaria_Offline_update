@@ -1128,10 +1128,11 @@ re-downloaded ~73MB.
 so a user who had installed 0.9.97+90970 himself while the mirror held 0.9.96+736 was
 offered a *downgrade*. `compareVersions` orders base components **numerically** (so
 `0.9.9 < 0.9.10`, which a string compare gets backwards) and ranks a pre-release
-suffix below the same bare base; `installedIsNewer` suppresses the offer. The one
-downgrade left is a deliberate channel switch — when the installed tag *is* the other
-mirrored channel's tag, the user asked for it (`OtzariaChannelPair` only ever holds a
-prerelease newer than the stable). Two different suffixes on one base are incomparable
+suffix below the same bare base; `installedIsNewer` suppresses the offer. **There is
+no downgrade at all, not even on a channel switch**: with a newer pre-release installed
+and the stable channel selected, nothing is offered and the page says calmly that the
+switch happens when a stable newer than the installed one arrives
+(`awaitsNewerInSelectedChannel`). Two different suffixes on one base are incomparable
 and compare as 0.
 
 **The FULL package is gone; a first install now runs the app wizard and then the

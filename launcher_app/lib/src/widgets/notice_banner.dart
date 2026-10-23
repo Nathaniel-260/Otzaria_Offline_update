@@ -4,7 +4,8 @@ import '../theme/theme_exports.dart';
 
 /// [notice] — כרטיס הודעה (`.notice`), [warning] — אותו על רקע אזהרה,
 /// [banner] — פס tonal בבית ובחנות (`.banner`).
-enum NoticeKind { notice, warning, banner }
+/// [inCard] — הודעה בתוך כרטיס: רקע של קטע-משנה, כדי שלא תיבלע בכרטיס.
+enum NoticeKind { notice, warning, banner, inCard }
 
 /// הודעה קבועה בדף: אריח (או לוגו), כותרת, פירוט ופעולות בקצה.
 class NoticeBanner extends StatelessWidget {
@@ -15,6 +16,7 @@ class NoticeBanner extends StatelessWidget {
     this.body,
     this.actions = const [],
     this.kind = NoticeKind.notice,
+    this.below,
   });
 
   final Widget leading;
@@ -22,6 +24,9 @@ class NoticeBanner extends StatelessWidget {
   final String? body;
   final List<Widget> actions;
   final NoticeKind kind;
+
+  /// מתחת לפירוט — למשל נתיב, שאינו חלק מהמשפט.
+  final Widget? below;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +36,7 @@ class NoticeBanner extends StatelessWidget {
       NoticeKind.notice => AppSurfaces.card(context),
       NoticeKind.warning => AppSurfaces.warningNotice(context),
       NoticeKind.banner => AppSurfaces.banner(context),
+      NoticeKind.inCard => AppSurfaces.panelSection(context),
     };
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -67,6 +73,7 @@ class NoticeBanner extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (below != null) ...[const SizedBox(height: 6), below!],
               ],
             ),
           ),

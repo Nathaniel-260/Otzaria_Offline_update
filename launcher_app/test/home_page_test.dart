@@ -163,6 +163,33 @@ void main() {
       expect(find.byKey(ShellKeys.tile(ShellSection.reports)), findsNothing);
     });
 
+    // דיווחי הכלי עצמו נשלחים מאותו דף — ולכן נספרים באותו אריח.
+    testWidgets('דיווחי הכלי שממתינים נספרים באריח הדיווחים', (tester) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: homeScenario('uptodate').guidance,
+            reportsToSend: 1,
+            toolReportsPending: 2,
+          ),
+        ),
+      );
+      expect(find.byKey(ShellKeys.tile(ShellSection.reports)), findsOneWidget);
+      expect(find.text(stringsOf().guide.chipReportsToSend(3)), findsOneWidget);
+
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: homeScenario('uptodate').guidance,
+            toolReportsPending: 1,
+          ),
+        ),
+      );
+      expect(find.byKey(ShellKeys.tile(ShellSection.reports)), findsOneWidget);
+    });
+
     testWidgets('newer: פס התוספים החדשים מוצג גם כשהמותקנת חדשה מהכונן', (
       tester,
     ) async {

@@ -159,6 +159,7 @@ const _spelledOne = {
   'task.minutesLeft#0',
   'task.donePluginsValue#0',
   'task.pluginsWaiting#0',
+  'pages.repSendStoredButton#0',
 };
 
 /// הזוגי העברי ("שתי דקות") — אותו כלל ב-2, בעברית בלבד.
