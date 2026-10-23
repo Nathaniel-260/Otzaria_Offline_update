@@ -31,6 +31,7 @@ class SettingsScreen extends StatelessWidget {
     required this.onOpenLog,
     required this.launcherVersion,
     this.customApps,
+    this.onManageCustomApps,
     this.readOnly = false,
     this.driveFull = false,
     this.saferMode,
@@ -47,6 +48,9 @@ class SettingsScreen extends StatelessWidget {
 
   /// ניהול התוכנות המותאמות. `null` בבדיקות שאינן נוגעות בהן.
   final CustomAppsController? customApps;
+
+  /// דף ניהול התוכנות הנוספות (`CustomAppsManageRoute`).
+  final VoidCallback? onManageCustomApps;
 
   final bool readOnly;
   final bool driveFull;
@@ -79,6 +83,7 @@ class SettingsScreen extends StatelessWidget {
         if (customApps case final controller?)
           CustomAppsSettingsCard(
             controller: controller,
+            onOpenManager: onManageCustomApps ?? () {},
             readOnly: readOnly,
             driveFull: driveFull,
           ),

@@ -7,23 +7,53 @@ import '../../controllers/custom_apps_controller.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 
-/// הקטגוריות נקבעות במחשב המקוון ונוסעות על הכונן.
+/// הקטגוריות נקבעות במחשב המקוון ונוסעות על הכונן. [editing] — נפתח ישר
+/// על עריכת הקטגוריה הזו.
 Future<void> showCustomAppCategoriesDialog({
   required BuildContext context,
   required CustomAppsController controller,
+  CustomAppCategory? editing,
 }) =>
     showDialog<void>(
       context: context,
       builder: (_) => ListenableBuilder(
         listenable: controller,
-        builder: (_, child) => _CategoriesDialog(controller: controller),
+        builder: (_, child) =>
+            _CategoriesDialog(controller: controller, editing: editing),
       ),
     );
 
+/// שואל, ורק אז מוחק קטגוריה. התוכנות שבה עוברות ל"ללא קטגוריה".
+Future<bool> confirmRemoveCustomAppCategory(
+  BuildContext context,
+  CustomAppsController controller,
+  CustomAppCategory category,
+) async {
+  final t = context.strings.customApps;
+  final count = controller.appsIn(category.slug).length;
+  final approved = await showWarningDialog(
+    context: context,
+    title: t.removeCategoryDialogTitle(category.name),
+    content: t.removeCategoryDialogContent(category.name, count),
+    confirmText: t.removeCategoryTooltip,
+  );
+  if (!approved) return false;
+
+  if (await controller.removeCategory(category.slug)) {
+    UiSnack.show(
+      AppL10n.strings.customApps.categoryRemovedSnack(category.name),
+    );
+    return true;
+  }
+  UiSnack.showFailure(controller.errorMessage);
+  return false;
+}
+
 class _CategoriesDialog extends StatefulWidget {
-  const _CategoriesDialog({required this.controller});
+  const _CategoriesDialog({required this.controller, this.editing});
 
   final CustomAppsController controller;
+  final CustomAppCategory? editing;
 
   @override
   State<_CategoriesDialog> createState() => _CategoriesDialogState();
@@ -37,6 +67,16 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
   String? _editingSlug;
 
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.editing case final category?) {
+      _editingSlug = category.slug;
+      _name.text = category.name;
+      _description.text = category.description;
+    }
+  }
 
   @override
   void dispose() {
@@ -88,47 +128,37 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
   }
 
   Future<void> _confirmRemove(CustomAppCategory category) async {
-    final t = context.strings.customApps;
-    final count = widget.controller.appsIn(category.slug).length;
-    final approved = await showWarningDialog(
-      context: context,
-      title: t.removeCategoryDialogTitle(category.name),
-      content: t.removeCategoryDialogContent(category.name, count),
-      confirmText: t.removeCategoryTooltip,
-    );
-    if (!approved) return;
-
-    if (await widget.controller.removeCategory(category.slug)) {
-      if (_editingSlug == category.slug) _clearForm();
-      UiSnack.show(
-        AppL10n.strings.customApps.categoryRemovedSnack(category.name),
-      );
-      return;
+    if (await confirmRemoveCustomAppCategory(
+          context,
+          widget.controller,
+          category,
+        ) &&
+        _editingSlug == category.slug) {
+      _clearForm();
     }
-    UiSnack.showFailure(widget.controller.errorMessage);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = context.strings.customApps;
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
     final categories = widget.controller.categories;
+    const pad = AppTokens.spaceLG;
 
     return AlertDialog(
-      title: Text(t.categoriesTitle, style: theme.textTheme.titleLarge),
+      insetPadding: const EdgeInsets.all(pad),
+      titlePadding: const EdgeInsets.fromLTRB(pad, pad, pad, 0),
+      contentPadding: const EdgeInsets.fromLTRB(pad, 10, pad, 0),
+      actionsPadding: const EdgeInsets.all(pad),
+      title: Text(t.categoriesTitle),
       content: SizedBox(
-        width: 480,
+        width: AppTokens.dialogFormWidth - 2 * pad,
         child: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                t.categoriesDialogHint,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+              Text(t.categoriesDialogHint),
               const SizedBox(height: AppTokens.spaceMD),
               RtlTextField(
                 controller: _name,
@@ -150,13 +180,13 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
                 spacing: AppTokens.spaceSM,
                 runSpacing: AppTokens.spaceSM,
                 children: [
-                  ActionButton.recommended(
+                  ActionButton.neutral(
                     text: _editingSlug == null
                         ? t.addCategoryButton
                         : t.saveEditButton,
                     icon: _editingSlug == null
-                        ? FluentIcons.add_24_regular
-                        : FluentIcons.checkmark_24_regular,
+                        ? FluentIcons.add_20_regular
+                        : FluentIcons.checkmark_20_regular,
                     isLoading: _busy,
                     onPressed:
                         _busy || _name.text.trim().isEmpty ? null : _submit,
@@ -169,43 +199,69 @@ class _CategoriesDialogState extends State<_CategoriesDialog> {
                 ],
               ),
               const SizedBox(height: AppTokens.spaceLG),
-              if (categories.isEmpty)
-                SettingsActionTile.text(
-                  icon: FluentIcons.tag_24_regular,
-                  title: t.categoriesTitle,
-                  subtitle: t.noCategoriesHint,
-                )
-              else
-                for (final category in categories)
-                  SettingsActionTile.text(
-                    icon: FluentIcons.tag_24_regular,
-                    // שם הקטגוריה ותיאורה הם תוכן — לא מתורגמים.
-                    title: category.name,
-                    subtitle: category.description.isEmpty
-                        ? t.categoryAppCount(
-                            widget.controller.appsIn(category.slug).length,
-                          )
-                        : category.description,
-                    actions: [
-                      SecondaryIconButton(
-                        icon: FluentIcons.edit_24_regular,
-                        tooltip: t.editTooltip,
-                        onPressed: _busy ? null : () => _startEditing(category),
-                      ),
-                      SecondaryIconButton(
-                        icon: FluentIcons.delete_24_regular,
-                        tooltip: t.removeCategoryTooltip,
-                        onPressed:
-                            _busy ? null : () => _confirmRemove(category),
-                      ),
-                    ],
-                  ),
+              Material(
+                color: cs.surfaceContainerLowest,
+                borderRadius: AppTokens.borderRadiusAll,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (categories.isEmpty)
+                      AppRow(
+                        title: t.noCategoriesTitle,
+                        subtitle: t.noCategoriesHint,
+                      )
+                    else
+                      for (final (i, category) in categories.indexed) ...[
+                        if (i > 0) const Divider(height: 1),
+                        AppRow(
+                          leading: const IconTile(
+                            icon: FluentIcons.tag_20_regular,
+                            size: IconTileSize.sm,
+                            tone: IconTileTone.quiet,
+                          ),
+                          // שם הקטגוריה ותיאורה הם תוכן — לא מתורגמים.
+                          title: category.name,
+                          subtitle: category.description.isEmpty
+                              ? t.categoryAppCount(
+                                  widget.controller
+                                      .appsIn(category.slug)
+                                      .length,
+                                )
+                              : category.description,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AppIconButton(
+                                icon: FluentIcons.edit_20_regular,
+                                tooltip: t.editTooltip,
+                                small: true,
+                                onPressed: _busy
+                                    ? null
+                                    : () => _startEditing(category),
+                              ),
+                              AppIconButton(
+                                icon: FluentIcons.delete_20_regular,
+                                tooltip: t.removeCategoryTooltip,
+                                small: true,
+                                danger: true,
+                                onPressed: _busy
+                                    ? null
+                                    : () => _confirmRemove(category),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
       actions: [
-        ActionButton.neutral(
+        ActionButton.recommended(
           text: context.strings.common.close,
           onPressed: () => Navigator.of(context).pop(),
         ),

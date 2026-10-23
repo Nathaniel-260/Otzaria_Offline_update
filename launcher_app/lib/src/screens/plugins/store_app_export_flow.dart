@@ -51,13 +51,11 @@ class StoreAppExportButton extends StatelessWidget {
         ? t.storeAppUnavailableTooltip
         : (controller.plugins.isEmpty ? t.storeAppNoPluginsTooltip : null);
 
-    // `outlined` ובסמל המסך, כמו הכפתור המקביל באתר: הוא עומד לצד
-    // "סנכרון מהאתר" ואינו אמור להתחרות בו על העין.
-    final button = ActionButton.outlined(
+    final button = ActionButton.neutral(
       text: controller.storeAppUpdatePending
           ? t.storeAppUpdateButton
-          : t.storeAppButton,
-      icon: FluentIcons.desktop_24_regular,
+          : t.storeAppCopyButton,
+      icon: FluentIcons.desktop_arrow_down_20_regular,
       isLoading: controller.isExporting,
       onPressed: enabled ? () => runStoreAppExport(context, controller) : null,
     );
@@ -170,133 +168,59 @@ Future<void> _showDoneDialog(
   StoreAppExportOutcome outcome,
 ) async {
   final t = context.strings.plugins;
-
-  await showDialog<void>(
+  final launch = await showTwoActionsDialog(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      scrollable: true,
-      title: Text(t.storeAppDoneTitle),
-      content: Column(
+    title: t.storeAppDoneTitle,
+    cancelText: context.strings.common.close,
+    confirmText: t.storeAppLaunch,
+    customContent: Builder(
+      builder: (dialogContext) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(t.storeAppDoneContent(
-            outcome.plugins,
-            formatBytes(outcome.bytes),
-          )),
+              outcome.plugins, formatBytes(outcome.bytes))),
           if (outcome.skipped.isNotEmpty) ...[
             const SizedBox(height: AppTokens.spaceSM),
-            Text(
-              t.storeAppDoneSkipped(outcome.skipped.length),
-              style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(dialogContext).colorScheme.onSurfaceVariant,
-                  ),
-            ),
+            Text(t.storeAppDoneSkipped(outcome.skipped.length)),
           ],
           const SizedBox(height: AppTokens.spaceSM),
-          CopyPathButton(path: outcome.destinationDir),
+          PathText(outcome.destinationDir),
+          const SizedBox(height: AppTokens.spaceXS),
+          ActionButton.ghost(
+            text: t.storeAppOpenFolder,
+            icon: FluentIcons.folder_open_20_regular,
+            size: ActionButtonSize.sm,
+            onPressed: () {
+              Navigator.of(dialogContext).pop(false);
+              unawaited(FileReveal.revealDirectory(outcome.destinationDir));
+            },
+          ),
         ],
       ),
-      actions: [
-        ActionButton.ghost(
-          text: context.strings.common.close,
-          onPressed: () => Navigator.of(dialogContext).pop(),
-        ),
-        ActionButton.neutral(
-          text: t.storeAppOpenFolder,
-          icon: FluentIcons.folder_open_24_regular,
-          onPressed: () {
-            Navigator.of(dialogContext).pop();
-            unawaited(FileReveal.revealDirectory(outcome.destinationDir));
-          },
-        ),
-        ActionButton.recommended(
-          text: t.storeAppLaunch,
-          icon: FluentIcons.play_24_regular,
-          onPressed: () {
-            Navigator.of(dialogContext).pop();
-            unawaited(_launch(outcome.appPath));
-          },
-        ),
-      ],
     ),
   );
+  if (launch && context.mounted) unawaited(_launch(outcome.appPath));
 }
 
-class StoreAppExportOverlay extends StatelessWidget {
-  const StoreAppExportOverlay({super.key, required this.controller});
+/// ההתקדמות בשורת ההעתקה — לא שכבה מעל הדף.
+class StoreAppCopyProgress extends StatelessWidget {
+  const StoreAppCopyProgress({super.key, required this.controller});
 
   final PluginsModuleController controller;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: controller.progress,
-        builder: (context, _) => _overlay(context),
-      );
-
-  Widget _overlay(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final t = context.strings.plugins;
-    final progress = controller.exportProgress;
-
-    return ColoredBox(
-      color: Colors.black54,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Material(
-            color: cs.surface,
-            borderRadius: AppTokens.borderRadiusAll,
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(AppTokens.spaceLG),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    t.storeAppCopyingTitle,
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: AppTokens.spaceXS),
-                  Text(
-                    t.storeAppCopyingSubtitle,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: AppTokens.spaceMD),
-                  Text(
-                    controller.exportMessage ?? '',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: AppTokens.spaceMD),
-                  ClipRRect(
-                    borderRadius: AppTokens.borderRadiusAll,
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 8,
-                    ),
-                  ),
-                  if (progress != null) ...[
-                    const SizedBox(height: AppTokens.spaceXS),
-                    Text(
-                      '${(progress.clamp(0.0, 1.0) * 100).round()}%',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+        builder: (context, _) => Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: InfoProgressRow(
+            stage: controller.exportMessage ??
+                context.strings.plugins.storeAppCopyingTitle,
+            progress: controller.exportProgress,
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 /// מנותק מהלאנצ'ר בכוונה: החנות היא תוכנה נפרדת, וסגירת הלאנצ'ר אינה

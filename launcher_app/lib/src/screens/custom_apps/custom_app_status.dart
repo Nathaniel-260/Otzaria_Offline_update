@@ -2,20 +2,11 @@ import 'package:custom_apps_manager/custom_apps_manager.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/custom_apps_controller.dart';
+import '../../services/byte_size.dart';
 import '../../widgets/widgets_exports.dart';
 
-/// התוויות שמתארות את מצב התוכנה — משותפות לכרטיס שברשת ולדף התוכנה,
-/// כדי שהשניים לא יאמרו על אותה תוכנה שני דברים שונים.
-
-StatusKind customAppStatusKind(CustomAppView app) {
-  if (!app.canDetect) return StatusKind.unknown;
-  if (app.installed == null) return StatusKind.needsAction;
-  // מותקנת, ועל הכונן יושבת גרסה חדשה יותר.
-  if (app.pending == CustomAppPending.newerOnDrive) {
-    return StatusKind.updateAvailable;
-  }
-  return StatusKind.ok;
-}
+/// התוויות שמתארות את מצב התוכנה — משותפות לכרטיס ולדף, כדי שהשניים לא
+/// יאמרו על אותה תוכנה שני דברים שונים.
 
 /// "אינה מותקנת" נאמר **רק** כשבאמת חיפשנו. בלי שם קובץ הרצה התשובה
 /// הנכונה היא "לא ניתן לדעת", וזה לא אותו דבר.
@@ -37,6 +28,38 @@ String customAppStoredLabel(BuildContext context, CustomAppView app) {
   return stored == null
       ? t.noStoredInstaller
       : t.storedInstaller(stored.version);
+}
+
+/// מאיפה התוכנה: "מאתר המפתחים (GitHub)" או "מקובץ".
+String customAppSourceLabel(BuildContext context, CustomAppView app) {
+  final t = context.strings.customApps;
+  return app.descriptor.sourceKind == AppSourceKind.github
+      ? t.sourceGithubShort
+      : t.sourceFileShort;
+}
+
+/// הגרסה שבכונן, ובלעדיה — המותקנת כאן.
+String? customAppVersionOf(CustomAppView app) =>
+    app.storedInstaller?.version ?? app.installed?.version;
+
+/// שורת המטא: גרסה, גודל ומקור.
+List<String> customAppMeta(BuildContext context, CustomAppView app) {
+  final t = context.strings.customApps;
+  final version = customAppVersionOf(app);
+  final size = app.storedInstaller?.sizeBytes ?? 0;
+  return [
+    if (version != null && version.isNotEmpty) t.versionLabel(version),
+    if (size > 0) formatBytes(size),
+    customAppSourceLabel(context, app),
+  ];
+}
+
+/// ההערה מתחת לפעולה: למה אין מה להתקין, או מה ידוע על ההתקנה כאן.
+String? customAppNoteOf(BuildContext context, CustomAppView app) {
+  final t = context.strings.customApps;
+  if (!app.canInstall && !app.canLaunch) return t.noStoredInstaller;
+  if (app.canLaunch) return null;
+  return customAppInstalledLabel(context, app);
 }
 
 String? customAppOnlineLabel(

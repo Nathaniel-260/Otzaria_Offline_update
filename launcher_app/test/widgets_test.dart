@@ -276,13 +276,13 @@ void main() {
             controller: controller,
             onChanged: (v) => seen = v,
             decoration: InputDecoration(
-              labelText: he.plugins.filterSearchLabel,
+              labelText: he.plugins.searchHint,
             ),
           ),
         ),
       );
 
-      expect(find.text(he.plugins.filterSearchLabel), findsOneWidget);
+      expect(find.text(he.plugins.searchHint), findsOneWidget);
       await tester.enterText(find.byType(TextField), he.plugins.statusStable);
       expect(seen, he.plugins.statusStable);
 
@@ -1142,12 +1142,12 @@ void main() {
         (context) => showSingleActionDialog(
           context: context,
           title: he.plugins.saveDialogTitle,
-          content: he.plugins.syncDialogContent,
+          content: he.plugins.syncingHint,
         ),
       );
 
       expect(find.text(he.plugins.saveDialogTitle), findsOneWidget);
-      expect(find.text(he.plugins.syncDialogContent), findsOneWidget);
+      expect(find.text(he.plugins.syncingHint), findsOneWidget);
       // כפתור אחד בלבד — אין ביטול.
       expect(find.text(he.common.cancel), findsNothing);
 

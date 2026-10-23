@@ -1609,47 +1609,18 @@ class _Plugins extends PluginsStrings {
   const _Plugins();
 
   @override
-  String get syncDialogTitle => 'סנכרון חנות התוספים';
-  @override
-  String get syncDialogContent =>
-      'הפעולה תוריד מ-otzaria.org את רשימת התוספים, הקטגוריות, התמונות '
-      'וקובצי ההתקנה אל תיקיית ההעברה. יורדים רק תוספים חדשים ומעודכנים — '
-      'מה שכבר בתיקייה נשאר כמו שהוא. דורשת אינטרנט, ומרגע שהסתיימה החנות '
-      'עובדת גם במחשב שאין בו אינטרנט.';
-  @override
-  String get syncDialogConfirm => 'סנכרן';
-  @override
-  String get syncFailedSnack => 'הסנכרון נכשל';
+  String get syncFailedSnack => 'העדכון מהאתר נכשל';
   @override
   String syncDoneSnack(int fetched, int total) => fetched == 0
-      ? 'הכול כבר היה מעודכן — לא ירד דבר ($total תוספים בחנות)'
-      : 'הסנכרון הושלם — $fetched תוספים ירדו, מתוך $total שבחנות';
-  @override
-  String get syncingOverlaySubtitle =>
-      'יורדים רק תוספים חדשים ומעודכנים — מה שכבר בתיקייה מדולג.';
+      ? 'רשימת התוספים עודכנה — לא היה חדש ($total תוספים)'
+      : 'רשימת התוספים עודכנה — ירדו $fetched מתוך $total';
   @override
   String syncDoneWithWarningsSnack(int count) =>
-      'הסנכרון הסתיים, אך $count פריטים לא ירדו. הפרטים ביומן.';
-  @override
-  String get syncButton => 'סנכרון מהאתר';
-  @override
-  String get reloadTooltip => 'טעינה מחדש מהתיקייה המקומית';
-  @override
-  String get syncingOverlayTitle => 'מסנכרן את חנות התוספים';
+      'הרשימה עודכנה, אבל $count פריטים לא ירדו. הפרטים ביומן.';
   @override
   String get syncingOverlayStarting => 'מתחיל...';
   @override
-  String get syncNeverRan => 'טרם בוצע סנכרון';
-  @override
-  String syncedAt(String time) => 'סונכרן לאחרונה: $time';
-  @override
-  String get syncDirUnknownTooltip => 'התיקייה תיקבע בסנכרון הראשון';
-  @override
-  String updatesAvailableChip(int count) => '$count עדכונים זמינים';
-  @override
-  String get updatesBarBody => 'בכונן יש גרסה חדשה של תוספים שמותקנים באוצריא.';
-  @override
-  String get updatesBarButton => 'הצגת העדכונים';
+  String get syncDirUnknownTooltip => 'התיקייה תיקבע בעדכון הראשון מהאתר';
 
   @override
   String get saveDialogTitle => 'שמירת התוסף';
@@ -1657,9 +1628,6 @@ class _Plugins extends PluginsStrings {
   String get saveDoneSnack => 'הקובץ נשמר';
   @override
   String get saveFailedSnack => 'שמירת הקובץ נכשלה';
-  @override
-  String installOpenedSnack(String pluginName) =>
-      'אוצריא נפתחה כדי להשלים את התקנת $pluginName';
   @override
   String installDoneSnack(String pluginName) =>
       'התוסף $pluginName הותקן בהצלחה';
@@ -1674,101 +1642,12 @@ class _Plugins extends PluginsStrings {
 
   @override
   String get loadingCatalog => 'טוען את קטלוג התוספים...';
-  @override
-  String get catalogTitleFallback => 'חנות התוספים של אוצריא';
-  @override
-  String get catalogSubtitleFallback =>
-      'תוספים שמרחיבים את חוויית הלימוד באוצריא';
-  @override
-  String get heroSearchHint => 'חפשו תוסף לפי שם, תיאור או נושא...';
-  @override
-  String get heroSearchButton => 'חיפוש';
 
-  @override
-  String get emptyStoreTitle => 'החנות בבנייה — אבל התוספים כבר כאן';
-  @override
-  String get emptyStoreBody =>
-      'בקרוב יופיעו כאן תוספים נבחרים וקטגוריות מסודרות. בינתיים אפשר לחפש '
-      'למעלה או לעיין ברשימה המלאה של כל התוספים.';
-  @override
-  String allPluginsWithCount(int count) => 'לכל התוספים ($count)';
-  @override
-  String get browseAllPrompt => 'לא מצאתם את מה שחיפשתם?';
-  @override
-  String browseAllButton(int count) => 'עיינו בכל התוספים ($count)';
-
-  @override
-  String get featuredEyebrow => 'מומלצי החנות';
-  @override
-  String get featuredTitle => 'תוספים נבחרים';
-  @override
-  String get showMoreFeatured => 'הצג עוד נבחרים';
-  @override
-  String categoryLinkButton(int count) => 'לכל הקטגוריה ($count)';
-
-  @override
-  String get breadcrumbRoot => 'חנות התוספים';
-  @override
-  String get allPluginsPage => 'כל התוספים';
-  @override
-  String get listEyebrow => 'רשימת תוספים';
-  @override
-  String get listTitle => 'בחרו את התוסף שמתאים לכם';
-  @override
-  String get summaryNoResults => 'לא נמצאו תוספים לפי הסינון שבחרתם';
-  @override
-  String get summaryAllShown => 'כל התוספים מוצגים';
-  @override
-  String summaryPartial(int shown, int total) =>
-      'מוצגים $shown מתוך $total תוספים';
-  @override
-  String get categoryOnePlugin => 'תוסף אחד בקטגוריה';
-  @override
-  String categoryPluginCount(int count) => '$count תוספים בקטגוריה';
-
-  @override
-  String get hideInstalledLabel => 'רק מה שלא מותקן';
-  @override
-  String hideInstalledOnTooltip(int installedCount) =>
-      'מוצגים רק תוספים שאינם מותקנים או שיש להם עדכון.\n'
-      'זוהו $installedCount תוספים מותקנים באוצריא.';
-  @override
-  String hideInstalledOffTooltip(int installedCount) =>
-      'מוצגים כל התוספים, כולל המותקנים והמעודכנים.\n'
-      'זוהו $installedCount תוספים מותקנים באוצריא.';
-
-  @override
-  String get neverSyncedTitle => 'עדיין לא סונכרנו תוספים';
-  @override
-  String get neverSyncedBody =>
-      'לחצו על "סנכרון מהאתר" במחשב שיש בו אינטרנט כדי לטעון את רשימת '
-      'התוספים העדכנית מ-otzaria.org.';
   @override
   String get noResultsTitle => 'לא נמצאו תוספים לפי הסינון שבחרתם';
   @override
-  String get noResultsBody =>
-      'נסו לחפש בשם אחר, להסיר תגית, לבחור סטטוס שונה, או לכבות את '
-      '"הצג רק מה שלא מותקן".';
-  @override
-  String get allInstalledTitle => 'הכול מותקן ומעודכן';
-  @override
-  String get allInstalledBody =>
-      'המתג "רק מה שלא מותקן" מסתיר תוספים שכבר מותקנים אצלכם בגרסה '
-      'העדכנית. כבו אותו כדי לראות גם אותם.';
-  @override
-  String get showInstalledButton => 'הצג גם את המותקנים';
-  @override
-  String get emptyCategoryTitle => 'בקרוב יתווספו תוספים לקטגוריה זו';
-  @override
-  String get emptyCategoryBody =>
-      'בינתיים אפשר לעיין ברשימה המלאה של כל התוספים בחנות.';
-  @override
-  String get allPluginsButton => 'לכל התוספים';
+  String get noResultsBody => 'נסו מילה אחרת, או חפשו בכל הקטגוריות.';
 
-  @override
-  String get filterSearchLabel => 'חיפוש';
-  @override
-  String get filterSearchHint => 'שם, תיאור או תגית...';
   @override
   String get filterStatusLabel => 'סטטוס';
   @override
@@ -1782,22 +1661,12 @@ class _Plugins extends PluginsStrings {
   @override
   String get filterTagsLabel => 'תגיות';
   @override
-  String get filterAllTags => 'כל התגיות';
-  @override
-  String get filterStatusAll => 'הכול';
-  @override
   String get showMoreTags => 'הצג עוד';
   @override
   String get showFewerTags => 'הצג פחות';
 
   @override
-  String get badgeFeaturedShort => 'נבחר';
-  @override
-  String get badgeFeatured => 'תוסף נבחר';
-  @override
   String pluginVersionBadge(String version) => 'גרסה $version';
-  @override
-  String downloadsBadge(int count) => '$count הורדות';
 
   @override
   String ratingBadge(String average, int count) => '$average ($count)';
@@ -1817,19 +1686,7 @@ class _Plugins extends PluginsStrings {
   @override
   String ratingStarsLabel(String average) => 'דירוג $average מתוך 5';
   @override
-  String get saveButton => 'שמירה';
-  @override
-  String get installButton => 'התקנה';
-  @override
-  String get directInstallButton => 'התקנה ישירה לאוצריא';
-  @override
   String get sourcePageButton => 'עמוד המקור';
-  @override
-  String get cardDetailsLink => 'לפרטים מלאים';
-  @override
-  String cardUpdatedOn(String date) => 'עודכן ב־$date';
-  @override
-  String get backToStore => 'חזרה לחנות';
 
   @override
   String get statusStable => 'יציב';
@@ -1841,97 +1698,37 @@ class _Plugins extends PluginsStrings {
   String get statusUnknown => 'לא ידוע';
 
   @override
-  String get installChipInstalled => 'מותקן';
-  @override
-  String get installChipUpdateAvailable => 'עדכון זמין';
-  @override
-  String installChipUpdateFrom(String installedVersion) =>
-      'עדכון זמין (מותקן $installedVersion)';
-  @override
-  String get installChipIncompatible => 'דורש אוצריא חדשה יותר';
-  @override
-  String get installChipDisabled => 'מותקן, מושבת באוצריא';
-  @override
-  String get installChipDisabledUpdate => 'עדכון זמין, מושבת באוצריא';
-  @override
-  String get installChipDevelopment => 'גרסת פיתוח מקומית';
-
-  @override
   String get infoPanelTitle => 'מידע כללי';
   @override
-  String get tagsPanelTitle => 'תגיות';
+  String get tagsPanelTitle => 'קטגוריות ותגיות';
   @override
   String get screenshotsPanelTitle => 'צילומי מסך';
   @override
   String get infoVersion => 'גרסה';
   @override
-  String get infoStatus => 'סטטוס';
+  String get infoStatus => 'מצב';
   @override
   String get infoAuthor => 'מפתח';
   @override
   String get infoUpdated => 'עודכן';
   @override
-  String get infoNetwork => 'חיבור אינטרנט בזמן שימוש';
+  String get infoNetwork => 'חיבור אינטרנט';
   @override
   String get infoNetworkRequired => 'נדרש';
   @override
   String get infoNetworkNotRequired => 'לא נדרש';
   @override
-  String get infoCompatibility => 'תאימות';
+  String get infoCompatibility => 'מתאים לגרסאות';
   @override
   String compatibilityRange(String from, String to) => '$from — עד $to';
   @override
-  String get infoLocalFile => 'קובץ התוסף במראה';
+  String get infoLocalFile => 'הקובץ בכונן';
   @override
-  String get infoLocalFileMissing => 'טרם ירד — יש לבצע סנכרון';
-  @override
-  String localFileDescription(String fileName, String size) =>
-      '$fileName ($size)';
+  String get infoLocalFileMissing => 'עוד לא ירד לכונן';
   @override
   String get valueUnspecifiedFeminine => 'לא צוינה';
   @override
   String get valueUnspecifiedMasculine => 'לא צוין';
-  @override
-  String get sizeUnknown => 'גודל לא ידוע';
-
-  @override
-  String get categoriesTitle => 'קטגוריות';
-  @override
-  String get storeHomeItem => 'דף הבית של החנות';
-  @override
-  String get storeHomeChip => 'דף הבית';
-
-  @override
-  String updatesDialogTitle(int count) => 'יש עדכונים זמינים ($count)';
-  @override
-  String get updatesDialogIntro =>
-      'התוספים הבאים מותקנים אצלך באוצריא בגרסה ישנה מזו שבחנות:';
-  @override
-  String updatesDialogRow(String installedVersion, String storeVersion) =>
-      'מותקן $installedVersion ← בחנות $storeVersion';
-  @override
-  String get updatesDialogUpdateButton => 'עדכון';
-  @override
-  String updatesDialogUpdateAllButton(int count) => 'עדכון הכל ($count)';
-  @override
-  String get updatesDialogDetailsButton => 'לפרטים';
-  @override
-  String get updatesDialogSentLabel => 'נשלח לאוצריא';
-  @override
-  String get updatesDialogDoneLabel => 'עודכן';
-  @override
-  String get updatesDialogPendingNote =>
-      'ההתקנה עצמה מתבצעת בחלון של אוצריא. הרשימה כאן מתעדכנת מאליה '
-      'ברגע שהיא מסתיימת שם — אין מה ללחוץ.';
-
-  @override
-  String get newToastOne => 'תוסף חדש בחנות!';
-  @override
-  String newToastMany(int count) => '$count תוספים חדשים בחנות!';
-  @override
-  String get newToastView => 'צפה';
-  @override
-  String get newToastClose => 'סגור';
 
   @override
   String get screenshotPrevious => 'הקודם';
@@ -1991,9 +1788,6 @@ class _Plugins extends PluginsStrings {
   @override
   String get storeAppCopyingTitle => 'מעתיק את חנות התוספים';
   @override
-  String get storeAppCopyingSubtitle =>
-      'מעתיק מהכונן בלבד — אין כאן שימוש באינטרנט.';
-  @override
   String get storeAppDoneTitle => 'החנות הועתקה';
   @override
   String storeAppDoneContent(int plugins, String size) =>
@@ -2009,6 +1803,200 @@ class _Plugins extends PluginsStrings {
   String storeAppFailedSnack(String error) => 'ההעתקה נכשלה: $error';
   @override
   String storeAppLaunchFailedSnack(String error) => 'הפעלת החנות נכשלה: $error';
+
+  @override
+  String get storeTitle => 'תוספים';
+  @override
+  String get storeSubtitle =>
+      'תוספים שמרחיבים את אוצריא. כל מה שכאן כבר בכונן, ומותקן גם בלי אינטרנט.';
+  @override
+  String asOfDate(String date) => 'נכון ל-$date.';
+  @override
+  String get refreshButton => 'רענון';
+  @override
+  String get syncingTitle => 'מעדכן את רשימת התוספים מהאתר';
+  @override
+  String get syncingHint =>
+      'יורדים רק תוספים חדשים ומעודכנים. אפשר להמשיך לעיין בינתיים.';
+  @override
+  String get syncStopButton => 'עצירה';
+  @override
+  String get syncStoppedSnack => 'העדכון נעצר. מה שכבר ירד נשמר בכונן.';
+  @override
+  String get emptyTitle => 'עוד אין תוספים בכונן';
+  @override
+  String get emptyBodyOnline =>
+      'תוספים יורדים לכונן יחד עם עדכוני אוצריא. המחשב הזה מחובר לאינטרנט, אז אפשר להוריד אותם עכשיו.';
+  @override
+  String get emptyBodyOffline =>
+      'תוספים יורדים לכונן יחד עם עדכוני אוצריא. במחשב עם אינטרנט לחצו "הורדת העדכונים לכונן", והם יופיעו כאן.';
+  @override
+  String get searchHint => 'חפשו תוסף לפי שם או נושא';
+  @override
+  String get clearSearchTooltip => 'ניקוי';
+  @override
+  String get filterAll => 'הכול';
+  @override
+  String get filterInstalled => 'מותקנים';
+  @override
+  String get filterNotInstalled => 'לא מותקנים';
+  @override
+  String get moreFilters => 'עוד סינון';
+  @override
+  String moreFiltersCount(int count) => 'עוד סינון ($count)';
+  @override
+  String noResultsForQuery(String query) => 'לא נמצאו תוספים ל"$query"';
+  @override
+  String get clearFiltersButton => 'ניקוי החיפוש והסינון';
+  @override
+  String updatesAvailable(int count) =>
+      plural(count, one: 'עדכון זמין', many: '$count עדכונים זמינים');
+  @override
+  String updatesBarNames(String names) =>
+      '$names · יישלחו לאוצריא, ושם מאשרים כל אחד';
+  @override
+  String joinNames(List<String> names) => names.length < 2
+      ? names.join()
+      : '${names.sublist(0, names.length - 1).join(', ')} ו${names.last}';
+  @override
+  String get updateAllButton => 'עדכון הכול';
+  @override
+  String updatingAllLabel(int current, int total) =>
+      'שולח לאוצריא $current מתוך $total…';
+  @override
+  String updatesSentSnack(int count) => plural(count,
+      one: 'העדכון נשלח לאוצריא — אשרו שם',
+      many: '$count עדכונים נשלחו לאוצריא — אשרו שם');
+  @override
+  String get updatesSentTitle => 'העדכונים נשלחו לאוצריא — אשרו שם';
+  @override
+  String get updatesSentBody =>
+      'הרשימה כאן מתעדכנת מעצמה ברגע שההתקנה מסתיימת באוצריא.';
+  @override
+  String installSentSnack(String pluginName) =>
+      '$pluginName נשלח לאוצריא — אשרו שם';
+  @override
+  String get newChip => 'חדש';
+  @override
+  String get networkChip => 'דורש אינטרנט';
+  @override
+  String get installInOtzariaButton => 'התקנה באוצריא';
+  @override
+  String updateToButton(String version) => 'עדכון ל-$version';
+  @override
+  String get saveFileButton => 'שמירת קובץ התוסף…';
+  @override
+  String get sendingLabel => 'שולח לאוצריא…';
+  @override
+  String get sentLabel => 'נשלח לאוצריא — אשרו שם';
+  @override
+  String get developmentLabel => 'בפיתוח במחשב הזה';
+  @override
+  String get incompatibleLabel => 'לא מתאים לאוצריא שלך';
+  @override
+  String get disabledLabel => 'מושבת באוצריא';
+  @override
+  String get installedLabel => 'מותקן';
+  @override
+  String get noteIncompatible => 'אין גרסה שמתאימה לאוצריא שבמחשב הזה';
+  @override
+  String noteNeedsApp(String version) => 'צריך אוצריא $version ומעלה';
+  @override
+  String get noteNeedsOtzaria => 'קודם מתקינים את אוצריא';
+  @override
+  String get noteSaveOnly => 'אין התקנה ישירה — שומרים את הקובץ';
+  @override
+  String get noteDisabled => 'מושבת באוצריא';
+  @override
+  String get noteFileMissing =>
+      'הקובץ עוד לא בכונן — יירד בהתקנה (צריך אינטרנט)';
+  @override
+  String get incompatibleTitle => 'התוסף לא מתאים לאוצריא שבמחשב הזה';
+  @override
+  String incompatibleBodyVersions(String needs, String here) =>
+      'הוא צריך אוצריא $needs ומעלה, ובמחשב הזה מותקנת $here. אחרי שתעדכנו את אוצריא אפשר יהיה להתקין אותו.';
+  @override
+  String get incompatibleBody =>
+      'אין לו גרסה שרצה על אוצריא שבמחשב הזה. אחרי שתעדכנו את אוצריא אפשר יהיה להתקין אותו.';
+  @override
+  String get disabledTitle => 'התוסף מושבת באוצריא';
+  @override
+  String get disabledBody =>
+      'הוא מותקן אבל לא פעיל. אפשר להפעיל אותו מחדש בהגדרות התוספים של אוצריא.';
+  @override
+  String get disabledUpdateBody => 'העדכון יותקן גם כשהוא מושבת.';
+  @override
+  String get developmentTitle => 'תוסף בפיתוח';
+  @override
+  String get developmentBody =>
+      'אוצריא טוענת אותו מהתיקייה שלו במחשב הזה, ולכן הכלי לא מעדכן אותו.';
+  @override
+  String get fileMissingTitle => 'הקובץ של התוסף עוד לא ירד לכונן';
+  @override
+  String get fileMissingBody =>
+      'הוא יירד בפעם הבאה שתורידו עדכונים לכונן במחשב עם אינטרנט. במחשב מחובר ההתקנה מורידה אותו עכשיו.';
+  @override
+  String get factRating => 'דירוג';
+  @override
+  String get factCompatible => 'מתאים לאוצריא שלך';
+  @override
+  String get factYes => 'כן';
+  @override
+  String get factNo => 'לא';
+  @override
+  String factOtzariaVersion(String version) => 'אוצריא $version';
+  @override
+  String get factVersionLatest => 'העדכנית';
+  @override
+  String get factVersionInstalled => 'מותקנת אצלך';
+  @override
+  String factVersionInstalledAt(String version) => 'מותקנת אצלך $version';
+  @override
+  String get factNetworkAny => 'עובד בכל מחשב';
+  @override
+  String get factNetworkSome => 'לחלק מהיכולות';
+  @override
+  String get factSize => 'גודל';
+  @override
+  String get factOnDrive => 'בכונן';
+  @override
+  String get factNotOnDrive => 'לא בכונן';
+  @override
+  String get descriptionTitle => 'תיאור';
+  @override
+  String get versionsTitle => 'גרסאות';
+  @override
+  String get versionLatestTag => 'העדכנית';
+  @override
+  String get versionInstalledTag => 'מותקנת אצלך';
+  @override
+  String get infoDownloads => 'הורדות';
+  @override
+  String get infoSource => 'מקור';
+  @override
+  String get copyAddressTooltip => 'העתקת הכתובת';
+  @override
+  String get addressCopiedSnack => 'הכתובת הועתקה';
+  @override
+  String get ratingSourceNote => 'מדרגים באתר אוצריא.';
+  @override
+  String ratingAsOfNote(String date) =>
+      'נכון ל-$date, היום שבו הורדתם לכונן. מדרגים באתר אוצריא.';
+  @override
+  String get screenshotZoom => 'הגדלת צילום המסך';
+  @override
+  String screenshotNumber(int index, int total) => 'צילום $index מתוך $total';
+  @override
+  String get advancedSummary => 'העתקת חנות התוספים למחשב';
+  @override
+  String get storeAppCopyButton => 'העתקה…';
+  @override
+  String get storeAppRowBody =>
+      'תוכנה קטנה שמציגה את התוספים שבכונן ומתקינה אותם גם בלי הכונן (Windows).';
+  @override
+  String get reloadRowTitle => 'טעינה מחדש מהכונן';
+  @override
+  String get reloadButton => 'טעינה מחדש';
 }
 
 class _Faq extends FaqStrings {
@@ -3538,13 +3526,7 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get allAppsItem => 'כל התוכנות';
   @override
-  String allAppsWithCount(int count) => 'לכל התוכנות ($count)';
-  @override
   String get uncategorizedItem => 'ללא קטגוריה';
-  @override
-  String get cardDetailsLink => 'לפרטים מלאים';
-  @override
-  String get backToApps => 'חזרה לתוכנות';
 
   // ── דף התוכנה ──
   @override
@@ -3555,8 +3537,6 @@ class _CustomApps extends CustomAppsStrings {
   String get screenshotsPanelTitle => 'צילומי מסך';
   @override
   String get infoSource => 'מקור';
-  @override
-  String get infoSourceGithub => 'גיטהאב';
   @override
   String get infoSourceFile => 'קובץ שנבחר ידנית';
   @override
@@ -3577,7 +3557,7 @@ class _CustomApps extends CustomAppsStrings {
   String get emptyCategoryTitle => 'אין כאן עדיין תוכנות';
   @override
   String get emptyCategoryBody =>
-      'אפשר לשייך תוכנות לקטגוריה הזו בעריכת התוכנה, במסך הניהול שבהגדרות.';
+      'אפשר לשייך תוכנות לקטגוריה הזו בעריכת התוכנה, בניהול התוכנות שבהגדרות.';
   @override
   String get emptyUncategorizedTitle => 'כל התוכנות משויכות';
   @override
@@ -3588,10 +3568,8 @@ class _CustomApps extends CustomAppsStrings {
 
   // ── ניהול הקטגוריות ──
   @override
-  String get manageCategoriesButton => 'ניהול קטגוריות';
-  @override
   String get categoriesDialogHint =>
-      'הקטגוריות נוסעות על הכונן יחד עם התוכנות, ומוצגות כסרגל צד במסך.';
+      'הקטגוריות נוסעות על הכונן יחד עם התוכנות, ומוצגות כשבבים מעל הרשימה.';
   @override
   String get categoryNameLabel => 'שם הקטגוריה';
   @override
@@ -3621,20 +3599,20 @@ class _CustomApps extends CustomAppsStrings {
   String get appCategoriesHint =>
       'אפשר לשייך את התוכנה לכמה קטגוריות, או לאף אחת.';
   @override
-  String get longDescriptionLabel => 'תיאור מורחב';
+  String get longDescriptionLabel => 'תיאור מלא (לא חובה)';
   @override
   String get longDescriptionHint =>
       'מה התוכנה עושה, למי היא מיועדת וכל מה שכדאי לדעת. מוצג בדף התוכנה.';
   @override
-  String get iconLabel => 'אייקון';
+  String get iconLabel => 'סמל';
   @override
-  String get pickIconButton => 'בחירת אייקון';
+  String get pickIconButton => 'בחירת תמונה';
   @override
   String get pickIconDialogTitle => 'בחירת תמונת אייקון';
   @override
   String get removeIconTooltip => 'הסרת האייקון';
   @override
-  String get extractIconButton => 'חילוץ מקובץ ההרצה';
+  String get extractIconButton => 'חילוץ מהקובץ';
   @override
   String extractedIconSnack(String fileName) => 'האייקון חולץ מתוך $fileName';
   @override
@@ -3677,28 +3655,16 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get manageDialogTitle => 'ניהול התוכנות הנוספות';
   @override
-  String get manageDialogHint =>
-      'לחיצה על תוכנה פותחת את העריכה שלה. המרשם נקבע פעם אחת במחשב המקוון '
-      'ונוסע על הכונן כפי שהוא; ההורדה וההתקנה עצמן נעשות במסך "תוכנות '
-      'נוספות".';
+  String get manageDialogHint => 'התוכנות שנשמרות בכונן, הסדר שלהן והקטגוריות.';
   @override
   String get orderHint =>
-      'גררו כרטיס בידית אל מקומו של כרטיס אחר כדי לשנות את הסדר. זה הסדר שבו '
-      'התוכנות מוצגות במסך, והוא נוסע על הכונן.';
+      'גררו שורה בידית אל מקומה של שורה אחרת, או השתמשו בחיצים. זה הסדר שבו התוכנות מוצגות, והוא נוסע על הכונן.';
   @override
   String get moveAppEarlierTooltip => 'הזזה למקום הקודם';
   @override
   String get moveAppLaterTooltip => 'הזזה למקום הבא';
   @override
   String get dragToReorderTooltip => 'גרירה לשינוי הסדר';
-  @override
-  String get formSectionDetails => 'פרטי התוכנה';
-  @override
-  String get formSectionSource => 'מקור קובץ ההתקנה';
-  @override
-  String get formSectionInstall => 'התקנה וזיהוי';
-  @override
-  String get formSectionMedia => 'אייקון ותמונות';
 
   @override
   String get addDialogTitle => 'הוספת תוכנה';
@@ -3709,28 +3675,21 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get nameHint => 'כפי שיוצג לכם ברשימה';
   @override
-  String get descriptionLabel => 'תיאור';
+  String get descriptionLabel => 'תיאור קצר';
   @override
   String get descriptionHint => 'שורה קצרה שתזכיר לכם מה זה';
   @override
-  String get installDirLabel => 'מיקום ההתקנה';
+  String get installDirLabel => 'תיקיית ההתקנה';
   @override
   String get installDirHint =>
       'אפשר להשאיר ריק — אחרי ההתקנה הראשונה המיקום יימצא לבד.';
   @override
-  String get pickInstallDirButton => 'בחירת תיקייה';
+  String get pickInstallDirButton => 'בחירה…';
   @override
   String get pickInstallDirDialogTitle => 'בחירת תיקיית ההתקנה';
 
   @override
-  String get sourceLabel => 'מאיפה מגיעה התוכנה';
-  @override
-  String get sourceGithub => 'מגיטהאב';
-  @override
-  String get sourceFile => 'מקובץ שלי';
-
-  @override
-  String get githubUrlLabel => 'כתובת הריפו בגיטהאב';
+  String get githubUrlLabel => 'כתובת התוכנה באתר המפתחים';
   @override
   String get githubUrlHint => 'למשל github.com/owner/repo';
   @override
@@ -3746,7 +3705,7 @@ class _CustomApps extends CustomAppsStrings {
   String assetsFromRelease(String tagName) => 'הקבצים בגרסה $tagName:';
 
   @override
-  String get pickInstallerButton => 'בחירת קובץ';
+  String get pickInstallerButton => 'בחירה…';
   @override
   String get pickInstallerDialogTitle => 'בחירת קובץ ההתקנה';
   @override
@@ -3780,7 +3739,7 @@ class _CustomApps extends CustomAppsStrings {
       'הקובץ השמור, $fileName, יישאר. להחלפה — בחרו קובץ אחר.';
 
   @override
-  String get saveButton => 'הוספה';
+  String get saveButton => 'הוספה לכונן';
   @override
   String get saveEditButton => 'שמירה';
   @override
@@ -3872,23 +3831,21 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String installedSnack(String name) => '$name הותקנה';
   @override
-  String get trustDialogTitle => 'תוכנה שנוספה במחשב אחר';
+  String get trustDialogTitle => 'להתקין תוכנה שלא נבדקה?';
   @override
   String trustDialogContent(String name, String source) =>
-      'את "$name" לא הוסיפו במחשב הזה — היא הגיעה על הכונן ממקום אחר '
-      '($source). התקנה מריצה את קובץ ההתקנה שלה במחשב הזה. להמשיך רק אם '
-      'ידוע מי הוסיף אותה ומה היא.';
+      '"$name" נוספה לכונן במחשב אחר, ואין לה אישור מהמחשב הזה. '
+      'התקינו רק אם אתם סומכים על מי שהוסיף אותה${source == name ? '' : ' ($source)'}.';
   @override
-  String get trustDialogConfirm => 'אני סומך על התוכנה, התקן';
+  String get trustDialogConfirm => 'התקנה בכל זאת';
   @override
-  String get unverifiedDialogTitle => 'קובץ התקנה בלי טביעת אצבע';
+  String get unverifiedDialogTitle => 'להתקין קובץ שלא נבדק?';
   @override
   String unverifiedDialogContent(String fileName) =>
-      'ל-$fileName אין טביעת אצבע (sha256) שמורה, ולכן אי אפשר לוודא שהוא '
-      'הקובץ שצורף במקור. אישור יחשב אותה עכשיו וישמור אותה, ומכאן והלאה '
-      'כל שינוי בקובץ ייחסם.';
+      'לקובץ $fileName אין טביעת אצבע שמורה, ולכן אי אפשר לוודא שזה הקובץ שצורף במקור. '
+      'אם תמשיכו, היא תחושב ותישמר, ומכאן כל שינוי בקובץ ייחסם.';
   @override
-  String get unverifiedDialogConfirm => 'אמת ושמור';
+  String get unverifiedDialogConfirm => 'התקנה בכל זאת';
   @override
   String get learningLabel => 'מזהה את ההתקנה...';
   @override
@@ -3914,6 +3871,51 @@ class _CustomApps extends CustomAppsStrings {
   String get removeDialogConfirm => 'הסרה';
   @override
   String removedSnack(String name) => '$name הוסרה';
+
+  @override
+  String get screenSubtitle =>
+      'תוכנות שנשמרו בכונן כדי להתקין אותן גם במחשבים בלי אינטרנט.';
+  @override
+  String get showAllAppsButton => 'הצגת כל התוכנות';
+  @override
+  String get sourceGithubShort => 'מאתר המפתחים (GitHub)';
+  @override
+  String get sourceFileShort => 'מקובץ';
+  @override
+  String versionLabel(String version) => 'גרסה $version';
+  @override
+  String updateToButton(String version) => 'עדכון ל-$version';
+  @override
+  String get onlineNotChecked => 'עוד לא נבדק';
+  @override
+  String get manageEmptyTitle => 'עוד לא נוספו תוכנות';
+  @override
+  String get manageEmptyBody =>
+      'אפשר לשמור בכונן תוכנה שתרצו להתקין גם במחשבים בלי אינטרנט — מקובץ שיש במחשב, או מאתר המפתחים (GitHub) כדי שתתעדכן לבד.';
+  @override
+  String get manageReadOnlyNote => 'אי אפשר להוסיף כשאי אפשר לכתוב לכונן.';
+  @override
+  String get noCategoriesTitle => 'אין קטגוריות';
+  @override
+  String get orderSectionTitle => 'התוכנות לפי הסדר שבו הן מוצגות';
+  @override
+  String get formStepSource => 'מאיפה התוכנה?';
+  @override
+  String get formStepGithubFile => 'איזה קובץ?';
+  @override
+  String get formStepLocalFile => 'בחירת הקובץ';
+  @override
+  String get formStepDetails => 'פרטי התוכנה';
+  @override
+  String get sourceGithubOption => 'מאתר המפתחים — GitHub (מומלץ)';
+  @override
+  String get sourceGithubOptionHint => 'התוכנה תתעדכן לבד בכל הורדה לכונן.';
+  @override
+  String get sourceFileOption => 'קובץ שיש במחשב הזה';
+  @override
+  String get sourceFileOptionHint => 'קובץ התקנה, או תוכנה שלא צריך להתקין.';
+  @override
+  String get fileLabel => 'הקובץ';
 }
 
 String _reports(int count) => count == 1 ? '1 דיווח' : '$count דיווחים';

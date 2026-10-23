@@ -1677,52 +1677,19 @@ class _Plugins extends PluginsStrings {
   const _Plugins();
 
   @override
-  String get syncDialogTitle => 'Sync the plugin store';
-  @override
-  String get syncDialogContent =>
-      'This downloads the plugin list, the categories, the images and the '
-      'install files from otzaria.org into the transfer folder. Only new and '
-      'updated plugins are fetched — whatever is already there is left alone. '
-      'It needs internet once; after that the store works on a computer with '
-      'no connection at all.';
-  @override
-  String get syncDialogConfirm => 'Sync';
-  @override
-  String get syncFailedSnack => 'The sync failed';
+  String get syncFailedSnack => 'Updating from the website failed';
   @override
   String syncDoneSnack(int fetched, int total) => fetched == 0
-      ? 'Everything was already up to date — nothing downloaded '
-          '($total plugins in the store)'
-      : 'Sync complete — $fetched plugins downloaded, out of $total in the '
-          'store';
-  @override
-  String get syncingOverlaySubtitle =>
-      'Only new and updated plugins are downloaded — the rest is skipped.';
+      ? 'The plugin list is up to date — nothing new ($total plugins)'
+      : 'The plugin list was updated — $fetched of $total downloaded';
   @override
   String syncDoneWithWarningsSnack(int count) =>
-      'Sync finished, but $count items did not download. Details in the log.';
-  @override
-  String get syncButton => 'Sync from the site';
-  @override
-  String get reloadTooltip => 'Reload from the local folder';
-  @override
-  String get syncingOverlayTitle => 'Syncing the plugin store';
+      'The list was updated, but $count items did not download. Details are in the log.';
   @override
   String get syncingOverlayStarting => 'Starting…';
   @override
-  String get syncNeverRan => 'Never synced';
-  @override
-  String syncedAt(String time) => 'Last synced: $time';
-  @override
   String get syncDirUnknownTooltip =>
-      'The folder is chosen during the first sync';
-  @override
-  String updatesAvailableChip(int count) => '$count updates available';
-  @override
-  String get updatesBarBody =>
-      'The drive holds newer versions of plugins installed in Otzaria.';
-  @override
-  String get updatesBarButton => 'Show updates';
+      'The folder is set on the first update from the website';
 
   @override
   String get saveDialogTitle => 'Save the plugin';
@@ -1730,9 +1697,6 @@ class _Plugins extends PluginsStrings {
   String get saveDoneSnack => 'The file was saved';
   @override
   String get saveFailedSnack => 'Saving the file failed';
-  @override
-  String installOpenedSnack(String pluginName) =>
-      'Otzaria was opened to finish installing $pluginName';
   @override
   String installDoneSnack(String pluginName) =>
       '$pluginName was installed successfully';
@@ -1747,102 +1711,12 @@ class _Plugins extends PluginsStrings {
 
   @override
   String get loadingCatalog => 'Loading the plugin catalogue…';
-  @override
-  String get catalogTitleFallback => 'The Otzaria Plugin Store';
-  @override
-  String get catalogSubtitleFallback =>
-      'Plugins that enhance your learning experience in Otzaria';
-  @override
-  String get heroSearchHint => 'Search by name, description or topic…';
-  @override
-  String get heroSearchButton => 'Search';
 
   @override
-  String get emptyStoreTitle => 'The store is still being built — the plugins '
-      'are already here';
+  String get noResultsTitle => 'No plugins match your filters';
   @override
-  String get emptyStoreBody =>
-      'Featured plugins and organized categories are on their way. In the '
-      'meantime, search above or browse the full list of plugins.';
-  @override
-  String allPluginsWithCount(int count) => 'All plugins ($count)';
-  @override
-  String get browseAllPrompt => "Didn't find what you were looking for?";
-  @override
-  String browseAllButton(int count) => 'Browse all Plugins ($count)';
+  String get noResultsBody => 'Try another word, or search all categories.';
 
-  @override
-  String get featuredEyebrow => 'Store Picks';
-  @override
-  String get featuredTitle => 'Featured Plugins';
-  @override
-  String get showMoreFeatured => 'Show more picks';
-  @override
-  String categoryLinkButton(int count) => 'See the whole category ($count)';
-
-  @override
-  String get breadcrumbRoot => 'Plugin Store';
-  @override
-  String get allPluginsPage => 'All Plugins';
-  @override
-  String get listEyebrow => 'Plugin List';
-  @override
-  String get listTitle => 'Pick the plugin that fits your needs';
-  @override
-  String get summaryNoResults => 'No plugins match the filters you chose';
-  @override
-  String get summaryAllShown => 'Showing Every Plugin';
-  @override
-  String summaryPartial(int shown, int total) =>
-      'Showing $shown of $total plugins';
-  @override
-  String get categoryOnePlugin => 'One plugin in this category';
-  @override
-  String categoryPluginCount(int count) => '$count plugins in this category';
-
-  @override
-  String get hideInstalledLabel => 'Not Installed Only';
-  @override
-  String hideInstalledOnTooltip(int installedCount) =>
-      'Showing only plugins that are not installed or have an update.\n'
-      '$installedCount installed plugins were detected in Otzaria.';
-  @override
-  String hideInstalledOffTooltip(int installedCount) =>
-      'Showing every plugin, including installed and up-to-date ones.\n'
-      '$installedCount installed plugins were detected in Otzaria.';
-
-  @override
-  String get neverSyncedTitle => 'No plugins have been synced yet';
-  @override
-  String get neverSyncedBody =>
-      'Press "Sync from the site" on a computer with internet to load the '
-      'current plugin list from otzaria.org.';
-  @override
-  String get noResultsTitle => 'No plugins match the filters you chose';
-  @override
-  String get noResultsBody =>
-      'Try a different name, clear a tag, pick another status, or turn off '
-      '"Not Installed Only".';
-  @override
-  String get allInstalledTitle => 'Everything is installed and up to date';
-  @override
-  String get allInstalledBody =>
-      'The "Not Installed Only" switch hides plugins you already have at '
-      'the latest version. Turn it off to see them too.';
-  @override
-  String get showInstalledButton => 'Show Installed Plugins Too';
-  @override
-  String get emptyCategoryTitle => 'Plugins are coming to this category soon';
-  @override
-  String get emptyCategoryBody =>
-      'In the meantime you can browse the full list of plugins in the store.';
-  @override
-  String get allPluginsButton => 'All Plugins';
-
-  @override
-  String get filterSearchLabel => 'Search';
-  @override
-  String get filterSearchHint => 'Name, description or tag…';
   @override
   String get filterStatusLabel => 'Status';
   @override
@@ -1856,22 +1730,12 @@ class _Plugins extends PluginsStrings {
   @override
   String get filterTagsLabel => 'Tags';
   @override
-  String get filterAllTags => 'All tags';
-  @override
-  String get filterStatusAll => 'All';
-  @override
   String get showMoreTags => 'Show More';
   @override
   String get showFewerTags => 'Show Fewer';
 
   @override
-  String get badgeFeaturedShort => 'Featured';
-  @override
-  String get badgeFeatured => 'Featured Plugin';
-  @override
   String pluginVersionBadge(String version) => 'Version $version';
-  @override
-  String downloadsBadge(int count) => '$count downloads';
 
   @override
   String ratingBadge(String average, int count) => '$average ($count)';
@@ -1892,19 +1756,7 @@ class _Plugins extends PluginsStrings {
   @override
   String ratingStarsLabel(String average) => 'Rated $average out of 5';
   @override
-  String get saveButton => 'Save';
-  @override
-  String get installButton => 'Install';
-  @override
-  String get directInstallButton => 'Install straight into Otzaria';
-  @override
   String get sourcePageButton => 'Source Page';
-  @override
-  String get cardDetailsLink => 'Full Details';
-  @override
-  String cardUpdatedOn(String date) => 'Updated $date';
-  @override
-  String get backToStore => 'Back to the store';
 
   @override
   String get statusStable => 'Stable';
@@ -1916,99 +1768,37 @@ class _Plugins extends PluginsStrings {
   String get statusUnknown => 'Unknown';
 
   @override
-  String get installChipInstalled => 'Installed';
-  @override
-  String get installChipUpdateAvailable => 'Update Available';
-  @override
-  String installChipUpdateFrom(String installedVersion) =>
-      'Update available (you have $installedVersion)';
-  @override
-  String get installChipIncompatible => 'Needs a newer Otzaria';
-  @override
-  String get installChipDisabled => 'Installed, disabled in Otzaria';
-  @override
-  String get installChipDisabledUpdate =>
-      'Update available, disabled in Otzaria';
-  @override
-  String get installChipDevelopment => 'Local development copy';
-
-  @override
   String get infoPanelTitle => 'General Information';
   @override
-  String get tagsPanelTitle => 'Tags';
+  String get tagsPanelTitle => 'Categories and tags';
   @override
   String get screenshotsPanelTitle => 'Screenshots';
   @override
   String get infoVersion => 'Version';
   @override
-  String get infoStatus => 'Status';
+  String get infoStatus => 'Stage';
   @override
   String get infoAuthor => 'Developer';
   @override
   String get infoUpdated => 'Updated';
   @override
-  String get infoNetwork => 'Internet needed while using';
+  String get infoNetwork => 'Internet connection';
   @override
   String get infoNetworkRequired => 'Required';
   @override
   String get infoNetworkNotRequired => 'Not Required';
   @override
-  String get infoCompatibility => 'Compatibility';
+  String get infoCompatibility => 'Fits versions';
   @override
   String compatibilityRange(String from, String to) => '$from — up to $to';
   @override
-  String get infoLocalFile => 'Plugin file in the local folder';
+  String get infoLocalFile => 'File on the drive';
   @override
-  String get infoLocalFileMissing => 'Not downloaded yet — run a sync';
-  @override
-  String localFileDescription(String fileName, String size) =>
-      '$fileName ($size)';
+  String get infoLocalFileMissing => 'Not on the drive yet';
   @override
   String get valueUnspecifiedFeminine => 'Not specified';
   @override
   String get valueUnspecifiedMasculine => 'Not specified';
-  @override
-  String get sizeUnknown => 'Size unknown';
-
-  @override
-  String get categoriesTitle => 'Categories';
-  @override
-  String get storeHomeItem => 'Store Home';
-  @override
-  String get storeHomeChip => 'Home';
-
-  @override
-  String updatesDialogTitle(int count) => 'Updates are available ($count)';
-  @override
-  String get updatesDialogIntro =>
-      'These plugins are installed in your Otzaria at an older version than '
-      'the store has:';
-  @override
-  String updatesDialogRow(String installedVersion, String storeVersion) =>
-      'Installed $installedVersion → store $storeVersion';
-  @override
-  String get updatesDialogUpdateButton => 'Update';
-  @override
-  String updatesDialogUpdateAllButton(int count) => 'Update all ($count)';
-  @override
-  String get updatesDialogDetailsButton => 'Details';
-  @override
-  String get updatesDialogSentLabel => 'Sent to Otzaria';
-  @override
-  String get updatesDialogDoneLabel => 'Updated';
-  @override
-  String get updatesDialogPendingNote =>
-      'The installation itself happens inside Otzaria. This list updates by '
-      'itself the moment it finishes there — nothing to press.';
-
-  @override
-  String get newToastOne => 'New plugin in the store!';
-  @override
-  String newToastMany(int count) => '$count new plugins in the store!';
-  @override
-  String get newToastView => 'View';
-  @override
-  String get newToastClose => 'Close';
 
   @override
   String get screenshotPrevious => 'Previous';
@@ -2072,9 +1862,6 @@ class _Plugins extends PluginsStrings {
   @override
   String get storeAppCopyingTitle => 'Copying the plugin store';
   @override
-  String get storeAppCopyingSubtitle =>
-      'Copying from this drive only — no internet is used here.';
-  @override
   String get storeAppDoneTitle => 'The store was copied';
   @override
   String storeAppDoneContent(int plugins, String size) =>
@@ -2091,6 +1878,205 @@ class _Plugins extends PluginsStrings {
   @override
   String storeAppLaunchFailedSnack(String error) =>
       'Launching the store failed: $error';
+
+  @override
+  String get storeTitle => 'Plugins';
+  @override
+  String get storeSubtitle =>
+      'Plugins that extend Otzaria. Everything here is already on the drive and installs without internet.';
+  @override
+  String asOfDate(String date) => 'As of $date.';
+  @override
+  String get refreshButton => 'Refresh';
+  @override
+  String get syncingTitle => 'Updating the plugin list from the website';
+  @override
+  String get syncingHint =>
+      'Only new and updated plugins are downloaded. You can keep browsing meanwhile.';
+  @override
+  String get syncStopButton => 'Stop';
+  @override
+  String get syncStoppedSnack =>
+      'The update stopped. What was already downloaded is kept on the drive.';
+  @override
+  String get emptyTitle => 'No plugins on the drive yet';
+  @override
+  String get emptyBodyOnline =>
+      'Plugins come to the drive with the Otzaria updates. This computer is online, so you can download them now.';
+  @override
+  String get emptyBodyOffline =>
+      'Plugins come to the drive with the Otzaria updates. On a computer with internet, click "Download updates to the drive" and they will appear here.';
+  @override
+  String get searchHint => 'Search plugins by name or topic';
+  @override
+  String get clearSearchTooltip => 'Clear';
+  @override
+  String get filterAll => 'All';
+  @override
+  String get filterInstalled => 'Installed';
+  @override
+  String get filterNotInstalled => 'Not installed';
+  @override
+  String get moreFilters => 'More filters';
+  @override
+  String moreFiltersCount(int count) => 'More filters ($count)';
+  @override
+  String noResultsForQuery(String query) => 'No plugins found for "$query"';
+  @override
+  String get clearFiltersButton => 'Clear search and filters';
+  @override
+  String updatesAvailable(int count) => plural(count,
+      one: 'One update available', many: '$count updates available');
+  @override
+  String updatesBarNames(String names) =>
+      '$names · sent to Otzaria, where you approve each one';
+  @override
+  String joinNames(List<String> names) => names.length < 2
+      ? names.join()
+      : '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+  @override
+  String get updateAllButton => 'Update all';
+  @override
+  String updatingAllLabel(int current, int total) =>
+      'Sending to Otzaria, $current of $total…';
+  @override
+  String updatesSentSnack(int count) => plural(count,
+      one: 'The update was sent to Otzaria — approve it there',
+      many: '$count updates were sent to Otzaria — approve them there');
+  @override
+  String get updatesSentTitle =>
+      'The updates were sent to Otzaria — approve them there';
+  @override
+  String get updatesSentBody =>
+      'This list updates by itself as soon as Otzaria finishes installing.';
+  @override
+  String installSentSnack(String pluginName) =>
+      '$pluginName was sent to Otzaria — approve it there';
+  @override
+  String get newChip => 'New';
+  @override
+  String get networkChip => 'Needs internet';
+  @override
+  String get installInOtzariaButton => 'Install in Otzaria';
+  @override
+  String updateToButton(String version) => 'Update to $version';
+  @override
+  String get saveFileButton => 'Save plugin file…';
+  @override
+  String get sendingLabel => 'Sending to Otzaria…';
+  @override
+  String get sentLabel => 'Sent to Otzaria — approve there';
+  @override
+  String get developmentLabel => 'In development here';
+  @override
+  String get incompatibleLabel => 'Not compatible with your Otzaria';
+  @override
+  String get disabledLabel => 'Disabled in Otzaria';
+  @override
+  String get installedLabel => 'Installed';
+  @override
+  String get noteIncompatible => 'No version fits the Otzaria on this computer';
+  @override
+  String noteNeedsApp(String version) => 'Needs Otzaria $version or later';
+  @override
+  String get noteNeedsOtzaria => 'Install Otzaria first';
+  @override
+  String get noteSaveOnly => 'No direct install — save the file';
+  @override
+  String get noteDisabled => 'Disabled in Otzaria';
+  @override
+  String get noteFileMissing =>
+      'Not on the drive yet — downloaded on install (needs internet)';
+  @override
+  String get incompatibleTitle =>
+      'This plugin does not fit the Otzaria on this computer';
+  @override
+  String incompatibleBodyVersions(String needs, String here) =>
+      'It needs Otzaria $needs or later, and this computer has $here. After you update Otzaria you can install it.';
+  @override
+  String get incompatibleBody =>
+      'It has no version that runs on the Otzaria here. After you update Otzaria you can install it.';
+  @override
+  String get disabledTitle => 'The plugin is disabled in Otzaria';
+  @override
+  String get disabledBody =>
+      'It is installed but not active. You can turn it back on in the Otzaria plugin settings.';
+  @override
+  String get disabledUpdateBody =>
+      'The update installs even while it is disabled.';
+  @override
+  String get developmentTitle => 'Plugin in development';
+  @override
+  String get developmentBody =>
+      'Otzaria loads it from its own folder on this computer, so this tool does not update it.';
+  @override
+  String get fileMissingTitle => 'The plugin file is not on the drive yet';
+  @override
+  String get fileMissingBody =>
+      'It downloads the next time you download updates to the drive on a computer with internet. On a connected computer, installing downloads it now.';
+  @override
+  String get factRating => 'Rating';
+  @override
+  String get factCompatible => 'Fits your Otzaria';
+  @override
+  String get factYes => 'Yes';
+  @override
+  String get factNo => 'No';
+  @override
+  String factOtzariaVersion(String version) => 'Otzaria $version';
+  @override
+  String get factVersionLatest => 'Latest';
+  @override
+  String get factVersionInstalled => 'Installed here';
+  @override
+  String factVersionInstalledAt(String version) => 'You have $version';
+  @override
+  String get factNetworkAny => 'Works on any computer';
+  @override
+  String get factNetworkSome => 'For some features';
+  @override
+  String get factSize => 'Size';
+  @override
+  String get factOnDrive => 'On the drive';
+  @override
+  String get factNotOnDrive => 'Not on the drive';
+  @override
+  String get descriptionTitle => 'Description';
+  @override
+  String get versionsTitle => 'Versions';
+  @override
+  String get versionLatestTag => 'latest';
+  @override
+  String get versionInstalledTag => 'installed here';
+  @override
+  String get infoDownloads => 'Downloads';
+  @override
+  String get infoSource => 'Source';
+  @override
+  String get copyAddressTooltip => 'Copy address';
+  @override
+  String get addressCopiedSnack => 'Address copied';
+  @override
+  String get ratingSourceNote => 'Ratings are given on the Otzaria website.';
+  @override
+  String ratingAsOfNote(String date) =>
+      'As of $date, when you downloaded to the drive. Ratings are given on the Otzaria website.';
+  @override
+  String get screenshotZoom => 'Enlarge screenshot';
+  @override
+  String screenshotNumber(int index, int total) =>
+      'Screenshot $index of $total';
+  @override
+  String get advancedSummary => 'Copy the plugin store to this computer';
+  @override
+  String get storeAppCopyButton => 'Copy…';
+  @override
+  String get storeAppRowBody =>
+      'A small app that shows the plugins on the drive and installs them even without the drive (Windows).';
+  @override
+  String get reloadRowTitle => 'Reload from the drive';
+  @override
+  String get reloadButton => 'Reload';
 }
 
 class _Faq extends FaqStrings {
@@ -3767,13 +3753,7 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get allAppsItem => 'All programs';
   @override
-  String allAppsWithCount(int count) => 'All programs ($count)';
-  @override
   String get uncategorizedItem => 'Uncategorized';
-  @override
-  String get cardDetailsLink => 'Full details';
-  @override
-  String get backToApps => 'Back to programs';
 
   // ── The program page ──
   @override
@@ -3784,8 +3764,6 @@ class _CustomApps extends CustomAppsStrings {
   String get screenshotsPanelTitle => 'Screenshots';
   @override
   String get infoSource => 'Source';
-  @override
-  String get infoSourceGithub => 'GitHub';
   @override
   String get infoSourceFile => 'Manually picked file';
   @override
@@ -3806,8 +3784,7 @@ class _CustomApps extends CustomAppsStrings {
   String get emptyCategoryTitle => 'No programs here yet';
   @override
   String get emptyCategoryBody =>
-      'Programs are assigned to a category when you edit them, from the '
-      'management window in the settings.';
+      'You can assign programs to this category when editing them, in program management under Settings.';
   @override
   String get emptyUncategorizedTitle => 'Every program is assigned';
   @override
@@ -3818,11 +3795,8 @@ class _CustomApps extends CustomAppsStrings {
 
   // ── Managing categories ──
   @override
-  String get manageCategoriesButton => 'Manage categories';
-  @override
   String get categoriesDialogHint =>
-      'Categories travel on the drive together with the programs, and appear '
-      'as a side rail on the screen.';
+      'Categories travel on the drive with the programs and appear as chips above the list.';
   @override
   String get categoryNameLabel => 'Category name';
   @override
@@ -3855,7 +3829,7 @@ class _CustomApps extends CustomAppsStrings {
   String get appCategoriesHint =>
       'A program can belong to several categories, or to none.';
   @override
-  String get longDescriptionLabel => 'Full description';
+  String get longDescriptionLabel => 'Full description (optional)';
   @override
   String get longDescriptionHint =>
       'What the program does, who it is for, and anything worth knowing. '
@@ -3863,13 +3837,13 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get iconLabel => 'Icon';
   @override
-  String get pickIconButton => 'Pick an icon';
+  String get pickIconButton => 'Choose image';
   @override
   String get pickIconDialogTitle => 'Pick an icon image';
   @override
   String get removeIconTooltip => 'Remove the icon';
   @override
-  String get extractIconButton => 'Extract from the executable';
+  String get extractIconButton => 'Extract from file';
   @override
   String extractedIconSnack(String fileName) =>
       'The icon was extracted from $fileName';
@@ -3916,27 +3890,16 @@ class _CustomApps extends CustomAppsStrings {
   String get manageDialogTitle => 'Manage Other Programs';
   @override
   String get manageDialogHint =>
-      'Click a program to edit it. The registry is set once on the online '
-      'computer and travels on the drive as it is; downloading and '
-      'installing themselves happen on the "Other Programs" screen.';
+      'The programs kept on the drive, their order and categories.';
   @override
   String get orderHint =>
-      "Drag a card by its handle onto another card's place to reorder. This is the order "
-      'the programs appear in on the screen, and it travels on the drive.';
+      'Drag a row by its handle onto another, or use the arrows. This is the order the programs are shown in, and it travels on the drive.';
   @override
   String get moveAppEarlierTooltip => 'Move earlier';
   @override
   String get moveAppLaterTooltip => 'Move later';
   @override
   String get dragToReorderTooltip => 'Drag to reorder';
-  @override
-  String get formSectionDetails => 'Program details';
-  @override
-  String get formSectionSource => 'Installer source';
-  @override
-  String get formSectionInstall => 'Install and detection';
-  @override
-  String get formSectionMedia => 'Icon and images';
 
   @override
   String get addDialogTitle => 'Add a Program';
@@ -3947,29 +3910,22 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String get nameHint => 'As it will appear in your list';
   @override
-  String get descriptionLabel => 'Description';
+  String get descriptionLabel => 'Short description';
   @override
   String get descriptionHint => 'A short line to remind you what this is';
   @override
-  String get installDirLabel => 'Install location';
+  String get installDirLabel => 'Installation folder';
   @override
   String get installDirHint =>
       'Can be left empty — the location is found by itself after the first '
       'install.';
   @override
-  String get pickInstallDirButton => 'Choose Folder';
+  String get pickInstallDirButton => 'Choose…';
   @override
   String get pickInstallDirDialogTitle => 'Choose the install folder';
 
   @override
-  String get sourceLabel => 'Where the program comes from';
-  @override
-  String get sourceGithub => 'From GitHub';
-  @override
-  String get sourceFile => 'From my own file';
-
-  @override
-  String get githubUrlLabel => 'GitHub repository address';
+  String get githubUrlLabel => 'Program address on the developer site';
   @override
   String get githubUrlHint => 'For example github.com/owner/repo';
   @override
@@ -3986,7 +3942,7 @@ class _CustomApps extends CustomAppsStrings {
   String assetsFromRelease(String tagName) => 'Files in release $tagName:';
 
   @override
-  String get pickInstallerButton => 'Choose File';
+  String get pickInstallerButton => 'Choose…';
   @override
   String get pickInstallerDialogTitle => 'Choose the installer file';
   @override
@@ -4023,7 +3979,7 @@ class _CustomApps extends CustomAppsStrings {
       'file.';
 
   @override
-  String get saveButton => 'Add';
+  String get saveButton => 'Add to the drive';
   @override
   String get saveEditButton => 'Save';
   @override
@@ -4121,24 +4077,21 @@ class _CustomApps extends CustomAppsStrings {
   @override
   String installedSnack(String name) => '$name was installed';
   @override
-  String get trustDialogTitle => 'A program added on another computer';
+  String get trustDialogTitle => 'Install a program that was not checked?';
   @override
   String trustDialogContent(String name, String source) =>
-      '"$name" was not added on this computer — it came on the drive from '
-      'elsewhere ($source). Installing runs its installer on this computer. '
-      'Continue only if you know who added it and what it is.';
+      '"$name" was added to the drive on another computer and has not been approved on this one. '
+      'Install it only if you trust whoever added it${source == name ? '' : ' ($source)'}.';
   @override
-  String get trustDialogConfirm => 'I trust this program, install';
+  String get trustDialogConfirm => 'Install anyway';
   @override
-  String get unverifiedDialogTitle => 'An installer without a fingerprint';
+  String get unverifiedDialogTitle => 'Install a file that was not checked?';
   @override
   String unverifiedDialogContent(String fileName) =>
-      '$fileName has no stored fingerprint (sha256), so there is no way to '
-      'tell whether it is the file that was originally added. Approving '
-      'computes and stores it now; from then on any change to the file is '
-      'blocked.';
+      '$fileName has no saved fingerprint, so it cannot be checked against the file that was added. '
+      'If you continue, it is computed and saved, and any later change to the file is blocked.';
   @override
-  String get unverifiedDialogConfirm => 'Verify and save';
+  String get unverifiedDialogConfirm => 'Install anyway';
   @override
   String get learningLabel => 'Identifying the installation...';
   @override
@@ -4166,6 +4119,55 @@ class _CustomApps extends CustomAppsStrings {
   String get removeDialogConfirm => 'Remove';
   @override
   String removedSnack(String name) => '$name was removed';
+
+  @override
+  String get screenSubtitle =>
+      'Programs saved on the drive so you can install them on computers without internet.';
+  @override
+  String get showAllAppsButton => 'Show all programs';
+  @override
+  String get sourceGithubShort => 'From the developer site (GitHub)';
+  @override
+  String get sourceFileShort => 'From a file';
+  @override
+  String versionLabel(String version) => 'Version $version';
+  @override
+  String updateToButton(String version) => 'Update to $version';
+  @override
+  String get onlineNotChecked => 'Not checked yet';
+  @override
+  String get manageEmptyTitle => 'No programs added yet';
+  @override
+  String get manageEmptyBody =>
+      'You can keep a program on the drive to install on computers without internet — from a file on this computer, or from the developer site (GitHub) so it updates by itself.';
+  @override
+  String get manageReadOnlyNote =>
+      'You cannot add programs while the drive is write-protected.';
+  @override
+  String get noCategoriesTitle => 'No categories';
+  @override
+  String get orderSectionTitle => 'Programs in the order they are shown';
+  @override
+  String get formStepSource => 'Where is the program from?';
+  @override
+  String get formStepGithubFile => 'Which file?';
+  @override
+  String get formStepLocalFile => 'Choose the file';
+  @override
+  String get formStepDetails => 'Program details';
+  @override
+  String get sourceGithubOption =>
+      'From the developer site — GitHub (recommended)';
+  @override
+  String get sourceGithubOptionHint =>
+      'The program updates by itself with every download to the drive.';
+  @override
+  String get sourceFileOption => 'A file on this computer';
+  @override
+  String get sourceFileOptionHint =>
+      'An installer, or a program that needs no installation.';
+  @override
+  String get fileLabel => 'The file';
 }
 
 String _reports(int count) => count == 1 ? 'report' : 'reports';

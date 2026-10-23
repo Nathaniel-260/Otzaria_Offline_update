@@ -1575,15 +1575,15 @@ deleted", because only the first is fixed by downloading again.
 
 **"New plugin" notices are once per machine, and an empty catalog is not a
 baseline.** `KnownPluginsStore` (`plugins_known.json`, keyed by hostname like
-`AnnouncedAppsStore`) keeps two lists: what the store toast has shown and what
-the home page has mentioned — one list would let the home banner swallow the
-toast. The home banner ("N new plugins on the drive") stays until the store is
+`AnnouncedAppsStore`) keeps two lists: what the store has marked "new" (a chip on
+the card, recorded as seen on entering the store) and what the home page has
+mentioned — one list would let the home banner swallow the store's mark. The home banner ("N new plugins on the drive") stays until the store is
 visited; entering it records them (`AppSession.markPluginsVisited`). The first
 *non-empty* load only records the catalog as known; recording on an empty one would
 make the first sync announce the whole store. Updates are never a popup: a count on
-the plugins tile and a bar at the top of the store that opens the update list.
-`PluginsModuleController.newPlugins`, `newPluginsForHome`,
-`AppSession.newPluginsForHome`, `PluginNewToast`.
+the plugins tile and a bar at the top of the store with "update all" (one delivery at a
+time, `pluginUpdateDeliverySpacing` apart). `PluginsModuleController.newPlugins`,
+`newPluginsForHome`, `AppSession.newPluginsForHome`, `PluginMeta(isNew:)`.
 
 ### 5.7 Custom apps
 
@@ -1702,26 +1702,20 @@ otherwise delete them; and `readOnly` stops it, because it writes to the drive.
 `AppDescriptor.autoIcon` is set to false only when the user **removed** an icon
 in the form — without it the removed icon reappeared on the next visit.
 
-**An icon is displayed with `StoreThumbnail.icon`, never the default
-constructor.** The default is `BoxFit.cover`, right for a wide store image and
-wrong for a square icon: it fills the frame and crops what sticks out, which is
-exactly the report "the icon escapes the frame and you can't see all of it". The
-named constructor centers the whole image on a neutral background.
+**Every store icon is a `StoreIcon`: a fixed square (64 in a card, 96 on a detail
+page) with the image inside at `BoxFit.contain`.** `BoxFit.cover` crops a square
+icon in a wide frame — the old report "the icon escapes the frame" — and a frame
+whose size follows the card width left the icon adrift in an empty band. The square
+never changes with the window, so neither can happen. Without an image it shows the
+app's placeholder icon (custom apps) or the Otzaria logo (plugins, as on the site).
 
-**The icon's size is a ratio of its frame, never a pixel count.**
-`kStoreIconRatio` (0.5) is the edge, `kStoreIconGutterRatio` the air above and
-below it, and `kStoreIconFrameAspect` is **derived** from the two — a frame whose
-height is not "icon + its air" is precisely the empty band the icon floats in. A
-fixed pixel size is right for one card width and either tiny or overflowing at
-every other, and the grid's card width changes with the window. `maxSize` is the
-blur ceiling (the source is 256×256), not the design.
-
-⚠️ A card that narrows its icon frame (`kCustomAppIconFrameMaxWidth`) must pass
-the same number to `StoreGridDelegate.imageMaxWidth`. The delegate decides the
-tile's height and the card decides what fills it; if the two disagree the card
-either overflows or floats in dead space. Without the cap a single-column window
-gave a 500px-wide frame with a small icon adrift in the middle — the same empty
-band, reintroduced from the other end.
+**Custom apps are managed only from Settings.** The "Other programs" page (its home
+tile appears only when there are apps) is for using them: download, check online,
+install, launch. Adding, editing, removing, categories and order live on
+`CustomAppsManagePage`, opened from Settings → Other programs → Manage as
+`CustomAppsManageRoute` — a page inside the body, behind the same safer-mode gate as
+Settings. The add/edit form stays a dialog. On a read-only drive the Manage button is
+disabled with the reason, since every management action writes to the drive.
 
 **`CustomAppsScreen` listens to its own controller**, like `PluginsScreen` and
 unlike the version before the card grid: the open category lives in the
@@ -2038,26 +2032,39 @@ the drive, who receives it) above "Collect to the drive", so the click is the co
 
 **Store images must pass `cacheWidth`.** Without it Flutter decodes at source
 resolution; a 1200×800 catalogue image is ~3.8MB of RAM, times every plugin. See
-`decodeWidthFor` in `screens/plugins/plugin_visuals.dart`. Related: the grid is a
-`SliverGrid` inside `PluginStoreBody`'s `CustomScrollView` — it was a
+`decodeWidthFor` in `screens/store_kit/store_visuals.dart`. Related: the grid is a
+`SliverGrid` inside `StoreBody`'s `CustomScrollView` — it was a
 `GridView(shrinkWrap: true)` inside a `ListView`, and `shrinkWrap` disables
 virtualisation, so every card was built regardless of the viewport.
 
 **Store cards live in a fixed-height grid, so nothing inside may grow.**
-`mainAxisExtent` is computed from `_cardContentHeight`, and the card's two `Wrap` rows
-(metadata badges, tags) silently wrap to another line when a chip gets longer or the
-column narrows — which overflowed the card. Both rows have a fixed height budget with
-`Clip.hardEdge`, the install chip is shortened inside cards
-(`PluginInstallChip(compact: true)`), and the "כרטיס עמוס" test in `screens_test.dart`
-renders the heaviest card in the narrowest column at two text scales.
+`StoreGridDelegate` gives one column of row cards below 772px of content and two
+columns of tile cards above it (the mockup's 820px container query), with
+`mainAxisExtent` from `storeRowCardExtent`/`storeTileCardExtent` — a fixed part plus a
+part multiplied by the text scale. The layout is computed in the delegate, not a
+`SliverLayoutBuilder`, which would rebuild the grid on every scroll frame. Inside the
+card the description always reserves two lines, the meta line is one clipped row whose
+items ellipsize, and the tile's action is `Flexible`. The search row stacks the
+installed filter under the search field below `600 × textScale`. The "כרטיס עמוס" test
+in `screens_test.dart` renders the heaviest card at four widths, both languages and
+five text scales.
 
-**`PluginStoreBody` takes slivers only, and nothing nests a scrollable inside it.** A
+**`StoreBody` takes slivers only, and nothing nests a scrollable inside it.** A
 `SliverList` with a fixed child list builds every child up front, re-creating the
-eager-image problem. The category sidebar therefore lives *outside* the
-`CustomScrollView` (it also stays put while the content scrolls, like the site's sticky
-aside), and the website's mobile-style horizontal card rows were deliberately not
-ported — a nested horizontal scrollable swallows the mouse wheel and makes the page
-feel frozen.
+eager-image problem. Categories are a wrapped row of chips above the grid (there is
+no sidebar), screenshots are one large image with dots rather than a horizontal strip,
+and the website's mobile-style horizontal card rows were deliberately not ported — a
+nested horizontal scrollable swallows the mouse wheel and makes the page feel frozen.
+`StoreBody` also supplies a transparent `Material`, so its fields and ink work outside
+a `Scaffold`.
+
+**The store is the website's catalogue page, not its curated home.** One page: title
+with "refresh" (only online and on a writable drive; progress is a card in the page,
+not an overlay), local search (final letters, niqqud and geresh ignored, matches
+highlighted — `services/store_search.dart`), an "all / installed / not installed"
+switch, category chips, a collapsed "more filters" (stability and tags), the updates
+bar, the grid, and "advanced" (store-app export on Windows, reload from the drive).
+The site's curated home (featured row, per-category rows) is not ported.
 
 ### 5.10 Error reports (offline → online)
 

@@ -14,6 +14,7 @@ import 'package:launcher_app/src/controllers/custom_apps_controller.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_app_detail_view.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_app_form_source.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_app_store_card.dart';
+import 'package:launcher_app/src/screens/custom_apps/custom_apps_manage_page.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_screen.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
 import 'package:launcher_app/src/screens/custom_apps/installer_kind_label.dart';
@@ -112,10 +113,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// פותח את מסך הניהול מתוך שורת ההגדרות — הדרך היחידה להגיע אליו.
+  /// דף הניהול — נפתח מהגדרות › תוכנות נוספות (ראו app_shell_test).
   Future<void> openManager(WidgetTester tester) async {
-    await pumpScreen(tester, CustomAppsSettingsCard(controller: controller));
-    await tester.tap(find.text('ניהול התוכנות'));
+    await pumpScreen(tester, CustomAppsManagePage(controller: controller));
     await tester.pumpAndSettle();
   }
 
@@ -128,7 +128,8 @@ void main() {
     // בהגדרות נשארה שורה אחת בלבד, וכל תפקידה לפתוח את מסך הניהול.
     testWidgets('שורת ההגדרות כן מוצגת — היא הכניסה הראשונה', (tester) async {
       await tester.runAsync(controller.load);
-      await pumpScreen(tester, CustomAppsSettingsCard(controller: controller));
+      await pumpScreen(tester,
+          CustomAppsSettingsCard(controller: controller, onOpenManager: () {}));
 
       expect(find.text('תוכנות נוספות'), findsWidgets);
       expect(find.text('לא נוספו תוכנות'), findsOneWidget);
@@ -144,7 +145,8 @@ void main() {
 
       expect(find.text('ניהול התוכנות הנוספות'), findsOneWidget);
       expect(find.text('הוספת תוכנה'), findsOneWidget);
-      expect(find.text('ניהול קטגוריות'), findsOneWidget);
+      expect(
+          find.text(stringsOf().customApps.manageEmptyTitle), findsOneWidget);
     });
 
     testWidgets('תוכנה ראשונה מדליקה את פריט הניווט', (tester) async {
@@ -178,14 +180,23 @@ void main() {
       await addApp(tester, exeName: 'demo.exe', withInstaller: true);
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
 
-      expect(find.textContaining('על הכונן: גרסה 1.4.2'), findsOneWidget);
+      expect(
+        find.text(stringsOf().customApps.versionLabel('1.4.2')),
+        findsOneWidget,
+      );
       expect(find.text('התקנה'), findsOneWidget);
+      // ובדף: "על הכונן: גרסה 1.4.2".
+      await tester.tap(find.byType(StoreItemCard).first);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('על הכונן: גרסה 1.4.2'), findsOneWidget);
     });
 
     // ההבחנה החשובה: "לא חיפשנו" אינו "חיפשנו ולא מצאנו".
     testWidgets('בלי שם קובץ הרצה אינו מדווח "אינה מותקנת"', (tester) async {
       await addApp(tester);
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
+      await tester.tap(find.byType(StoreItemCard).first);
+      await tester.pumpAndSettle();
 
       expect(find.textContaining('לא ניתן לזהות'), findsOneWidget);
       expect(find.textContaining('אינה מותקנת'), findsNothing);
@@ -194,6 +205,8 @@ void main() {
     testWidgets('עם שם קובץ הרצה שלא נמצא — כן "אינה מותקנת"', (tester) async {
       await addApp(tester, exeName: 'no-such-app-anywhere.exe');
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
+      await tester.tap(find.byType(StoreItemCard).first);
+      await tester.pumpAndSettle();
 
       expect(find.textContaining('אינה מותקנת'), findsOneWidget);
     });
@@ -268,7 +281,6 @@ void main() {
           controller: controller,
           app: controller.apps.single,
           readOnly: false,
-          onBack: () {},
           onInstall: () {},
           onLaunch: () {},
           onDownload: () {},
@@ -803,8 +815,10 @@ void main() {
       expect(idsOf(), ['gimel', 'bet', 'alef']);
     });
 
-    // בקטגוריה פתוחה "הקודם" הוא הקודם *בה*, וההזזה נשמרת בסדר המלא.
-    testWidgets('בקטגוריה החיצים מדלגים על מה שמחוץ לה', (tester) async {
+    // הניהול מסדר את הרשימה המלאה — גם כשבחנות פתוחה קטגוריה.
+    testWidgets('דף הניהול מציג את כל התוכנות, גם כשבחנות פתוחה קטגוריה', (
+      tester,
+    ) async {
       await tester.runAsync(() async {
         await controller.load();
         await controller.addCategory('כלים');
@@ -813,24 +827,21 @@ void main() {
       await addApp(tester, id: 'alef', name: 'א', categories: [slug]);
       await addApp(tester, id: 'bet', name: 'ב');
       await addApp(tester, id: 'gimel', name: 'ג', categories: [slug]);
-      // קטגוריה שנפתחה בלשונית אינה נגררת לניהול — הוא מתחיל מהכול.
       controller.showCategory(slug);
       await openManager(tester);
       expect(find.text('ב'), findsOneWidget);
 
-      controller.showCategory(slug);
-      await tester.pumpAndSettle();
-      expect(find.text('ב'), findsNothing);
       await tester.tap(find.byTooltip('הזזה למקום הקודם').at(1));
       await tester.pumpAndSettle();
 
-      expect(idsOf(), ['gimel', 'alef', 'bet']);
+      expect(idsOf(), ['bet', 'alef', 'gimel']);
     });
   });
 
-  /// מסך הניהול הוא מסך התוכנות עצמו, רק עם כלי העריכה במקום הפעולות.
+  /// דף הניהול: שורה לכל תוכנה עם כלי העריכה — בלי הפעולות של החנות.
   group('מסך הניהול', () {
-    testWidgets('זו אותה רשת, בלי התקנה, הורדה או בדיקה ברשת', (tester) async {
+    testWidgets('שורה לכל תוכנה, בלי התקנה, הורדה או בדיקה ברשת',
+        (tester) async {
       await addApp(
         tester,
         id: 'gh',
@@ -846,19 +857,21 @@ void main() {
       );
       await openManager(tester);
 
-      expect(find.byType(CustomAppStoreCard), findsNWidgets(2));
+      expect(find.byType(CustomAppStoreCard), findsNothing);
+      expect(find.text('מגיטהאב'), findsOneWidget);
+      expect(find.text('מקומית'), findsOneWidget);
       expect(find.byTooltip('עריכה'), findsNWidgets(2));
-      expect(find.text('לפרטים מלאים'), findsNothing);
+      expect(find.byTooltip('הסרה מהרשימה'), findsNWidgets(2));
       expect(find.text('התקנה'), findsNothing);
       expect(find.text('הורדה לכונן'), findsNothing);
       expect(find.text('בדיקה ברשת לכל התוכנות'), findsNothing);
     });
 
-    testWidgets('לחיצה על כרטיס פותחת את טופס העריכה', (tester) async {
+    testWidgets('"עריכה" בשורה פותחת את טופס העריכה', (tester) async {
       await addApp(tester, name: 'לעריכה בלחיצה');
       await openManager(tester);
 
-      await tester.tap(find.text('לעריכה בלחיצה'));
+      await tester.tap(find.byTooltip('עריכה'));
       await tester.pumpAndSettle();
 
       expect(find.text('עריכת התוכנה'), findsOneWidget);
@@ -868,7 +881,8 @@ void main() {
       await tester.runAsync(controller.load);
       await openManager(tester);
 
-      expect(find.text('לא נוספו תוכנות'), findsWidgets);
+      expect(
+          find.text(stringsOf().customApps.manageEmptyTitle), findsOneWidget);
       await tester.tap(find.text('הוספת תוכנה'));
       await tester.pumpAndSettle();
       expect(find.text('פרטי התוכנה'), findsOneWidget);
@@ -894,15 +908,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.text('ביטול'), findsNothing);
       expect(controller.isBusy, isTrue);
-    });
-
-    testWidgets('סגירה מחזירה להגדרות', (tester) async {
-      await tester.runAsync(controller.load);
-      await openManager(tester);
-
-      await tester.tap(find.text('סגירה'));
-      await tester.pumpAndSettle();
-      expect(find.text('ניהול התוכנות הנוספות'), findsNothing);
     });
 
     // המסך נפתח כדי לערוך — ההודעה על מה שממתין שייכת ללשונית.
@@ -1055,7 +1060,8 @@ void main() {
         exeName: 'no-such-app-anywhere.exe',
         withInstaller: true,
       );
-      await pumpScreen(tester, CustomAppsSettingsCard(controller: controller));
+      await pumpScreen(tester,
+          CustomAppsSettingsCard(controller: controller, onOpenManager: () {}));
       await tester.pumpAndSettle();
 
       expect(controller.unannouncedApps, hasLength(1));
@@ -1101,7 +1107,7 @@ void main() {
       );
       await pumpScreen(
         tester,
-        CustomAppsScreen(controller: controller, manage: true),
+        CustomAppsManagePage(controller: controller),
       );
       await tester.pumpAndSettle();
 
@@ -1614,10 +1620,10 @@ void main() {
       // התיאור המורחב שייך לדף בלבד — הכרטיס ברשת בגובה קבוע.
       expect(find.textContaining('הסבר ארוך'), findsNothing);
 
-      await tester.tap(find.text('לפרטים מלאים'));
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
 
-      expect(find.text('חזרה לתוכנות'), findsOneWidget);
+      expect(find.byType(CustomAppDetailView), findsOneWidget);
       expect(find.text('על התוכנה'), findsOneWidget);
       expect(find.textContaining('הסבר ארוך'), findsOneWidget);
       expect(find.text('מידע כללי'), findsOneWidget);
@@ -1631,25 +1637,12 @@ void main() {
         source: AppSourceKind.github,
       );
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
-      await tester.tap(find.text('לפרטים מלאים'));
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
 
       expect(find.text('בחירת מיקום ידנית'), findsOneWidget);
       expect(find.text('בדיקה ברשת'), findsOneWidget);
       expect(find.text('הורדה לכונן'), findsOneWidget);
-    });
-
-    testWidgets('חזרה מדף התוכנה מחזירה לרשת', (tester) async {
-      await addApp(tester, name: 'תוכנת דמו');
-      await pumpScreen(tester, CustomAppsScreen(controller: controller));
-      await tester.tap(find.text('לפרטים מלאים'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('חזרה לתוכנות'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('לפרטים מלאים'), findsOneWidget);
-      expect(find.text('חזרה לתוכנות'), findsNothing);
     });
 
     // סרגל עם פריט אחד הוא רעש שגוזל רוחב — ולכן אינו קיים.
@@ -1713,13 +1706,13 @@ void main() {
         await controller.saveMedia('demo', screenshotSources: [shot.path]);
       });
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
-      await tester.tap(find.text('לפרטים מלאים'));
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
 
       expect(find.text('צילומי מסך'), findsOneWidget);
     });
 
-    testWidgets('דף התוכנה: כותרת, תאי מידע ופס צילומי מסך מערכת החנות', (
+    testWidgets('דף התוכנה: ראש, מידע וצילום גדול שנפתח לתצוגה מוגדלת', (
       tester,
     ) async {
       final t = stringsOf().customApps;
@@ -1735,52 +1728,38 @@ void main() {
         );
       });
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
-      await tester.tap(find.text(t.cardDetailsLink));
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
 
-      final header = find.byType(StoreDetailHeader);
-      expect(header, findsOneWidget);
+      final hero = find.byType(StoreDetailHero);
       expect(
-        find.descendant(of: header, matching: find.text(t.backToApps)),
+        find.descendant(of: hero, matching: find.text('תוכנה לבדיקת פריסה')),
         findsOneWidget,
       );
-      final title = tester.widget<Text>(
-        find.descendant(of: header, matching: find.text('תוכנה לבדיקת פריסה')),
-      );
-      expect(title.overflow, TextOverflow.ellipsis);
-      expect(title.style?.fontWeight, FontWeight.bold);
-
-      final cells = find.byType(StoreInfoCell);
-      expect(cells, findsNWidgets(5));
+      final info = find.byType(StoreInfoRows);
       expect(
-        find.descendant(of: cells, matching: find.text(t.infoStoredSize)),
+        find.descendant(of: info, matching: find.text(t.infoStoredSize)),
         findsOneWidget,
       );
-      final gridWidth = tester.getSize(find.byType(StoreInfoGrid)).width;
-      final halfWidth = (gridWidth - AppTokens.spaceSM) / 2;
-      for (var i = 0; i < 5; i++) {
-        expect(tester.getSize(cells.at(i)).width, closeTo(halfWidth, 0.01));
-      }
 
-      final strip = find.byType(StoreScreenshotsPanel);
+      // צילום אחד גדול בכל פעם, מפוענח ברוחב שלו, ונקודה לכל צילום.
+      final shots = find.byType(StoreScreenshots);
       expect(
         find.descendant(
-          of: strip,
+          of: find.byType(CustomAppDetailView),
           matching: find.text(t.screenshotsPanelTitle),
         ),
         findsOneWidget,
       );
-      final thumbs = find.descendant(of: strip, matching: find.byType(Image));
-      expect(thumbs, findsNWidgets(2));
-      for (var i = 0; i < 2; i++) {
-        final image = tester.widget<Image>(thumbs.at(i));
-        expect((image.image as ResizeImage).width, 256);
-        expect(tester.getSize(thumbs.at(i)), const Size(200, 112.5));
-      }
+      final images = find.descendant(of: shots, matching: find.byType(Image));
+      expect(images, findsOneWidget);
+      expect(tester.widget<Image>(images).image, isA<ResizeImage>());
+      final p1 = stringsOf().plugins;
+      expect(find.byTooltip(p1.screenshotNumber(2, 2)), findsOneWidget);
 
-      await tester.tap(thumbs.first);
+      await tester.tap(images);
       await tester.pumpAndSettle();
-      expect(find.text('1 / 2'), findsOneWidget);
+      expect(find.text(p1.screenshotNumber(1, 2)), findsOneWidget);
     });
 
     testWidgets('צילום מסך שנמחק מהכונן נעלם מהגלריה בטעינה הבאה', (
@@ -1813,7 +1792,7 @@ void main() {
       expect(controller.shownScreenshotPathsOf(descriptor), isEmpty);
 
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
-      await tester.tap(find.text('לפרטים מלאים'));
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
       expect(find.text('צילומי מסך'), findsNothing);
     });
@@ -1821,7 +1800,7 @@ void main() {
     testWidgets('בלי תמונות אין סעיף צילומי מסך', (tester) async {
       await addApp(tester, name: 'תוכנת דמו');
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
-      await tester.tap(find.text('לפרטים מלאים'));
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pumpAndSettle();
 
       expect(find.text('צילומי מסך'), findsNothing);
@@ -1842,11 +1821,10 @@ void main() {
         );
       }
 
-      // שני רוחבים צרים ושניים רחבים, שתי השפות, וכל ההגדלות שהמשתמש
-      // יכול לבחור — ומעליהן ההגדלה של המערכת. גם במצב ניהול, שבו סרגל
-      // הכלים מחליף את הפעולה הראשית.
+      // שורות צרות ורחבות, כרטיסים בשתי עמודות, שתי השפות וכל ההגדלות —
+      // ומעליהן ההגדלה של המערכת. גם דף הניהול, ששורותיו נושאות ארבעה כפתורים.
       for (final manage in [false, true]) {
-        for (final width in [584.0, 700.0, 1160.0]) {
+        for (final width in [584.0, 760.0, 840.0, 1160.0]) {
           for (final language in AppLanguage.values) {
             for (final scale in [0.9, 1.0, 1.15, 1.3, 1.5]) {
               // עץ נקי בין שילוב לשילוב: `RenderFlex` מדווח על גלישה **פעם
@@ -1858,10 +1836,9 @@ void main() {
                 wrap(
                   MediaQuery(
                     data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-                    child: CustomAppsScreen(
-                      controller: controller,
-                      manage: manage,
-                    ),
+                    child: manage
+                        ? CustomAppsManagePage(controller: controller)
+                        : CustomAppsScreen(controller: controller),
                   ),
                   language: language,
                 ),
@@ -1887,7 +1864,7 @@ void main() {
   group('תצוגת האייקון', () {
     Finder iconImage() => find.byType(Image);
 
-    testWidgets('אייקון נכנס שלם, וגודלו נגזר מרוחב המסגרת', (tester) async {
+    testWidgets('אייקון נכנס שלם בתוך מסגרת ריבועית קבועה', (tester) async {
       await addApp(tester, name: 'תוכנת דמו');
       await tester.runAsync(() async {
         final png = File(p.join(tempDir.path, 'icon.png'))
@@ -1898,15 +1875,14 @@ void main() {
 
       final image = tester.widget<Image>(iconImage().first);
       expect(image.fit, BoxFit.contain);
+      expect(image.image, isA<ResizeImage>());
 
-      // הכלל עצמו: צלע האייקון היא חלק קבוע מרוחב המסגרת, ולא מספר
-      // פיקסלים — ראו `kStoreIconRatio`.
-      final frame = tester.getSize(find.byType(StoreThumbnail).first);
+      // סמל 64 בכרטיס, כמו `.picon` במוקאפ; התמונה בתוכו ריבועית ושלמה.
+      final frame = tester.getSize(find.byType(StoreIcon).first);
+      expect(frame, const Size(64, 64));
       final icon = tester.getSize(iconImage().first);
-      expect(icon.width, closeTo(frame.width * kStoreIconRatio, 1));
+      expect(icon.width, lessThan(frame.width));
       expect(icon.height, closeTo(icon.width, 0.01));
-      // והמסגרת חסומה ברוחבה, אחרת האייקון מרחף בפס ריק.
-      expect(frame.width, lessThanOrEqualTo(kCustomAppIconFrameMaxWidth));
     });
   });
 
@@ -2106,7 +2082,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text(stringsOf().customApps.cardDetailsLink));
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pump();
       expect(requests, ['demo']);
       // המסך אינו פותח בעצמו: רק הנתיב שהמסגרת מעבירה.
@@ -2115,7 +2091,6 @@ void main() {
       rebuild(() => detail = 'demo');
       await tester.pumpAndSettle();
       expect(find.byType(CustomAppDetailView), findsOneWidget);
-      expect(find.byType(StoreDetailHeader), findsNothing);
     });
   });
 }

@@ -18,6 +18,7 @@ import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/search_feedback_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
+import 'package:launcher_app/src/screens/custom_apps/custom_apps_manage_page.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
 import 'package:launcher_app/src/screens/faq/faq_dialog.dart';
 import 'package:launcher_app/src/screens/home/home_page.dart';
@@ -25,11 +26,11 @@ import 'package:launcher_app/src/screens/launcher/launcher_update_page.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
 import 'package:launcher_app/src/screens/otzaria_screen.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_detail_view.dart';
-import 'package:launcher_app/src/screens/plugins/plugin_sync_overlay.dart';
 import 'package:launcher_app/src/screens/plugins/plugins_screen.dart';
 import 'package:launcher_app/src/screens/reports_upload_section.dart';
 import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/screens/settings_screen.dart';
+import 'package:launcher_app/src/screens/store_kit/store_kit.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/mirror_download_undo.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
@@ -403,24 +404,6 @@ void main() {
     });
   });
 
-  testWidgets('בקשת מיקוד מחנות התוספים מעבירה את התצוגה אליה', (tester) async {
-    await pumpShell(tester);
-
-    // כניסה ויציאה — המסך נשאר בעץ, ודו-שיח שנפתח ממנו יכול לבקש מיקוד
-    // כשהמשתמש כבר בבית.
-    await open(tester, ShellSection.plugins);
-    await back(tester);
-
-    int? shownScreen() =>
-        tester.widget<IndexedStack>(find.byKey(ShellKeys.sectionStack)).index;
-    expect(shownScreen(), ShellSection.home.index);
-
-    tester.widget<PluginsScreen>(screen(PluginsScreen)).onRequestFocus!();
-    await tester.pump();
-
-    expect(shownScreen(), ShellSection.plugins.index);
-  });
-
   testWidgets('סרגל הזהות מציג את שם התוכנה ואת הסמל', (tester) async {
     await pumpShell(tester);
 
@@ -539,14 +522,12 @@ void main() {
           }, 'https://otzaria.org'),
         ]
         ..installed = const {}
-        ..status = PluginsModuleStatus.ready
-        // בלי אצירה החנות פותחת בדף בית ריק; הכרטיס ב"כל התוספים".
-        ..showAllPlugins();
+        ..status = PluginsModuleStatus.ready;
     }
 
     Future<void> openDetails(WidgetTester tester) async {
       await open(tester, ShellSection.plugins);
-      await tester.tap(find.text(stringsOf().plugins.cardDetailsLink).first);
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pump();
     }
 
@@ -558,9 +539,8 @@ void main() {
       await openDetails(tester);
       expect(nav.current, const PluginDetailRoute('a'));
       expect(screen(PluginDetailView), findsOneWidget);
-      // אין "חזרה לחנות" שני, והפירור הוא "בית › תוספים › התוסף".
+      // חזרה אחת בלבד, והפירור הוא "בית › תוספים › התוסף".
       expect(find.byTooltip(shell.backTooltip), findsOneWidget);
-      expect(find.text(stringsOf().plugins.backToStore), findsNothing);
       expect(find.text('תוסף בדיקה'), findsWidgets);
 
       await back(tester);
@@ -568,7 +548,7 @@ void main() {
       expect(nav.current, const SectionRoute(ShellSection.plugins));
       expect(screen(PluginDetailView), findsNothing);
 
-      await tester.tap(find.text(stringsOf().plugins.cardDetailsLink).first);
+      await tester.tap(find.byType(StoreItemCard).first);
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pump();
@@ -623,14 +603,13 @@ void main() {
       expect(screen(PluginDetailView), findsNothing);
     });
 
-    testWidgets('שכבת הסנכרון אינה מכסה את החזרה ואת הפירור', (tester) async {
+    testWidgets('בזמן סנכרון החזרה והפירור נשארים פעילים', (tester) async {
       await pumpShell(tester);
       final plugins = sessionOf(tester).plugins
         ..status = PluginsModuleStatus.syncing;
       addTearDown(() => plugins.status = PluginsModuleStatus.idle);
 
       await open(tester, ShellSection.plugins);
-      expect(find.byType(PluginSyncOverlay), findsOneWidget);
       expect(find.byTooltip(shell.backTooltip).hitTestable(), findsOneWidget);
       expect(find.text(shell.breadcrumbHome).hitTestable(), findsOneWidget);
 
@@ -899,6 +878,35 @@ void main() {
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('"ניהול" בהגדרות פותח את דף הניהול בתוך הגוף, וחזרה מחזירה', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    await open(tester, ShellSection.settings);
+    final nav = navigatorOf(tester);
+
+    final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
+    await tester.ensureVisible(card);
+    await tester.tap(
+      find.descendant(of: card, matching: find.byType(ActionButton)),
+    );
+    await tester.pump();
+
+    expect(nav.current, const CustomAppsManageRoute());
+    expect(screen(CustomAppsManagePage), findsOneWidget);
+    expect(screen(SettingsScreen), findsNothing);
+    // הפירור: "בית › הגדרות › ניהול התוכנות".
+    expect(
+      find.text(stringsOf().customApps.manageDialogTitle),
+      findsWidgets,
+    );
+
+    await back(tester);
+    expect(nav.section, ShellSection.settings);
+    expect(screen(CustomAppsManagePage), findsNothing);
+    expect(screen(SettingsScreen), findsOneWidget);
   });
 
   testWidgets('ביטול הורדה מנקה את שתי תיקיות המראה של התוספים', (

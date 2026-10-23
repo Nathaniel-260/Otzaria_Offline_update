@@ -3,22 +3,22 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/custom_apps_controller.dart';
 import '../../widgets/widgets_exports.dart';
-import 'custom_apps_manage_dialog.dart';
 
-/// שורה אחת במסך ההגדרות, וכל תפקידה לפתוח את מסך הניהול.
-///
-/// הניהול עצמו — הוספה, עריכה, הסרה, קטגוריות וסדר — יושב כולו ב-
-/// [showCustomAppsManageDialog]. מסך ההגדרות הוא רשימת הגדרות, ומרשם
-/// שגדל עם כל תוכנה שנוספת הפך אותו למסך של תוכנות נוספות.
+/// שורה אחת במסך ההגדרות, וכל תפקידה לפתוח את דף הניהול
+/// (`CustomAppsManagePage`) — ההוספה, העריכה, הקטגוריות והסדר יושבים שם.
 class CustomAppsSettingsCard extends StatelessWidget {
   const CustomAppsSettingsCard({
     super.key,
     required this.controller,
+    required this.onOpenManager,
     this.readOnly = false,
     this.driveFull = false,
   });
 
   final CustomAppsController controller;
+
+  /// נכנס לדף הניהול בנווט — דרך שער הסייפר.
+  final VoidCallback onOpenManager;
 
   final bool readOnly;
   final bool driveFull;
@@ -27,7 +27,7 @@ class CustomAppsSettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.strings.customApps;
 
-    // מאזין בעצמו: מספר התוכנות שבשורה משתנה בזמן שמסך הניהול פתוח מעליה.
+    // מאזין בעצמו: מספר התוכנות משתנה בזמן שדף הניהול פתוח.
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) => SettingsCard(
@@ -46,15 +46,9 @@ class CustomAppsSettingsCard extends StatelessWidget {
                     ? t.registeredAppCount(controller.apps.length)
                     : t.emptyHint,
             actions: [
-              ActionButton.recommended(
+              ActionButton.neutral(
                 text: t.openManagerButton,
-                icon: FluentIcons.settings_24_regular,
-                onPressed: readOnly
-                    ? null
-                    : () => showCustomAppsManageDialog(
-                          context: context,
-                          controller: controller,
-                        ),
+                onPressed: readOnly ? null : onOpenManager,
               ),
             ],
           ),

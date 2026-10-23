@@ -247,48 +247,28 @@ void main() {
       expect(controller.pluginsDir, p.join(tempDir.path, 'mirror', 'plugins'));
     });
 
-    test('בלי אצירה אין דף בית — נפתחת ישר "כל התוספים"', () async {
-      await saveCatalog(PluginCatalog(plugins: [plugin('a', 'תוסף')]));
-
-      await controller.load();
-
-      expect(controller.hasCuratedHome, isFalse);
-      expect(controller.view, PluginStorePage.all);
-    });
-
-    test('יש אצירה — נשארים בדף הבית', () async {
-      await saveCatalog(
-        PluginCatalog(
-          plugins: [plugin('a', 'תוסף נבחר', featured: true)],
-          home: const PluginStoreHome(title: 'החנות', subtitle: 'תקציר'),
-        ),
-      );
-
-      await controller.load();
-
-      expect(controller.hasCuratedHome, isTrue);
-      expect(controller.view, PluginStorePage.home);
-      expect(controller.homeTitle, 'החנות');
-      expect(controller.homeSubtitle, 'תקציר');
-    });
-
-    test('קטגוריה שנעלמה מהחנות אינה נשארת פתוחה', () async {
+    test('שבב קטגוריה שנעלמה מהחנות מתאפס ל"הכול"', () async {
       await saveCatalog(
         PluginCatalog(
           plugins: [plugin('a', 'תוסף')],
-          categories: const [PluginStoreCategory(slug: 'study', name: 'לימוד')],
+          categories: const [
+            PluginStoreCategory(
+              slug: 'study',
+              name: 'לימוד',
+              pluginIds: ['a'],
+            ),
+          ],
         ),
       );
       await controller.load();
-      controller.showCategory('study');
-      expect(controller.view, PluginStorePage.category);
+      controller.setCategory('study');
+      expect(controller.categoryFilter, 'study');
 
       await saveCatalog(PluginCatalog(plugins: [plugin('a', 'תוסף')]));
       await controller.load();
 
-      expect(controller.view, PluginStorePage.all);
-      expect(controller.openCategorySlug, isNull);
-      expect(controller.openCategory, isNull);
+      expect(controller.categoryFilter, isNull);
+      expect(controller.filtered.map((p) => p.id), ['a']);
     });
   });
 
@@ -357,8 +337,8 @@ void main() {
       controller.setSearch('');
       controller.setStatusFilter(PluginStatusFilter.all);
       controller.setTagFilter(null);
-      controller.setHideInstalled(controller.hideInstalled);
-      controller.setSortMode(PluginSortMode.recommended);
+      controller.setInstallFilter(controller.installFilter);
+      controller.setCategory(null);
 
       expect(notifications, 0);
     });
@@ -543,26 +523,30 @@ void main() {
       expect(controller.installedCount, 2);
     });
 
-    test('מתג "רק מה שלא מותקן" מסתיר את המעודכן בלבד', () {
+    test('בורר המותקנים: הכול / מותקנים / לא מותקנים', () {
       controller.installed = const {
         'com.example.one': '1.0.0',
         'com.example.two': '1.5.0',
       };
 
-      expect(controller.hideInstalled, isTrue);
-      expect(controller.filtered.map((p) => p.id), ['db-2', 'db-3', 'db-4']);
-
-      controller.setHideInstalled(false);
+      // ברירת המחדל "הכול" — המשתמש בא לראות מה קיים.
+      expect(controller.installFilter, PluginInstallFilter.all);
       expect(controller.filtered, hasLength(4));
+
+      controller.setInstallFilter(PluginInstallFilter.installed);
+      expect(controller.filtered.map((p) => p.id), ['db-1', 'db-2']);
+
+      controller.setInstallFilter(PluginInstallFilter.notInstalled);
+      expect(controller.filtered.map((p) => p.id), ['db-3', 'db-4']);
     });
   });
 
-  group('אצירה — נבחרים, קטגוריות ודף הבית', () {
+  group('קטגוריות', () {
     setUp(() async {
       await saveCatalog(
         PluginCatalog(
           plugins: [
-            plugin('a', 'ראשון', featured: true, manifestId: 'm.a'),
+            plugin('a', 'ראשון', manifestId: 'm.a'),
             plugin('b', 'שני', manifestId: 'm.b'),
             plugin('c', 'שלישי', manifestId: 'm.c'),
           ],
@@ -571,15 +555,9 @@ void main() {
               slug: 'study',
               name: 'כלי לימוד',
               description: 'תיאור',
-              showOnHome: true,
-              homeLimit: 2,
-              pluginIds: ['a', 'b', 'c', 'לא-קיים'],
+              pluginIds: ['c', 'a', 'לא-קיים'],
             ),
-            PluginStoreCategory(
-              slug: 'hidden',
-              name: 'לא בדף הבית',
-              pluginIds: ['c'],
-            ),
+            PluginStoreCategory(slug: 'empty', name: 'ריקה'),
           ],
         ),
       );
@@ -587,90 +565,54 @@ void main() {
       controller.installed = const {};
     });
 
-    test('נבחרים בסדר הקטלוג, קטגוריות דף-הבית ומגבלת השורה', () {
-      expect(controller.featured.map((p) => p.id), ['a']);
-      expect(controller.homeCategories.map((c) => c.slug), ['study']);
-
+    test('תוספי קטגוריה בסדר האתר, ומזהה שאינו בקטלוג מדולג', () {
       final category = controller.categoryBySlug('study')!;
-      expect(controller.pluginsIn(category).map((p) => p.id), ['a', 'b', 'c']);
-      expect(
-        controller
-            .pluginsIn(category, limit: category.homeLimit)
-            .map((p) => p.id),
-        ['a', 'b'],
-      );
+      expect(controller.pluginsIn(category).map((p) => p.id), ['c', 'a']);
       expect(controller.categoryName('study'), 'כלי לימוד');
       // slug לא מוכר מחזיר את עצמו, ולא נופל.
       expect(controller.categoryName('אין-כזו'), 'אין-כזו');
     });
 
+    test('קטגוריה ריקה אינה מקבלת שבב', () {
+      expect(controller.shownCategories.map((c) => c.slug), ['study']);
+    });
+
+    test('שבב קטגוריה מצמצם, ומשתלב עם בורר המותקנים', () {
+      controller.setCategory('study');
+      expect(controller.filtered.map((p) => p.id), ['a', 'c']);
+
+      controller.installed = const {'m.a': '1.0.0'};
+      controller.setInstallFilter(PluginInstallFilter.notInstalled);
+      expect(controller.filtered.map((p) => p.id), ['c']);
+    });
+
     // התוצרים ממוזנים, ולכן קריאה **לפני** שינוי מצב חייבת להתבטל אחריו.
-    // בלי זה דף הבית היה נשאר על התשובה של הטעינה הראשונה.
-    test('homeCategories מתעדכן אחרי שינוי מצב, ולא נשאר על cache', () {
-      expect(controller.homeCategories.map((c) => c.slug), ['study']);
+    test('filtered מתעדכן אחרי שינוי מצב, ולא נשאר על cache', () {
+      controller.setInstallFilter(PluginInstallFilter.installed);
+      expect(controller.filtered, isEmpty);
 
-      // הצבה ישירה ל-installed — כל התוספים מותקנים ומעודכנים.
-      controller.installed = const {
-        'm.a': '1.0.0',
-        'm.b': '1.0.0',
-        'm.c': '1.0.0',
-      };
-      expect(controller.homeCategories, isEmpty);
-
-      // כיבוי המתג מחזיר אותן, למרות שכבר נקרא פעמיים לפני כן.
-      controller.setHideInstalled(false);
-      expect(controller.homeCategories.map((c) => c.slug), ['study']);
+      controller.installed = const {'m.b': '1.0.0'};
+      expect(controller.filtered.map((p) => p.id), ['b']);
     });
 
-    test('hasCuratedHome נמדד על המבנה — גם כשהמתג ריקן את הכרטיסים', () {
-      controller.installed = const {
-        'm.a': '1.0.0',
-        'm.b': '1.0.0',
-        'm.c': '1.0.0',
-      };
+    test('"ניקוי החיפוש והסינון" מאפס הכול בבת אחת', () {
+      controller
+        ..setSearch('שני')
+        ..setCategory('study')
+        ..setStatusFilter(PluginStatusFilter.beta)
+        ..setTagFilter('תגית')
+        ..setInstallFilter(PluginInstallFilter.installed);
+      expect(controller.moreFiltersCount, 2);
 
-      expect(controller.featured, isEmpty);
-      expect(controller.homeCategories, isEmpty);
-      // ובכל זאת יש דף בית — אחרת כיבוי הכרטיסים היה נראה כחנות ריקה.
-      expect(controller.hasCuratedHome, isTrue);
-    });
-  });
+      controller.clearFilters();
 
-  group('ניווט בין מסכי החנות', () {
-    setUp(() async {
-      await saveCatalog(
-        PluginCatalog(
-          plugins: [plugin('a', 'תוסף', featured: true)],
-          categories: const [
-            PluginStoreCategory(slug: 'study', name: 'לימוד', pluginIds: ['a']),
-          ],
-        ),
-      );
-      await controller.load();
-    });
-
-    test('מעבר לקטגוריה ובחזרה מנקה את ה-slug', () {
-      controller.showCategory('study');
-      expect(controller.view, PluginStorePage.category);
-      expect(controller.openCategory?.name, 'לימוד');
-
-      controller.showHome();
-      expect(controller.view, PluginStorePage.home);
-      expect(controller.openCategorySlug, isNull);
-    });
-
-    test('חיפוש מה-hero מוביל ל"כל התוספים" עם המילה בתיבה', () {
-      controller.showAllPlugins(query: 'תוסף');
-
-      expect(controller.view, PluginStorePage.all);
-      expect(controller.search, 'תוסף');
-    });
-
-    test('מעבר בלי query אינו מוחק חיפוש קיים', () {
-      controller.setSearch('קיים');
-      controller.showAllPlugins();
-
-      expect(controller.search, 'קיים');
+      expect(controller.search, isEmpty);
+      expect(controller.categoryFilter, isNull);
+      expect(controller.statusFilter, PluginStatusFilter.all);
+      expect(controller.tagFilter, isNull);
+      expect(controller.installFilter, PluginInstallFilter.all);
+      expect(controller.moreFiltersCount, 0);
+      expect(controller.filtered, hasLength(3));
     });
   });
 
@@ -684,26 +626,6 @@ void main() {
         controller.assetPath('files/a.png'),
         p.join(tempDir.path, 'mirror', 'plugins', 'files', 'a.png'),
       );
-    });
-
-    test('כותרת ברירת המחדל מגיעה מ-otzaria_l10n בשתי השפות', () async {
-      await controller.load();
-
-      expect(
-        controller.homeTitle,
-        AppL10n.strings.plugins.catalogTitleFallback,
-      );
-      expect(
-        controller.homeSubtitle,
-        AppL10n.strings.plugins.catalogSubtitleFallback,
-      );
-
-      AppL10n.use(AppLanguage.english);
-      expect(
-        controller.homeTitle,
-        AppL10n.strings.plugins.catalogTitleFallback,
-      );
-      expect(controller.homeTitle, isNot(contains('אוצריא')));
     });
 
     test('byId מחזיר null למזהה שאינו בקטלוג', () async {

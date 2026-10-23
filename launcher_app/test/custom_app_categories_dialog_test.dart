@@ -218,5 +218,35 @@ void main() {
       expect(find.text(t.noCategoriesHint), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+        '$language: opened on a category (from the manage page) '
+        'starts with its fields filled', (tester) async {
+      await tester.runAsync(controller.load);
+      await tester.runAsync(
+          () => controller.addCategory('לימוד', description: 'כלים ללימוד'));
+      final category = controller.categories.single;
+      await pumpScreen(
+          tester,
+          Builder(
+              builder: (context) => Scaffold(
+                  body: TextButton(
+                      onPressed: () => showCustomAppCategoriesDialog(
+                          context: context,
+                          controller: controller,
+                          editing: category),
+                      child: const Text('open')))),
+          language: language,
+          size: const Size(900, 1000));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      final fields = tester
+          .widgetList<TextField>(find.byType(TextField))
+          .map((field) => field.controller?.text)
+          .toList();
+      expect(fields, containsAll(['לימוד', 'כלים ללימוד']));
+      await tap(tester, find.text(strings.common.close));
+    });
   }
 }

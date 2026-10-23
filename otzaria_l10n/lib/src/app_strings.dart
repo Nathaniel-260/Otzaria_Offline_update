@@ -876,35 +876,20 @@ abstract class SaferModeStrings {
 abstract class PluginsStrings {
   const PluginsStrings();
 
-  String get syncDialogTitle;
-  String get syncDialogContent;
-  String get syncDialogConfirm;
   String get syncFailedSnack;
 
   /// [fetched] הוא מה שבאמת ירד עכשיו, מתוך [total] שבחנות — הסנכרון מדלג
   /// על כל מה שכבר מעודכן במראה, וההודעה חייבת לומר את זה.
   String syncDoneSnack(int fetched, int total);
 
-  /// נאמר בזמן הסנכרון עצמו, מתחת לכותרת: לא מורידים את החנות מחדש.
-  String get syncingOverlaySubtitle;
-
   /// סנכרון שהסתיים אך פריטים בודדים בו נכשלו — ראו `syncWarnings`.
   String syncDoneWithWarningsSnack(int count);
-  String get syncButton;
-  String get reloadTooltip;
-  String get syncingOverlayTitle;
   String get syncingOverlayStarting;
-  String get syncNeverRan;
-  String syncedAt(String time);
   String get syncDirUnknownTooltip;
-  String updatesAvailableChip(int count);
-  String get updatesBarBody;
-  String get updatesBarButton;
 
   String get saveDialogTitle;
   String get saveDoneSnack;
   String get saveFailedSnack;
-  String installOpenedSnack(String pluginName);
 
   /// אחרי שהסריקה הוכיחה שאוצריא סיימה — ולא כשהמסירה אליה הצליחה.
   String installDoneSnack(String pluginName);
@@ -913,66 +898,22 @@ abstract class PluginsStrings {
   String get installFailedSnack;
 
   String get loadingCatalog;
-  String get catalogTitleFallback;
-  String get catalogSubtitleFallback;
-  String get heroSearchHint;
-  String get heroSearchButton;
 
-  String get emptyStoreTitle;
-  String get emptyStoreBody;
-  String allPluginsWithCount(int count);
-  String get browseAllPrompt;
-  String browseAllButton(int count);
-
-  String get featuredEyebrow;
-  String get featuredTitle;
-  String get showMoreFeatured;
-  String categoryLinkButton(int count);
-
-  String get breadcrumbRoot;
-  String get allPluginsPage;
-  String get listEyebrow;
-  String get listTitle;
-  String get summaryNoResults;
-  String get summaryAllShown;
-  String summaryPartial(int shown, int total);
-  String get categoryOnePlugin;
-  String categoryPluginCount(int count);
-
-  String get hideInstalledLabel;
-  String hideInstalledOnTooltip(int installedCount);
-  String hideInstalledOffTooltip(int installedCount);
-
-  String get neverSyncedTitle;
-  String get neverSyncedBody;
   String get noResultsTitle;
   String get noResultsBody;
-  String get allInstalledTitle;
-  String get allInstalledBody;
-  String get showInstalledButton;
-  String get emptyCategoryTitle;
-  String get emptyCategoryBody;
-  String get allPluginsButton;
 
   // ── שורת הסינון ─────────────────────────────────────────────────────────
-  String get filterSearchLabel;
-  String get filterSearchHint;
   String get filterStatusLabel;
   String get filterSortLabel;
   String get sortRecommended;
   String get sortNewest;
   String get sortUpdated;
   String get filterTagsLabel;
-  String get filterAllTags;
-  String get filterStatusAll;
   String get showMoreTags;
   String get showFewerTags;
 
   // ── כרטיס ועמוד התוסף ───────────────────────────────────────────────────
-  String get badgeFeaturedShort;
-  String get badgeFeatured;
   String pluginVersionBadge(String version);
-  String downloadsBadge(int count);
 
   // ── דירוג המשתמשים ──────────────────────────────────────────────────────
   // תצוגה בלבד. הדירוג עצמו נעשה באתר (דורש חשבון), ואין כאן דרך לדרג.
@@ -985,31 +926,12 @@ abstract class PluginsStrings {
   String get ratingEmpty;
   String ratingStarsLabel(String average);
 
-  String get saveButton;
-  String get installButton;
-  String get directInstallButton;
   String get sourcePageButton;
-  String get cardDetailsLink;
-  String cardUpdatedOn(String date);
-  String get backToStore;
 
   String get statusStable;
   String get statusBeta;
   String get statusExperimental;
   String get statusUnknown;
-
-  String get installChipInstalled;
-  String get installChipUpdateAvailable;
-  String installChipUpdateFrom(String installedVersion);
-
-  /// אין לתוסף בילד שירוץ על גרסת אוצריא שבמחשב הזה. **המקום היחיד**
-  /// שבו בחירת הגרסה נראית למשתמש: כשאין מה להתקין, כפתור מושבת בלי מילה
-  /// היה נראה כתקלה. בכל שאר המצבים הבחירה שקופה — מוצג פשוט מספר הגרסה
-  /// שתותקן.
-  String get installChipIncompatible;
-  String get installChipDisabled;
-  String get installChipDisabledUpdate;
-  String get installChipDevelopment;
 
   String get infoPanelTitle;
   String get tagsPanelTitle;
@@ -1025,43 +947,15 @@ abstract class PluginsStrings {
   String compatibilityRange(String from, String to);
   String get infoLocalFile;
   String get infoLocalFileMissing;
-  String localFileDescription(String fileName, String size);
   String get valueUnspecifiedFeminine;
   String get valueUnspecifiedMasculine;
-  String get sizeUnknown;
-
-  // ── קטגוריות וניווט ─────────────────────────────────────────────────────
-  String get categoriesTitle;
-  String get storeHomeItem;
-  String get storeHomeChip;
-
-  // ── דיאלוג העדכונים ─────────────────────────────────────────────────────
-  String updatesDialogTitle(int count);
-  String get updatesDialogIntro;
-  String updatesDialogRow(String installedVersion, String storeVersion);
-  String get updatesDialogUpdateButton;
-  String updatesDialogUpdateAllButton(int count);
-  String get updatesDialogDetailsButton;
-
-  /// שורה שהמסירה שלה לאוצריא הצליחה — ההתקנה עצמה נעשית שם.
-  String get updatesDialogSentLabel;
-  String get updatesDialogDoneLabel;
-
-  /// למה השורות עדיין לא הפכו ל"עודכן" — והבטחה שאין מה ללחוץ.
-  String get updatesDialogPendingNote;
-
-  // ── תוספים חדשים: הטוסט שבחנות והחלון שבמסך הראשי ──────────────────────
-  String get newToastOne;
-  String newToastMany(int count);
-  String get newToastView;
-  String get newToastClose;
 
   // ── גלריית צילומי המסך ──────────────────────────────────────────────────
   String get screenshotPrevious;
   String get screenshotNext;
 
   // ── תוכנת החנות העצמאית ─────────────────────────────────────────────────
-  // כפתור בשורת הסנכרון שמעתיק את חנות התוספים כתוכנת ווינדוס עצמאית,
+  // שורה ב"מתקדם" שמעתיקה את חנות התוספים כתוכנת ווינדוס עצמאית,
   // ואיתה כל התוספים שבמראה. הניסוח מקביל לזה שבאתר (Otzaria_Website#171).
   String get storeAppButton;
   String get storeAppDialogTitle;
@@ -1094,7 +988,6 @@ abstract class PluginsStrings {
   String get storeAppInUseSnack;
 
   String get storeAppCopyingTitle;
-  String get storeAppCopyingSubtitle;
 
   String get storeAppDoneTitle;
   String storeAppDoneContent(int plugins, String size);
@@ -1108,6 +1001,96 @@ abstract class PluginsStrings {
   /// הפעלת החנות שהועתקה נכשלה. קובץ חסר הוא הסיבה השכיחה, ולכן ההודעה
   /// אינה נבלעת: כפתור שלא עושה דבר נראה כתקלה בלאנצ'ר.
   String storeAppLaunchFailedSnack(String error);
+
+  // ── החנות: עמוד, סינון, כרטיס ופרטים ──
+  String get storeTitle;
+  String get storeSubtitle;
+  String asOfDate(String date);
+  String get refreshButton;
+  String get syncingTitle;
+  String get syncingHint;
+  String get syncStopButton;
+  String get syncStoppedSnack;
+  String get emptyTitle;
+  String get emptyBodyOnline;
+  String get emptyBodyOffline;
+  String get searchHint;
+  String get clearSearchTooltip;
+  String get filterAll;
+  String get filterInstalled;
+  String get filterNotInstalled;
+  String get moreFilters;
+  String moreFiltersCount(int count);
+  String noResultsForQuery(String query);
+  String get clearFiltersButton;
+  String updatesAvailable(int count);
+  String updatesBarNames(String names);
+
+  /// "א, ב ו-ג" — רשימת שמות במשפט.
+  String joinNames(List<String> names);
+  String get updateAllButton;
+  String updatingAllLabel(int current, int total);
+  String updatesSentSnack(int count);
+  String get updatesSentTitle;
+  String get updatesSentBody;
+  String installSentSnack(String pluginName);
+  String get newChip;
+  String get networkChip;
+  String get installInOtzariaButton;
+  String updateToButton(String version);
+  String get saveFileButton;
+  String get sendingLabel;
+  String get sentLabel;
+  String get developmentLabel;
+  String get incompatibleLabel;
+  String get disabledLabel;
+  String get installedLabel;
+  String get noteIncompatible;
+  String noteNeedsApp(String version);
+  String get noteNeedsOtzaria;
+  String get noteSaveOnly;
+  String get noteDisabled;
+  String get noteFileMissing;
+  String get incompatibleTitle;
+  String incompatibleBodyVersions(String needs, String here);
+  String get incompatibleBody;
+  String get disabledTitle;
+  String get disabledBody;
+  String get disabledUpdateBody;
+  String get developmentTitle;
+  String get developmentBody;
+  String get fileMissingTitle;
+  String get fileMissingBody;
+  String get factRating;
+  String get factCompatible;
+  String get factYes;
+  String get factNo;
+  String factOtzariaVersion(String version);
+  String get factVersionLatest;
+  String get factVersionInstalled;
+  String factVersionInstalledAt(String version);
+  String get factNetworkAny;
+  String get factNetworkSome;
+  String get factSize;
+  String get factOnDrive;
+  String get factNotOnDrive;
+  String get descriptionTitle;
+  String get versionsTitle;
+  String get versionLatestTag;
+  String get versionInstalledTag;
+  String get infoDownloads;
+  String get infoSource;
+  String get copyAddressTooltip;
+  String get addressCopiedSnack;
+  String get ratingSourceNote;
+  String ratingAsOfNote(String date);
+  String get screenshotZoom;
+  String screenshotNumber(int index, int total);
+  String get advancedSummary;
+  String get storeAppCopyButton;
+  String get storeAppRowBody;
+  String get reloadRowTitle;
+  String get reloadButton;
 }
 
 // ── שאלות נפוצות ──────────────────────────────────────────────────────────────
@@ -1318,8 +1301,6 @@ abstract class LauncherUpdateStrings {
   String installedVersion(String version);
 
   String get installButton;
-
-  // ── דיאלוג "פרטים ועדכון" ──────────────────────────────────────────────
 
   // ── דיאלוג "ההורדה הושלמה" ──────────────────────────────────────────────
   String get readyDialogTitle;
@@ -1871,13 +1852,9 @@ abstract class CustomAppsStrings {
   /// כותרת סרגל הצד, וגם כותרת חלון ניהול הקטגוריות.
   String get categoriesTitle;
   String get allAppsItem;
-  String allAppsWithCount(int count);
 
   /// הפריט שמרכז את מה שלא שויך לשום קטגוריה. מוצג רק כשיש קטגוריות.
   String get uncategorizedItem;
-
-  String get cardDetailsLink;
-  String get backToApps;
 
   /// כותרות הסעיפים בדף התוכנה.
   String get aboutPanelTitle;
@@ -1886,7 +1863,6 @@ abstract class CustomAppsStrings {
 
   // ── שדות "מידע כללי" בדף התוכנה ──
   String get infoSource;
-  String get infoSourceGithub;
   String get infoSourceFile;
   String get infoInstalled;
   String get infoStored;
@@ -1903,7 +1879,6 @@ abstract class CustomAppsStrings {
   String categoryAppCount(int count);
 
   // ── ניהול הקטגוריות (בהגדרות) ──
-  String get manageCategoriesButton;
   String get categoriesDialogHint;
   String get categoryNameLabel;
   String get categoryNameHint;
@@ -1965,12 +1940,6 @@ abstract class CustomAppsStrings {
   String get moveAppLaterTooltip;
   String get dragToReorderTooltip;
 
-  // ── קבוצות השדות בטופס ──
-  String get formSectionDetails;
-  String get formSectionSource;
-  String get formSectionInstall;
-  String get formSectionMedia;
-
   // ── טופס ההוספה, והוא גם טופס העריכה ──
   String get addDialogTitle;
   String get editDialogTitle;
@@ -1982,10 +1951,6 @@ abstract class CustomAppsStrings {
   String get installDirHint;
   String get pickInstallDirButton;
   String get pickInstallDirDialogTitle;
-
-  String get sourceLabel;
-  String get sourceGithub;
-  String get sourceFile;
 
   String get githubUrlLabel;
   String get githubUrlHint;
@@ -2106,6 +2071,29 @@ abstract class CustomAppsStrings {
   String removeDialogContent(String name);
   String get removeDialogConfirm;
   String removedSnack(String name);
+
+  // ── החנות: עמוד, סינון, כרטיס ופרטים ──
+  String get screenSubtitle;
+  String get showAllAppsButton;
+  String get sourceGithubShort;
+  String get sourceFileShort;
+  String versionLabel(String version);
+  String updateToButton(String version);
+  String get onlineNotChecked;
+  String get manageEmptyTitle;
+  String get manageEmptyBody;
+  String get manageReadOnlyNote;
+  String get noCategoriesTitle;
+  String get orderSectionTitle;
+  String get formStepSource;
+  String get formStepGithubFile;
+  String get formStepLocalFile;
+  String get formStepDetails;
+  String get sourceGithubOption;
+  String get sourceGithubOptionHint;
+  String get sourceFileOption;
+  String get sourceFileOptionHint;
+  String get fileLabel;
 }
 
 // ── הודעות מ-custom_apps_manager ──────────────────────────────────────────────

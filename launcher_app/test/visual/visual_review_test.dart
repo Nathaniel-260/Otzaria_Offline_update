@@ -26,6 +26,7 @@ import 'package:path/path.dart' as p;
 
 import '../home_fixtures.dart';
 import '../page_fixtures.dart';
+import '../store_fixtures.dart';
 import '../task_fixtures.dart';
 import '../test_harness.dart';
 import '../test_support.dart';
@@ -126,7 +127,12 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase2b2': const [],
   // תיקוני 3: הדפים בלבד, כולל המצבים שחסרו.
   'phase3b': const [],
+  // החנות והתוכנות הנוספות מצולמות מה-fixtures — ראו `store_<scenario>`.
+  'phase4': const [],
 };
+
+/// השלבים שמצלמים את מצבי החנות.
+const _storePhases = {'phase4'};
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
 Set<String> get _homeScenarioPhases =>
@@ -465,6 +471,94 @@ void main() {
           }
         });
       }
+    }
+  }
+
+  for (final MapEntry(key: name, value: scenario) in storeScenarios.entries) {
+    for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
+      testWidgets('$_phase/store_$name$suffix',
+          skip: !_enabled || !_storePhases.contains(_phase), (tester) async {
+        await tester.runAsync(loadVisualFonts);
+        WidgetsApp.debugAllowBannerOverride = false;
+        final fixture = StoreFixture(tempDir.path);
+        try {
+          useViewSize(tester, size);
+          AppL10n.use(AppLanguage.hebrew);
+          await tester.runAsync(fixture.paint);
+          final screen = scenario.build(fixture);
+          final s = stringsOf();
+          final section = name.startsWith('plugin') || name == 'lightbox'
+              ? s.guide.tilePlugins
+              : name.startsWith('manage') || name == 'addapp'
+                  ? s.settings.title
+                  : s.guide.tileCustomApps;
+          final leaf = switch (name) {
+            'plugin_cal' ||
+            'plugin_cal_scrolled' ||
+            'lightbox' =>
+              'לוח שנה עברי',
+            'plugin_tikkun' => 'תיקון קוראים',
+            'plugin_colors' => 'סימניות צבעוניות',
+            'plugin_nusach' => 'סידור לפי נוסח',
+            'plugin_mydev' => 'התוסף שלי',
+            'app_player' => 'נגן שיעורים',
+            'app_detail_editor' => 'עורך מסמכים',
+            'manage' ||
+            'manage_empty' ||
+            'addapp' =>
+              s.customApps.manageDialogTitle,
+            _ => null,
+          };
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: boundary,
+              child: wrap(
+                Scaffold(
+                  backgroundColor: const Color(0xFFF6EDE5),
+                  body: Column(
+                    children: [
+                      AppTitleBar(
+                        onHelp: () {},
+                        onSettings: () {},
+                        showWindowButtons: true,
+                      ),
+                      Expanded(
+                        child: SubPageHeaderScope(
+                          header: SubPageHeader(
+                            onBack: () {},
+                            onHome: () {},
+                            trail: [
+                              (
+                                label: section,
+                                onTap: leaf == null ? null : () {}
+                              ),
+                              if (leaf != null) (label: leaf, onTap: null),
+                            ],
+                          ),
+                          child: screen,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+          await settle(tester);
+          if (scenario.after case final after?) {
+            await after(tester, fixture);
+            await settle(tester);
+          }
+          await capture(
+            tester,
+            p.join('build', 'visual_review', _phase, 'store_$name$suffix.png'),
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          fixture.dispose();
+          WidgetsApp.debugAllowBannerOverride = true;
+        }
+      });
     }
   }
 

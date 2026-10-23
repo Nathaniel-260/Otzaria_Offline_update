@@ -32,6 +32,7 @@ import '../shell/shell_tasks.dart';
 import '../theme/theme_exports.dart';
 import '../widgets/widgets_exports.dart';
 import 'app_report/crash_prompt_dialog.dart';
+import 'custom_apps/custom_apps_manage_page.dart';
 import 'custom_apps/custom_apps_screen.dart';
 import 'error_reports_flow.dart';
 import 'faq/faq_dialog.dart';
@@ -508,6 +509,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     );
   }
 
+  /// ניהול התוכנות הנוספות — דף בתוך מקטע ההגדרות.
+  bool _managesApps(ShellSection section) =>
+      section == ShellSection.settings &&
+      _navigator.current is CustomAppsManageRoute;
+
   String? _detailLabel(ShellSection section, String id) => switch (section) {
         ShellSection.plugins => _session.plugins.byId(id)?.name,
         ShellSection.customApps => _session.customApps.apps
@@ -523,7 +529,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     final screen = _subPage(section);
     final label = _sectionLabel(context, section);
     final detail = _detailId(section);
-    final detailLabel = detail == null ? null : _detailLabel(section, detail);
+    final detailLabel = detail == null
+        ? (_managesApps(section)
+            ? context.strings.customApps.manageDialogTitle
+            : null)
+        : _detailLabel(section, detail);
     return SubPageHeaderScope(
       header: SubPageHeader(
         onBack: _navigator.back,
@@ -583,8 +593,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         ),
       ShellSection.plugins => PluginsScreen(
           controller: s.plugins,
-          onRequestFocus: () => unawaited(_goTo(ShellSection.plugins)),
           readOnly: widget.readOnly,
+          online: onlineState(s),
+          otzariaInstalled: s.otzaria.currentVersion != null,
           driveFull: widget.driveFull,
           busyElsewhere: s.pluginSyncBlockedElsewhere,
           detailId: _detailId(ShellSection.plugins),
@@ -617,12 +628,18 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onOpenFolder: () => unawaited(_openLauncherFolder()),
           onRestartElevated: _restartElevated,
         ),
+      ShellSection.settings when _managesApps(section) => CustomAppsManagePage(
+          controller: s.customApps,
+          readOnly: widget.readOnly,
+        ),
       ShellSection.settings => SettingsScreen(
           controller: widget.settings,
           onOpenLog: s.openLogFolder,
           launcherVersion: s.launcherUpdate.currentVersion,
           saferMode: s.saferMode,
           customApps: s.customApps,
+          onManageCustomApps: () =>
+              unawaited(_navigator.push(const CustomAppsManageRoute())),
           readOnly: widget.readOnly,
           driveFull: widget.driveFull,
           appReports: widget.appReports,

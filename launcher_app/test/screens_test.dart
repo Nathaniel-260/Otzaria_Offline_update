@@ -17,6 +17,7 @@ import 'package:launcher_app/src/screens/plugins/plugin_store_card.dart';
 import 'package:launcher_app/src/screens/plugins/plugins_screen.dart';
 import 'package:launcher_app/src/screens/settings_screen.dart';
 import 'package:launcher_app/src/screens/setup_error_screen.dart';
+import 'package:launcher_app/src/screens/store_kit/store_kit.dart';
 import 'package:launcher_app/src/self_update/launcher_version.dart';
 import 'package:launcher_app/src/self_update/payload_check.dart';
 import 'package:launcher_app/src/services/app_paths.dart';
@@ -669,17 +670,31 @@ void main() {
     // הטעינה נעשית ב-runAsync: קריאות דיסק אמיתיות לא מסתיימות בתוך
     // ה-fake-async של testWidgets. באפליקציה עצמה AppShell קורא ל-load().
     await tester.runAsync(plugins.load);
-    // הסריקה שב-load קוראת מההתקנה האמיתית של אוצריא במחשב הזה; הבדיקה
-    // אינה נשענת עליה, ולכן המפה מאופסת מיד.
     plugins.installed = const {};
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
 
-    expect(find.text('סנכרון מהאתר'), findsOneWidget);
-    expect(find.text('טרם בוצע סנכרון'), findsOneWidget);
-    expect(find.text('עדיין לא סונכרנו תוספים'), findsOneWidget);
-    // מראה ריקה — לא מציגים סינון על כלום.
-    expect(find.text('חיפוש'), findsNothing);
+    final t = stringsOf().plugins;
+    expect(find.text(t.emptyTitle), findsOneWidget);
+    expect(find.text(t.emptyBodyOnline), findsOneWidget);
+    // הרענון בראש הדף ובמצב הריק.
+    expect(find.text(t.refreshButton), findsNWidgets(2));
+    // מראה ריקה — לא מציגים חיפוש וסינון על כלום.
+    expect(find.text(t.searchHint), findsNothing);
+    expect(find.text(t.filterInstalled), findsNothing);
+  });
+
+  testWidgets('בלי אינטרנט אין "רענון", והמצב הריק אומר מאיפה מביאים', (
+    tester,
+  ) async {
+    await tester.runAsync(plugins.load);
+    plugins.installed = const {};
+    await pumpScreen(tester, PluginsScreen(controller: plugins, online: false));
+    await tester.pumpAndSettle();
+
+    final t = stringsOf().plugins;
+    expect(find.text(t.refreshButton), findsNothing);
+    expect(find.text(t.emptyBodyOffline), findsOneWidget);
   });
 
   testWidgets('מסך החנות מציג כרטיס תוסף מהקטלוג המקומי', (tester) async {
@@ -714,25 +729,23 @@ void main() {
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
 
+    final t = stringsOf().plugins;
+    expect(find.text(t.storeTitle), findsOneWidget);
+    expect(find.textContaining(t.storeSubtitle), findsOneWidget);
     expect(find.text('תוסף לבדיקה'), findsOneWidget);
-    expect(find.text('גרסה 1.2.3'), findsOneWidget);
-    expect(find.text('יציב'), findsWidgets);
-    // מראה בלי אצירה (לא נבחרים ולא קטגוריות בית) נופלת ל"כל התוספים",
-    // כמו דף הבית הריק באתר ששולח לרשימה המלאה.
-    expect(find.text('בחרו את התוסף שמתאים לכם'), findsOneWidget);
-    expect(find.text('כל התוספים מוצגים'), findsOneWidget);
-    expect(find.text('חיפוש'), findsOneWidget);
-    // תאריך עברי, כמו בחנות המקורית.
-    expect(find.textContaining('ט"ו בניסן'), findsOneWidget);
+    expect(find.text('תקציר קצר'), findsOneWidget);
+    expect(find.text(t.pluginVersionBadge('1.2.3')), findsOneWidget);
+    // "יציב" אינו מוצג בכרטיס — רק בטא וניסיוני, כמו באתר.
+    expect(find.text(t.statusStable), findsNothing);
+    expect(find.text(t.searchHint), findsOneWidget);
+    expect(find.text(t.installInOtzariaButton), findsOneWidget);
   });
 
   testWidgets('כרטיס עמוס בכרטיס הצר ביותר אינו גולש — בכל הגדלה ובשתי השפות', (
     tester,
   ) async {
-    // המקרה הגרוע: שם ארוך, תקציר ארוך, ארבע תגיות עבריות ארוכות, מונה
-    // הורדות בן שש ספרות, גלולת דירוג ושבב "עדכון זמין" (שמופיע רק
-    // כשמותקנת גרסה ישנה) — כל אלה מרחיבים את שורות הגלולות שהכרטיס
-    // תוקצב עבורן.
+    // המקרה הגרוע: שם ארוך, תקציר ארוך, מונה הורדות בן שש ספרות, דירוג,
+    // שבבי "ניסיוני" ו"חדש", ו"עדכון ל-<גרסה ארוכה>" עם הערת קובץ חסר.
     final store = PluginMirrorStore(tempDir.path);
     await tester.runAsync(
       () => store.save(
@@ -751,7 +764,7 @@ void main() {
                 'downloadCount': 123456,
                 'ratingAvg': 4.5,
                 'ratingCount': 128,
-                'isPinned': true,
+                'requiresNetwork': true,
                 'tags': const [
                   'תגית ארוכה למדי',
                   'עוד תגית',
@@ -769,15 +782,14 @@ void main() {
     );
 
     await tester.runAsync(plugins.load);
-    // סריקת ההתקנה האמיתית מגיעה מתיקיית אוצריא של המכונה; כאן מזריקים
-    // גרסאות מותקנות ישנות ישירות, כדי שהשבב הארוך ביותר ייבנה.
+    // גרסאות מותקנות ישנות — כדי שהכפתור הארוך ביותר ("עדכון ל-...") ייבנה.
     plugins.installed = {for (var i = 0; i < 4; i++) 'id-$i': '1.0.0'};
 
-    // 584/620 = שתי עמודות צרות, 700 = שתיים רחבות, 1160 = שלוש. שתי
-    // השפות וכל ההגדלות שהמשתמש יכול לבחור (0.9/1.0/1.15), ומעליהן 1.3
-    // ו-1.5 מהגדלת המערכת. אנגלית היא המקרה הצפוף — התקציב אינו תלוי שפה.
+    // 584 = שורות צרות, 760 = שורות רחבות, 840 = שני כרטיסים צרים,
+    // 1160 = שניים ברוחב המרבי. כל ההגדלות שהמשתמש יכול לבחור
+    // (0.9/1.0/1.15), ומעליהן 1.3 ו-1.5 מהגדלת המערכת.
     final cases = <({double width, AppLanguage language, double scale})>[
-      for (final width in [584.0, 620.0, 700.0, 1160.0])
+      for (final width in [584.0, 760.0, 840.0, 1160.0])
         for (final language in AppLanguage.values)
           for (final scale in [0.9, 1.0, 1.15, 1.3, 1.5])
             (width: width, language: language, scale: scale),
@@ -785,7 +797,7 @@ void main() {
 
     for (final c in cases) {
       final t = stringsOf(c.language).plugins;
-      useViewSize(tester, Size(c.width, 1400));
+      useViewSize(tester, Size(c.width, 2400));
       AppL10n.use(c.language);
       addTearDown(() => AppL10n.use(AppLanguage.hebrew));
 
@@ -803,18 +815,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // השבב אכן מוצג — אחרת הבדיקה לא באמת בודקת את המקרה הגרוע.
+      // הכפתור הארוך אכן מוצג — אחרת הבדיקה לא בודקת את המקרה הגרוע.
       expect(
-        find.text(t.installChipUpdateAvailable),
+        find.text(t.updateToButton('10.20.30')),
         findsWidgets,
-        reason: 'שבב "עדכון זמין" חסר ב-$c',
+        reason: 'כפתור העדכון חסר ב-$c',
       );
       // גלישת RenderFlex נזרקת כחריג; אין צורך ב-expect נוסף.
       expect(tester.takeException(), isNull, reason: 'הכרטיס גלש ב-$c');
     }
   });
 
-  testWidgets('מתג "רק מה שלא מותקן" בשורה העליונה חל גם על דף הבית', (
+  testWidgets('בורר "הכול / מותקנים / לא מותקנים" מצמצם את הרשת', (
     tester,
   ) async {
     final store = PluginMirrorStore(tempDir.path);
@@ -828,7 +840,6 @@ void main() {
               'name': 'תוסף שכבר מותקן',
               'version': '1.0.0',
               'status': 'stable',
-              'isPinned': true,
             }, 'https://otzaria.org')
                 .copyWith(manifestId: 'id-a'),
             StorePlugin.fromApi(const {
@@ -836,7 +847,6 @@ void main() {
               'name': 'תוסף שאינו מותקן',
               'version': '1.0.0',
               'status': 'stable',
-              'isPinned': true,
             }, 'https://otzaria.org'),
           ],
         ),
@@ -849,18 +859,26 @@ void main() {
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
 
-    // המתג דלוק כברירת מחדל — המותקן והמעודכן מוסתר גם בסעיף הנבחרים.
-    expect(find.text('רק מה שלא מותקן'), findsOneWidget);
-    expect(find.text('תוסף שאינו מותקן'), findsOneWidget);
-    expect(find.text('תוסף שכבר מותקן'), findsNothing);
-
-    await tester.tap(find.text('רק מה שלא מותקן'));
-    await tester.pumpAndSettle();
-
+    final t = stringsOf().plugins;
+    // ברירת המחדל "הכול" — גם המותקן מוצג, עם "מותקן ✓".
     expect(find.text('תוסף שכבר מותקן'), findsOneWidget);
+    expect(find.text('תוסף שאינו מותקן'), findsOneWidget);
+    expect(find.text(t.installedLabel), findsOneWidget);
+
+    await tester.tap(find.text(t.filterNotInstalled));
+    await tester.pumpAndSettle();
+    expect(find.text('תוסף שכבר מותקן'), findsNothing);
+    expect(find.text('תוסף שאינו מותקן'), findsOneWidget);
+
+    await tester.tap(find.text(t.filterInstalled));
+    await tester.pumpAndSettle();
+    expect(find.text('תוסף שכבר מותקן'), findsOneWidget);
+    expect(find.text('תוסף שאינו מותקן'), findsNothing);
   });
 
-  testWidgets('הרשת מציגה שלושה כרטיסים בשורה בחלון בינוני', (tester) async {
+  testWidgets('הרשת בשתי עמודות בחלון רחב, ובעמודה אחת בחלון צר', (
+    tester,
+  ) async {
     final store = PluginMirrorStore(tempDir.path);
     await tester.runAsync(
       () => store.save(
@@ -873,118 +891,86 @@ void main() {
                 'name': 'תוסף מספר $i',
                 'shortDescription': 'תקציר',
                 'status': 'stable',
-                'tags': const ['לימוד', 'עיצוב'],
                 'supportsDirectInstall': true,
               }, 'https://otzaria.org'),
           ],
         ),
       ),
     );
-
-    // חלון בינוני — בדיוק המקרה שבו האתר כבר מציג שלוש עמודות.
-    tester.view.physicalSize = const Size(1000, 1200);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
     await tester.runAsync(plugins.load);
     plugins.installed = const {};
-    await tester.pumpWidget(wrap(PluginsScreen(controller: plugins)));
-    await tester.pumpAndSettle();
 
-    // שלושה כרטיסים חולקים את אותה קואורדינטת y — כלומר שורה אחת.
-    final cards = tester
-        .widgetList<PluginStoreCard>(find.byType(PluginStoreCard))
-        .toList();
-    expect(cards.length, greaterThanOrEqualTo(3));
-    final firstRowTop =
-        tester.getTopLeft(find.byType(PluginStoreCard).first).dy;
-    final inFirstRow = [
-      for (var i = 0; i < cards.length; i++)
-        if (tester.getTopLeft(find.byType(PluginStoreCard).at(i)).dy ==
-            firstRowTop)
-          i,
-    ];
-    expect(inFirstRow.length, 3);
+    int perRow() {
+      final cards = find.byType(PluginStoreCard);
+      final top = tester.getTopLeft(cards.first).dy;
+      return [
+        for (var i = 0; i < tester.widgetList(cards).length; i++)
+          if (tester.getTopLeft(cards.at(i)).dy == top) i,
+      ].length;
+    }
+
+    // רוחב התוכן 952 — מעל נקודת השבירה (772) של המוקאפ.
+    await pumpScreen(
+      tester,
+      PluginsScreen(controller: plugins),
+      size: const Size(1000, 1200),
+    );
+    await tester.pumpAndSettle();
+    expect(perRow(), 2);
+
+    await pumpScreen(
+      tester,
+      PluginsScreen(controller: plugins),
+      size: const Size(760, 1200),
+    );
+    await tester.pumpAndSettle();
+    expect(perRow(), 1);
   });
 
-  testWidgets('החנות נפתחת בדף הבית האצור, ומשם לדף קטגוריה ולכל התוספים', (
-    tester,
-  ) async {
-    StorePlugin plugin(
-      String id,
-      String name, {
-      bool featured = false,
-      List<String> categories = const [],
-    }) =>
-        StorePlugin.fromApi({
+  testWidgets('שבב קטגוריה מסנן את הרשת, ו"הכול" מחזיר', (tester) async {
+    StorePlugin plugin(String id, String name) => StorePlugin.fromApi({
           'id': id,
           'name': name,
           'status': 'stable',
-          'isPinned': featured,
-        }, 'https://otzaria.org')
-            .copyWith(categorySlugs: categories);
+        }, 'https://otzaria.org');
 
     final store = PluginMirrorStore(tempDir.path);
     await tester.runAsync(
       () => store.save(
         PluginCatalog(
           lastSync: DateTime.utc(2026, 8, 6),
-          plugins: [
-            plugin('a', 'תוסף נבחר', featured: true, categories: ['study']),
-            plugin('b', 'תוסף אחר'),
-          ],
+          plugins: [plugin('a', 'תוסף בקטגוריה'), plugin('b', 'תוסף אחר')],
           categories: const [
             PluginStoreCategory(
               slug: 'study',
               name: 'כלי לימוד',
               description: 'תוספים שמסייעים בלימוד',
-              showOnHome: true,
               pluginIds: ['a'],
             ),
+            // קטגוריה ריקה אינה מקבלת שבב.
+            PluginStoreCategory(slug: 'empty', name: 'קטגוריה ריקה'),
           ],
-          home: const PluginStoreHome(
-            title: 'החנות של אוצריא',
-            subtitle: 'תוספים שמרחיבים את הלימוד',
-          ),
         ),
       ),
     );
 
     await tester.runAsync(plugins.load);
-    // הסריקה שב-load קוראת מההתקנה האמיתית של אוצריא במחשב הזה; הבדיקה
-    // אינה נשענת עליה, ולכן המפה מאופסת מיד.
     plugins.installed = const {};
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
 
-    // דף הבית: hero עם הטקסטים מהאתר, וסעיף "תוספים נבחרים".
-    expect(find.text('החנות של אוצריא'), findsOneWidget);
-    expect(find.text('תוספים שמרחיבים את הלימוד'), findsOneWidget);
-    expect(find.text('מומלצי החנות'), findsOneWidget);
-    expect(find.text('תוספים נבחרים'), findsOneWidget);
-    // דף הבית מציג אצירה בלבד — אין בו סינון (רק חיפוש ב-hero).
-    expect(find.text('סטטוס'), findsNothing);
+    final t = stringsOf().plugins;
+    expect(
+        find.widgetWithText(StoreCategoryChip, 'קטגוריה ריקה'), findsNothing);
 
-    // שורת הקטגוריה של דף הבית, ו"לכל הקטגוריה" שפותח את דף הקטגוריה.
-    expect(find.text('תוספים שמסייעים בלימוד'), findsWidgets);
-    await tester.tap(find.text('לכל הקטגוריה (1)'));
+    await tester.tap(find.widgetWithText(StoreCategoryChip, 'כלי לימוד'));
     await tester.pumpAndSettle();
-
-    expect(find.text('תוסף אחד בקטגוריה'), findsOneWidget);
-    expect(find.text('תוסף נבחר'), findsWidgets);
+    expect(find.text('תוסף בקטגוריה'), findsOneWidget);
     expect(find.text('תוסף אחר'), findsNothing);
 
-    // פירורי הלחם מחזירים לדף הבית, ומשם אל "כל התוספים".
-    await tester.tap(find.text('חנות התוספים'));
+    await tester.tap(find.widgetWithText(StoreCategoryChip, t.filterAll));
     await tester.pumpAndSettle();
-    expect(find.text('תוספים נבחרים'), findsOneWidget);
-
-    await tester.tap(find.text('עיינו בכל התוספים (2)'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('בחרו את התוסף שמתאים לכם'), findsOneWidget);
-    expect(find.text('חיפוש'), findsOneWidget);
-    expect(find.text('תוסף אחר'), findsWidgets);
+    expect(find.text('תוסף אחר'), findsOneWidget);
   });
 
   testWidgets('מסך ההגדרות מציג את כל קטגוריות ההגדרה', (tester) async {
