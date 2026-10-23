@@ -567,8 +567,10 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           busy: s.longTaskRunning,
           readOnly: widget.readOnly,
           appInstalled: s.otzaria.currentVersion != null,
-          appInstallable:
-              s.otzaria.status == OtzariaModuleStatus.updateAvailable,
+          appInstallable: switch (s.otzaria.status) {
+            OtzariaModuleStatus.idle || OtzariaModuleStatus.checking => null,
+            final status => status == OtzariaModuleStatus.updateAvailable,
+          },
           onUpdateHere: () => _updateOnly(GuidanceItem.library),
           onInstallFull: () =>
               _updateOnly(GuidanceItem.library, fullLibrary: true),

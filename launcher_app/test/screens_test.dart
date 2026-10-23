@@ -1695,6 +1695,24 @@ void main() {
     expect(primary.text, p.libInstallButton);
     expect(primary.onPressed, isNull);
     expect(find.text(p.libInstallNeedsApp), findsOneWidget);
+
+    // בזמן שמודול התוכנה בבדיקה לא ידוע אם היא בכונן — אין הסבר שגוי.
+    await pumpScreen(
+      tester,
+      LibraryScreen(
+        library: library,
+        otzariaIsRunning: false,
+        onCloseOtzaria: () async => true,
+        isDownloading: false,
+        onProcessStateChanged: () async => false,
+        onRequestReindex: () async {},
+        onGoToSettings: () {},
+        onUpdateHere: () => tasks++,
+        appInstalled: false,
+        appInstallable: null,
+      ),
+    );
+    expect(find.byKey(ShellKeys.libraryInstallNote), findsNothing);
   });
 
   testWidgets('אחרי כשל — הספרייה המלאה היא הפעולה הראשית, עם גודל', (
@@ -1733,13 +1751,12 @@ void main() {
     expect(find.text(stringsOf().pages.libFullBodyNoSize), findsOneWidget);
   });
 
-  testWidgets('כונן מוגן — בחירת מיקום הספרייה מושבתת, עם הסבר',
-      (tester) async {
+  // מיקום המסד נשמר ב-stateDir, שבכונן מוגן עובר למחשב עצמו.
+  testWidgets('כונן מוגן — אפשר לבחור את מיקום הספרייה', (tester) async {
     library.installTargetPath = r'C:\otzaria\books\seforim.db';
     await pumpScreen(tester, libraryPage(readOnly: true));
     await openAdvanced(tester);
 
-    expect(find.text(stringsOf().pages.libLocationReadOnly), findsOneWidget);
     for (final text in [
       stringsOf().libraryScreen.pickInstallDirButton,
       stringsOf().libraryScreen.pickDbButton,
@@ -1748,9 +1765,18 @@ void main() {
         tester
             .widget<ActionButton>(find.widgetWithText(ActionButton, text))
             .onPressed,
-        isNull,
+        isNotNull,
       );
     }
+
+    library.status = LibraryModuleStatus.needsManualPath;
+    await pumpScreen(tester, libraryPage(readOnly: true));
+    expect(
+      tester
+          .widget<ActionButton>(find.byKey(ShellKeys.statusPrimary))
+          .onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets('הסכמה לחיפוש החכם — "מה נשלח?" מציג את הגילוי המלא', (

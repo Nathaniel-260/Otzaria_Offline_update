@@ -1268,6 +1268,7 @@ void main() {
 
         expect(await controller.download(), isFalse);
         expect(controller.errorMessage, isNotNull);
+        expect(controller.failure, LauncherUpdateFailure.download);
         expect(controller.hasUpdateReady, isTrue);
         expect(controller.downloadedVersion, _release().version);
       });
@@ -1342,6 +1343,7 @@ void main() {
           expect(await controller.install(), isFalse);
 
           expect(controller.errorMessage, isNotNull);
+          expect(controller.failure, LauncherUpdateFailure.install);
           expect(controller.hasUpdateReady, isTrue);
           expect(controller.isInstalling, isFalse);
           expect(installer.cleanupCalls, 1);

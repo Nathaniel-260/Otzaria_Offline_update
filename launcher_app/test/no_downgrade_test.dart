@@ -7,11 +7,14 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+const _olderPhrase = r'(?:להתקין גרסה ישנה|התקנת גרסה ישנה|לחזור לגרסה'
+    r'|install (?:an |the )?older|Install the folder version)';
+
 /// שמות קוד, ומחרוזת שמציעה להתקין גרסה ישנה — לא הערה שמזכירה זאת.
 final _forbidden = RegExp(
   r'installOlder|_Install\.older'
-  r"|'[^'\n]*(?:להתקין גרסה ישנה|התקנת גרסה ישנה|לחזור לגרסה"
-  r"|install (?:an|the) older|Install the folder version)[^'\n]*'",
+  "|'[^'\\n]*$_olderPhrase[^'\\n]*'"
+  '|"[^"\\n]*$_olderPhrase[^"\\n]*"',
   caseSensitive: false,
 );
 
@@ -39,6 +42,14 @@ void main() {
         isTrue);
     expect(
       _forbidden.hasMatch("  String get x => 'Install an older version';"),
+      isTrue,
+    );
+    expect(
+      _forbidden.hasMatch("  String get x => 'Install older version';"),
+      isTrue,
+    );
+    expect(
+      _forbidden.hasMatch('  String get x => "להתקין גרסה ישנה";'),
       isTrue,
     );
     expect(_forbidden.hasMatch('  void installOlder() {}'), isTrue);

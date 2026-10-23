@@ -731,9 +731,6 @@ class _Pages extends PageStrings {
   @override
   String get libLocationNone => 'No location chosen yet';
   @override
-  String get libLocationReadOnly =>
-      'The drive is write-protected, so the library location cannot be changed here.';
-  @override
   String get libFullTitle => 'The full library instead of an update';
   @override
   String libFullBody(String size) =>
@@ -812,9 +809,6 @@ class _Pages extends PageStrings {
   @override
   String get repOwnEmpty => 'There are no reports about this tool yet.';
   @override
-  String get repOwnReadOnly =>
-      'The drive is write-protected, so reports cannot be sent or deleted here, and no new report can be written.';
-  @override
   String get repCrumb => 'Reports';
   @override
   String get repProblemSection => 'Something not working in this tool?';
@@ -850,8 +844,10 @@ class _Pages extends PageStrings {
   @override
   String get selfErrorTitle => 'Updating the tool did not succeed';
   @override
-  String get selfDownloadFailed =>
-      'Downloading the new version failed. The internet connection may have dropped.';
+  String get selfDownloadFailed => 'The new version was not fully downloaded.';
+  @override
+  String get selfCheckFailed =>
+      'We could not read the new version on the drive.';
   @override
   String get selfInstallFailed => 'Installing the new version did not succeed.';
   @override
@@ -978,6 +974,10 @@ class _Guide extends GuidanceStrings {
       'The Otzaria site has not been checked yet. "Check again" checks now.';
   @override
   String get newerTitle => 'This computer is newer than the drive';
+  @override
+  String newerChannelTitle({required bool stable}) => stable
+      ? 'This computer is newer than the stable version on the drive'
+      : 'This computer is newer than the beta version on the drive';
   @override
   String newerBody(String installed, String onDrive) =>
       'This computer has Otzaria $installed, and the drive has $onDrive. '
@@ -4346,7 +4346,7 @@ class _AppReports extends AppReportsStrings {
   String get clearSentButton => 'Clear History';
   @override
   String openIssueButton(int? number) =>
-      number == null ? 'Open on GitHub' : 'Open issue #$number';
+      number == null ? 'Open the report' : 'Open report #$number';
   @override
   String get mergedLabel => 'Added to an existing report';
   @override

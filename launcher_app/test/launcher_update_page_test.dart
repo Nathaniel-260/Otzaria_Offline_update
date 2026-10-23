@@ -171,6 +171,25 @@ void main() {
     expect(find.textContaining('503'), findsOneWidget);
   });
 
+  testWidgets('ההודעה מתארת את השלב שנכשל, גם כשיש גרסה מוכנה', (
+    tester,
+  ) async {
+    c
+      ..status = LauncherUpdateStatus.readyToInstall
+      ..downloadedVersion = '99.1.2'
+      ..canInstall = true
+      ..errorMessage = 'x';
+    for (final (failure, text) in [
+      (LauncherUpdateFailure.download, p.selfDownloadFailed),
+      (LauncherUpdateFailure.install, p.selfInstallFailed),
+      (LauncherUpdateFailure.check, p.selfCheckFailed),
+    ]) {
+      c.failure = failure;
+      await pumpScreen(tester, page());
+      expect(find.textContaining(text), findsOneWidget, reason: '$failure');
+    }
+  });
+
   testWidgets('הרשאות מנהל — "הפעלה מחדש כמנהל" ראשי', (tester) async {
     c
       ..status = LauncherUpdateStatus.readyToInstall

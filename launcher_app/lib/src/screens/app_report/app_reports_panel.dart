@@ -22,7 +22,6 @@ class AppReportsPanel extends StatefulWidget {
     required this.reports,
     this.openUrl = FileReveal.openGithubUrl,
     this.connection,
-    this.readOnly = false,
   });
 
   final AppReportsController reports;
@@ -30,9 +29,6 @@ class AppReportsPanel extends StatefulWidget {
 
   /// שליחה רק כשידוע שיש חיבור — כמו בכרטיס הראשי של הדף.
   final bool? connection;
-
-  /// כונן מוגן: התור וההיסטוריה יושבים בו, ולכן אין שליחה ואין מחיקה.
-  final bool readOnly;
 
   @override
   State<AppReportsPanel> createState() => _AppReportsPanelState();
@@ -231,8 +227,7 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
     final cs = Theme.of(context).colorScheme;
     final pending = _pending;
     final meta = AppTextStyles.meta.copyWith(color: cs.onSurfaceVariant);
-    final canWrite = !widget.readOnly;
-    final canSend = canWrite && widget.connection == true;
+    final canSend = widget.connection == true;
 
     if (pending == null) {
       return const Padding(
@@ -259,33 +254,31 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
         if (pending.isNotEmpty) ...[
           SectionLabel(
             pages.repOwnPending(pending.length),
-            trailing: !canWrite
-                ? null
-                : Wrap(
-                    spacing: 4,
-                    children: [
-                      if (canSend)
-                        ActionButton.ghost(
-                          key: const ValueKey('app-reports-flush'),
-                          text: t.sendNowButton,
-                          icon: FluentIcons.send_24_regular,
-                          size: ActionButtonSize.sm,
-                          isLoading: _isFlushing,
-                          onPressed: _isFlushing ? null : _flush,
-                        ),
-                      ActionButton.warning(
-                        key: const ValueKey('app-reports-clear-pending'),
-                        text: t.clearPendingButton,
-                        size: ActionButtonSize.sm,
-                        onPressed: _isFlushing ? null : _clearPending,
-                      ),
-                    ],
+            trailing: Wrap(
+              spacing: 4,
+              children: [
+                if (canSend)
+                  ActionButton.ghost(
+                    key: const ValueKey('app-reports-flush'),
+                    text: t.sendNowButton,
+                    icon: FluentIcons.send_24_regular,
+                    size: ActionButtonSize.sm,
+                    isLoading: _isFlushing,
+                    onPressed: _isFlushing ? null : _flush,
                   ),
+                ActionButton.warning(
+                  key: const ValueKey('app-reports-clear-pending'),
+                  text: t.clearPendingButton,
+                  size: ActionButtonSize.sm,
+                  onPressed: _isFlushing ? null : _clearPending,
+                ),
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(
-              canWrite ? t.manageDialogIntro : pages.repOwnReadOnly,
+              t.manageDialogIntro,
               style: meta,
             ),
           ),
@@ -319,16 +312,15 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
                               ? null
                               : () => _sendPending(report),
                         ),
-                      if (canWrite)
-                        AppIconButton(
-                          icon: FluentIcons.delete_24_regular,
-                          tooltip: t.deleteButton,
-                          small: true,
-                          danger: true,
-                          onPressed: _sendingReportId == report.reportId
-                              ? null
-                              : () => _deletePending(report),
-                        ),
+                      AppIconButton(
+                        icon: FluentIcons.delete_24_regular,
+                        tooltip: t.deleteButton,
+                        small: true,
+                        danger: true,
+                        onPressed: _sendingReportId == report.reportId
+                            ? null
+                            : () => _deletePending(report),
+                      ),
                     ],
                   ),
                 ),
@@ -340,14 +332,12 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
             _sentTotal == 0
                 ? t.sentSectionTitle
                 : '${t.sentSectionTitle} · ${t.sentSummary(_sent.length, _sentTotal)}',
-            trailing: !canWrite
-                ? null
-                : ActionButton.ghost(
-                    key: const ValueKey('app-reports-clear-sent'),
-                    text: t.clearSentButton,
-                    size: ActionButtonSize.sm,
-                    onPressed: _clearSent,
-                  ),
+            trailing: ActionButton.ghost(
+              key: const ValueKey('app-reports-clear-sent'),
+              text: t.clearSentButton,
+              size: ActionButtonSize.sm,
+              onPressed: _clearSent,
+            ),
           ),
           if (_sent.isEmpty)
             _emptyCard(context, pages.repOwnEmpty)
@@ -383,14 +373,13 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
                             size: ActionButtonSize.sm,
                             onPressed: () => _openIssue(url),
                           ),
-                        if (canWrite)
-                          AppIconButton(
-                            icon: FluentIcons.delete_24_regular,
-                            tooltip: t.deleteButton,
-                            small: true,
-                            danger: true,
-                            onPressed: () => _deleteSent(report),
-                          ),
+                        AppIconButton(
+                          icon: FluentIcons.delete_24_regular,
+                          tooltip: t.deleteButton,
+                          small: true,
+                          danger: true,
+                          onPressed: () => _deleteSent(report),
+                        ),
                       ],
                     ),
                   ),

@@ -712,9 +712,6 @@ class _Pages extends PageStrings {
   @override
   String get libLocationNone => 'עוד לא נבחר מיקום';
   @override
-  String get libLocationReadOnly =>
-      'הכונן מוגן מפני כתיבה, ולכן אי אפשר לשנות כאן את מיקום הספרייה.';
-  @override
   String get libFullTitle => 'הספרייה המלאה במקום עדכון';
   @override
   String libFullBody(String size) =>
@@ -786,9 +783,6 @@ class _Pages extends PageStrings {
   @override
   String get repOwnEmpty => 'עוד אין דיווחים על הכלי הזה.';
   @override
-  String get repOwnReadOnly =>
-      'הכונן מוגן מפני כתיבה, ולכן אי אפשר לשלוח או למחוק כאן דיווחים, וגם לא לכתוב דיווח חדש.';
-  @override
   String get repCrumb => 'דיווחים';
   @override
   String get repProblemSection => 'משהו לא עובד בכלי הזה?';
@@ -822,8 +816,9 @@ class _Pages extends PageStrings {
   @override
   String get selfErrorTitle => 'העדכון של הכלי לא הצליח';
   @override
-  String get selfDownloadFailed =>
-      'ההורדה של הגרסה החדשה נכשלה. אולי החיבור לאינטרנט נקטע.';
+  String get selfDownloadFailed => 'ההורדה של הגרסה החדשה לא הושלמה.';
+  @override
+  String get selfCheckFailed => 'לא הצלחנו לקרוא את הגרסה החדשה שבכונן.';
   @override
   String get selfInstallFailed => 'ההתקנה של הגרסה החדשה לא הצליחה.';
   @override
@@ -944,6 +939,10 @@ class _Guide extends GuidanceStrings {
       'עוד לא נבדק אם יש באתר אוצריא משהו חדש. "בדוק שוב" בודק עכשיו.';
   @override
   String get newerTitle => 'המחשב הזה מעודכן יותר מהכונן';
+  @override
+  String newerChannelTitle({required bool stable}) => stable
+      ? 'המחשב הזה מעודכן יותר מהגרסה היציבה שבכונן'
+      : 'המחשב הזה מעודכן יותר מהגרסה הניסיונית שבכונן';
   @override
   String newerBody(String installed, String onDrive) =>
       'במחשב הזה מותקנת אוצריא $installed, ובכונן יש $onDrive. אין מה '
@@ -4090,7 +4089,7 @@ class _AppReports extends AppReportsStrings {
   String get clearSentButton => 'ניקוי ההיסטוריה';
   @override
   String openIssueButton(int? number) =>
-      number == null ? 'פתח ב-GitHub' : 'פתח דיווח #$number';
+      number == null ? 'פתח את הדיווח' : 'פתח דיווח #$number';
   @override
   String get mergedLabel => 'צורף לדיווח קיים';
   @override

@@ -33,6 +33,7 @@ class HomeViewModel {
     this.online,
     this.installedVersion,
     this.driveAppVersion,
+    this.appAwaitsNewerStable,
     this.onlineAppVersion,
     this.driveLibraryVersion,
     this.driveCompanionNames,
@@ -79,6 +80,10 @@ class HomeViewModel {
   final bool? online;
   final String? installedVersion;
   final String? driveAppVersion;
+
+  /// מותקנת גרסה חדשה מהערוץ שנבחר, וממתינים לגרסה חדשה יותר בו: `true`
+  /// לערוץ היציב. `null` כשזה לא המצב.
+  final bool? appAwaitsNewerStable;
   final String? onlineAppVersion;
   final String? driveLibraryVersion;
 
@@ -177,6 +182,8 @@ HomeViewModel homeViewModelOf(AppSession s) {
     online: facts.online,
     installedVersion: otzaria.currentVersion,
     driveAppVersion: otzaria.latestVersion,
+    appAwaitsNewerStable:
+        otzaria.awaitsNewerInSelectedChannel ? !otzaria.preferPrerelease : null,
     onlineAppVersion:
         otzaria.hasOnlineUpdate ? otzaria.onlineUpdateVersion : null,
     driveLibraryVersion: library.companionsOnly || library.targetVersion == null

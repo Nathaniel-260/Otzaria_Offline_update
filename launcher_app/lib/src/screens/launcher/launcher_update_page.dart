@@ -218,7 +218,11 @@ class LauncherUpdatePage extends StatelessWidget {
             ),
             title: t.selfErrorTitle,
             // הסיבה הטכנית (סטטוס, חריג) נשארת בפרטים וביומן.
-            body: '${ready ? t.selfInstallFailed : t.selfDownloadFailed}\n'
+            body: '${switch (c.failure) {
+              LauncherUpdateFailure.install => t.selfInstallFailed,
+              LauncherUpdateFailure.check => t.selfCheckFailed,
+              _ => t.selfDownloadFailed,
+            }}\n'
                 '${t.selfErrorKeepsWorking}',
             actions: [
               ActionButton.ghost(

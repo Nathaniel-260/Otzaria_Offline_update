@@ -250,6 +250,20 @@ void main() {
       s.plugins.isExporting = false;
       expect(homeViewModelOf(s).checkBlocked, isFalse);
     });
+
+    test('הבית מקבל את הערוץ כשממתינים לגרסה חדשה יותר בערוץ שנבחר', () {
+      final s = session();
+      s.otzaria
+        ..status = OtzariaModuleStatus.installedIsNewer
+        ..awaitsNewerInSelectedChannel = true;
+      expect(
+        homeViewModelOf(s).appAwaitsNewerStable,
+        !s.otzaria.preferPrerelease,
+      );
+
+      s.otzaria.awaitsNewerInSelectedChannel = false;
+      expect(homeViewModelOf(s).appAwaitsNewerStable, isNull);
+    });
   });
 
   group('בדיקת המראה בעלייה', () {

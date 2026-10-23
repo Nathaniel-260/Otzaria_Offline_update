@@ -19,10 +19,12 @@ import 'package:launcher_app/src/screens/app_report/app_report_preview_section.d
 import 'package:launcher_app/src/screens/app_report/app_reports_panel.dart';
 import 'package:launcher_app/src/screens/app_report/app_reports_settings_card.dart';
 import 'package:launcher_app/src/screens/app_report/crash_prompt_dialog.dart';
+import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/services/file_reveal.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
@@ -546,25 +548,42 @@ void main() {
       expect(find.byTooltip(t.deleteButton), findsOneWidget);
     });
 
-    testWidgets('כונן מוגן — אין שליחה ואין מחיקה, ונאמר למה', (tester) async {
+    // התור והטופס נכתבים ל-stateDir, שבכונן מוגן עובר למחשב עצמו.
+    testWidgets('כונן מוגן — הדיווחים של הכלי והטופס זמינים כרגיל', (
+      tester,
+    ) async {
       final service = _MemoryService()
         ..pending.add(_report('p1'))
         ..history.add(_report('s1'));
       final reports = _controller(service);
-      await _open(
+      await pumpScreen(
         tester,
-        (_) => _PanelDialog(reports: reports, readOnly: true),
+        ReportsPage(
+          errorReports: null,
+          searchFeedback: null,
+          connection: true,
+          isUploadingAll: false,
+          busy: false,
+          reportsToCollect: 0,
+          onCollect: () {},
+          onUpload: null,
+          readOnly: true,
+          appReports: reports,
+        ),
       );
+      await tester.pumpAndSettle();
 
-      expect(find.text(pages.repOwnReadOnly), findsOneWidget);
-      expect(find.byKey(const ValueKey('app-reports-flush')), findsNothing);
+      expect(find.text(t.manageDialogIntro), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-reports-flush')), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('app-reports-clear-pending')),
-        findsNothing,
+        find.byKey(const ValueKey('app-reports-clear-sent')),
+        findsOneWidget,
       );
-      expect(
-          find.byKey(const ValueKey('app-reports-clear-sent')), findsNothing);
-      expect(find.byTooltip(t.deleteButton), findsNothing);
+      expect(find.byTooltip(t.deleteButton), findsNWidgets(2));
+      final problem =
+          tester.widget<AppRow>(find.byKey(ShellKeys.reportsProblem));
+      expect(problem.subtitle, pages.repProblemBody);
+      expect(problem.onTap, isNotNull);
     });
   });
 
@@ -1263,13 +1282,11 @@ class _PanelDialog extends StatelessWidget {
     required this.reports,
     this.openUrl = _neverOpens,
     this.connection = true,
-    this.readOnly = false,
   });
 
   final AppReportsController reports;
   final Future<bool> Function(String url) openUrl;
   final bool? connection;
-  final bool readOnly;
 
   static Future<bool> _neverOpens(String _) async => false;
 
@@ -1281,7 +1298,6 @@ class _PanelDialog extends StatelessWidget {
             reports: reports,
             openUrl: openUrl,
             connection: connection,
-            readOnly: readOnly,
           ),
         ),
       );

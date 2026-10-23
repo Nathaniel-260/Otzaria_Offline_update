@@ -394,7 +394,6 @@ abstract class PageStrings {
   String get libSemanticActiveBody;
   String get libLocationTitle;
   String get libLocationNone;
-  String get libLocationReadOnly;
   String get libFullTitle;
   String libFullBody(String size);
   String get libFullBodyNoSize;
@@ -426,7 +425,6 @@ abstract class PageStrings {
   String repOwnPending(int count);
   String get repOwnTitle;
   String get repOwnEmpty;
-  String get repOwnReadOnly;
 
   /// פירור הלחם של דף הדיווחים — קצר מהכותרת.
   String get repCrumb;
@@ -446,6 +444,7 @@ abstract class PageStrings {
   String get selfInstalling;
   String get selfErrorTitle;
   String get selfDownloadFailed;
+  String get selfCheckFailed;
   String get selfInstallFailed;
   String get selfErrorKeepsWorking;
   String get selfManualTitle;
@@ -507,6 +506,7 @@ abstract class GuidanceStrings {
   String get offlineNote;
   String get checkOnlineNowNote;
   String get newerTitle;
+  String newerChannelTitle({required bool stable});
   String newerBody(String installed, String onDrive);
   String get newerNote;
   String get attentionAppTitle;

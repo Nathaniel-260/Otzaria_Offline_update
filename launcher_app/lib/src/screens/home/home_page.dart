@@ -582,11 +582,26 @@ class _Hero extends StatelessWidget {
         );
       case GuidancePrimary.newerHereThanDrive:
         return (
-          title: g.newerTitle,
-          body: g.newerBody(
-            displayVersion(m.installedVersion ?? '', other: m.driveAppVersion),
-            displayVersion(m.driveAppVersion ?? '', other: m.installedVersion),
-          ),
+          title: switch (m.appAwaitsNewerStable) {
+            final stable? => g.newerChannelTitle(stable: stable),
+            null => g.newerTitle,
+          },
+          // הכונן מחזיק שני ערוצים; במצב הזה משווים לערוץ שנבחר בלבד.
+          body: switch (m.appAwaitsNewerStable) {
+            final stable? => context.strings.pages.appAwaitsNewer(
+                stable: stable,
+              ),
+            null => g.newerBody(
+                displayVersion(
+                  m.installedVersion ?? '',
+                  other: m.driveAppVersion,
+                ),
+                displayVersion(
+                  m.driveAppVersion ?? '',
+                  other: m.installedVersion,
+                ),
+              ),
+          },
           pills: const [],
           actions: quietActions,
           notes: [

@@ -68,7 +68,9 @@ class LibraryScreen extends StatelessWidget {
   /// אוצריא מותקנת במחשב הזה. בלעדיה "עדכון כאן" מתקין קודם את התוכנה —
   /// ורק כשהיא בכונן ([appInstallable]) והספרייה עוד לא מותקנת.
   final bool appInstalled;
-  final bool appInstallable;
+
+  /// `null` — מודול התוכנה עוד בבדיקה, ולכן לא ידוע אם היא בכונן.
+  final bool? appInstallable;
 
   bool get _isBusy =>
       library.isApplying ||
@@ -224,7 +226,7 @@ class LibraryScreen extends StatelessWidget {
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
     final full = c.canRetryWithFullDownload;
-    final withApp = !appInstalled && appInstallable && c.isFreshInstall;
+    final withApp = !appInstalled && appInstallable == true && c.isFreshInstall;
     final blocked = _isBusy || busy;
     final updateText = withApp
         ? t.libInstallWithAppButton
@@ -273,11 +275,12 @@ class LibraryScreen extends StatelessWidget {
             style: sub,
           )
         else if ((canUpdate || full) && !appInstalled)
-          Text(
-            key: ShellKeys.libraryInstallNote,
-            appInstallable ? t.libUpdateNeedsApp : t.libInstallNeedsApp,
-            style: sub,
-          ),
+          if (appInstallable case final installable?)
+            Text(
+              key: ShellKeys.libraryInstallNote,
+              installable ? t.libUpdateNeedsApp : t.libInstallNeedsApp,
+              style: sub,
+            ),
         if (full && appInstalled)
           if (_fullMeta(context) case final meta?) Text(meta, style: sub),
         if (busy && !updating)
@@ -311,26 +314,16 @@ class LibraryScreen extends StatelessWidget {
       quiet: true,
       title: t.libNotFoundTitle,
       subtitle: t.libNotFoundBody,
-      extra: [
-        if (readOnly)
-          Text(
-            t.libLocationReadOnly,
-            style: AppTextStyles.rowSub.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-      ],
       actions: [
         ActionButton.recommended(
           key: ShellKeys.statusPrimary,
           text: t.libPickFolderButton,
           icon: FluentIcons.folder_open_24_regular,
-          onPressed:
-              _isBusy || readOnly ? null : () => _pickInstallDir(context),
+          onPressed: _isBusy ? null : () => _pickInstallDir(context),
         ),
         ActionButton.ghost(
           text: context.strings.libraryScreen.pickDbButton,
-          onPressed: _isBusy || readOnly ? null : () => _pickDbFile(context),
+          onPressed: _isBusy ? null : () => _pickDbFile(context),
         ),
       ],
       endActions: [RecheckButton(onPressed: _isBusy ? null : _recheck)],
@@ -480,11 +473,7 @@ class LibraryScreen extends StatelessWidget {
         AppRow(
           key: ShellKeys.libraryLocation,
           title: t.libLocationTitle,
-          subtitle: readOnly
-              ? t.libLocationReadOnly
-              : location == null
-                  ? t.libLocationNone
-                  : null,
+          subtitle: location == null ? t.libLocationNone : null,
           below: location == null ? null : PathText(location),
           trailing: Wrap(
             spacing: 8,
@@ -494,15 +483,12 @@ class LibraryScreen extends StatelessWidget {
                 ActionButton.ghost(
                   text: s.pickInstallDirButton,
                   icon: FluentIcons.folder_open_24_regular,
-                  onPressed: _isBusy || readOnly
-                      ? null
-                      : () => _pickInstallDir(context),
+                  onPressed: _isBusy ? null : () => _pickInstallDir(context),
                 ),
               ActionButton.ghost(
                 text: s.pickDbButton,
                 icon: FluentIcons.document_24_regular,
-                onPressed:
-                    _isBusy || readOnly ? null : () => _pickDbFile(context),
+                onPressed: _isBusy ? null : () => _pickDbFile(context),
               ),
             ],
           ),

@@ -23,6 +23,9 @@ enum LauncherUpdateStatus {
   error,
 }
 
+/// השלב שבו נכשל העדכון — כדי שההודעה תתאר אותו ולא תנחש.
+enum LauncherUpdateFailure { check, download, install }
+
 class LauncherUpdateController extends ChangeNotifier
     with DisposeGuard, ProgressNotifier {
   LauncherUpdateController(
@@ -51,6 +54,7 @@ class LauncherUpdateController extends ChangeNotifier
   DateTime? onlineCheckedAt;
 
   String? errorMessage;
+  LauncherUpdateFailure? failure;
 
   /// ההחלפה נכשלה על הרשאות — הלאנצ'ר מותקן בתיקייה מוגנת (`Program Files`).
   bool needsElevation = false;
@@ -151,6 +155,7 @@ class LauncherUpdateController extends ChangeNotifier
     } catch (e, st) {
       status = LauncherUpdateStatus.error;
       errorMessage = e.toString();
+      failure = LauncherUpdateFailure.check;
       AppLogger.instance
           .error('LauncherUpdateController.checkForUpdate נכשל', e, st);
     }
@@ -180,6 +185,7 @@ class LauncherUpdateController extends ChangeNotifier
       await _loadLocal();
       if (!hasUpdateReady) status = LauncherUpdateStatus.error;
       errorMessage = e.toString();
+      failure = LauncherUpdateFailure.download;
       notifyListeners();
       return false;
     }
@@ -209,6 +215,7 @@ class LauncherUpdateController extends ChangeNotifier
       await _loadLocal(cleanupLeftovers: false);
       if (!hasUpdateReady) status = LauncherUpdateStatus.error;
       errorMessage = e.toString();
+      failure = LauncherUpdateFailure.install;
       needsElevation = Elevation.isAccessDenied(e);
       notifyListeners();
       return false;

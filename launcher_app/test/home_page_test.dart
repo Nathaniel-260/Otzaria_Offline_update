@@ -218,6 +218,33 @@ void main() {
       expect(find.byKey(ShellKeys.newPluginsBanner), findsNothing);
     });
 
+    testWidgets('newer בערוץ שנבחר: הכותרת והגוף מציינים את הערוץ', (
+      tester,
+    ) async {
+      final newer = homeScenario('newer');
+      for (final stable in [true, false]) {
+        await pumpScreen(
+          tester,
+          HomePage(
+            model: HomeViewModel(
+              guidance: newer.guidance,
+              installedVersion: newer.installedVersion,
+              driveAppVersion: newer.driveAppVersion,
+              appAwaitsNewerStable: stable,
+            ),
+          ),
+        );
+
+        expect(find.text(g.newerChannelTitle(stable: stable)), findsOneWidget);
+        expect(
+          find.text(stringsOf().pages.appAwaitsNewer(stable: stable)),
+          findsOneWidget,
+        );
+        expect(find.text(g.newerTitle), findsNothing);
+        expect(find.text(g.newerBody('0.10.5', '0.10.4')), findsNothing);
+      }
+    });
+
     testWidgets('open: פס "אוצריא פתוחה כרגע" כמו במוקאפ, בלי כפתור', (
       tester,
     ) async {

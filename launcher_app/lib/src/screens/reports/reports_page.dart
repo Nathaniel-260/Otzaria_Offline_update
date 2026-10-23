@@ -80,11 +80,7 @@ class ReportsPage extends StatelessWidget {
           builder: (context, _) => _statusCard(context),
         ),
         if (reports != null)
-          AppReportsPanel(
-            reports: reports,
-            connection: connection,
-            readOnly: readOnly,
-          ),
+          AppReportsPanel(reports: reports, connection: connection),
         if (reports != null) ...[
           SectionLabel(t.repProblemSection),
           RowsCard(
@@ -95,8 +91,8 @@ class ReportsPage extends StatelessWidget {
                   icon: FluentIcons.person_feedback_24_regular,
                 ),
                 title: t.repProblemTitle,
-                subtitle: readOnly ? t.repOwnReadOnly : t.repProblemBody,
-                onTap: readOnly ? null : () => _openForm(context, reports),
+                subtitle: t.repProblemBody,
+                onTap: () => _openForm(context, reports),
               ),
             ],
           ),
