@@ -129,15 +129,21 @@ Future<void> showLibraryChangesDialog(
   );
 }
 
-Future<void> confirmLibraryUpdate(
+/// `false` — נחסם או שהמשתמש סירב; `true` — אישר, והעדכון רץ.
+/// [closeOtzaria] — במקום לחסום כשאוצריא פתוחה, מבקשים לסגור אותה אחרי האישור.
+Future<bool> confirmLibraryUpdate(
   BuildContext context, {
   required LibraryModuleController library,
   required String Function(AppStrings strings) dialogTitle,
   required Future<bool> Function() isOtzariaRunning,
   required Future<void> Function() onRequestReindex,
+  Future<bool> Function()? closeOtzaria,
 }) async {
-  if (await _blockedByRunningOtzaria(isOtzariaRunning)) return;
-  if (!context.mounted) return;
+  if (closeOtzaria == null &&
+      await _blockedByRunningOtzaria(isOtzariaRunning)) {
+    return false;
+  }
+  if (!context.mounted) return false;
   final home = context.strings.home;
 
   final c = library;
@@ -158,15 +164,16 @@ Future<void> confirmLibraryUpdate(
     ),
     confirmText: home.libraryUpdateConfirm,
   );
-  if (!approved) return;
-
-  if (!context.mounted) return;
+  if (!approved || !context.mounted) return false;
+  if (closeOtzaria != null && !await closeOtzaria()) return false;
+  if (!context.mounted) return false;
   await applyLibraryAndReport(
     context,
     c,
     c.update,
     onRequestReindex: onRequestReindex,
   );
+  return true;
 }
 
 Future<void> confirmLibraryFullDownload(

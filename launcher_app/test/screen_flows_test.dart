@@ -7,10 +7,11 @@ import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
-import 'package:launcher_app/src/screens/home_screen.dart';
+import 'package:launcher_app/src/flows/home_flows.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
 import 'package:launcher_app/src/screens/otzaria_screen.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/theme/theme_exports.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -51,6 +52,7 @@ class _FakeLibrary extends LibraryModuleController {
   int updates = 0;
   int fullDownloads = 0;
   int checks = 0;
+  VoidCallback? onUpdate;
 
   void _finishApply() {
     status = statusAfterApply;
@@ -62,6 +64,7 @@ class _FakeLibrary extends LibraryModuleController {
   @override
   Future<void> update() async {
     updates++;
+    onUpdate?.call();
     _finishApply();
   }
 
@@ -139,32 +142,50 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  HomeScreen home({
+  /// מה שהגיבור בבית מפעיל: "התקנה" (או עדכון התוכנה כשהיא מותקנת) ו"עדכון"
+  /// של הספרייה — אותן זרימות בדיוק, בלי שאר הדף.
+  Widget home({
     Future<bool> Function()? onProcessStateChanged,
     Future<bool> Function()? onCloseOtzaria,
     Future<void> Function()? onRequestReindex,
+    List<GuidanceItem> updateItems = const [GuidanceItem.library],
   }) =>
-      HomeScreen(
-        otzaria: otzaria,
-        library: library,
-        plugins: plugins,
-        launcherUpdate: launcherUpdate,
-        settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: onCloseOtzaria ?? () async => true,
-        isDownloading: false,
-        isCancellingDownload: false,
-        isCheckingOnline: false,
-        longTaskRunning: false,
-        onProcessStateChanged: onProcessStateChanged ?? () async => false,
-        onCheckOnline: () async {},
-        onDownloadAll: () async {},
-        onCancelDownload: () async {},
-        onDownloadLauncherUpdate: () async {},
-        onInstallLauncherUpdate: () async {},
-        onRequestReindex: onRequestReindex ?? () async {},
-        onGoToOtzaria: () {},
-        onGoToLibrary: () {},
+      Scaffold(
+        body: Builder(
+          builder: (context) {
+            final deps = HomeFlowDeps(
+              otzaria: otzaria,
+              library: library,
+              isOtzariaRunning: onProcessStateChanged ?? () async => false,
+              closeOtzaria: onCloseOtzaria ?? () async => true,
+              onRequestReindex: onRequestReindex ?? () async {},
+            );
+            return Column(
+              children: [
+                ActionButton.recommended(
+                  text: stringsOf().common.update,
+                  onPressed: () => updateHere(
+                    context,
+                    deps,
+                    items: updateItems,
+                    onPluginsOnly: () {},
+                  ),
+                ),
+                ActionButton.recommended(
+                  text: stringsOf().common.install,
+                  onPressed: () => otzaria.currentVersion == null
+                      ? installOtzariaHere(context, deps)
+                      : updateHere(
+                          context,
+                          deps,
+                          items: const [GuidanceItem.app],
+                          onPluginsOnly: () {},
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
       );
 
   LibraryScreen libraryScreen({
@@ -213,6 +234,216 @@ void main() {
       expect(library.updates, 1);
       expect(find.text(t.libraryUpdatedSnack('2')), findsOneWidget);
       expect(reindex, 1);
+      await _drainSnack(tester);
+    });
+
+    // הבית אינו לוכד "אוצריא פתוחה" מרגע הבנייה: כל לחיצה בודקת מחדש.
+    testWidgets('מדף הבית: החסימה לפי בדיקה טרייה — סגורה עכשיו, ממשיכים', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      libraryUpdateAvailable();
+      var checks = 0;
+      await _pump(
+        tester,
+        home(
+          onProcessStateChanged: () async {
+            checks++;
+            return false;
+          },
+        ),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      // הבדיקה רצה אחרי האישור, לפני ההחלה — לא מרגע הבנייה ולא לפני השאלה.
+      expect(checks, 0);
+      expect(_inDialog(t.libraryUpdateDialogTitle), findsOneWidget);
+      await _confirm(tester, t.libraryUpdateConfirm);
+      expect(checks, 1);
+      expect(library.updates, 1);
+      await _drainSnack(tester);
+    });
+
+    // הפס "אוצריא פתוחה כרגע" מבטיח: "כשתלחצו עדכון, הכלי יבקש לסגור אותה".
+    testWidgets('מדף הבית: אוצריא פתוחה — מבקש לסגור, ואחרי אישור ממשיך', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      libraryUpdateAvailable();
+      var running = true;
+      var closes = 0;
+      await _pump(
+        tester,
+        home(
+          onProcessStateChanged: () async => running,
+          onCloseOtzaria: () async {
+            closes++;
+            running = false;
+            return true;
+          },
+        ),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      // קודם אישור העדכון, ורק אחריו בקשת הסגירה.
+      expect(_inDialog(t.closeOtzariaForUpdatePrompt), findsNothing);
+      expect(_inDialog(t.libraryUpdateDialogTitle), findsOneWidget);
+      await _confirm(tester, t.libraryUpdateConfirm);
+      expect(closes, 0);
+      expect(_inDialog(t.closeOtzariaForUpdatePrompt), findsOneWidget);
+      await _confirm(tester, t.closeOtzariaAndUpdateConfirm);
+
+      expect(closes, 1);
+      expect(library.updates, 1);
+      await _drainSnack(tester);
+    });
+
+    testWidgets('מדף הבית: ביטול אישור העדכון — אוצריא אינה נסגרת', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      libraryUpdateAvailable();
+      var closes = 0;
+      await _pump(
+        tester,
+        home(
+          onProcessStateChanged: () async => true,
+          onCloseOtzaria: () async {
+            closes++;
+            return true;
+          },
+        ),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      expect(_inDialog(t.libraryUpdateDialogTitle), findsOneWidget);
+      await tester.tap(_inDialog(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+
+      expect(_inDialog(t.closeOtzariaForUpdatePrompt), findsNothing);
+      expect(closes, 0);
+      expect(library.updates, 0);
+    });
+
+    testWidgets('מדף הבית: אישור העדכון וסירוב לסגור — שום דבר לא רץ', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      libraryUpdateAvailable();
+      var closes = 0;
+      await _pump(
+        tester,
+        home(
+          onProcessStateChanged: () async => true,
+          onCloseOtzaria: () async {
+            closes++;
+            return true;
+          },
+        ),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      await _confirm(tester, t.libraryUpdateConfirm);
+      expect(_inDialog(t.closeOtzariaForUpdatePrompt), findsOneWidget);
+      await tester.tap(_inDialog(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+
+      expect(closes, 0);
+      expect(library.updates, 0);
+    });
+
+    testWidgets('מדף הבית, תוכנה בלבד: ביטול אישור ההתקנה — אוצריא אינה נסגרת',
+        (tester) async {
+      final t = stringsOf().home;
+      otzaria
+        ..status = OtzariaModuleStatus.updateAvailable
+        ..currentVersion = '0.9.95'
+        ..latestVersion = '0.9.96'
+        ..running = true;
+      var closes = 0;
+      await _pump(
+        tester,
+        home(
+          updateItems: const [GuidanceItem.app],
+          onProcessStateChanged: () async => true,
+          onCloseOtzaria: () async {
+            closes++;
+            return true;
+          },
+        ),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      expect(_inDialog(t.appInstallDialogTitle), findsOneWidget);
+      await tester.tap(_inDialog(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDialog), findsNothing);
+      expect(closes, 0);
+      expect(otzaria.closes, 0);
+      expect(otzaria.installs, 0);
+    });
+
+    testWidgets('מדף הבית: סירוב לעדכון — אוצריא אינה נסגרת ושום דבר לא רץ', (
+      tester,
+    ) async {
+      libraryUpdateAvailable();
+      otzaria
+        ..status = OtzariaModuleStatus.updateAvailable
+        ..currentVersion = '0.9.95'
+        ..latestVersion = '0.9.96';
+      var closes = 0;
+      await _pump(
+        tester,
+        home(
+          updateItems: const [GuidanceItem.library, GuidanceItem.app],
+          onProcessStateChanged: () async => true,
+          onCloseOtzaria: () async {
+            closes++;
+            return true;
+          },
+        ),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      await tester.tap(_inDialog(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+
+      expect(closes, 0);
+      expect(find.byType(AppDialog), findsNothing);
+      expect(library.updates, 0);
+      expect(otzaria.installs, 0);
+    });
+
+    testWidgets('מדף הבית: אוצריא שלא נסגרה — הודעה, ושום דבר לא רץ', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      libraryUpdateAvailable();
+      await _pump(
+        tester,
+        home(
+          onProcessStateChanged: () async => true,
+          onCloseOtzaria: () async => false,
+        ),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      await _confirm(tester, t.libraryUpdateConfirm);
+      await _confirm(tester, t.closeOtzariaAndUpdateConfirm);
+
+      expect(library.updates, 0);
+      expect(
+        find.text(stringsOf().common.closeOtzariaFailedSnack),
+        findsOneWidget,
+      );
       await _drainSnack(tester);
     });
 
@@ -348,6 +579,35 @@ void main() {
       otzaria.currentVersion = '0.9.95';
       otzaria.latestVersion = '0.9.96';
     }
+
+    testWidgets('דיאלוג ההתקנה וההודעה — גרסאות בלי v ובלי build', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      otzaria
+        ..status = OtzariaModuleStatus.updateAvailable
+        ..currentVersion = 'v0.9.95+790'
+        ..latestVersion = 'v0.9.96+812'
+        ..onInstall = (c) {
+          c.status = OtzariaModuleStatus.upToDate;
+          c.currentVersion = 'v0.9.96+812';
+        };
+      await _pump(tester, home());
+
+      await tester.tap(find.text(stringsOf().common.install));
+      await tester.pumpAndSettle();
+      expect(
+        _inDialog(stringsOf().appScreen.installPrompt(
+              latestVersion: '0.9.96',
+              currentVersion: '0.9.95',
+              prereleaseNote: false,
+            )),
+        findsOneWidget,
+      );
+      await _confirm(tester, t.appInstallConfirm);
+      expect(find.text(t.appInstalledSnack('0.9.96')), findsOneWidget);
+      await _drainSnack(tester);
+    });
 
     testWidgets('מדף הבית: התקנה מוצלחת מודיעה על הגרסה', (tester) async {
       final t = stringsOf().home;
@@ -522,6 +782,34 @@ void main() {
       await _drainSnack(tester);
     });
 
+    // תחליף ל'אין אוצריא אך יש כבר מסד — הדיאלוג הרגיל' (דיאלוג ההכרזה הישן).
+    testWidgets('אין אוצריא אבל יש כבר מסד: דיאלוג התוכנה בלבד, בלי ספרייה', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      appUpdateAvailable();
+      otzaria.currentVersion = null;
+      library.isFreshInstall = false;
+      library.status = LibraryModuleStatus.updateAvailable;
+      library.targetVersion = 27;
+      otzaria.onInstall = (c) {
+        c.status = OtzariaModuleStatus.upToDate;
+        c.currentVersion = '0.9.96';
+      };
+      await _pump(tester, home());
+
+      await tester.tap(find.text(stringsOf().common.install).first);
+      await tester.pumpAndSettle();
+      expect(_inDialog(t.appInstallDialogTitle), findsOneWidget);
+      expect(_inDialog(t.firstInstallDialogTitle), findsNothing);
+      await _confirm(tester, t.appInstallConfirm);
+
+      expect(otzaria.installs, 1);
+      expect(library.checks, 0);
+      expect(library.updates, 0);
+      await _drainSnack(tester);
+    });
+
     testWidgets('מחשב ריק: אחרי התוכנה הספרייה נבדקת מחדש ומותקנת', (
       tester,
     ) async {
@@ -590,6 +878,55 @@ void main() {
       expect(library.updates, 0);
       expect(reindex, 0);
       await _drainSnack(tester);
+    });
+
+    testWidgets('עדכון כאן: הספרייה ואז התוכנה, כמו ההתקנה האוטומטית', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      appUpdateAvailable();
+      libraryUpdateAvailable();
+      final order = <String>[];
+      library.onUpdate = () => order.add('library');
+      otzaria.onInstall = (c) {
+        order.add('app');
+        c.status = OtzariaModuleStatus.upToDate;
+        c.currentVersion = '0.9.96';
+      };
+      await _pump(
+        tester,
+        home(updateItems: const [GuidanceItem.library, GuidanceItem.app]),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      await _confirm(tester, t.libraryUpdateConfirm);
+      await _confirm(tester, t.appInstallConfirm);
+
+      expect(order, ['library', 'app']);
+      await _drainSnack(tester);
+    });
+
+    testWidgets('עדכון כאן: סירוב לספרייה עוצר — בלי דיאלוג התקנה אחריו', (
+      tester,
+    ) async {
+      final t = stringsOf().home;
+      appUpdateAvailable();
+      libraryUpdateAvailable();
+      await _pump(
+        tester,
+        home(updateItems: const [GuidanceItem.library, GuidanceItem.app]),
+      );
+
+      await tester.tap(find.text(stringsOf().common.update));
+      await tester.pumpAndSettle();
+      expect(_inDialog(t.libraryUpdateDialogTitle), findsOneWidget);
+      await tester.tap(_inDialog(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AppDialog), findsNothing);
+      expect(library.updates, 0);
+      expect(otzaria.installs, 0);
     });
   });
 }

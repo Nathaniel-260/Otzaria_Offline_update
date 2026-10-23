@@ -26,11 +26,14 @@ class StoreDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StoreBody(
-      header: StoreDetailHeader(
-        backLabel: backLabel,
-        title: title,
-        onBack: onBack,
-      ),
+      // בדף משנה החזרה והשם כבר בראש הדף — כפתור חזרה שני היה סותר אותו.
+      header: SubPageHeaderScope.isSubPage(context)
+          ? null
+          : StoreDetailHeader(
+              backLabel: backLabel,
+              title: title,
+              onBack: onBack,
+            ),
       slivers: [
         StoreBody.padded(
           SliverList.list(children: panels),

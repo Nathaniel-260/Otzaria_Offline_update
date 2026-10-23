@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/theme_exports.dart';
+import '../../widgets/sub_page_header.dart';
 
 /// גוף מסך החנות — **רוחב מלא**, בשונה מ-`ScreenBody` של שאר המסכים
 /// שמגביל את התוכן ל-860px וממרכז אותו.
@@ -46,6 +47,17 @@ class StoreBody extends StatelessWidget {
         sliver: sliver,
       );
 
+  /// ראש דף המשנה במרווחים של החנות — גם למסך שמציג אותו מעל שכבה משלו.
+  static Widget subPageHeader(Widget header) => Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          horizontalPadding,
+          AppTokens.spaceLG,
+          horizontalPadding,
+          0,
+        ),
+        child: header,
+      );
+
   /// עוטף widget רגיל כ-sliver ממורווח — לכותרות סעיף ולכרטיסי מצב.
   static Widget block(Widget child, {double top = 0, double bottom = 0}) =>
       padded(SliverToBoxAdapter(child: child), top: top, bottom: bottom);
@@ -61,8 +73,10 @@ class StoreBody extends StatelessWidget {
       ],
     );
 
+    final subPage = SubPageHeaderScope.maybeOf(context);
     return Column(
       children: [
+        if (subPage != null) subPageHeader(subPage),
         if (header != null) header!,
         Expanded(
           child: sidebar == null

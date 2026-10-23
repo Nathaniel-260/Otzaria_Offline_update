@@ -45,7 +45,6 @@ enum GuidancePrimary {
 enum GuidanceSecondary {
   none,
   updateHereToo,
-  downloadLocked,
 
   /// "בדוק עכשיו": משהו עוד לא נבדק — ברשת, או מקומית כשהבדיקה
   /// האוטומטית כבויה.
@@ -66,6 +65,9 @@ enum TileStatus {
   needsConsent,
   nothingOnDrive,
   attention,
+
+  /// באתר יש חדש שההורדה לכונן תביא — כמו "מה ייכלל" בגיבור.
+  onlineAvailable,
 }
 
 class GuidanceFacts {
@@ -130,8 +132,6 @@ class GuidanceFacts {
   final bool installing;
 
   bool get hasSyncSelection => syncApp || syncLibrary || syncPlugins;
-
-  bool get anyOnline => onlineApp || onlineLibrary || onlinePlugins;
 }
 
 class HomeGuidance {
@@ -285,9 +285,6 @@ HomeGuidance deriveHomeGuidance(GuidanceFacts f) {
       f.otzariaInstalled
           ? GuidancePrimary.updateHere
           : GuidancePrimary.installHere,
-      secondary: f.readOnly && f.anyOnline
-          ? GuidanceSecondary.downloadLocked
-          : GuidanceSecondary.none,
       here: here,
     );
   }
@@ -314,11 +311,8 @@ GuidanceSecondary _quietSecondary(
   List<GuidanceItem> onlineItems,
   List<GuidanceItem> download,
 ) {
-  if (f.readOnly) {
-    return f.anyOnline
-        ? GuidanceSecondary.downloadLocked
-        : GuidanceSecondary.none;
-  }
+  // בכונן מוגן אין בדיקה ברשת (`AppSession.checkOnline`), ולכן אין מה לומר.
+  if (f.readOnly) return GuidanceSecondary.none;
   return switch (f.online) {
     false => GuidanceSecondary.offlineHint,
     null => GuidanceSecondary.checkOnlineNow,
@@ -328,7 +322,26 @@ GuidanceSecondary _quietSecondary(
   };
 }
 
-TileStatus deriveTileStatus(GuidanceItem item, GuidanceFacts f) =>
+/// [download] — `HomeGuidance.downloadItems`: רכיב שההורדה מביאה מוצג כך גם
+/// באריח, אחרת האריח ("מעודכנת", "עוד לא בכונן") סותר את הגיבור.
+TileStatus deriveTileStatus(
+  GuidanceItem item,
+  GuidanceFacts f, {
+  List<GuidanceItem> download = const [],
+}) {
+  final local = _localTileStatus(item, f);
+  if (!download.contains(item)) return local;
+  return switch (local) {
+    TileStatus.working ||
+    TileStatus.checking ||
+    TileStatus.attention ||
+    TileStatus.needsConsent =>
+      local,
+    _ => TileStatus.onlineAvailable,
+  };
+}
+
+TileStatus _localTileStatus(GuidanceItem item, GuidanceFacts f) =>
     switch (item) {
       GuidanceItem.app => switch (f.otzariaStatus) {
           AppStatusFact.idle => TileStatus.unknown,

@@ -11,6 +11,7 @@ import 'package:launcher_app/src/controllers/launcher_update_flow.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
+import 'package:launcher_app/src/screens/home/home_view_model.dart';
 import 'package:launcher_app/src/self_update/launcher_release.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
@@ -22,7 +23,6 @@ import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/shell/home_guidance_session.dart';
 import 'package:launcher_app/src/shell/session_prompts.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
-import 'package:plugins_manager/plugins_manager.dart';
 
 import 'test_support.dart';
 
@@ -53,7 +53,11 @@ void main() {
     await deleteTempDir(tempDir);
   });
 
-  AppSession session({bool readOnly = false, SleepInhibitor? sleep}) {
+  AppSession session({
+    bool readOnly = false,
+    SleepInhibitor? sleep,
+    NoticesSeenStore? notices,
+  }) {
     final s = AppSession(
       dataDir: tempDir.path,
       stateDir: tempDir.path,
@@ -61,7 +65,7 @@ void main() {
       prompts: prompts,
       readOnly: readOnly,
       runningLocator: const _NeverRunningLocator(),
-      noticesStore:
+      noticesStore: notices ??
           MemoryNoticesStore(seen: {NoticesSeenStore.errorReportsIntro}),
       sleepInhibitor: sleep,
     );
@@ -74,6 +78,43 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
   }
+
+  group('הודעות הבית במקום דיאלוגים בעלייה', () {
+    test('ההסבר על הדיווחים: הודעה עד "הבנתי", ורק אז נרשם', () async {
+      final notices = MemoryNoticesStore();
+      final s = session(notices: notices)..start();
+      await waitFor(() => s.showsReportsIntro);
+      expect(s.showsReportsIntro, isTrue);
+      expect(notices.marked, isEmpty);
+
+      await s.dismissReportsIntro();
+      expect(s.showsReportsIntro, isFalse);
+      expect(notices.marked, [NoticesSeenStore.errorReportsIntro]);
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+    });
+
+    test('ההסבר שכבר הוצג במחשב הזה אינו חוזר', () async {
+      final s = session()..start();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      expect(s.showsReportsIntro, isFalse);
+    });
+
+    test('כונן לקריאה בלבד אינו סופר דיווחים לאיסוף', () async {
+      final s = session(readOnly: true);
+      await s.recountReportsToCollect();
+      expect(s.reportsToCollect, 0);
+    });
+
+    test('בלי בעיית הרשאות אין פס "הפעלה מחדש כמנהל"', () {
+      expect(session().offersElevation, isFalse);
+    });
+
+    test('בלי קטלוג אין תוספים חדשים לפס, והביקור אינו נכשל', () async {
+      final s = session();
+      expect(s.newPluginsForHome, isEmpty);
+      await s.markPluginsVisited();
+    });
+  });
 
   group('checkOnline', () {
     setUp(() => HttpOverrides.global = NoNetworkHttpOverrides());
@@ -92,6 +133,7 @@ void main() {
       expect(s.launcherUpdate.onlineCheckedAt, isNotNull);
       expect(flags.first, isTrue);
       expect(s.isCheckingOnline, isFalse);
+      expect(s.lastCheckedAt, isNotNull);
       // בלי רשת אין גרסה חדשה של הכלי, ולכן גם אין הצעה להוריד אותה.
       expect(prompts.calls, isNot(contains('offerLauncherUpdate')));
     });
@@ -108,6 +150,90 @@ void main() {
       expect(s.plugins.onlineCheckedAt, isNull);
       expect(s.launcherUpdate.onlineCheckedAt, isNull);
       expect(notified, 0);
+    });
+  });
+
+  group('checkNow', () {
+    setUp(() => HttpOverrides.global = NoNetworkHttpOverrides());
+    tearDown(() => HttpOverrides.global = null);
+
+    // checkAll מחכה לפריים (ההצעות שאחרי הבדיקה), ולכן רץ עם פריימים. כל
+    // התרחישים בבדיקה אחת: בדיקת הספרייה זוכרת מצב סטטי בין אזורי זמן מדומה.
+    testWidgets('מקומית ואז ברשת; כונן מוגן — מקומית; בלי כפילות; העלייה נחשבת',
+        (tester) async {
+      Future<void> drive(bool Function() done) async {
+        for (var i = 0; i < 300 && !done(); i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      Future<void> finish(Future<void> run) async {
+        var done = false;
+        unawaited(run.whenComplete(() => done = true));
+        await drive(() => done);
+        expect(done, isTrue);
+      }
+
+      // מקומית ואז ברשת, מחוון רק בזמן הבדיקה, ולחיצה שנייה אינה מוסיפה.
+      final s = session();
+      var starts = 0;
+      DateTime? localFirst;
+      var was = false;
+      s.addListener(() {
+        if (s.isCheckingOnline && !was) {
+          starts++;
+          localFirst ??= s.lastCheckedAt;
+        }
+        was = s.isCheckingOnline;
+      });
+      final run = s.checkNow();
+      expect(s.isCheckingNow, isTrue);
+      await finish(s.checkNow());
+      await finish(run);
+      expect(starts, 1);
+      expect(localFirst, isNotNull);
+      expect(s.otzaria.onlineCheckedAt, isNotNull);
+      expect(s.isCheckingNow, isFalse);
+
+      // כונן מוגן: "בדוק שוב" בודק מקומית בלבד — לא כלום, ולא ברשת.
+      final locked = session(readOnly: true);
+      var lockedOnline = false;
+      locked.addListener(() => lockedOnline |= locked.isCheckingOnline);
+      final lockedRun = locked.checkNow();
+      expect(locked.isCheckingNow, isTrue);
+      await finish(lockedRun);
+      expect(locked.lastCheckedAt, isNotNull);
+      expect(lockedOnline, isFalse);
+      expect(locked.otzaria.onlineCheckedAt, isNull);
+
+      // הבדיקה המקומית שבעלייה נחשבת בדיקה רצה.
+      await tester.runAsync(
+        () => settings.update(const AppSettings(autoCheckUpdates: true)),
+      );
+      final started = session()..start();
+      expect(started.isCheckingNow, isTrue);
+      await drive(() => !started.isCheckingNow);
+      expect(started.isCheckingNow, isFalse);
+      expect(started.lastCheckedAt, isNotNull);
+      await drive(() => started.plugins.status != PluginsModuleStatus.loading);
+    });
+
+    test('משימה ארוכה (ייצוא) חוסמת: אין בדיקה, והבית רואה את אותו תנאי',
+        () async {
+      final s = session();
+      s.plugins.isExporting = true;
+      expect(s.checkNowBlocked, isTrue);
+      expect(homeViewModelOf(s).checkBlocked, isTrue);
+
+      await s.checkNow();
+
+      expect(s.lastCheckedAt, isNull);
+      expect(s.isCheckingNow, isFalse);
+      s.plugins.isExporting = false;
+      expect(homeViewModelOf(s).checkBlocked, isFalse);
     });
   });
 
@@ -342,24 +468,11 @@ class _FakePrompts implements SessionPrompts {
   }
 
   @override
-  Future<void> showErrorReportsIntro() async => calls.add('intro');
-
-  @override
   Future<bool?> showCrashPrompt(
     AppReportsController reports,
     CrashCandidate candidate,
   ) async =>
       false;
-
-  @override
-  Future<void> announcePlugins({
-    required List<StorePlugin> fresh,
-    required bool hasUpdates,
-  }) async =>
-      calls.add('announcePlugins');
-
-  @override
-  Future<bool?> offerElevation() async => false;
 
   @override
   Future<bool> confirmLauncherInstall(String version,
@@ -368,10 +481,6 @@ class _FakePrompts implements SessionPrompts {
 
   @override
   void notifyLauncherUpdate(LauncherUpdateNotice notice, String detail) {}
-
-  @override
-  Future<void> showAutoInstallSkipped() async =>
-      calls.add('showAutoInstallSkipped');
 
   @override
   Future<bool> confirmCancelDownload() async => false;
@@ -390,9 +499,6 @@ class _FakePrompts implements SessionPrompts {
     required List<MirrorComponent> failed,
     required List<MirrorComponent> skipped,
   }) {}
-
-  @override
-  Future<void> performReportOffer() async {}
 
   @override
   Future<void> uploadReports({

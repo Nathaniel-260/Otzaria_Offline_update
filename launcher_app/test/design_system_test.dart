@@ -322,13 +322,13 @@ void main() {
       SizedBox(
         width: 600,
         child: AdvancedSection(
-          title: he.home.moreDetails,
+          title: he.guide.whatsNewButton,
           child: Text(he.common.install),
         ),
       ),
     );
     expect(find.text(he.common.install), findsNothing);
-    await tester.tap(find.text(he.home.moreDetails));
+    await tester.tap(find.text(he.guide.whatsNewButton));
     await tester.pumpAndSettle();
     expect(find.text(he.common.install), findsOneWidget);
   });

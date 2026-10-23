@@ -24,6 +24,7 @@ import 'package:launcher_app/src/services/byte_size.dart';
 import 'package:launcher_app/src/services/custom_app_detection_snapshot.dart';
 import 'package:launcher_app/src/theme/theme_exports.dart';
 import 'package:launcher_app/src/widgets/settings_card.dart';
+import 'package:launcher_app/src/widgets/sub_page_header.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -1006,7 +1007,26 @@ void main() {
       expect(viewOf().pending, CustomAppPending.none);
     });
 
-    testWidgets('בכניסה למסך ההודעה נפתחת, ומונה את התוכנות', (tester) async {
+    // אין דיאלוג: הבית מציג שבב באריח, והכניסה לדף מסמנת את הממתינות כנראו.
+    testWidgets('בכניסה למסך אין דיאלוג, והממתינות נרשמות כנראו', (
+      tester,
+    ) async {
+      await addApp(
+        tester,
+        exeName: 'no-such-app-anywhere.exe',
+        withInstaller: true,
+      );
+      expect(controller.unannouncedApps, hasLength(1));
+      await pumpScreen(tester, CustomAppsScreen(controller: controller));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsNothing);
+      expect(controller.pendingApps, hasLength(1));
+      expect(controller.unannouncedApps, isEmpty);
+    });
+
+    // הבקשה שחזרה מהמשתמשים: להתקין בלי לחפש — הכרטיס עצמו מציע התקנה.
+    testWidgets('הכרטיס של ממתינה מציע התקנה', (tester) async {
       await addApp(
         tester,
         exeName: 'no-such-app-anywhere.exe',
@@ -1015,42 +1035,21 @@ void main() {
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
       await tester.pumpAndSettle();
 
-      final t = stringsOf().customApps;
-      expect(find.text(t.pendingDialogTitle(1)), findsOneWidget);
-      expect(
-        find.text(t.pendingDialogNotInstalledRow('1.4.2')),
-        findsOneWidget,
-      );
+      expect(find.text(stringsOf().common.install), findsOneWidget);
     });
 
-    // הבקשה שחזרה מהמשתמשים: לא לסגור את החלון ולחפש את הכרטיס.
-    testWidgets('לכל שורה בחלון יש כפתור התקנה', (tester) async {
-      await addApp(
-        tester,
-        exeName: 'no-such-app-anywhere.exe',
-        withInstaller: true,
-      );
-      await pumpScreen(tester, CustomAppsScreen(controller: controller));
-      await tester.pumpAndSettle();
-
-      // אחד בחלון, ואחד בכרטיס שמאחוריו.
-      expect(find.text(stringsOf().common.install), findsNWidgets(2));
-    });
-
-    testWidgets('כשאין מה להתקין אין הודעה', (tester) async {
+    testWidgets('כשאין מה להתקין אין ממתינות ואין מה לסמן', (tester) async {
       await addApp(tester, exeName: 'no-such-app-anywhere.exe');
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining(stringsOf().customApps.pendingDialogIntro),
-        findsNothing,
-      );
+      expect(find.byType(Dialog), findsNothing);
+      expect(controller.pendingApps, isEmpty);
     });
 
-    // המסך נבנה רק בכניסה ללשונית (`ShellNavigator.isBuilt`) — ולכן מי
-    // שאינו נכנס אליה אינו רואה דבר, גם כשיש מה להתקין.
-    testWidgets('בלי כניסה למסך אין הודעה', (tester) async {
+    // המסך נבנה רק בכניסה (`ShellNavigator.isBuilt`) — ולכן בלי כניסה
+    // הממתינה נשארת "חדשה", והשבב באריח שבבית נשאר בולט.
+    testWidgets('בלי כניסה למסך הממתינה נשארת חדשה', (tester) async {
       await addApp(
         tester,
         exeName: 'no-such-app-anywhere.exe',
@@ -1059,30 +1058,54 @@ void main() {
       await pumpScreen(tester, CustomAppsSettingsCard(controller: controller));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining(stringsOf().customApps.pendingDialogIntro),
-        findsNothing,
-      );
+      expect(controller.unannouncedApps, hasLength(1));
     });
 
-    testWidgets('ההודעה נפתחת פעם אחת, ולא בכל רענון', (tester) async {
+    // המסגרת משאירה מקטע בנוי אחרי היציאה ממנו (IndexedStack עם TickerMode
+    // כבוי). ממתינה שמגיעה אז — למשל אחרי הורדה לכונן — לא נראתה.
+    testWidgets('מסך בנוי אבל מוסתר אינו מסמן; כשהוא מוצג — מסמן', (
+      tester,
+    ) async {
+      var shown = false;
+      late StateSetter setShown;
+      await pumpScreen(
+        tester,
+        StatefulBuilder(
+          builder: (context, setState) {
+            setShown = setState;
+            return TickerMode(
+              enabled: shown,
+              child: CustomAppsScreen(controller: controller),
+            );
+          },
+        ),
+      );
       await addApp(
         tester,
         exeName: 'no-such-app-anywhere.exe',
         withInstaller: true,
       );
-      await pumpScreen(tester, CustomAppsScreen(controller: controller));
+      await tester.pumpAndSettle();
+      expect(controller.unannouncedApps, hasLength(1));
+
+      setShown(() => shown = true);
+      await tester.pumpAndSettle();
+      expect(controller.unannouncedApps, isEmpty);
+    });
+
+    testWidgets('מסך הניהול אינו מסמן — הוא נפתח כדי לערוך', (tester) async {
+      await addApp(
+        tester,
+        exeName: 'no-such-app-anywhere.exe',
+        withInstaller: true,
+      );
+      await pumpScreen(
+        tester,
+        CustomAppsScreen(controller: controller, manage: true),
+      );
       await tester.pumpAndSettle();
 
-      final title = stringsOf().customApps.pendingDialogTitle(1);
-      await tester.tap(find.text(stringsOf().common.close));
-      await tester.pumpAndSettle();
-      expect(find.text(title), findsNothing);
-
-      // רענון של הרשימה אינו כניסה מחדש למסך.
-      await tester.pumpWidget(wrap(CustomAppsScreen(controller: controller)));
-      await tester.pumpAndSettle();
-      expect(find.text(title), findsNothing);
+      expect(controller.unannouncedApps, hasLength(1));
     });
   });
 
@@ -1129,7 +1152,7 @@ void main() {
       });
     });
 
-    testWidgets('תוכנה שכבר הוכרזה אינה פותחת את החלון', (tester) async {
+    testWidgets('תוכנה שכבר הוכרזה אינה חדשה גם אחרי כניסה', (tester) async {
       await addApp(
         tester,
         exeName: 'no-such-app-anywhere.exe',
@@ -1139,10 +1162,9 @@ void main() {
       await pumpScreen(tester, CustomAppsScreen(controller: controller));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining(stringsOf().customApps.pendingDialogIntro),
-        findsNothing,
-      );
+      expect(find.byType(Dialog), findsNothing);
+      expect(controller.pendingApps, hasLength(1));
+      expect(controller.unannouncedApps, isEmpty);
     });
 
     testWidgets('תוכנה חדשה שנוספה אחר כך כן מכריזה', (tester) async {
@@ -2056,6 +2078,45 @@ void main() {
         expect(c.apps.map((a) => a.descriptor.id), ['late']);
       },
     );
+  });
+
+  group('דף התוכנה כנתיב בנווט', () {
+    testWidgets('הפתיחה והחזרה עוברות דרך המסגרת, בלי כפתור חזרה משלו', (
+      tester,
+    ) async {
+      await addApp(tester, name: 'תוכנת פרטים');
+      final requests = <String?>[];
+      String? detail;
+      late StateSetter rebuild;
+      await pumpScreen(
+        tester,
+        StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return SubPageHeaderScope(
+              header: const SizedBox.shrink(),
+              child: CustomAppsScreen(
+                controller: controller,
+                detailId: detail,
+                onDetailChanged: requests.add,
+              ),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(stringsOf().customApps.cardDetailsLink));
+      await tester.pump();
+      expect(requests, ['demo']);
+      // המסך אינו פותח בעצמו: רק הנתיב שהמסגרת מעבירה.
+      expect(find.byType(CustomAppDetailView), findsNothing);
+
+      rebuild(() => detail = 'demo');
+      await tester.pumpAndSettle();
+      expect(find.byType(CustomAppDetailView), findsOneWidget);
+      expect(find.byType(StoreDetailHeader), findsNothing);
+    });
   });
 }
 

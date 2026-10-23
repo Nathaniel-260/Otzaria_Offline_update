@@ -44,13 +44,15 @@ GuidanceFacts guidanceFactsFromSession(AppSession s) {
 
 /// אותו כלל כמו כרטיס הבדיקה בדף הבית: `null` כשאף בדיקה לא רצה, `true`
 /// כשלפחות אחת הצליחה.
-bool? onlineState(AppSession s) {
-  final checks = [
-    (s.otzaria.onlineCheckedAt, s.otzaria.onlineCheckError),
-    (s.library.onlineCheckedAt, s.library.onlineCheckError),
-    (s.plugins.onlineCheckedAt, s.plugins.onlineCheckError),
-    (s.launcherUpdate.onlineCheckedAt, s.launcherUpdate.onlineCheckError),
-  ];
+bool? onlineState(AppSession s) => connectionOf([
+      (s.otzaria.onlineCheckedAt, s.otzaria.onlineCheckError),
+      (s.library.onlineCheckedAt, s.library.onlineCheckError),
+      (s.plugins.onlineCheckedAt, s.plugins.onlineCheckError),
+      (s.launcherUpdate.onlineCheckedAt, s.launcherUpdate.onlineCheckError),
+    ]);
+
+/// (מתי נבדק, שגיאה) לכל בדיקה מקוונת: `null` כשאף אחת לא רצה.
+bool? connectionOf(List<(DateTime?, Object?)> checks) {
   if (checks.every((c) => c.$1 == null)) return null;
   return checks.any((c) => c.$1 != null && c.$2 == null);
 }

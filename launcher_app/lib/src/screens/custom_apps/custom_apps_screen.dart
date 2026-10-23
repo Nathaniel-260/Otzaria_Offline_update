@@ -15,7 +15,6 @@ import 'custom_app_detail_view.dart';
 import 'custom_app_install_action.dart';
 import 'custom_app_store_card.dart';
 import 'custom_apps_manage_dialog.dart';
-import 'custom_apps_pending_dialog.dart';
 
 /// מסך "תוכנות נוספות" — רשת כרטיסים עם סרגל קטגוריות בצד, ודף לכל
 /// תוכנה. אותה פריסה של חנות התוספים, והרכיבים המשותפים הם אותם רכיבים
@@ -34,6 +33,8 @@ class CustomAppsScreen extends StatefulWidget {
     this.readOnly = false,
     this.manage = false,
     this.onClose,
+    this.detailId,
+    this.onDetailChanged,
   });
 
   final CustomAppsController controller;
@@ -49,17 +50,30 @@ class CustomAppsScreen extends StatefulWidget {
   /// כפתור הסגירה של מצב הניהול.
   final VoidCallback? onClose;
 
+  /// כמו ב-`PluginsScreen`: עם [onDetailChanged] התוכנה שדף הפרטים שלה מוצג
+  /// היא נתיב בנווט.
+  final String? detailId;
+  final ValueChanged<String?>? onDetailChanged;
+
   @override
   State<CustomAppsScreen> createState() => _CustomAppsScreenState();
 }
 
 class _CustomAppsScreenState extends State<CustomAppsScreen> {
-  /// ההודעה נאמרת פעם אחת בכל הרצה, ולא בכל רענון של הרשימה. מה שמונע
-  /// ממנה לחזור בהרצה הבאה הוא הרישום שבקונטרולר — ראו `markAnnounced`.
-  bool _pendingDialogShown = false;
-
   /// המזהה של התוכנה שדף הפרטים שלה מוצג, או `null` כשמוצגת הרשת.
-  String? _selectedId;
+  String? _localSelectedId;
+
+  String? get _selectedId =>
+      widget.onDetailChanged == null ? _localSelectedId : widget.detailId;
+
+  void _select(String? id) {
+    final external = widget.onDetailChanged;
+    if (external != null) {
+      external(id);
+    } else {
+      setState(() => _localSelectedId = id);
+    }
+  }
 
   @override
   void initState() {
@@ -68,8 +82,17 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
     // יושבת בקונטרולר, ולחיצה בסרגל הצד חייבת לרענן את הרשת גם כשאיש
     // אינו בונה את המסך מחדש מבחוץ.
     widget.controller.addListener(_onControllerChange);
-    _announcePendingIfNeeded();
     _fillMissingIcons();
+  }
+
+  /// המסגרת משאירה את המסך בנוי גם כשאינו מוצג, ומכבה לו את הטיקרים.
+  bool _shown = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _shown = TickerMode.valuesOf(context).enabled;
+    _markPendingSeen();
   }
 
   /// מילוי האייקונים החסרים רץ בכניסה למסך ולא בעלייה, כדי שמי שאינו נכנס
@@ -87,7 +110,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
   void _onControllerChange() {
     if (!mounted) return;
     setState(() {});
-    _announcePendingIfNeeded();
+    _markPendingSeen();
     // גם תוכנה שקובץ ההתקנה שלה הרגע ירד מקבלת אייקון, בלי כניסה מחדש.
     _fillMissingIcons();
   }
@@ -101,29 +124,22 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
       oldWidget.controller.removeListener(_onControllerChange);
       widget.controller.addListener(_onControllerChange);
     }
-    _announcePendingIfNeeded();
+    _markPendingSeen();
   }
 
-  /// **המסך הוא התנאי.** הוא נבנה רק כשנכנסים ללשונית (ראו
-  /// `ShellNavigator.isBuilt`), ולכן מי שלא נכנס אליה אינו רואה את ההודעה.
-  void _announcePendingIfNeeded() {
-    // מסך הניהול נפתח כדי לערוך, לא כדי להתקין.
-    if (widget.manage || _pendingDialogShown) return;
-    final pending = widget.controller.unannouncedApps;
-    if (pending.isEmpty) return;
-
-    _pendingDialogShown = true;
-    // אחרי סיום הפריים: פתיחת דיאלוג בתוך build/initState אסורה.
-    unawaited(WidgetsBinding.instance.endOfFrame.then((_) async {
-      if (!mounted) return;
-      // נרשם עם הפתיחה ולא עם הסגירה: מה שנרשם הוא שההודעה הוצגה כאן.
-      unawaited(widget.controller.markAnnounced(pending));
-      await showCustomAppsPendingDialog(
-        context: context,
-        controller: widget.controller,
-        pending: pending,
-      );
-    }));
+  /// רק דף שמוצג מסמן את הממתינות כ"נראו" במחשב הזה — עד אז השבב באריח
+  /// שבבית בולט. מסך הניהול נפתח כדי לערוך, לא כדי להתקין.
+  void _markPendingSeen() {
+    if (widget.manage || !_shown) return;
+    if (widget.controller.unannouncedApps.isEmpty) return;
+    // אחרי הפריים: הרישום מודיע לסשן, והקריאה מגיעה מתוך בנייה של המסגרת.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_shown) return;
+      final pending = widget.controller.unannouncedApps;
+      if (pending.isNotEmpty) {
+        unawaited(widget.controller.markAnnounced(pending));
+      }
+    });
   }
 
   CustomAppView? _byId(String id) {
@@ -135,22 +151,22 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selected =
-        _selectedId == null || widget.manage ? null : _byId(_selectedId!);
+    final id = _selectedId;
+    final selected = id == null || widget.manage ? null : _byId(id);
     if (selected == null) return _gridView(context);
 
     return CustomAppDetailView(
       controller: widget.controller,
       app: selected,
       readOnly: widget.readOnly,
-      onBack: () => setState(() => _selectedId = null),
+      onBack: () => _select(null),
       onInstall: () => _install(selected),
       onLaunch: () => _launch(selected),
       onDownload: () => _download(selected),
       onPickLocation: () => _pickLocation(selected),
       onCategorySelected: (slug) {
         widget.controller.showCategory(slug);
-        setState(() => _selectedId = null);
+        _select(null);
       },
     );
   }
@@ -515,7 +531,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
           controller: widget.controller,
           app: app,
           readOnly: widget.readOnly,
-          onOpenDetail: () => setState(() => _selectedId = app.descriptor.id),
+          onOpenDetail: () => _select(app.descriptor.id),
           onInstall: () => _install(app),
           onLaunch: () => _launch(app),
           onDownload: () => _download(app),

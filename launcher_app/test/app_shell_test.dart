@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -14,12 +15,15 @@ import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/search_feedback_controller.dart';
+import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
 import 'package:launcher_app/src/screens/faq/faq_dialog.dart';
-import 'package:launcher_app/src/screens/home_screen.dart';
+import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
 import 'package:launcher_app/src/screens/otzaria_screen.dart';
+import 'package:launcher_app/src/screens/plugins/plugin_detail_view.dart';
+import 'package:launcher_app/src/screens/plugins/plugin_sync_overlay.dart';
 import 'package:launcher_app/src/screens/plugins/plugins_screen.dart';
 import 'package:launcher_app/src/screens/reports_upload_section.dart';
 import 'package:launcher_app/src/screens/settings_screen.dart';
@@ -30,6 +34,8 @@ import 'package:launcher_app/src/services/sleep_inhibitor.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/app_session.dart';
+import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_navigator.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -37,6 +43,7 @@ import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:plugins_manager/plugins_manager.dart';
 
+import 'home_fixtures.dart';
 import 'test_harness.dart';
 import 'test_support.dart';
 
@@ -115,6 +122,29 @@ void main() {
   /// אחרת "לא נמצא" היה יכול להיות "נבנה אבל מוסתר".
   Finder screen(Type type) => find.byType(type, skipOffstage: false);
 
+  AppSession sessionOf(WidgetTester tester) =>
+      (tester.state(find.byType(AppShell)) as dynamic).session as AppSession;
+
+  ShellNavigator navigatorOf(WidgetTester tester) =>
+      (tester.state(find.byType(AppShell)) as dynamic).navigator
+          as ShellNavigator;
+
+  /// מקטע נפתח מהאריח שלו בבית, וההגדרות — מגלגל השיניים.
+  Future<void> open(WidgetTester tester, ShellSection section) async {
+    if (section == ShellSection.settings) {
+      await tester.tap(find.byTooltip(shell.settingsTooltip));
+    } else {
+      await tester.tap(find.byKey(ShellKeys.tile(section)));
+    }
+    await tester.pump();
+  }
+
+  /// חזרה בכפתור שבראש דף המשנה המוצג.
+  Future<void> back(WidgetTester tester) async {
+    await tester.tap(find.byTooltip(shell.backTooltip));
+    await tester.pump();
+  }
+
   testWidgets('מניעת שינה נשמרת עד סיום כל הפעולות ומשוחררת בסגירה',
       (tester) async {
     var acquired = 0;
@@ -124,7 +154,7 @@ void main() {
       return () => released++;
     });
     await pumpShell(tester, sleepInhibitor: inhibitor, readOnly: true);
-    final home = tester.widget<HomeScreen>(screen(HomeScreen));
+    final home = sessionOf(tester);
     expect(acquired, 0);
 
     void changed() => settings.notifyListeners();
@@ -172,23 +202,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  /// ב-[NavRailItem] רק הסמל לחיץ; התווית יושבת מתחתיו כאחות שלו.
-  Future<void> tapNav(WidgetTester tester, String label) async {
-    await tester.tap(
-      find.descendant(
-        of: find.widgetWithText(NavRailItem, label),
-        matching: find.byType(IconButton),
-      ),
-    );
-    await tester.pump();
-  }
-
   testWidgets('בעלייה נבנה דף הבית בלבד — שאר המסכים כלל לא בעץ', (
     tester,
   ) async {
     await pumpShell(tester);
 
-    expect(screen(HomeScreen), findsOneWidget);
+    expect(screen(HomePage), findsOneWidget);
     // חנות התוספים היא היקרה מכולן (רשת כרטיסים עם תמונה לכל תוסף), וזו
     // בדיוק הסיבה שה-IndexedStack אינו בונה את כל ילדיו.
     expect(screen(PluginsScreen), findsNothing);
@@ -222,10 +241,16 @@ void main() {
   ) async {
     await pumpShell(tester);
 
-    await tester.tap(find.byTooltip(shell.settingsTooltip));
-    await tester.pump();
+    await open(tester, ShellSection.settings);
 
     expect(screen(SettingsScreen), findsOneWidget);
+    // דף משנה בתוך הגוף: חזרה ופירור "בית › הגדרות".
+    expect(find.byTooltip(shell.backTooltip), findsOneWidget);
+    expect(find.text(shell.breadcrumbHome), findsOneWidget);
+    expect(
+      find.text(stringsOf().settings.title),
+      findsAtLeastNWidgets(2),
+    );
     expect(
       find.descendant(
         of: find.byType(AppTitleBar),
@@ -242,15 +267,15 @@ void main() {
   ) async {
     await pumpShell(tester);
 
-    await tapNav(tester, shell.navPlugins);
+    await open(tester, ShellSection.plugins);
     expect(screen(PluginsScreen), findsOneWidget);
     // שאר המסכים עדיין לא נבנו — הבנייה היא לפי ביקור, לא מראש.
     expect(screen(LibraryScreen), findsNothing);
 
-    await tapNav(tester, shell.navHome);
+    await back(tester);
     // נשאר בעץ עם המצב שלו — זו כל הנקודה של IndexedStack מדורג.
     expect(screen(PluginsScreen), findsOneWidget);
-    expect(screen(HomeScreen), findsOneWidget);
+    expect(screen(HomePage), findsOneWidget);
   });
 
   testWidgets('מסך מוסתר אינו מריץ אנימציות — רק המוצג מקבל טיקרים', (
@@ -260,30 +285,31 @@ void main() {
     bool ticking(Type type) =>
         TickerMode.valuesOf(tester.element(screen(type))).enabled;
 
-    expect(ticking(HomeScreen), isTrue);
+    expect(ticking(HomePage), isTrue);
 
-    await tapNav(tester, shell.navPlugins);
+    await open(tester, ShellSection.plugins);
     expect(ticking(PluginsScreen), isTrue);
-    expect(ticking(HomeScreen), isFalse);
+    expect(ticking(HomePage), isFalse);
 
-    await tapNav(tester, shell.navHome);
-    expect(ticking(HomeScreen), isTrue);
+    await back(tester);
+    expect(ticking(HomePage), isTrue);
     expect(ticking(PluginsScreen), isFalse);
   });
 
   testWidgets('כל חמשת המסכים נבנים אחרי ביקור בכולם', (tester) async {
     await pumpShell(tester);
 
-    for (final label in [
-      shell.navApp,
-      shell.navLibrary,
-      shell.navPlugins,
-      shell.navSettings,
+    for (final section in [
+      ShellSection.otzaria,
+      ShellSection.library,
+      ShellSection.plugins,
+      ShellSection.settings,
     ]) {
-      await tapNav(tester, label);
+      await open(tester, section);
+      if (section != ShellSection.settings) await back(tester);
     }
 
-    expect(screen(HomeScreen), findsOneWidget);
+    expect(screen(HomePage), findsOneWidget);
     expect(screen(OtzariaScreen), findsOneWidget);
     expect(screen(LibraryScreen), findsOneWidget);
     expect(screen(PluginsScreen), findsOneWidget);
@@ -301,60 +327,73 @@ void main() {
     expect(screen(PluginsScreen), findsNothing);
   });
 
-  group('הסבר חד-פעמי על דיווחי הטעויות', () {
+  group('הסבר חד-פעמי על דיווחי הטעויות — הודעה בבית', () {
     final t = stringsOf().errorReports;
 
-    /// `pump` ולא `pumpAndSettle` — ראו ההערה בראש הקובץ. הראשון מריץ את
-    /// `endOfFrame`, השני בונה את הדיאלוג, והשלישי מסיים את האנימציה שלו.
-    Future<void> settleDialog(WidgetTester tester) async {
+    /// הנוסח נכתב לדו-שיח; בהודעה הפסקאות מתחברות לאחת.
+    String oneParagraph(String text) => text.replaceAll('\n\n', ' ');
+
+    /// הטעינה של "מה כבר הוצג" אסינכרונית — שני פריימים מספיקים לה.
+    Future<void> settle(WidgetTester tester) async {
       await tester.pump();
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
     }
 
-    testWidgets('הרצה ראשונה: החלון מופיע אחרי הפריים ונרשם רק בסגירה', (
+    testWidgets('הרצה ראשונה: הודעה בבית, בלי דיאלוג, ונרשם רק ב"הבנתי"', (
       tester,
     ) async {
       final notices = MemoryNoticesStore();
       await pumpShell(tester, notices: notices);
-      await settleDialog(tester);
+      await settle(tester);
 
+      expect(find.byKey(ShellKeys.reportsIntroNotice), findsOneWidget);
       expect(find.text(t.introDialogTitle), findsOneWidget);
-      expect(find.text(t.introDialogContent), findsOneWidget);
+      expect(find.text(oneParagraph(t.introDialogContent)), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
       expect(notices.marked, isEmpty);
 
       await tester.tap(find.text(t.introDialogConfirm));
-      await settleDialog(tester);
+      await settle(tester);
 
-      expect(find.text(t.introDialogTitle), findsNothing);
+      expect(find.byKey(ShellKeys.reportsIntroNotice), findsNothing);
       expect(notices.marked, [NoticesSeenStore.errorReportsIntro]);
     });
 
-    testWidgets('כונן נעול: מופיע בנוסח שמסביר שאי אפשר לאסוף', (tester) async {
+    testWidgets('כונן נעול: בנוסח שמסביר שאי אפשר לאסוף', (tester) async {
       await pumpShell(tester, notices: MemoryNoticesStore(), readOnly: true);
-      await settleDialog(tester);
+      await settle(tester);
 
-      expect(find.text(t.introDialogContentReadOnly), findsOneWidget);
-      expect(find.text(t.introDialogContent), findsNothing);
+      expect(
+        find.text(oneParagraph(t.introDialogContentReadOnly)),
+        findsOneWidget,
+      );
+      expect(find.text(oneParagraph(t.introDialogContent)), findsNothing);
     });
 
-    testWidgets('כונן מלא: מופיע בנוסח שמבקש לפנות מקום', (tester) async {
+    testWidgets('כונן מלא: בנוסח שמבקש לפנות מקום', (tester) async {
       await pumpShell(
         tester,
         notices: MemoryNoticesStore(),
         readOnly: true,
         driveFull: true,
       );
-      await settleDialog(tester);
+      await settle(tester);
 
-      expect(find.text(t.introDialogContentReadOnlyDriveFull), findsOneWidget);
-      expect(find.text(t.introDialogContentReadOnly), findsNothing);
+      expect(
+        find.text(oneParagraph(t.introDialogContentReadOnlyDriveFull)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(oneParagraph(t.introDialogContentReadOnly)),
+        findsNothing,
+      );
     });
 
-    testWidgets('כבר הוצג במחשב הזה → אין חלון', (tester) async {
+    testWidgets('כבר הוצג במחשב הזה → אין הודעה', (tester) async {
       await pumpShell(tester);
-      await settleDialog(tester);
+      await settle(tester);
 
+      expect(find.byKey(ShellKeys.reportsIntroNotice), findsNothing);
       expect(find.text(t.introDialogTitle), findsNothing);
     });
   });
@@ -362,20 +401,19 @@ void main() {
   testWidgets('בקשת מיקוד מחנות התוספים מעבירה את התצוגה אליה', (tester) async {
     await pumpShell(tester);
 
-    // כניסה ויציאה — המסך נשאר בעץ, ולכן הודעת העדכונים שלו יכולה לצוץ
-    // כשהמשתמש כבר בדף הבית. בחירת תוסף מתוכה מבקשת מיקוד, וזו הבקשה כאן.
-    await tapNav(tester, shell.navPlugins);
-    await tapNav(tester, shell.navHome);
+    // כניסה ויציאה — המסך נשאר בעץ, ודו-שיח שנפתח ממנו יכול לבקש מיקוד
+    // כשהמשתמש כבר בבית.
+    await open(tester, ShellSection.plugins);
+    await back(tester);
 
-    int? shownScreen() => tester
-        .widget<IndexedStack>(find.byType(IndexedStack, skipOffstage: false))
-        .index;
-    expect(shownScreen(), LauncherScreen.home.index);
+    int? shownScreen() =>
+        tester.widget<IndexedStack>(find.byKey(ShellKeys.sectionStack)).index;
+    expect(shownScreen(), ShellSection.home.index);
 
     tester.widget<PluginsScreen>(screen(PluginsScreen)).onRequestFocus!();
     await tester.pump();
 
-    expect(shownScreen(), LauncherScreen.plugins.index);
+    expect(shownScreen(), ShellSection.plugins.index);
   });
 
   testWidgets('סרגל הזהות מציג את שם התוכנה ואת הסמל', (tester) async {
@@ -394,7 +432,8 @@ void main() {
 
     expect(find.byType(InfoErrorRow), findsNothing);
     expect(find.text(stringsOf().common.error), findsNothing);
-    expect(find.text(stringsOf().home.onlineNeverChecked), findsOneWidget);
+    // עוד לא ידוע אם יש אינטרנט — לא "אין חיבור" ולא תקלה.
+    expect(find.text(stringsOf().guide.eyebrowThisComputer), findsOneWidget);
   });
 
   testWidgets('checkOnline שנכשל (אין רשת) אינו מציג שגיאה אלא "אין חיבור"', (
@@ -413,7 +452,7 @@ void main() {
     // ההצצה לתוספים ממתינה לבדיקה המקומית — היא שקובעת לאילו גרסאות אוצריא
     // לשאול על בילדי התוספים. זו סדרת קריאות `dart:io`, וכל אחת מתקדמת רק
     // ב-runAsync בעוד המיקרו-משימות שלה נשטפות ב-pump שאחריו.
-    final offline = find.text(stringsOf().home.onlineOffline);
+    final offline = find.text(stringsOf().guide.eyebrowOffline);
     for (var i = 0; i < 40 && offline.evaluate().isEmpty; i++) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 20)),
@@ -425,7 +464,7 @@ void main() {
     expect(find.byType(InfoErrorRow), findsNothing);
     expect(find.text(stringsOf().common.error), findsNothing);
     // לא נמצא עדכון ברשת, ולכן גם אין הצעה להוריד.
-    expect(find.text(stringsOf().home.downloadNowButton), findsNothing);
+    expect(find.text(stringsOf().guide.downloadButton), findsNothing);
   });
 
   testWidgets('אוצריא שנסגרה מזוהה בזמן שהלאנצ\'ר פתוח — בלי הפעלה מחדש שלו', (
@@ -440,14 +479,14 @@ void main() {
 
     await pumpShell(tester, locator: locator);
     await tester.pump();
-    expect(find.text(stringsOf().home.otzariaRunningTitle), findsOneWidget);
+    expect(sessionOf(tester).otzariaIsRunning, isTrue);
 
     // המשתמש סוגר את אוצריא. הרענון המחזורי אמור להבחין בזה מעצמו.
     locator.isRunning = false;
     await tester.pump(const Duration(seconds: 4));
     await tester.pump();
 
-    expect(find.text(stringsOf().home.otzariaRunningTitle), findsNothing);
+    expect(sessionOf(tester).otzariaIsRunning, isFalse);
 
     // ומכאן הטיימר צריך להיכבות: אחרת `tasklist` (~300ms) היה רץ כל 3
     // שניות לנצח, על אוצריא שכבר סגורה.
@@ -473,22 +512,310 @@ void main() {
     expect(source, contains('blocked: () => _blockedByReadOnly()'));
   });
 
-  testWidgets('הניווט מסמן את הפריט הנבחר ומחליף את המסך המוצג', (
-    tester,
-  ) async {
-    await pumpShell(tester);
+  group('דף פרטי תוסף — נתיב בנווט', () {
+    /// הקטלוג מוצב ישירות: הטעינה מהדיסק ממתינה לבדיקה המקומית של אוצריא,
+    /// שאינה מסתיימת בתוך ה-fake-async של המסגרת.
+    void givePlugin(WidgetTester tester) {
+      sessionOf(tester).plugins
+        ..plugins = [
+          StorePlugin.fromApi(const {
+            'id': 'a',
+            'name': 'תוסף בדיקה',
+            'shortDescription': 'תקציר',
+            'description': 'תיאור',
+            'version': '1.0.0',
+            'status': 'stable',
+            'author': 'מחבר',
+            'originalDate': '2026-04-02',
+            'tags': <String>[],
+            'isPinned': false,
+            'supportsDirectInstall': true,
+            'downloadUrl': '/api/plugins/a/download',
+          }, 'https://otzaria.org'),
+        ]
+        ..installed = const {}
+        ..status = PluginsModuleStatus.ready
+        // בלי אצירה החנות פותחת בדף בית ריק; הכרטיס ב"כל התוספים".
+        ..showAllPlugins();
+    }
 
-    NavRailItem item(String label) =>
-        tester.widget<NavRailItem>(find.widgetWithText(NavRailItem, label));
+    Future<void> openDetails(WidgetTester tester) async {
+      await open(tester, ShellSection.plugins);
+      await tester.tap(find.text(stringsOf().plugins.cardDetailsLink).first);
+      await tester.pump();
+    }
 
-    expect(item(shell.navHome).isSelected, isTrue);
-    expect(item(shell.navSettings).isSelected, isFalse);
+    testWidgets('חזרה אחת בלבד: הראש חוזר לרשימה, ו-Esc גם', (tester) async {
+      await pumpShell(tester);
+      givePlugin(tester);
+      final nav = navigatorOf(tester);
 
-    await tapNav(tester, shell.navSettings);
+      await openDetails(tester);
+      expect(nav.current, const PluginDetailRoute('a'));
+      expect(screen(PluginDetailView), findsOneWidget);
+      // אין "חזרה לחנות" שני, והפירור הוא "בית › תוספים › התוסף".
+      expect(find.byTooltip(shell.backTooltip), findsOneWidget);
+      expect(find.text(stringsOf().plugins.backToStore), findsNothing);
+      expect(find.text('תוסף בדיקה'), findsWidgets);
 
-    expect(item(shell.navHome).isSelected, isFalse);
-    expect(item(shell.navSettings).isSelected, isTrue);
-    expect(screen(SettingsScreen), findsOneWidget);
+      await back(tester);
+      expect(nav.section, ShellSection.plugins);
+      expect(nav.current, const SectionRoute(ShellSection.plugins));
+      expect(screen(PluginDetailView), findsNothing);
+
+      await tester.tap(find.text(stringsOf().plugins.cardDetailsLink).first);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(nav.current, const SectionRoute(ShellSection.plugins));
+      expect(screen(PluginDetailView), findsNothing);
+    });
+
+    testWidgets('תוסף שנמחק בזמן שפרטיו פתוחים — חוזרים לרשימה, וחזרה אחת לבית',
+        (tester) async {
+      await pumpShell(tester);
+      givePlugin(tester);
+      final nav = navigatorOf(tester);
+      await openDetails(tester);
+      expect(nav.current, const PluginDetailRoute('a'));
+
+      final plugins = sessionOf(tester).plugins..plugins = const [];
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      plugins.notifyListeners();
+      await tester.pump();
+
+      expect(nav.current, const SectionRoute(ShellSection.plugins));
+      expect(screen(PluginDetailView), findsNothing);
+      await back(tester);
+      expect(nav.current, const HomeRoute());
+    });
+
+    testWidgets('"תוספים" בפירור מחזיר לרשימה', (tester) async {
+      await pumpShell(tester);
+      givePlugin(tester);
+
+      await openDetails(tester);
+      await tester.tap(find.text(stringsOf().guide.tilePlugins).last);
+      await tester.pump();
+      expect(
+        navigatorOf(tester).current,
+        const SectionRoute(ShellSection.plugins),
+      );
+    });
+
+    testWidgets('יציאה לבית מהפרטים — בכניסה הבאה מוצגת הרשימה', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      givePlugin(tester);
+
+      await openDetails(tester);
+      await tester.tap(find.text(shell.breadcrumbHome));
+      await tester.pump();
+      expect(navigatorOf(tester).section, ShellSection.home);
+
+      await open(tester, ShellSection.plugins);
+      expect(screen(PluginDetailView), findsNothing);
+    });
+
+    testWidgets('שכבת הסנכרון אינה מכסה את החזרה ואת הפירור', (tester) async {
+      await pumpShell(tester);
+      final plugins = sessionOf(tester).plugins
+        ..status = PluginsModuleStatus.syncing;
+      addTearDown(() => plugins.status = PluginsModuleStatus.idle);
+
+      await open(tester, ShellSection.plugins);
+      expect(find.byType(PluginSyncOverlay), findsOneWidget);
+      expect(find.byTooltip(shell.backTooltip).hitTestable(), findsOneWidget);
+      expect(find.text(shell.breadcrumbHome).hitTestable(), findsOneWidget);
+
+      await back(tester);
+      expect(navigatorOf(tester).section, ShellSection.home);
+    });
+  });
+
+  group('הבית בכונן מוגן', () {
+    testWidgets('אין "בדוק עכשיו"; דיווחים שבכונן נאמרים, נעולים', (
+      tester,
+    ) async {
+      final outbox = Directory(p.join(tempDir.path, 'reports', 'outbox'))
+        ..createSync(recursive: true);
+      File(p.join(outbox.path, 'r1.json')).writeAsStringSync('{}');
+
+      await pumpShell(tester, readOnly: true);
+      await tester.runAsync(sessionOf(tester).errorReports.refreshOutbox);
+      await tester.pump();
+
+      expect(find.byKey(ShellKeys.checkNow), findsNothing);
+      final tile = find.byKey(ShellKeys.tile(ShellSection.reports));
+      expect(tile, findsOneWidget);
+      expect(
+        find.descendant(
+          of: tile,
+          matching: find.text(stringsOf().guide.chipReportsLocked),
+        ),
+        findsOneWidget,
+      );
+
+      await open(tester, ShellSection.reports);
+      expect(
+        find.text(stringsOf().guide.reportsLockedNote(driveFull: false)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('בכונן כתיב יש "בדוק עכשיו" ליד "נבדק ב-"', (tester) async {
+      await pumpShell(tester);
+      expect(find.byKey(ShellKeys.checkNow), findsOneWidget);
+    });
+  });
+
+  group('החלפת שפה במסך הפתיחה', () {
+    testWidgets('נשמרת בהגדרות, והממשק עובר ל-LTR בלי לאבד את המסגרת', (
+      tester,
+    ) async {
+      useViewSize(tester, const Size(1000, 800));
+      await tester.runAsync(
+        () => settings.update(
+          settings.settings.copyWith(
+            languagePreference: AppLanguagePreference.hebrew,
+          ),
+        ),
+      );
+      final opened = <ShellSection>[];
+      await tester.pumpWidget(
+        ListenableBuilder(
+          listenable: settings,
+          builder: (context, _) => wrap(
+            HomePage(
+              model: homeScenario('first'),
+              actions: HomeActions(
+                onToggleLanguage: () => unawaited(toggleAppLanguage(settings)),
+                onOpenSection: opened.add,
+              ),
+            ),
+            language: settings.settings.language,
+          ),
+        ),
+      );
+      final pageState = tester.element(find.byType(HomePage));
+      expect(Directionality.of(pageState), TextDirection.rtl);
+
+      await tester.runAsync(() async {
+        await tester.tap(find.byKey(ShellKeys.welcomeLanguage));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pump();
+
+      expect(settings.settings.language, AppLanguage.english);
+      expect(
+        Directionality.of(tester.element(find.byType(HomePage))),
+        TextDirection.ltr,
+      );
+      expect(
+        find.text(stringsOf(AppLanguage.english).guide.welcomeTitle),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<ActionButton>(find.byKey(ShellKeys.welcomeLanguage)).text,
+        stringsOf(AppLanguage.english).settings.languageHebrew,
+      );
+
+      // נשמר בקובץ: טעינה חדשה של ההגדרות קוראת אנגלית.
+      final reloaded = SettingsController(dataDir: tempDir.path);
+      addTearDown(reloaded.dispose);
+      await tester.runAsync(reloaded.load);
+      expect(reloaded.settings.language, AppLanguage.english);
+    });
+  });
+
+  group('ניווט בתוך הגוף', () {
+    testWidgets('אריח פותח דף משנה עם פירור, וחזרה מחזירה לבית', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      final nav = navigatorOf(tester);
+
+      await open(tester, ShellSection.library);
+      expect(nav.section, ShellSection.library);
+      expect(screen(LibraryScreen), findsOneWidget);
+      expect(find.text(shell.breadcrumbHome), findsOneWidget);
+      expect(find.text(stringsOf().guide.tileLibrary), findsWidgets);
+
+      await back(tester);
+      expect(nav.section, ShellSection.home);
+      expect(find.byKey(ShellKeys.hero), findsOneWidget);
+    });
+
+    testWidgets('"בית" בפירור מחזיר לבית', (tester) async {
+      await pumpShell(tester);
+      await open(tester, ShellSection.plugins);
+
+      await tester.tap(find.text(shell.breadcrumbHome));
+      await tester.pump();
+
+      expect(navigatorOf(tester).section, ShellSection.home);
+    });
+
+    testWidgets('Esc הוא חזרה, ומהבית אינו עושה דבר', (tester) async {
+      await pumpShell(tester);
+      final nav = navigatorOf(tester);
+      await open(tester, ShellSection.otzaria);
+      expect(nav.section, ShellSection.otzaria);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(nav.section, ShellSection.home);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(nav.section, ShellSection.home);
+      expect(nav.stack, [const HomeRoute()]);
+    });
+
+    testWidgets('Esc אינו יוצא משכבת משימה', (tester) async {
+      await pumpShell(tester);
+      final nav = navigatorOf(tester);
+      await open(tester, ShellSection.plugins);
+      nav.showTask();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(nav.showsTask, isTrue);
+      nav.endTask();
+    });
+
+    testWidgets('גלגל השיניים מסומן רק בהגדרות', (tester) async {
+      await pumpShell(tester);
+      Finder selectedTool() => find.descendant(
+            of: find.byType(AppTitleBar),
+            matching: find.byWidgetPredicate(
+              (w) => w is Semantics && w.properties.selected == true,
+            ),
+          );
+
+      await open(tester, ShellSection.library);
+      expect(selectedTool(), findsNothing);
+      await back(tester);
+      await open(tester, ShellSection.settings);
+      expect(selectedTool(), findsOneWidget);
+    });
+
+    testWidgets('אין אריח תוכנות נוספות ואין אריח דיווחים כשאין מה להציג', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+
+      expect(find.byKey(ShellKeys.tile(ShellSection.otzaria)), findsOneWidget);
+      expect(find.byKey(ShellKeys.tile(ShellSection.library)), findsOneWidget);
+      expect(find.byKey(ShellKeys.tile(ShellSection.plugins)), findsOneWidget);
+      expect(
+        find.byKey(ShellKeys.tile(ShellSection.customApps)),
+        findsNothing,
+      );
+      expect(find.byKey(ShellKeys.tile(ShellSection.reports)), findsNothing);
+    });
   });
 
   // Custom-app management writes to mirror/apps on the drive (issue #25).
@@ -497,7 +824,7 @@ void main() {
       tester,
     ) async {
       await pumpShell(tester, readOnly: readOnly);
-      await tapNav(tester, shell.navSettings);
+      await open(tester, ShellSection.settings);
 
       final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
       expect(card, findsOneWidget);
@@ -521,7 +848,7 @@ void main() {
     tester,
   ) async {
     await pumpShell(tester, readOnly: true, driveFull: true);
-    await tapNav(tester, shell.navSettings);
+    await open(tester, ShellSection.settings);
 
     final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
     final t = stringsOf().readOnlyDrive;
@@ -577,8 +904,18 @@ void main() {
     expect(source, contains('LogicalKeyboardKey.keyR, control: true'));
     expect(source, contains('LogicalKeyboardKey.f5'));
     expect(
-      '_session.refreshFromKeyboard()'.allMatches(source).length,
-      2,
+      'LogicalKeyboardKey.f5): () =>\n'
+              '            unawaited(_session.refreshFromKeyboard())'
+          .allMatches(source)
+          .length,
+      1,
+    );
+    expect(
+      'control: true): () =>\n'
+              '            unawaited(_session.refreshFromKeyboard())'
+          .allMatches(source)
+          .length,
+      1,
     );
     final body = _methodBody(
       _appSessionSource(),
@@ -610,19 +947,81 @@ void main() {
       expect(wiring, isNot(contains('otzariaIsRunning')));
     });
 
-    test('דילוג בגלל אוצריא פתוחה מדווח בדיאלוג', () {
+    // "סגור ועדכן" נמחק: "עדכון כאן" עצמו מבקש לסגור את אוצריא (ראו
+    // screen_flows_test), והדילוג נאמר בפתיח של פס "אוצריא פתוחה כרגע".
+    test('דילוג בגלל אוצריא פתוחה נשמר לפס, ואין כפתור שמתחרה בגיבור', () {
       final body = bodyOf(
         'Future<void> _autoInstallIfEnabled() async {',
         'downloadMirrorDirs',
       );
       expect(body, contains('_autoInstall.run('));
       expect(body, contains('settings.settings.autoInstall'));
-      expect(body, contains('prompts.showAutoInstallSkipped()'));
+      expect(body, contains('_autoInstallSkipped = skippedWhileRunning'));
       expect(body, isNot(contains('useWizard: true')));
-      final dialog =
-          _methodBody(shellSource, 'Future<void> showAutoInstallSkipped()');
-      expect(dialog, contains('showSingleActionDialog'));
-      expect(dialog, contains('autoInstallSkippedTitle'));
+      expect(source, isNot(contains('closeAndUpdate')));
+      expect(shellSource, isNot(contains('closeAndUpdate')));
+    });
+
+    // ההתנהגות עצמה — app_session_test, קבוצת checkNow.
+    test('"בדוק עכשיו" ו"בדוק שוב" מחווטים ל-checkNow; Ctrl+R/F5 מקומיים', () {
+      expect(shellSource,
+          contains('onRecheck: () => unawaited(_session.checkNow())'));
+      expect(
+        'unawaited(_session.refreshFromKeyboard())'.allMatches(shellSource),
+        hasLength(2),
+      );
+    });
+
+    test('"לא עכשיו" מסתיר את פס המנהל עד סוף ההרצה', () {
+      final offers = source.substring(
+        source.indexOf('bool get offersElevation =>'),
+        source.indexOf('Future<void> restartElevated()'),
+      );
+      expect(offers, contains('!_elevationDismissed'));
+      expect(
+        offers,
+        contains('void dismissElevation() => '
+            '_update(() => _elevationDismissed = true);'),
+      );
+      expect(shellSource,
+          contains('onDismissElevation: _session.dismissElevation'));
+    });
+
+    test('תורים ישנים: הודעה בבית עד "הבנתי", גם בלי מה לאסוף', () {
+      final recount =
+          _methodBody(source, 'Future<void> recountReportsToCollect() async {');
+      expect(recount, contains('_errorReports.unmigratedLegacy.isNotEmpty'));
+      expect(
+        recount,
+        contains('_notices.hasSeen(NoticesSeenStore.legacyReportsNotice)'),
+      );
+      final dismiss = _methodBody(
+        source,
+        'Future<void> dismissLegacyReportsNotice() async {',
+      );
+      expect(
+        dismiss,
+        contains('_notices.markSeen(NoticesSeenStore.legacyReportsNotice)'),
+      );
+    });
+
+    test('איסוף מכפתור "איסוף" — בלי דו-שיח, וגם לא זה של התורים הישנים', () {
+      final collect =
+          _methodBody(shellSource, 'Future<void> _collectReports()');
+      expect(collect, contains('confirm: false'));
+      // בלי notices אין דיאלוג ה-Hive: הפס שבבית הוא המקור היחיד.
+      expect(collect, isNot(contains('notices:')));
+    });
+
+    test('תוסף שהגיע בזמן שהמשתמש בחנות אינו "חדש" בבית', () {
+      expect(shellSource, contains('..addListener(_onSessionChangeInStore)'));
+      expect(
+        shellSource,
+        contains('..removeListener(_onSessionChangeInStore)'),
+      );
+      final body = _methodBody(shellSource, 'void _onSessionChangeInStore()');
+      expect(body, contains('_navigator.section == ShellSection.plugins'));
+      expect(body, contains('_session.markPluginsVisited()'));
     });
 
     test('הבדיקה המקוונת שלפני ההורדה מרעננת רק את מה שהתיישן', () {
@@ -1116,41 +1515,36 @@ void main() {
       final screen =
           shellSource.substring(shellSource.indexOf('PluginsScreen('));
       final args =
-          screen.substring(0, screen.indexOf('LauncherScreen.settings'));
+          screen.substring(0, screen.indexOf('ShellSection.reports =>'));
       expect(args, contains('busyElsewhere: s.pluginSyncBlockedElsewhere'));
     });
   });
 
-  group('_maybeOfferElevation', () {
+  group('הפעלה מחדש כמנהל — פס בבית', () {
     final source = _appSessionSource();
     final shellSource = _appShellSource();
-    final start = source.indexOf('Future<void> _maybeOfferElevation()');
-    final body = source.substring(
-      start,
-      source.indexOf('void _syncRunningPoll()', start),
+    String restartBody() =>
+        _methodBody(source, 'Future<void> restartElevated() async {');
+    final offers = source.substring(
+      source.indexOf('bool get offersElevation =>'),
+      source.indexOf('Future<void> restartElevated()'),
     );
 
-    test('גוף המתודה נמצא', () {
-      expect(start, greaterThan(-1));
-      expect(body, contains('Elevation.restartElevated()'));
+    test('הפס מוצע רק ב-Windows, כשצריך, ולא בזמן פעולה שיציאה קוטעת', () {
+      expect(offers, contains('Platform.isWindows'));
+      expect(offers, contains('_needsElevation'));
+      expect(offers, contains('!_elevationPending'));
+      expect(offers, contains('!exitWouldInterrupt'));
+      expect(shellSource, isNot(contains('offerElevation')));
     });
 
-    test('נדחית בזמן פעולה ארוכה, לפני הדיאלוג ואחריו', () {
-      final dialog = body.indexOf('prompts.offerElevation()');
+    test('לחיצה בזמן פעולה ארוכה אינה מפעילה מחדש', () {
+      final body = restartBody();
+      final busy = body.indexOf('if (exitWouldInterrupt)');
       final restart = body.indexOf('Elevation.restartElevated()');
-      expect(dialog, greaterThan(-1));
-      expect(
-        _methodBody(shellSource, 'Future<bool?> offerElevation()'),
-        contains('showTwoActionsDialog'),
-      );
-      expect(body.indexOf('exitWouldInterrupt'), lessThan(dialog));
-      final afterDialog = body.indexOf('exitWouldInterrupt', dialog);
-      expect(afterDialog, greaterThan(dialog));
-      expect(afterDialog, lessThan(restart));
-      expect(
-        body.substring(afterDialog, restart),
-        contains('_offeredElevation = false'),
-      );
+      expect(busy, greaterThan(-1));
+      expect(busy, lessThan(restart));
+      expect(body.substring(busy, restart), contains('t.busyNotice'));
     });
 
     test('משוב ברקע נעצר בסדר אחרי האישור, לפני בדיקת החסימה', () {
@@ -1161,6 +1555,7 @@ void main() {
     });
 
     test('מסמנת המתנה ל-UAC סביב restartElevated ומאפסת בכשל', () {
+      final body = restartBody();
       final pending = body.indexOf('_update(() => _elevationPending = true)');
       final restart = body.indexOf('Elevation.restartElevated()');
       expect(pending, greaterThan(-1));
@@ -1200,33 +1595,15 @@ void main() {
       },
     );
 
-    test('מוצעת שוב בסיום איסוף או העלאה של דיווחים', () {
+    test('הבית נבנה מחדש גם בסיום איסוף או העלאה של דיווחים', () {
       expect('..addListener(_onReportsChange)'.allMatches(source).length, 2);
       expect('removeListener(_onReportsChange)'.allMatches(source).length, 2);
-      final listener = source.substring(
-        source.indexOf('void _onReportsChange()'),
-        source.indexOf('Future<void> _maybeAnnouncePlugins()'),
-      );
-      expect(listener, contains('_maybeOfferElevation()'));
+      final listener = _methodBody(source, 'void _onReportsChange()');
       expect(listener, isNot(contains('notifyListeners')));
-      expect(listener, isNot(contains('_update(')));
-    });
-
-    test('מוצעת שוב בסוף ההורדה', () {
-      final host = source.substring(
-        source.indexOf('class _SessionDownloadHost'),
-        source.indexOf('class _SessionLauncherHost'),
+      expect(
+        shellSource,
+        contains('Listenable.merge([s.errorReports, s.searchFeedback])'),
       );
-      final cancelled = host.substring(
-        host.indexOf('void downloadCancelled('),
-        host.indexOf('void downloadEnded()'),
-      );
-      final ended = host.substring(
-        host.indexOf('void downloadEnded()'),
-        host.indexOf('void downloadFinished('),
-      );
-      expect(cancelled, contains('_session._maybeOfferElevation()'));
-      expect(ended, contains('_session._maybeOfferElevation()'));
     });
   });
 
@@ -1249,7 +1626,7 @@ void main() {
       await lockSettings(tester);
       await pumpShell(tester);
 
-      await tapNav(tester, shell.navSettings);
+      await open(tester, ShellSection.settings);
       await tester.pump();
 
       expect(find.text(stringsOf().saferMode.verifyTitle), findsOneWidget);
@@ -1261,13 +1638,13 @@ void main() {
       await lockSettings(tester);
       await pumpShell(tester);
 
-      await tapNav(tester, shell.navSettings);
+      await open(tester, ShellSection.settings);
       await tester.pump();
       await tester.tap(find.text(stringsOf().common.cancel));
       await tester.pump();
 
       expect(screen(SettingsScreen), findsNothing);
-      expect(screen(HomeScreen), findsOneWidget);
+      expect(screen(HomePage), findsOneWidget);
     });
 
     testWidgets('ניהול התוכנות דרך הנווט עובר באותו שער', (tester) async {
@@ -1292,7 +1669,7 @@ void main() {
       await lockSettings(tester);
       await pumpShell(tester);
 
-      await tapNav(tester, shell.navSettings);
+      await open(tester, ShellSection.settings);
       await tester.pump();
       await tester.enterText(find.byType(TextField), '9999');
       await tester.tap(find.text(stringsOf().common.confirm));
@@ -1309,7 +1686,7 @@ void main() {
       await lockSettings(tester);
       await pumpShell(tester);
 
-      await tapNav(tester, shell.navSettings);
+      await open(tester, ShellSection.settings);
       await tester.pump();
       await tester.enterText(find.byType(TextField), '1234');
       await tester.tap(find.text(stringsOf().common.confirm));
@@ -1318,8 +1695,8 @@ void main() {
       expect(screen(SettingsScreen), findsOneWidget);
 
       // אימות אחד מחזיק להרצה — יציאה וחזרה אינן מבקשות סיסמה שוב.
-      await tapNav(tester, shell.navHome);
-      await tapNav(tester, shell.navSettings);
+      await back(tester);
+      await open(tester, ShellSection.settings);
       await tester.pump();
 
       expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
@@ -1346,7 +1723,7 @@ void main() {
       );
       await pumpShell(tester);
 
-      await tapNav(tester, shell.navSettings);
+      await open(tester, ShellSection.settings);
       await tester.pump();
 
       expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
@@ -1356,8 +1733,7 @@ void main() {
 
   group("בדיקת עדכון הלאנצ'ר מהמראה", () {
     Future<LauncherUpdateStatus> statusAfterStart(WidgetTester tester) async {
-      LauncherUpdateController launcher() =>
-          tester.widget<HomeScreen>(screen(HomeScreen)).launcherUpdate;
+      LauncherUpdateController launcher() => sessionOf(tester).launcherUpdate;
       for (var i = 0;
           i < 40 && launcher().status == LauncherUpdateStatus.idle;
           i++) {
@@ -1403,7 +1779,7 @@ void main() {
             (tester) async {
           await pumpShell(tester, language: language, readOnly: true);
           addTearDown(LauncherCrashSession.resetForTest);
-          final home = tester.widget<HomeScreen>(screen(HomeScreen));
+          final home = sessionOf(tester);
           if (installingLibrary) {
             home.library.status = LibraryModuleStatus.updating;
           } else {

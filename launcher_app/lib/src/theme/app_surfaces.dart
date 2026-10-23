@@ -22,11 +22,7 @@ class AppSurfaces {
   static Color topBarBackground(BuildContext context) =>
       _cs(context).surfaceContainerHigh;
 
-  /// רקע סרגל הניווט הצדי — רקע הדף, בלי תפר מול התוכן.
-  static Color navRailBackground(BuildContext context) =>
-      panelBackground(context);
-
-  /// הקו שמתחת לשורת הכותרת ובין סרגל הניווט לתוכן.
+  /// הקו שמתחת לשורת הכותרת.
   static Color shellDivider(BuildContext context) =>
       AppPalette.of(context).titleBarBorder;
 
@@ -116,6 +112,12 @@ class AppSurfaces {
 
   /// הטבעת שמסביב לתג תוצאה — צבע התג ב-11%.
   static Color badgeRing(Color base) => base.withValues(alpha: 0.11);
+
+  /// הטבעת שמסביב לסמל הגיבור — secondaryContainer ב-45%.
+  static Color emblemRing(Color base) => base.withValues(alpha: 0.45);
+
+  /// [base] שקוף לגמרי — קצה של מעבר צבע.
+  static Color transparent(Color base) => base.withValues(alpha: 0);
 
   /// טבעת התג הרגוע: onSurfaceVariant ב-9%.
   static Color calmBadgeRing(ColorScheme cs) =>

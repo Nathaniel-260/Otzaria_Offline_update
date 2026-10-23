@@ -186,6 +186,12 @@ void main() {
 
   // ── פענוח התמונות ────────────────────────────────────────────────────────
 
+  /// הרשימה נפתחת מהפס שבראש החנות — לא מעצמה בכניסה.
+  Future<void> openUpdates(WidgetTester tester) async {
+    await tester.tap(find.text(stringsOf().plugins.updatesBarButton));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('decodeWidthFor מעגל כלפי מעלה לקפיצות של 64 לפי צפיפות המסך',
       (tester) async {
     late BuildContext ctx;
@@ -975,9 +981,8 @@ void main() {
     expect(selected, 'a');
   });
 
-  testWidgets('הדיאלוג נפתח בכניסה למסך התוספים, ורק פעם אחת', (tester) async {
-    // ב-AppShell המסך הזה נבנה רק בכניסה הראשונה ללשונית, ולכן זו גם
-    // הנקודה שבה ההודעה מוצגת — לא בעליית התוכנה.
+  testWidgets('בכניסה לחנות אין דיאלוג — פס העדכונים בראשה פותח את הרשימה',
+      (tester) async {
     await seed(tester, catalog: [
       storePlugin('a', name: 'תוסף לעדכון', manifestId: 'id-a', version: '2.0'),
     ]);
@@ -986,17 +991,18 @@ void main() {
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
 
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text(t.updatesAvailableChip(1)), findsOneWidget);
+    await openUpdates(tester);
     expect(find.text(t.updatesDialogTitle(1)), findsOneWidget);
     await tester.tap(find.text(stringsOf().common.close));
     await tester.pumpAndSettle();
     expect(find.text(t.updatesDialogTitle(1)), findsNothing);
 
-    // רענון נוסף של הקטלוג לא מציג אותה שוב באותה הרצה.
+    // רענון של הקטלוג אינו פותח אותה מעצמו.
     plugins.setHideInstalled(false);
     await tester.pumpAndSettle();
     expect(find.text(t.updatesDialogTitle(1)), findsNothing);
-    // השבב בשורת הסנכרון כן נשאר, כתזכורת שקטה.
-    expect(find.text(t.updatesAvailableChip(1)), findsOneWidget);
   });
 
   testWidgets('בחירת תוסף מהדיאלוג פותחת את פרטיו ומבקשת מיקוד למסך',
@@ -1017,6 +1023,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await openUpdates(tester);
 
     // אותו שם מופיע גם בכרטיס שברשת מאחורי הדיאלוג — הלחיצה היא על השורה
     // שבתוכו.
@@ -1043,6 +1050,7 @@ void main() {
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
+    await openUpdates(tester);
 
     expect(find.text(t.updatesDialogTitle(1)), findsOneWidget);
     // תוסף בודד — אין "עדכון הכל", הכפתור שבשורה הוא הפעולה כולה.
@@ -1072,6 +1080,7 @@ void main() {
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
+    await openUpdates(tester);
 
     await tester.tap(find.text(t.updatesDialogUpdateAllButton(2)));
     await tester.pump();
@@ -1099,6 +1108,7 @@ void main() {
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
+    await openUpdates(tester);
 
     await tester.tap(find.text(t.updatesDialogUpdateButton));
     await tester.pump();
@@ -1108,9 +1118,7 @@ void main() {
     expect(find.text(t.updatesDialogUpdateButton), findsOneWidget);
   });
 
-  testWidgets('לחיצה על שבב העדכונים פותחת את הרשימה מחדש', (tester) async {
-    // התלונה שהתיקון הזה בא בשבילה: ההודעה נפתחת פעם אחת בלבד, ובלי דרך
-    // לחזור אליה אי אפשר לדעת אילו תוספים עדיין ממתינים.
+  testWidgets('הפס פותח את הרשימה שוב אחרי שנסגרה', (tester) async {
     await seed(tester, catalog: [
       storePlugin('a', name: 'תוסף לעדכון', manifestId: 'id-a', version: '2.0'),
     ]);
@@ -1118,13 +1126,13 @@ void main() {
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
+    await openUpdates(tester);
 
     await tester.tap(find.text(stringsOf().common.close));
     await tester.pumpAndSettle();
     expect(find.text(t.updatesDialogTitle(1)), findsNothing);
 
-    await tester.tap(find.text(t.updatesAvailableChip(1)));
-    await tester.pumpAndSettle();
+    await openUpdates(tester);
     expect(find.text(t.updatesDialogTitle(1)), findsOneWidget);
   });
 
@@ -1156,6 +1164,7 @@ void main() {
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
+    await openUpdates(tester);
 
     await tester.tap(find.text(t.updatesDialogUpdateButton));
     await tester.pump();
@@ -1215,6 +1224,7 @@ void main() {
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
+    await openUpdates(tester);
     expect(find.text(t.updatesDialogUpdateAllButton(2)), findsOneWidget);
 
     await tester.runAsync(plugins.refreshInstalled);
@@ -1244,6 +1254,7 @@ void main() {
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
+    await openUpdates(tester);
     expect(inDialog('שני'), findsNothing);
 
     await tester.runAsync(plugins.refreshInstalled);

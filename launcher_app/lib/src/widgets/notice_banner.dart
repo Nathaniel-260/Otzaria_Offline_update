@@ -42,8 +42,10 @@ class NoticeBanner extends StatelessWidget {
         borderRadius: AppTokens.borderRadiusAll,
       ),
       child: Row(
-        crossAxisAlignment:
-            banner ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        // הודעה עם כפתור: הכפתור באמצע הגובה, לא צמוד לשורה הראשונה.
+        crossAxisAlignment: banner || actions.isNotEmpty
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
           leading,
           const SizedBox(width: 14),

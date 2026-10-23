@@ -1,28 +1,32 @@
 import 'dart:async';
 
 import 'package:error_reports_manager/error_reports_manager.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
-import 'package:plugins_manager/plugins_manager.dart';
 
 import '../controllers/app_reports_controller.dart';
 import '../controllers/download_plan.dart';
 import '../controllers/download_summary.dart';
 import '../controllers/launcher_update_flow.dart';
+import '../controllers/plugins_module_controller.dart' show PluginsModuleStatus;
+import '../flows/home_flows.dart';
 import '../self_update/launcher_release.dart';
 import '../services/app_paths.dart';
 import '../services/byte_size.dart';
 import '../services/dialog_queue.dart';
 import '../services/notices_seen_store.dart';
 import '../services/sleep_inhibitor.dart';
+import '../settings/app_settings.dart';
 import '../settings/safer_mode.dart';
 import '../settings/settings_controller.dart';
 import '../shell/app_session.dart';
+import '../shell/home_guidance.dart';
+import '../shell/home_guidance_session.dart';
 import '../shell/session_prompts.dart';
+import '../shell/shell_keys.dart';
 import '../shell/shell_navigator.dart';
 import '../theme/theme_exports.dart';
 import '../widgets/widgets_exports.dart';
@@ -30,19 +34,27 @@ import 'app_report/crash_prompt_dialog.dart';
 import 'custom_apps/custom_apps_screen.dart';
 import 'error_reports_flow.dart';
 import 'faq/faq_dialog.dart';
-import 'home_screen.dart';
+import 'home/home_page.dart';
+import 'home/home_progress.dart';
+import 'home/home_view_model.dart';
 import 'library_screen.dart';
 import 'otzaria_screen.dart';
 import 'plugins/plugins_screen.dart';
+import 'reports/reports_section.dart';
 import 'reports_upload_flow.dart';
 import 'settings_screen.dart';
 
-/// המסך הפעיל בסרגל הניווט. [customApps] מופיע בסרגל רק אחרי שהמשתמש
-/// הוסיף תוכנה משלו.
-enum LauncherScreen { home, otzaria, library, plugins, customApps, settings }
+/// כפתור השפה שבמסך הפתיחה: עברית ↔ אנגלית, ונשמר בהגדרות.
+Future<void> toggleAppLanguage(SettingsController settings) {
+  final current = settings.settings;
+  final next = current.language == AppLanguage.hebrew
+      ? AppLanguagePreference.english
+      : AppLanguagePreference.hebrew;
+  return settings.update(current.copyWith(languagePreference: next));
+}
 
-/// מסגרת האפליקציה: שורת כותרת מותאמת למעלה, סרגל ניווט קבוע בצד, וחמשת
-/// המסכים.
+/// מסגרת האפליקציה: שורת כותרת מותאמת למעלה, ומתחתיה הגוף — הבית או דף
+/// משנה שנפתח ממנו. אין סרגל ניווט ואין דף שמכסה את שורת הכותרת.
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -108,8 +120,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   late final AppSession _session;
   late final ShellNavigator _navigator = ShellNavigator(canEnter: _canEnter);
 
-  LauncherScreen get _screen => _screenOf(_navigator.section);
-
   late final DialogQueue _dialogs = DialogQueue(
     isActive: () => mounted,
     isBlocked: () =>
@@ -136,8 +146,12 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       noticesStore: widget.noticesStore,
       appReports: widget.appReports,
       sleepInhibitor: widget.sleepInhibitor,
-    )..addListener(_onSessionChange);
-    _navigator.addListener(_onSessionChange);
+    )
+      ..addListener(_onSessionChange)
+      ..addListener(_onSessionChangeInStore);
+    _navigator
+      ..addListener(_onSessionChange)
+      ..addListener(_onNavigation);
     _session.start();
   }
 
@@ -146,9 +160,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     _dialogs.dispose();
     _navigator
       ..removeListener(_onSessionChange)
+      ..removeListener(_onNavigation)
       ..dispose();
     _session
       ..removeListener(_onSessionChange)
+      ..removeListener(_onSessionChangeInStore)
       ..dispose();
     super.dispose();
   }
@@ -157,19 +173,30 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     if (mounted) setState(() {});
   }
 
+  /// מה שמוצג בחנות "מוזכר" — גם תוסף שהגיע בסנכרון בזמן שהמשתמש בה, כדי
+  /// שלא יופיע אחר כך בבית כ"חדש".
+  void _onNavigation() {
+    if (_navigator.section == ShellSection.plugins) {
+      unawaited(_session.markPluginsVisited());
+    }
+  }
+
+  void _onSessionChangeInStore() {
+    // תוסף שנמחק בסנכרון בזמן שפרטיו מוצגים — חוזרים לרשימה, כדי שחזרה אחת תספיק.
+    if (_navigator.current case PluginDetailRoute(:final id)
+        when _session.plugins.status == PluginsModuleStatus.ready &&
+            _session.plugins.byId(id) == null) {
+      _navigator.back();
+    }
+    if (_navigator.section == ShellSection.plugins &&
+        _session.newPluginsForHome.isNotEmpty) {
+      unawaited(_session.markPluginsVisited());
+    }
+  }
+
   @override
   Future<T?> runDialog<T>(Future<T> Function() body, {bool forever = false}) =>
       _dialogs.run(body, forever: forever);
-
-  @override
-  Future<void> showErrorReportsIntro() => _dialogs.run(
-        () => showErrorReportsIntroOnce(
-          context,
-          _session.notices,
-          readOnly: widget.readOnly,
-          driveFull: widget.driveFull,
-        ),
-      );
 
   @override
   Future<bool?> showCrashPrompt(
@@ -188,46 +215,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         },
         forever: true,
       );
-
-  @override
-  Future<void> announcePlugins({
-    required List<StorePlugin> fresh,
-    required bool hasUpdates,
-  }) =>
-      _dialogs.run(() async {
-        final t = context.strings.plugins;
-        final message = hasUpdates && fresh.isNotEmpty
-            ? t.homeNoticeUpdatesAndNew
-            : hasUpdates
-                ? t.homeNoticeUpdates
-                : fresh.length == 1
-                    ? t.homeNoticeNewOne
-                    : t.homeNoticeNewMany(fresh.length);
-
-        unawaited(_session.plugins.markHomeNotified(fresh));
-        final open = await showTwoActionsDialog(
-          context: context,
-          title: t.homeNoticeTitle,
-          content: message,
-          cancelText: context.strings.common.close,
-          confirmText: t.homeNoticeOpenButton,
-        );
-        if (open && mounted) await _goTo(LauncherScreen.plugins);
-      });
-
-  @override
-  Future<bool?> offerElevation() {
-    final t = AppL10n.strings.elevation;
-    return _dialogs.run(
-      () => showTwoActionsDialog(
-        context: context,
-        title: t.dialogTitle,
-        content: t.dialogContent,
-        cancelText: t.dialogCancel,
-        confirmText: t.dialogConfirm,
-      ),
-    );
-  }
 
   @override
   Future<bool?> offerLauncherUpdate(LauncherRelease release, String? whatsNew) {
@@ -276,16 +263,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       case LauncherUpdateNotice.manualRestart:
         UiSnack.show(t.manualRestartNotice);
     }
-  }
-
-  @override
-  Future<void> showAutoInstallSkipped() {
-    final t = context.strings.home;
-    return showSingleActionDialog(
-      context: context,
-      title: t.autoInstallSkippedTitle,
-      content: t.autoInstallSkippedContent,
-    );
   }
 
   @override
@@ -353,9 +330,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   }) {
     final t = context.strings;
     String label(MirrorComponent component) => switch (component) {
-          MirrorComponent.app => t.home.appTileTitle,
-          MirrorComponent.library => t.home.libraryTileTitle,
-          MirrorComponent.plugins => t.shell.navPlugins,
+          MirrorComponent.app => t.guide.tileApp,
+          MirrorComponent.library => t.guide.tileLibrary,
+          MirrorComponent.plugins => t.guide.tilePlugins,
         };
     final failedLabels = [for (final c in failed) label(c)];
     final skippedLabels = [for (final c in skipped) label(c)];
@@ -368,18 +345,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       case DownloadSummary.done:
         UiSnack.showSuccess(t.home.downloadDoneSnack);
     }
-  }
-
-  @override
-  Future<void> performReportOffer() async {
-    await offerErrorReportCollection(
-      context,
-      _session.errorReports,
-      readOnly: widget.readOnly,
-      isOtzariaRunning: _session.refreshProcessState,
-      notices: _session.notices,
-      searchFeedback: _session.searchFeedback,
-    );
   }
 
   @override
@@ -397,8 +362,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         onUploadingChanged: onUploadingChanged,
       );
 
-  Future<void> _goTo(LauncherScreen screen) =>
-      _navigator.select(_sectionOf(screen));
+  Future<void> _goTo(ShellSection section) => _navigator.select(section);
 
   /// שער הניווט: ההגדרות (וניהול התוכנות שתחתן) נעולות במצב הסייפר. השער
   /// בנווט ולא במסך, כי מסך שנבנה נשאר בעץ ושער בתוכו היה נשאר פתוח.
@@ -419,39 +383,165 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     return true;
   }
 
-  Widget _screenWidget(LauncherScreen screen) {
-    final s = _session;
-    return switch (screen) {
-      LauncherScreen.home => HomeScreen(
-          otzaria: s.otzaria,
-          library: s.library,
-          plugins: s.plugins,
-          launcherUpdate: s.launcherUpdate,
-          settings: widget.settings,
-          otzariaIsRunning: s.otzariaIsRunning,
-          isDownloading: s.isDownloading,
-          isCancellingDownload: s.isCancellingDownload,
-          isCheckingOnline: s.isCheckingOnline,
-          longTaskRunning: s.longTaskRunning,
-          onProcessStateChanged: s.refreshProcessState,
-          onCloseOtzaria: s.closeOtzaria,
-          onCheckOnline: s.checkOnline,
-          onDownloadAll: s.downloadAll,
-          onCancelDownload: s.cancelDownload,
-          onDownloadLauncherUpdate: s.downloadLauncherUpdate,
-          onInstallLauncherUpdate: s.installLauncherUpdate,
-          onRequestReindex: s.requestLibraryReindex,
-          onGoToOtzaria: () => _goTo(LauncherScreen.otzaria),
-          onGoToLibrary: () => _goTo(LauncherScreen.library),
-          readOnly: widget.readOnly,
-          driveFull: widget.driveFull,
-          errorReports: s.errorReports,
-          searchFeedback: s.searchFeedback,
-          isUploadingReports: s.uploadingReports,
-          onUploadReports: s.uploadReports,
-          onStopReports: s.stopReports,
+  void _openHelp() => unawaited(
+        showFaqDialog(
+          context,
+          faq: _session.faq,
+          saferMode: _session.saferMode,
         ),
-      LauncherScreen.otzaria => OtzariaScreen(
+      );
+
+  void _toggleLanguage() => unawaited(toggleAppLanguage(widget.settings));
+
+  HomeFlowDeps get _flowDeps => HomeFlowDeps(
+        otzaria: _session.otzaria,
+        library: _session.library,
+        isOtzariaRunning: _session.refreshProcessState,
+        closeOtzaria: _session.closeOtzaria,
+        onRequestReindex: _session.requestLibraryReindex,
+      );
+
+  Future<void> _collectReports() async {
+    final s = _session;
+    await offerErrorReportCollection(
+      context,
+      s.errorReports,
+      readOnly: widget.readOnly,
+      isOtzariaRunning: s.refreshProcessState,
+      searchFeedback: s.searchFeedback,
+      // הגילוי בדף והלחיצה הם האישור; התורים הישנים — רק הפס שבבית.
+      confirm: false,
+    );
+    if (mounted) await s.recountReportsToCollect();
+  }
+
+  late final HomeActions _homeActions = HomeActions(
+    onInstallHere: () => unawaited(installOtzariaHere(context, _flowDeps)),
+    onUpdateHere: () => unawaited(
+      updateHere(
+        context,
+        _flowDeps,
+        items: homeViewModelOf(_session).guidance.hereItems,
+        onPluginsOnly: () => unawaited(_goTo(ShellSection.plugins)),
+      ),
+    ),
+    onDownload: () => unawaited(_session.downloadAll()),
+    onLaunch: () => unawaited(_session.otzaria.launch()),
+    onRecheck: () => unawaited(_session.checkNow()),
+    onCancelDownload: () => unawaited(_session.cancelDownload()),
+    onOpenSection: (section) => unawaited(_goTo(section)),
+    onOpenSettings: () => unawaited(_goTo(ShellSection.settings)),
+    onHelp: _openHelp,
+    onToggleLanguage: _toggleLanguage,
+    onDismissReportsIntro: () => unawaited(_session.dismissReportsIntro()),
+    onDismissLegacyReports: () =>
+        unawaited(_session.dismissLegacyReportsNotice()),
+    onRestartElevated: () => unawaited(_session.restartElevated()),
+    onDismissElevation: _session.dismissElevation,
+    onReviewLauncherUpdate: () => unawaited(_session.reviewLauncherUpdate()),
+    onInstallLauncherUpdate: () => unawaited(_session.installLauncherUpdate()),
+  );
+
+  Widget _home() {
+    final s = _session;
+    return ListenableBuilder(
+      // מוני הדיווחים והשליחה אינם מעירים את הסשן כולו.
+      listenable: Listenable.merge([s.errorReports, s.searchFeedback]),
+      builder: (context, _) {
+        final model = homeViewModelOf(s);
+        return HomePage(
+          model: model,
+          actions: _homeActions,
+          taskProgress: model.guidance.primary == GuidancePrimary.taskInProgress
+              ? HomeTaskProgress(
+                  task: model.task,
+                  otzaria: s.otzaria,
+                  library: s.library,
+                  plugins: s.plugins,
+                )
+              : null,
+          launcherProgress:
+              LauncherDownloadPercent(controller: s.launcherUpdate),
+        );
+      },
+    );
+  }
+
+  String _sectionLabel(BuildContext context, ShellSection section) {
+    final g = context.strings.guide;
+    return switch (section) {
+      ShellSection.home => context.strings.shell.breadcrumbHome,
+      ShellSection.otzaria => g.tileApp,
+      ShellSection.library => g.tileLibrary,
+      ShellSection.plugins => g.tilePlugins,
+      ShellSection.customApps => g.tileCustomApps,
+      ShellSection.reports => g.tileReports,
+      ShellSection.settings => context.strings.settings.title,
+      ShellSection.help => context.strings.shell.helpTooltip,
+    };
+  }
+
+  /// דף הפרטים שמוצג עכשיו במקטע — נתיב בנווט, כך שחזרה ו-Esc מובילים
+  /// לרשימה, ובכניסה מחדש למקטע מוצגת הרשימה.
+  String? _detailId(ShellSection section) => switch (_navigator.current) {
+        PluginDetailRoute(:final id) when section == ShellSection.plugins => id,
+        CustomAppDetailRoute(:final id)
+            when section == ShellSection.customApps =>
+          id,
+        _ => null,
+      };
+
+  void _showDetail(ShellSection section, String? id) {
+    if (id == null) {
+      if (_detailId(section) != null) _navigator.back();
+      return;
+    }
+    unawaited(
+      _navigator.push(
+        section == ShellSection.plugins
+            ? PluginDetailRoute(id)
+            : CustomAppDetailRoute(id),
+      ),
+    );
+  }
+
+  String? _detailLabel(ShellSection section, String id) => switch (section) {
+        ShellSection.plugins => _session.plugins.byId(id)?.name,
+        ShellSection.customApps => _session.customApps.apps
+            .where((app) => app.descriptor.id == id)
+            .firstOrNull
+            ?.descriptor
+            .name,
+        _ => null,
+      };
+
+  Widget _sectionWidget(BuildContext context, ShellSection section) {
+    if (section == ShellSection.home) return _home();
+    final screen = _subPage(section);
+    final label = _sectionLabel(context, section);
+    final detail = _detailId(section);
+    final detailLabel = detail == null ? null : _detailLabel(section, detail);
+    return SubPageHeaderScope(
+      header: SubPageHeader(
+        onBack: _navigator.back,
+        onHome: () => unawaited(_goTo(ShellSection.home)),
+        trail: [
+          if (detailLabel == null)
+            (label: label, onTap: null)
+          else ...[
+            (label: label, onTap: _navigator.back),
+            (label: detailLabel, onTap: null),
+          ],
+        ],
+      ),
+      child: screen,
+    );
+  }
+
+  Widget _subPage(ShellSection section) {
+    final s = _session;
+    return switch (section) {
+      ShellSection.otzaria => OtzariaScreen(
           otzaria: s.otzaria,
           settings: widget.settings,
           otzariaIsRunning: s.otzariaIsRunning,
@@ -459,28 +549,46 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onInstallAdopted: s.plugins.refreshInstalled,
           saferMode: s.saferMode,
         ),
-      LauncherScreen.customApps => CustomAppsScreen(
+      ShellSection.customApps => CustomAppsScreen(
           controller: s.customApps,
           readOnly: widget.readOnly,
+          detailId: _detailId(ShellSection.customApps),
+          onDetailChanged: (id) => _showDetail(ShellSection.customApps, id),
         ),
-      LauncherScreen.library => LibraryScreen(
+      ShellSection.library => LibraryScreen(
           library: s.library,
           otzariaIsRunning: s.otzariaIsRunning,
           isDownloading: s.isDownloading,
           onProcessStateChanged: s.refreshProcessState,
           onCloseOtzaria: s.closeOtzaria,
           onRequestReindex: s.requestLibraryReindex,
-          onGoToSettings: () => _goTo(LauncherScreen.settings),
+          onGoToSettings: () => unawaited(_goTo(ShellSection.settings)),
           onGrantSemanticConsent: s.grantSemanticConsent,
         ),
-      LauncherScreen.plugins => PluginsScreen(
+      ShellSection.plugins => PluginsScreen(
           controller: s.plugins,
-          onRequestFocus: () => _goTo(LauncherScreen.plugins),
+          onRequestFocus: () => unawaited(_goTo(ShellSection.plugins)),
           readOnly: widget.readOnly,
           driveFull: widget.driveFull,
           busyElsewhere: s.pluginSyncBlockedElsewhere,
+          detailId: _detailId(ShellSection.plugins),
+          onDetailChanged: (id) => _showDetail(ShellSection.plugins, id),
         ),
-      LauncherScreen.settings => SettingsScreen(
+      ShellSection.reports => ReportsSection(
+          errorReports: s.errorReports,
+          searchFeedback: s.searchFeedback,
+          connection: s.isCheckingOnline ? null : onlineState(s),
+          isUploadingAll: s.uploadingReports,
+          busy: s.longTaskRunning,
+          reportsToCollect: s.errorReportsToCollect,
+          searchRecordsToCollect: s.searchRecordsToCollect,
+          onCollect: () => unawaited(_collectReports()),
+          onUpload: s.uploadReports,
+          onStop: s.stopReports,
+          readOnly: widget.readOnly,
+          driveFull: widget.driveFull,
+        ),
+      ShellSection.settings => SettingsScreen(
           controller: widget.settings,
           onOpenLog: s.openLogFolder,
           launcherVersion: s.launcherUpdate.currentVersion,
@@ -490,6 +598,8 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           driveFull: widget.driveFull,
           appReports: widget.appReports,
         ),
+      // העזרה עדיין דו-שיח (`showFaqDialog`), ואין אליה ניווט.
+      ShellSection.home || ShellSection.help => const SizedBox.shrink(),
     };
   }
 
@@ -501,30 +611,24 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             unawaited(_session.refreshFromKeyboard()),
         const SingleActivator(LogicalKeyboardKey.f5): () =>
             unawaited(_session.refreshFromKeyboard()),
+        const SingleActivator(LogicalKeyboardKey.escape): _navigator.back,
       },
       child: Focus(autofocus: true, child: _scaffold(context)),
     );
   }
 
   Widget _scaffold(BuildContext context) {
+    final section = _navigator.section;
     return Scaffold(
       backgroundColor: AppSurfaces.panelBackground(context),
-      // שורת הכותרת נפרסת על כל הרוחב, מעל סרגל הניווט, כך שגרירת החלון
-      // אפשרית לכל רוחבו. כפתורי החלון נשארים פעילים גם כשהיציאה ממתינה.
+      // כפתורי החלון נשארים פעילים גם כשהיציאה ממתינה.
       body: Column(
         children: [
           AppTitleBar(
-            onHelp: () => unawaited(
-              showFaqDialog(
-                context,
-                faq: _session.faq,
-                saferMode: _session.saferMode,
-              ),
-            ),
-            onSettings: () => unawaited(_goTo(LauncherScreen.settings)),
-            activeTool: _screen == LauncherScreen.settings
-                ? TitleBarTool.settings
-                : null,
+            onHelp: _openHelp,
+            onSettings: () => unawaited(_goTo(ShellSection.settings)),
+            activeTool:
+                section == ShellSection.settings ? TitleBarTool.settings : null,
             toolsEnabled: !_session.exitPending,
             showWindowButtons: widget.showWindowButtons,
           ),
@@ -533,7 +637,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
               absorbing: _session.exitPending,
               child: ExcludeFocus(
                 excluding: _session.exitPending,
-                child: _shellRow(context),
+                child: _body(context, section),
               ),
             ),
           ),
@@ -542,142 +646,18 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     );
   }
 
-  Widget _shellRow(BuildContext context) => Row(
+  /// מקטע נבנה בכניסה הראשונה אליו ונשאר; רק המוצג מריץ טיקרים.
+  Widget _body(BuildContext context, ShellSection current) => IndexedStack(
+        key: ShellKeys.sectionStack,
+        index: current.index,
         children: [
-          _NavRail(
-            current: _screen,
-            onSelect: _goTo,
-            showCustomApps: _session.customApps.hasApps,
-          ),
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: AppSurfaces.shellDivider(context),
-          ),
-          Expanded(
-            child: IndexedStack(
-              index: _screen.index,
-              children: [
-                for (final screen in LauncherScreen.values)
-                  _navigator.isBuilt(_sectionOf(screen))
-                      ? TickerMode(
-                          enabled: screen == _screen,
-                          child: _screenWidget(screen),
-                        )
-                      : const SizedBox.shrink(),
-              ],
-            ),
-          ),
+          for (final section in ShellSection.values)
+            _navigator.isBuilt(section)
+                ? TickerMode(
+                    enabled: section == current,
+                    child: _sectionWidget(context, section),
+                  )
+                : const SizedBox.shrink(),
         ],
       );
-}
-
-ShellSection _sectionOf(LauncherScreen screen) => switch (screen) {
-      LauncherScreen.home => ShellSection.home,
-      LauncherScreen.otzaria => ShellSection.otzaria,
-      LauncherScreen.library => ShellSection.library,
-      LauncherScreen.plugins => ShellSection.plugins,
-      LauncherScreen.customApps => ShellSection.customApps,
-      LauncherScreen.settings => ShellSection.settings,
-    };
-
-/// למקטעים שאין להם מסך בסרגל (דיווחים, עזרה) עדיין אין יעד — הבית.
-LauncherScreen _screenOf(ShellSection section) => switch (section) {
-      ShellSection.home => LauncherScreen.home,
-      ShellSection.otzaria => LauncherScreen.otzaria,
-      ShellSection.library => LauncherScreen.library,
-      ShellSection.plugins => LauncherScreen.plugins,
-      ShellSection.customApps => LauncherScreen.customApps,
-      ShellSection.settings => LauncherScreen.settings,
-      ShellSection.reports || ShellSection.help => LauncherScreen.home,
-    };
-
-// ── סרגל הניווט ───────────────────────────────────────────────────────────────
-
-/// שם המסך בסרגל הניווט.
-String _screenLabel(BuildContext context, LauncherScreen screen) {
-  final s = context.strings.shell;
-  return switch (screen) {
-    LauncherScreen.home => s.navHome,
-    LauncherScreen.otzaria => s.navApp,
-    LauncherScreen.library => s.navLibrary,
-    LauncherScreen.plugins => s.navPlugins,
-    LauncherScreen.customApps => s.navCustomApps,
-    LauncherScreen.settings => s.navSettings,
-  };
-}
-
-class _NavRail extends StatelessWidget {
-  final LauncherScreen current;
-  final ValueChanged<LauncherScreen> onSelect;
-
-  /// מוסיף את "תוכנות נוספות" לסרגל. מוצג רק כשיש בפועל תוכנה כזו —
-  /// הכניסה הראשונה היא מההגדרות.
-  final bool showCustomApps;
-
-  const _NavRail({
-    required this.current,
-    required this.onSelect,
-    required this.showCustomApps,
-  });
-
-  /// הסמל הרגיל והמלא לכל מסך. הפריטים נגזרים מ-[LauncherScreen.values], כך
-  /// שמסך חדש בלי סמל ייפול כאן במקום להיעלם מהסרגל בשקט.
-  static const Map<LauncherScreen, (IconData, IconData)> _icons = {
-    LauncherScreen.home: (
-      FluentIcons.home_24_regular,
-      FluentIcons.home_24_filled,
-    ),
-    LauncherScreen.otzaria: (
-      FluentIcons.desktop_24_regular,
-      FluentIcons.desktop_24_filled,
-    ),
-    LauncherScreen.library: (
-      FluentIcons.library_24_regular,
-      FluentIcons.library_24_filled,
-    ),
-    LauncherScreen.plugins: (
-      FluentIcons.puzzle_piece_24_regular,
-      FluentIcons.puzzle_piece_24_filled,
-    ),
-    LauncherScreen.customApps: (
-      FluentIcons.box_24_regular,
-      FluentIcons.box_24_filled,
-    ),
-    LauncherScreen.settings: (
-      FluentIcons.settings_24_regular,
-      FluentIcons.settings_24_filled,
-    ),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    NavRailItem item(LauncherScreen screen) {
-      final (icon, iconFilled) = _icons[screen]!;
-      return NavRailItem(
-        icon: icon,
-        iconFilled: iconFilled,
-        label: _screenLabel(context, screen),
-        isSelected: current == screen,
-        onTap: () => onSelect(screen),
-      );
-    }
-
-    return Container(
-      width: NavRailItem.width,
-      color: AppSurfaces.navRailBackground(context),
-      padding: const EdgeInsets.symmetric(vertical: AppTokens.spaceSM),
-      child: Column(
-        children: [
-          // ההגדרות נדחקות לתחתית; כל השאר בסדר ההכרזה של ה-enum.
-          for (final screen in LauncherScreen.values)
-            if (screen != LauncherScreen.settings &&
-                (screen != LauncherScreen.customApps || showCustomApps))
-              item(screen),
-          const Spacer(),
-          item(LauncherScreen.settings),
-        ],
-      ),
-    );
-  }
 }

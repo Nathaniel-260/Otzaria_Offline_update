@@ -193,6 +193,7 @@ class CustomAppsController extends ChangeNotifier
     final ids = [for (final app in shown) app.descriptor.id];
     if (ids.isEmpty) return;
     _announcedIds = {..._announcedIds, ...ids};
+    notifyListeners();
     await _announced?.record(ids);
   }
 

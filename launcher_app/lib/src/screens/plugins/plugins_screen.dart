@@ -32,7 +32,9 @@ class PluginsScreen extends StatefulWidget {
       this.onRequestFocus,
       this.readOnly = false,
       this.driveFull = false,
-      this.busyElsewhere = false});
+      this.busyElsewhere = false,
+      this.detailId,
+      this.onDetailChanged});
 
   final PluginsModuleController controller;
 
@@ -44,6 +46,11 @@ class PluginsScreen extends StatefulWidget {
   final bool readOnly;
   final bool driveFull;
   final bool busyElsewhere;
+
+  /// עם [onDetailChanged] — התוסף שפרטיו מוצגים נקבע בחוץ (נתיב בנווט), כך
+  /// שחזרה ו-Esc מהפרטים מובילים לרשימה. בלעדיו המסך זוכר בעצמו.
+  final String? detailId;
+  final ValueChanged<String?>? onDetailChanged;
 
   @override
   State<PluginsScreen> createState() => _PluginsScreenState();
@@ -80,13 +87,22 @@ class _PluginsScreenState extends State<PluginsScreen> {
   final TextEditingController _search = TextEditingController();
 
   /// ה-id של התוסף שפרטיו מוצגים, או null כשמוצגת הרשימה.
-  String? _selectedId;
+  String? _localSelectedId;
+
+  String? get _selectedId =>
+      widget.onDetailChanged == null ? _localSelectedId : widget.detailId;
+
+  void _select(String? id) {
+    final external = widget.onDetailChanged;
+    if (external != null) {
+      external(id);
+    } else {
+      setState(() => _localSelectedId = id);
+    }
+  }
 
   /// ה-id של התוסף שכרגע רצה עליו פעולה (שמירה / התקנה).
   String? _busyId;
-
-  /// הודעת העדכונים מוצגת פעם אחת בכל הרצה, לא בכל טעינה מחדש.
-  bool _updatesDialogShown = false;
 
   /// התוספים החדשים שהטוסט עוד לא נצפה בהם. מוגדר פעם אחת בהרצה, ברגע
   /// שהם נרשמים כ"נראו" — ראו [_announceNewIfNeeded].
@@ -101,7 +117,6 @@ class _PluginsScreenState extends State<PluginsScreen> {
     super.initState();
     widget.controller.addListener(_onControllerChange);
     // הטעינה עצמה נעשית ב-AppSession, כמו לשאר המודולים; כאן רק מגיבים לה.
-    _announceUpdatesIfNeeded();
     _announceNewIfNeeded();
   }
 
@@ -115,7 +130,6 @@ class _PluginsScreenState extends State<PluginsScreen> {
   void _onControllerChange() {
     if (!mounted) return;
     setState(() {});
-    _announceUpdatesIfNeeded();
     _announceNewIfNeeded();
   }
 
@@ -137,29 +151,18 @@ class _PluginsScreenState extends State<PluginsScreen> {
   void _viewNextNew() {
     if (_newQueue.isEmpty) return;
     final next = _newQueue.first;
-    setState(() {
-      _newQueue = _newQueue.sublist(1);
-      _selectedId = next.id;
-    });
-    widget.onRequestFocus?.call();
+    setState(() => _newQueue = _newQueue.sublist(1));
+    _openDetail(next.id);
   }
 
-  /// מציג את הודעת "יש עדכונים זמינים" בפעם הראשונה שהקטלוג נטען בהצלחה.
-  void _announceUpdatesIfNeeded() {
-    if (_updatesDialogShown) return;
-    if (widget.controller.status != PluginsModuleStatus.ready) return;
-    if (widget.controller.updatablePlugins.isEmpty) return;
-
-    _updatesDialogShown = true;
-    unawaited(WidgetsBinding.instance.endOfFrame.then((_) async {
-      if (!mounted) return;
-      await _showUpdatesDialog();
-    }));
+  /// נתיב פרטים בנווט כבר מעביר את התצוגה לכאן; בלעדיו — בקשת מיקוד.
+  void _openDetail(String id) {
+    _select(id);
+    if (widget.onDetailChanged == null) widget.onRequestFocus?.call();
   }
 
-  /// פותח את רשימת העדכונים — אוטומטית פעם אחת, ומכאן ואילך בלחיצה על
-  /// השבב. הרשימה נלקחת מהקונטרולר בכל פתיחה, ולכן היא תמיד רק מה שעדיין
-  /// ממתין לעדכון.
+  /// פותח את רשימת העדכונים מהפס שבראש החנות. הרשימה נלקחת מהקונטרולר בכל
+  /// פתיחה, ולכן היא תמיד רק מה שעדיין ממתין לעדכון.
   Future<void> _showUpdatesDialog() async {
     final updatable = widget.controller.updatablePlugins;
     if (updatable.isEmpty) return;
@@ -170,8 +173,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
       updatable: updatable,
     );
     if (selected == null || !mounted) return;
-    setState(() => _selectedId = selected);
-    widget.onRequestFocus?.call();
+    _openDetail(selected);
   }
 
   // ── פעולות ────────────────────────────────────────────────────────────────
@@ -255,7 +257,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
   void _backToList() {
     widget.controller.setSearch('');
     _search.clear();
-    setState(() => _selectedId = null);
+    _select(null);
   }
 
   // ── תצוגה ─────────────────────────────────────────────────────────────────
@@ -263,16 +265,17 @@ class _PluginsScreenState extends State<PluginsScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final selected = _selectedId == null ? null : controller.byId(_selectedId!);
+    final id = _selectedId;
+    final selected = id == null ? null : controller.byId(id);
 
-    return Stack(
+    final body = Stack(
       children: [
         if (selected != null)
           PluginDetailView(
             plugin: selected,
             controller: controller,
             busy: _busyId == selected.id,
-            onBack: () => setState(() => _selectedId = null),
+            onBack: () => _select(null),
             onSave: () => _save(selected),
             onInstall: () => _install(selected),
             onTagSelected: (tag) {
@@ -300,6 +303,16 @@ class _PluginsScreenState extends State<PluginsScreen> {
             onView: _viewNextNew,
             onClose: () => setState(() => _newQueue = const []),
           ),
+      ],
+    );
+
+    // שכבות הסנכרון והייצוא מכסות את הגוף, לא את ראש הדף: החזרה נשארת.
+    final subPage = SubPageHeaderScope.maybeOf(context);
+    if (subPage == null) return body;
+    return Column(
+      children: [
+        StoreBody.subPageHeader(subPage),
+        Expanded(child: SubPageHeaderScope(header: null, child: body)),
       ],
     );
   }
@@ -333,7 +346,28 @@ class _PluginsScreenState extends State<PluginsScreen> {
   List<Widget> _slivers(BuildContext context) {
     final controller = widget.controller;
 
+    final updatable = controller.status == PluginsModuleStatus.ready
+        ? controller.updatablePlugins.length
+        : 0;
+    final t = context.strings.plugins;
+
     return [
+      if (updatable > 0)
+        StoreBody.block(
+          NoticeBanner(
+            kind: NoticeKind.banner,
+            leading: const IconTile(icon: FluentIcons.arrow_sync_24_regular),
+            title: t.updatesAvailableChip(updatable),
+            body: t.updatesBarBody,
+            actions: [
+              ActionButton.neutral(
+                text: t.updatesBarButton,
+                onPressed: () => unawaited(_showUpdatesDialog()),
+              ),
+            ],
+          ),
+          top: AppTokens.spaceMD,
+        ),
       if (controller.errorMessage != null)
         StoreBody.block(
           AppCard(
@@ -732,31 +766,6 @@ class _PluginsScreenState extends State<PluginsScreen> {
             ),
           );
 
-          // השבב הוא גם הדרך לפתוח שוב את רשימת העדכונים: ההודעה מוצגת
-          // אוטומטית פעם אחת בלבד, ובלעדיו אי אפשר לחזור אליה.
-          final updates = controller.status == PluginsModuleStatus.ready &&
-                  controller.updatablePlugins.isNotEmpty
-              ? Tooltip(
-                  message: t.updatesChipTooltip,
-                  // Material שקוף: ה-Container של השורה צובע מעל ה-Material
-                  // של המסך, ובלעדיו אפקט הלחיצה נצבע מאחוריו ואינו נראה.
-                  child: Material(
-                    type: MaterialType.transparency,
-                    child: InkWell(
-                      borderRadius: AppTokens.borderRadiusAll,
-                      mouseCursor: SystemMouseCursors.click,
-                      onTap: () => unawaited(_showUpdatesDialog()),
-                      child: StatusChip(
-                        kind: StatusKind.updateAvailable,
-                        label: t.updatesAvailableChip(
-                          controller.updatablePlugins.length,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-              : null;
-
           // `Expanded` (tight) ולא `Flexible`: ילד רופף שאינו מנצל את כל קצבתו
           // משאיר יתרה, ו-`Row` דוחף אותה **אחרי** האחרון — כך המתג שבסוף
           // השורה נדחק פנימה ונראה באמצע. ה-`Align` משאיר לתוכן את רוחבו
@@ -787,7 +796,6 @@ class _PluginsScreenState extends State<PluginsScreen> {
                 Row(
                   children: [
                     stretched(status),
-                    if (updates != null) updates,
                   ],
                 ),
               ],
@@ -799,10 +807,6 @@ class _PluginsScreenState extends State<PluginsScreen> {
               stretched(actions),
               const SizedBox(width: AppTokens.spaceMD),
               stretched(status, flex: 2),
-              if (updates != null) ...[
-                updates,
-                const SizedBox(width: AppTokens.spaceSM),
-              ],
               filterToggle,
             ],
           );
@@ -933,7 +937,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           plugin: plugin,
           controller: widget.controller,
           busy: _busyId == plugin.id,
-          onOpenDetail: () => setState(() => _selectedId = plugin.id),
+          onOpenDetail: () => _select(plugin.id),
           onSave: () => _save(plugin),
           onInstall: () => _install(plugin),
         );

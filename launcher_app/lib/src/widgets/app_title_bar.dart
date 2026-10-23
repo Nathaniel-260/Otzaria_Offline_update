@@ -127,6 +127,12 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
         widget.toolsEnabled && (ModalRoute.isCurrentOf(context) ?? true);
 
     return Container(
+      // הקו לכל הרוחב, גם מתחת לכפתורי החלון — כמו במוקאפ.
+      foregroundDecoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppSurfaces.shellDivider(context)),
+        ),
+      ),
       color: AppSurfaces.topBarBackground(context),
       // `EdgeInsets.only(left:)` ולא `EdgeInsetsDirectional`: הכפתורים של
       // macOS יושבים בפינה השמאלית הפיזית גם כשהממשק בעברית.
@@ -135,78 +141,68 @@ class _AppTitleBarState extends State<AppTitleBar> with WindowListener {
           : EdgeInsets.zero,
       child: Row(
         children: [
-          // הקו מצויר רק כאן: כפתורי החלון מכסים אותו, כמו במוקאפ.
           Expanded(
-            child: DecoratedBox(
-              position: DecorationPosition.foreground,
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: AppSurfaces.shellDivider(context)),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: DragToMoveArea(
-                      child: Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 12),
-                        child: Row(
-                          children: [
-                            Image.asset(
-                              'assets/images/otzaria_logo.png',
-                              width: 16,
-                              height: 16,
-                              filterQuality: FilterQuality.medium,
-                              semanticLabel: s.otzariaLogoLabel,
-                            ),
-                            const SizedBox(width: 8),
-                            if (widget.showTitle)
-                              Flexible(
-                                child: Text(
-                                  s.appTitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTextStyles.meta.copyWith(
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (onHelp != null || onSettings != null) ...[
-                    _ToolsGate(
-                      enabled: toolsEnabled,
+            child: Row(
+              children: [
+                Expanded(
+                  child: DragToMoveArea(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 12),
                       child: Row(
                         children: [
-                          if (onHelp != null)
-                            _ToolButton(
-                              icon: FluentIcons.question_circle_20_regular,
-                              tooltip: s.helpTooltip,
-                              active: widget.activeTool == TitleBarTool.help,
-                              enabled: toolsEnabled,
-                              onPressed: onHelp,
-                            ),
-                          if (onHelp != null && onSettings != null)
-                            const _DragGap(width: 2),
-                          if (onSettings != null)
-                            _ToolButton(
-                              icon: FluentIcons.settings_20_regular,
-                              tooltip: s.settingsTooltip,
-                              active:
-                                  widget.activeTool == TitleBarTool.settings,
-                              enabled: toolsEnabled,
-                              onPressed: onSettings,
+                          Image.asset(
+                            'assets/images/otzaria_logo.png',
+                            width: 16,
+                            height: 16,
+                            filterQuality: FilterQuality.medium,
+                            semanticLabel: s.otzariaLogoLabel,
+                          ),
+                          const SizedBox(width: 8),
+                          if (widget.showTitle)
+                            Flexible(
+                              child: Text(
+                                s.appTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.meta.copyWith(
+                                  color: cs.onSurface,
+                                ),
+                              ),
                             ),
                         ],
                       ),
                     ),
-                    const _DragGap(width: 8),
-                  ],
+                  ),
+                ),
+                if (onHelp != null || onSettings != null) ...[
+                  _ToolsGate(
+                    enabled: toolsEnabled,
+                    child: Row(
+                      children: [
+                        if (onHelp != null)
+                          _ToolButton(
+                            icon: FluentIcons.question_circle_20_regular,
+                            tooltip: s.helpTooltip,
+                            active: widget.activeTool == TitleBarTool.help,
+                            enabled: toolsEnabled,
+                            onPressed: onHelp,
+                          ),
+                        if (onHelp != null && onSettings != null)
+                          const _DragGap(width: 2),
+                        if (onSettings != null)
+                          _ToolButton(
+                            icon: FluentIcons.settings_20_regular,
+                            tooltip: s.settingsTooltip,
+                            active: widget.activeTool == TitleBarTool.settings,
+                            enabled: toolsEnabled,
+                            onPressed: onSettings,
+                          ),
+                      ],
+                    ),
+                  ),
+                  const _DragGap(width: 8),
                 ],
-              ),
+              ],
             ),
           ),
           if (_showWindowButtons) const WindowCaptionButtons(),

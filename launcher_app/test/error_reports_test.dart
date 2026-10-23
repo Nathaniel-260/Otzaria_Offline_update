@@ -1,4 +1,4 @@
-// דיווחי הטעויות בלאנצ'ר: הדיאלוג בעלייה, כפתור ההעלאה בכרטיס ההורדות,
+// דיווחי הטעויות בלאנצ'ר: דיאלוג האיסוף וכפתור ההעלאה שבדף הדיווחים,
 // ההסבר לפני יותר ממנה אחת, ועצירה והמשך. בלי `dart:io` ובלי רשת — התיבה
 // בזיכרון, התור של אוצריא מזויף והשרת `MockClient`.
 
@@ -18,11 +18,17 @@ import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/error_reports_flow.dart';
-import 'package:launcher_app/src/screens/home_screen.dart';
+import 'package:launcher_app/src/screens/home/home_page.dart';
+import 'package:launcher_app/src/screens/home/home_view_model.dart';
+import 'package:launcher_app/src/screens/reports/reports_section.dart';
 import 'package:launcher_app/src/screens/reports_upload_flow.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/services/report_offer_trigger.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/home_guidance.dart';
+import 'package:launcher_app/src/shell/home_guidance_session.dart';
+import 'package:launcher_app/src/shell/shell_keys.dart';
+import 'package:launcher_app/src/widgets/widgets_exports.dart' show AppDialog;
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaCapabilities;
@@ -170,118 +176,67 @@ void main() {
 
   setUp(() => running = false);
 
-  group('הסבר חד-פעמי על הדיווחים', () {
-    const key = NoticesSeenStore.errorReportsIntro;
+  // ההסבר הוא הודעה בבית ולא דיאלוג. "פעם במחשב" ו"נרשם רק אחרי הבנתי"
+  // נבדקים בסשן (`app_session_test`) ובמסגרת (`app_shell_test`).
+  group('הסבר חד-פעמי על הדיווחים — ההודעה בבית', () {
+    HomeViewModel model({bool readOnly = false, bool driveFull = false}) =>
+        HomeViewModel(
+          guidance: deriveHomeGuidance(
+            GuidanceFacts(
+              readOnly: readOnly,
+              driveFull: driveFull,
+              online: false,
+            ),
+          ),
+          reportsIntro: true,
+        );
 
-    testWidgets('בהרצה הראשונה מופיע, ו"הבנתי" רושם שהוצג', (tester) async {
-      final store = MemoryNoticesStore();
-      final ctx = await host(tester);
-      unawaited(showErrorReportsIntroOnce(ctx, store));
-      await tester.pumpAndSettle();
+    /// בהודעה שבבית שתי הפסקאות של הדו-שיח מתחברות לאחת.
+    String para(String text) => text.replaceAll('\n\n', ' ');
+
+    testWidgets('מופיעה עם "הבנתי", והלחיצה מדווחת', (tester) async {
+      var dismissed = 0;
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: model(),
+          actions: HomeActions(onDismissReportsIntro: () => dismissed++),
+        ),
+      );
 
       expect(find.text(t.introDialogTitle), findsOneWidget);
-      expect(find.text(t.introDialogContent), findsOneWidget);
-      // עוד לא נסגר — עוד לא נרשם.
-      expect(store.marked, isEmpty);
-
+      expect(find.text(para(t.introDialogContent)), findsOneWidget);
+      expect(find.byType(Dialog), findsNothing);
       await tester.tap(find.text(t.introDialogConfirm));
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.introDialogTitle), findsNothing);
-      expect(store.marked, [key]);
+      expect(dismissed, 1);
     });
 
-    testWidgets('Esc נחשב "נראה"', (tester) async {
-      final store = MemoryNoticesStore();
-      final ctx = await host(tester);
-      unawaited(showErrorReportsIntroOnce(ctx, store));
-      await tester.pumpAndSettle();
+    testWidgets('כונן לקריאה בלבד: בנוסח שאומר שאי אפשר לאסוף', (
+      tester,
+    ) async {
+      await pumpScreen(tester, HomePage(model: model(readOnly: true)));
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.introDialogTitle), findsNothing);
-      expect(store.marked, [key]);
+      expect(find.text(para(t.introDialogContentReadOnly)), findsOneWidget);
+      expect(find.text(para(t.introDialogContent)), findsNothing);
     });
 
-    testWidgets('פעם אחת בלבד: מי שכבר ראה לא רואה שוב', (tester) async {
-      final store = MemoryNoticesStore();
-      final ctx = await host(tester);
-      unawaited(showErrorReportsIntroOnce(ctx, store));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(t.introDialogConfirm));
-      await tester.pumpAndSettle();
-
-      late bool shownAgain;
-      unawaited(
-        showErrorReportsIntroOnce(ctx, store).then((v) => shownAgain = v),
+    testWidgets('כונן מלא: בנוסח שמבקש לפנות מקום ולא בנוסח הנעילה', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        HomePage(model: model(readOnly: true, driveFull: true)),
       );
-      await tester.pumpAndSettle();
 
-      expect(shownAgain, isFalse);
-      expect(find.text(t.introDialogTitle), findsNothing);
-    });
-
-    testWidgets('הודעה שכבר נרשמה במחשב הזה אינה מופיעה', (tester) async {
-      final ctx = await host(tester);
-      unawaited(
-        showErrorReportsIntroOnce(ctx, MemoryNoticesStore(seen: {key})),
+      expect(
+        find.text(para(t.introDialogContentReadOnlyDriveFull)),
+        findsOneWidget,
       );
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.introDialogTitle), findsNothing);
+      expect(find.text(para(t.introDialogContentReadOnly)), findsNothing);
+      expect(find.text(para(t.introDialogContent)), findsNothing);
     });
 
-    testWidgets('כונן לקריאה בלבד: מופיע בנוסח שאומר שאי אפשר לאסוף',
-        (tester) async {
-      final store = MemoryNoticesStore();
-      final ctx = await host(tester);
-      unawaited(showErrorReportsIntroOnce(ctx, store, readOnly: true));
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.introDialogContentReadOnly), findsOneWidget);
-      expect(find.text(t.introDialogContent), findsNothing);
-      await tester.tap(find.text(t.introDialogConfirm));
-      await tester.pumpAndSettle();
-      expect(store.marked, [key]);
-    });
-
-    testWidgets('כונן מלא: מופיע בנוסח שמבקש לפנות מקום ולא בנוסח הנעילה',
-        (tester) async {
-      final store = MemoryNoticesStore();
-      final ctx = await host(tester);
-      unawaited(
-        showErrorReportsIntroOnce(ctx, store, readOnly: true, driveFull: true),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text(t.introDialogContentReadOnlyDriveFull), findsOneWidget);
-      expect(find.text(t.introDialogContentReadOnly), findsNothing);
-      expect(find.text(t.introDialogContent), findsNothing);
-      await tester.tap(find.text(t.introDialogConfirm));
-      await tester.pumpAndSettle();
-      expect(store.marked, [key]);
-    });
-
-    testWidgets('אי אפשר להציג עכשיו → לא מוצג ולא נרשם', (tester) async {
-      final store = MemoryNoticesStore();
-      final ctx = await host(tester);
-      late bool shown;
-      unawaited(
-        showErrorReportsIntroOnce(
-          ctx,
-          store,
-          waitUntilFree: () async => false,
-        ).then((v) => shown = v),
-      );
-      await tester.pumpAndSettle();
-
-      expect(shown, isFalse);
-      expect(find.text(t.introDialogTitle), findsNothing);
-      expect(store.marked, isEmpty);
-    });
-
-    testWidgets('הנוסח באנגלית קיים ושונה מהעברי', (tester) async {
+    test('הנוסח באנגלית קיים ושונה מהעברי', () {
       final en = stringsOf(AppLanguage.english).errorReports;
 
       expect(en.introDialogTitle, isNotEmpty);
@@ -517,7 +472,32 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('empty reports never offer collection', (tester) async {
+    // מדף הדיווחים: הלחיצה על "איסוף" היא האישור — בלי "לאסוף?" נוסף.
+    testWidgets('confirm: false collects without a second dialog', (
+      tester,
+    ) async {
+      final queue = _QaQueue(2);
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => queue,
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+      final result = await offerErrorReportCollection(
+        ctx,
+        c,
+        isOtzariaRunning: () async => false,
+        confirm: false,
+      );
+      await tester.pump();
+      expect(result, ReportOfferOutcome.collected);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text(t.collectConfirm), findsNothing);
+      expect(queue.collections, 1);
+      await tester.pump(const Duration(seconds: 7));
+    });
+
+    testWidgets('empty sources never offer collection', (tester) async {
       final c = controller();
       addTearDown(c.dispose);
       final ctx = await host(tester);
@@ -722,6 +702,117 @@ void main() {
     });
   });
 
+  // האיסוף בלי דו-שיח: הגילוי שבדף הוא ההסכמה, ולכן הוא חייב לעמוד ליד הכפתור.
+  group('הגילוי על הפרטיות לצד כפתור האיסוף', () {
+    final g = stringsOf().guide;
+
+    ReportsSection page({
+      int reports = 0,
+      int searchRecords = 0,
+      bool busy = false,
+      bool readOnly = false,
+      VoidCallback? onCollect,
+    }) =>
+        ReportsSection(
+          errorReports: null,
+          searchFeedback: null,
+          connection: null,
+          isUploadingAll: false,
+          busy: busy,
+          reportsToCollect: reports,
+          searchRecordsToCollect: searchRecords,
+          onCollect: onCollect ?? () {},
+          onUpload: null,
+          readOnly: readOnly,
+        );
+
+    Finder inDisclosure(String text) => find.descendant(
+          of: find.byKey(ShellKeys.reportsDisclosure),
+          matching: find.text(text),
+        );
+
+    testWidgets('דיווחים: מה יועתק, בלי הצפנה, למי — מעל כפתור "איסוף לכונן"',
+        (tester) async {
+      var collected = 0;
+      await pumpScreen(tester, page(reports: 2, onCollect: () => collected++));
+
+      final button = find.byKey(ShellKeys.reportsCollect);
+      expect(button, findsOneWidget);
+      expect(find.text(g.reportsCollectButton), findsOneWidget);
+      expect(
+        find.text(g.reportsCollectTitle(reports: 2, searchRecords: 0)),
+        findsOneWidget,
+      );
+      expect(inDisclosure(g.reportsDisclosureReports), findsOneWidget);
+      expect(inDisclosure(g.reportsDisclosureStorage), findsOneWidget);
+      // רשומות החיפוש — שורה נפרדת, רק כשיש כאלה.
+      expect(find.text(g.reportsDisclosureSearch), findsNothing);
+      expect(
+        tester.getBottomLeft(find.byKey(ShellKeys.reportsDisclosure)).dy,
+        lessThanOrEqualTo(tester.getTopLeft(button).dy),
+      );
+
+      await tester.tap(button);
+      expect(collected, 1);
+    });
+
+    testWidgets('רשומות חיפוש: שורה נפרדת, ונספרות בנפרד בכותרת', (
+      tester,
+    ) async {
+      await pumpScreen(tester, page(reports: 1, searchRecords: 3));
+      expect(
+        find.text(g.reportsCollectTitle(reports: 1, searchRecords: 3)),
+        findsOneWidget,
+      );
+      expect(inDisclosure(g.reportsDisclosureReports), findsOneWidget);
+      expect(inDisclosure(g.reportsDisclosureSearch), findsOneWidget);
+      expect(inDisclosure(g.reportsDisclosureStorage), findsOneWidget);
+    });
+
+    testWidgets('רשומות חיפוש בלבד — בלי שורת הדיווחים', (tester) async {
+      await pumpScreen(tester, page(searchRecords: 2));
+      expect(find.byKey(ShellKeys.reportsCollect), findsOneWidget);
+      expect(inDisclosure(g.reportsDisclosureSearch), findsOneWidget);
+      expect(find.text(g.reportsDisclosureReports), findsNothing);
+    });
+
+    testWidgets('בלי כפתור אין גילוי, ובכונן מוגן אין אף אחד מהם', (
+      tester,
+    ) async {
+      await pumpScreen(tester, page());
+      expect(find.byKey(ShellKeys.reportsCollect), findsNothing);
+      expect(find.byKey(ShellKeys.reportsDisclosure), findsNothing);
+
+      await pumpScreen(tester, page(reports: 2, readOnly: true));
+      expect(find.byKey(ShellKeys.reportsCollect), findsNothing);
+      expect(find.byKey(ShellKeys.reportsDisclosure), findsNothing);
+    });
+
+    test('הנוסח שומר את מה שהדיאלוג הישן הבטיח', () {
+      for (final strings in [
+        AppL10n.stringsFor(AppLanguage.hebrew),
+        AppL10n.stringsFor(AppLanguage.english),
+      ]) {
+        final guide = strings.guide;
+        final he = strings == AppL10n.stringsFor(AppLanguage.hebrew);
+        expect(guide.reportsDisclosureStorage,
+            contains(he ? 'בלי הצפנה' : 'unencrypted'));
+        expect(guide.reportsDisclosureStorage,
+            contains(he ? 'מי שמחזיק בכונן' : 'anyone holding the drive'));
+        expect(guide.reportsDisclosureReports,
+            contains(he ? 'כתובת המייל' : 'email address'));
+        expect(guide.reportsDisclosureReports,
+            contains(he ? 'צילומי מסך' : 'screenshots'));
+        expect(guide.reportsDisclosureReports,
+            contains(he ? 'תמונת הזיכרון' : 'memory dump'));
+        expect(guide.reportsDisclosureSearch,
+            contains(he ? 'מילות החיפוש' : 'search terms'));
+        expect(guide.reportsDisclosureSearch,
+            contains(he ? 'המפתח האנונימי' : 'anonymous key'));
+      }
+    });
+  });
+
   group('כפתור ההעלאה בכרטיס ההורדות', () {
     late Directory tempDir;
     late OtzariaModuleController otzaria;
@@ -751,36 +842,28 @@ void main() {
       tempDir.deleteSync(recursive: true);
     });
 
-    HomeScreen home(
+    /// דף הדיווחים. החיבור — אותו כלל של `onlineState`: בדיקה מקוונת אחת
+    /// שהצליחה מספיקה.
+    ReportsSection home(
       ErrorReportsController reports, {
       bool readOnly = false,
       Future<void> Function()? onUpload,
     }) =>
-        HomeScreen(
+        ReportsSection(
           readOnly: readOnly,
-          otzaria: otzaria,
-          library: library,
-          plugins: plugins,
-          launcherUpdate: launcherUpdate,
-          settings: settings,
-          otzariaIsRunning: false,
-          onCloseOtzaria: () async => true,
-          isDownloading: false,
-          isCancellingDownload: false,
-          isCheckingOnline: false,
-          longTaskRunning: false,
-          onProcessStateChanged: () async => false,
-          onCheckOnline: () async {},
-          onDownloadAll: () async {},
-          onCancelDownload: () async {},
-          onDownloadLauncherUpdate: () async {},
-          onInstallLauncherUpdate: () async {},
-          onRequestReindex: () async {},
-          onGoToOtzaria: () {},
-          onGoToLibrary: () {},
           errorReports: reports,
-          isUploadingReports: false,
-          onUploadReports: onUpload ?? () async {},
+          searchFeedback: feedback,
+          connection: connectionOf([
+            (otzaria.onlineCheckedAt, otzaria.onlineCheckError),
+            (library.onlineCheckedAt, library.onlineCheckError),
+            (plugins.onlineCheckedAt, plugins.onlineCheckError),
+            (launcherUpdate.onlineCheckedAt, launcherUpdate.onlineCheckError),
+          ]),
+          isUploadingAll: false,
+          busy: false,
+          reportsToCollect: 0,
+          onCollect: () {},
+          onUpload: onUpload ?? () async {},
         );
 
     testWidgets('הכפתור מעלה את הדיווחים בלבד, והסיכום הוא שלהם בלבד',
@@ -1135,6 +1218,30 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(t.collectDialogTitle), findsOneWidget);
       expect(notices.marked, [NoticesSeenStore.legacyReportsNotice]);
+    });
+
+    testWidgets('איסוף מהדף (בלי notices) — אין דיאלוג Hive, ואוסף מיד',
+        (tester) async {
+      final c = ErrorReportsController(
+        outbox: outbox,
+        resolveQueue: () async => _FakeQueue(2),
+        findUnmigratedLegacy: () async => ['error_reports_queue'],
+      );
+      addTearDown(c.dispose);
+      final ctx = await host(tester);
+
+      final result = offerErrorReportCollection(
+        ctx,
+        c,
+        isOtzariaRunning: () async => false,
+        confirm: false,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.legacyReportsDialogTitle), findsNothing);
+      expect(find.byType(AppDialog), findsNothing);
+      expect(await result, ReportOfferOutcome.collected);
+      await tester.pump(const Duration(seconds: 7));
     });
 
     testWidgets('הודעת ה-Hive הישן — פעם אחת בלבד במחשב', (tester) async {

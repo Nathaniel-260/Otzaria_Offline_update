@@ -110,7 +110,7 @@ void main() {
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (context) =>
-                      Scaffold(body: Text(context.strings.home.title)),
+                      Scaffold(body: Text(context.strings.guide.tilesLabel)),
                 ),
               ),
             ),
@@ -121,7 +121,7 @@ void main() {
       await tester.tap(find.byKey(const Key('push')));
       await tester.pumpAndSettle();
 
-      expect(find.text(he.home.title), findsOneWidget);
+      expect(find.text(he.guide.tilesLabel), findsOneWidget);
     });
 
     testWidgets('דיאלוג קורא את המלל מתוך המסלול שלו', (tester) async {
@@ -501,12 +501,12 @@ void main() {
           AppCard(
             onTap: () => taps++,
             padding: const EdgeInsets.all(AppTokens.spaceMD),
-            child: Text(he.home.appTileTitle),
+            child: Text(he.guide.tileApp),
           ),
         ),
       );
 
-      await tester.tap(find.text(he.home.appTileTitle));
+      await tester.tap(find.text(he.guide.tileApp));
       expect(taps, 1);
     });
 
@@ -797,7 +797,7 @@ void main() {
     });
   });
 
-  // ── StatusChip / CustomSwitch / NavRailItem ────────────────────────────────
+  // ── StatusChip / CustomSwitch ────────────────────────────────
 
   group('חיוויים ופקדים', () {
     testWidgets('StatusChip מציג סמל וטקסט בכל סוג', (tester) async {
@@ -836,59 +836,6 @@ void main() {
         wrap(const CustomSwitch(value: true, onChanged: null)),
       );
       expect(tester.widget<Switch>(find.byType(Switch)).onChanged, isNull);
-    });
-
-    testWidgets('NavRailItem מחליף לאייקון המלא כשהוא נבחר ומדווח על הקשה', (
-      tester,
-    ) async {
-      var taps = 0;
-      Widget item(bool selected) => NavRailItem(
-            icon: FluentIcons.home_24_regular,
-            iconFilled: FluentIcons.home_24_filled,
-            label: he.shell.navHome,
-            isSelected: selected,
-            tooltip: he.shell.navHome,
-            onTap: () => taps++,
-          );
-
-      await tester.pumpWidget(wrap(item(false)));
-      expect(find.text(he.shell.navHome), findsOneWidget);
-      expect(
-        renderedIcon(tester, find.byType(RtlIcon)),
-        FluentIcons.home_24_regular,
-      );
-
-      await tester.tap(find.byType(IconButton));
-      expect(taps, 1);
-
-      await tester.pumpWidget(wrap(item(true)));
-      await tester.pumpAndSettle();
-      expect(
-        renderedIcon(tester, find.byType(RtlIcon)),
-        FluentIcons.home_24_filled,
-      );
-    });
-
-    testWidgets('NavRailItem הצר משתמש ברוחב שהוגדר כקבוע', (tester) async {
-      await tester.pumpWidget(
-        wrap(
-          Align(
-            alignment: Alignment.topRight,
-            child: NavRailItem(
-              icon: FluentIcons.home_24_regular,
-              label: he.shell.navHome,
-              isSelected: false,
-              compact: true,
-              onTap: () {},
-            ),
-          ),
-        ),
-      );
-
-      expect(
-        tester.getSize(find.byType(NavRailItem)).width,
-        NavRailItem.compactWidth,
-      );
     });
   });
 
@@ -1034,37 +981,6 @@ void main() {
       );
       expect(bar.semanticsLabel, he.libraryDomain.applyVerifying);
       expect(bar.semanticsValue, '42%');
-    });
-
-    testWidgets('פריט בסרגל הניווט הוא כפתור אחד עם שם ומצב בחירה', (
-      tester,
-    ) async {
-      final handle = tester.ensureSemantics();
-      await tester.pumpWidget(
-        wrap(
-          NavRailItem(
-            icon: FluentIcons.home_24_regular,
-            label: 'בית',
-            isSelected: true,
-            onTap: () {},
-          ),
-        ),
-      );
-      expect(
-        tester.getSemantics(find.byType(IconButton)),
-        matchesSemantics(
-          label: 'בית',
-          isButton: true,
-          isSelected: true,
-          hasSelectedState: true,
-          isEnabled: true,
-          hasEnabledState: true,
-          isFocusable: true,
-          hasTapAction: true,
-          hasFocusAction: true,
-        ),
-      );
-      handle.dispose();
     });
 
     testWidgets('CardActionsRow פורס את הפעולות שקיבל', (tester) async {
@@ -1645,31 +1561,6 @@ void main() {
       skip: true,
     );
 
-    testWidgets('סרגל הניווט ברוחב הפריט הקבוע', (tester) async {
-      await expectNoOverflow(
-        tester,
-        () => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final label in [
-              he.shell.navHome,
-              he.shell.navApp,
-              he.shell.navLibrary,
-              he.shell.navPlugins,
-              he.shell.navSettings,
-            ])
-              NavRailItem(
-                icon: FluentIcons.home_24_regular,
-                label: label,
-                isSelected: label == he.shell.navHome,
-                onTap: () {},
-              ),
-          ],
-        ),
-        width: NavRailItem.width,
-      );
-    });
-
     testWidgets('גוף מסך שלם באנגלית ובעברית', (tester) async {
       for (final language in AppLanguage.values) {
         final s = AppL10n.stringsFor(language);
@@ -1788,6 +1679,29 @@ void main() {
       expect(
         tester.getTopLeft(find.bySemanticsLabel(shell.windowClose)).dx,
         0,
+      );
+    });
+
+    // במוקאפ הקו שמתחת לשורה רציף לכל הרוחב, גם מתחת לכפתורי החלון.
+    testWidgets('הקו התחתון עובר גם מתחת לכפתורי החלון', (tester) async {
+      await tester.pumpWidget(
+        wrap(const AppTitleBar(isMacOS: false, showWindowButtons: true)),
+      );
+      await tester.pumpAndSettle();
+
+      final bar = find.ancestor(
+        of: find.byType(WindowCaptionButtons),
+        matching: find.byWidgetPredicate(
+          (w) => w is Container && w.foregroundDecoration != null,
+        ),
+      );
+      expect(bar, findsOneWidget);
+      final decoration =
+          tester.widget<Container>(bar).foregroundDecoration! as BoxDecoration;
+      expect((decoration.border! as Border).bottom.width, 1);
+      expect(
+        tester.getSize(bar).width,
+        tester.getSize(find.byType(AppTitleBar)).width,
       );
     });
 

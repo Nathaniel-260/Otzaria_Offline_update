@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../controllers/otzaria_module_controller.dart';
+import '../screens/home/home_view_model.dart' show displayVersion;
 import '../widgets/widgets_exports.dart';
 
 String appInstallPrompt(BuildContext context, OtzariaModuleController c) =>
     context.strings.appScreen.installPrompt(
-      latestVersion: c.latestVersion,
-      currentVersion: c.currentVersion,
+      latestVersion: _shown(c.latestVersion, other: c.currentVersion),
+      currentVersion: _shown(c.currentVersion, other: c.latestVersion),
       prereleaseNote: c.hasChannelChoice && c.preferPrerelease,
     );
+
+String? _shown(String? version, {String? other}) =>
+    version == null ? null : displayVersion(version, other: other);
 
 StatusKind otzariaStatusKind(OtzariaModuleStatus status) => switch (status) {
       OtzariaModuleStatus.idle => StatusKind.unknown,
@@ -69,7 +73,9 @@ Future<bool> confirmOtzariaInstall(
   }
   if (otzaria.status != OtzariaModuleStatus.upToDate) return false;
   UiSnack.showSuccess(
-    AppL10n.strings.home.appInstalledSnack('${otzaria.currentVersion}'),
+    AppL10n.strings.home.appInstalledSnack(
+      displayVersion('${otzaria.currentVersion}'),
+    ),
   );
   return true;
 }

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/shell/shell_navigator.dart';
 
 void main() {
@@ -163,10 +162,13 @@ void main() {
     });
   });
 
-  test('כל מסך בסרגל הקיים הוא מקטע בשם זהה', () {
-    final sections = ShellSection.values.map((s) => s.name).toSet();
-    for (final screen in LauncherScreen.values) {
-      expect(sections, contains(screen.name), reason: screen.name);
-    }
+  test('לכל אריח בבית יש מקטע, והבית הוא הראשון', () {
+    expect(ShellSection.values.first, ShellSection.home);
+    expect(
+      ShellSection.values.map((s) => s.name),
+      containsAll(
+        ['otzaria', 'library', 'plugins', 'customApps', 'reports', 'settings'],
+      ),
+    );
   });
 }

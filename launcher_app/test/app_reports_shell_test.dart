@@ -14,11 +14,12 @@ import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
 import 'package:launcher_app/src/controllers/app_reports_controller.dart';
 import 'package:launcher_app/src/screens/app_report/crash_prompt_dialog.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
-import 'package:launcher_app/src/screens/home_screen.dart';
+import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
@@ -39,7 +40,7 @@ class _CountingService extends AppReportService {
   @override
   void startAutomaticFlush() {
     starts++;
-    homeBuiltAtStart = find.byType(HomeScreen).evaluate().isNotEmpty;
+    homeBuiltAtStart = find.byType(HomePage).evaluate().isNotEmpty;
   }
 
   @override
@@ -137,10 +138,11 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.byType(HomePage), findsOneWidget);
   });
 
-  testWidgets('ההסבר החד-פעמי וההצעה אחרי קריסה לא עולים יחד', (tester) async {
+  testWidgets('ההסבר החד-פעמי הוא הודעה בבית, וההצעה אחרי קריסה דו-שיח יחיד',
+      (tester) async {
     useViewSize(tester, const Size(1400, 1000));
     final logs = p.join(tempDir.path, 'logs')..toString();
     Directory(logs).createSync(recursive: true);
@@ -160,7 +162,6 @@ void main() {
     final reports = controller(_CountingService(), logs: logs);
     // לא נראה עדיין: ההסבר החד-פעמי רוצה לעלות באותה עלייה.
     final notices = MemoryNoticesStore();
-    final intro = stringsOf().errorReports.introDialogConfirm;
     final crash = stringsOf().appReports.crashTitle;
 
     var maxOpen = 0;
@@ -171,15 +172,14 @@ void main() {
       for (var i = 0; i < 80 && !(sawIntro && sawCrash); i++) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
         await tester.pump();
-        final introOpen = find.text(intro).evaluate().isNotEmpty;
+        final introShown = find
+            .byKey(ShellKeys.reportsIntroNotice, skipOffstage: false)
+            .evaluate()
+            .isNotEmpty;
         final crashOpen = find.byType(CrashPromptDialog).evaluate().isNotEmpty;
-        final open = (introOpen ? 1 : 0) + (crashOpen ? 1 : 0);
+        final open = find.byType(Dialog).evaluate().length;
         if (open > maxOpen) maxOpen = open;
-        if (introOpen) {
-          sawIntro = true;
-          await tester.tap(find.text(intro));
-          await tester.pump();
-        }
+        if (introShown) sawIntro = true;
         if (crashOpen) {
           sawCrash = true;
           expect(find.text(crash), findsOneWidget);
@@ -209,7 +209,7 @@ void main() {
 
     Future<void> openBlocker(WidgetTester tester) async {
       unawaited(showDialog<void>(
-        context: tester.element(find.byType(HomeScreen)),
+        context: tester.element(find.byType(HomePage)),
         builder: (_) => const AlertDialog(title: Text('חוסם')),
       ));
       await tester.pump();
@@ -235,7 +235,7 @@ void main() {
       expect(reports.shown, isNull, reason: 'עדיין ממתינה');
       expect(find.byType(CrashPromptDialog), findsNothing);
 
-      Navigator.of(tester.element(find.byType(HomeScreen))).pop();
+      Navigator.of(tester.element(find.byType(HomePage))).pop();
       await tester.pump(const Duration(seconds: 1));
       await tester.pump(const Duration(seconds: 1));
       expect(find.byType(CrashPromptDialog), findsOneWidget);

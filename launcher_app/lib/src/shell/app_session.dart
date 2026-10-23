@@ -6,6 +6,7 @@ import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
+import 'package:plugins_manager/plugins_manager.dart' show StorePlugin;
 
 import '../app_report/launcher_crash_session.dart';
 import '../controllers/app_reports_controller.dart';
@@ -181,22 +182,56 @@ class AppSession extends ChangeNotifier {
   bool get isActive => !_disposed;
 
   Future<void> _errorReportsIntro = Future<void>.value();
-
-  /// ההצעה להוריד גרסה חדשה של הלאנצ'ר מוצגת פעם אחת בהרצה, גם כשהבדיקה
-  /// הקלה רצה שוב.
-  bool _askedAboutLauncherUpdate = false;
+  bool _reportsIntroPending = false;
+  bool _autoInstallSkipped = false;
+  int _errorReportsToCollect = 0;
+  int _searchRecordsToCollect = 0;
+  DateTime? _checkedAt;
 
   /// "מה התחדש" כבר הוצג בהצעה, ולכן אישור ההתקנה שאחריה לא חוזר עליו.
   bool _whatsNewAlreadyShown = false;
 
-  bool _offeredElevation = false;
   bool _elevationPending = false;
-  bool _announcedPlugins = false;
+  bool _elevationDismissed = false;
+  bool _legacyReportsNotice = false;
   bool _isCheckingOnline = false;
+  bool _checkingNow = false;
+  bool _markingPluginsVisited = false;
   bool _uploadingReports = false;
   bool _reportsStopRequested = false;
 
   bool get isCheckingOnline => _isCheckingOnline;
+
+  /// בדיקה רצה — "בדוק עכשיו", הבדיקה שבעלייה, או בדיקה ברשת.
+  bool get isCheckingNow => _checkingNow || _isCheckingOnline;
+
+  /// משימה ארוכה חוסמת את "בדוק עכשיו" — אותו תנאי לקישור, לכפתור ולפעולה.
+  bool get checkNowBlocked => longTaskRunning;
+
+  /// תורי דיווחים ישנים שלא הועברו — הסבר בבית עד "הבנתי".
+  bool get showsLegacyReportsNotice => _legacyReportsNotice;
+
+  /// ההסבר החד-פעמי על הדיווחים: הודעה בבית עד "הבנתי".
+  bool get showsReportsIntro => _reportsIntroPending;
+
+  /// ההתקנה האוטומטית דילגה כי אוצריא הייתה פתוחה — הודעה קבועה בבית.
+  bool get autoInstallSkipped => _autoInstallSkipped;
+
+  /// כמה דיווחים ומשובים ממתינים באוצריא לאיסוף — המונה של אריח הדיווחים.
+  int get reportsToCollect => _errorReportsToCollect + _searchRecordsToCollect;
+  int get errorReportsToCollect => _errorReportsToCollect;
+  int get searchRecordsToCollect => _searchRecordsToCollect;
+
+  /// הבדיקה האחרונה, מקומית או ברשת — "נבדק ב-" בתחתית הבית.
+  DateTime? get lastCheckedAt => [
+        _checkedAt,
+        _otzaria.onlineCheckedAt,
+        _library.onlineCheckedAt,
+        _plugins.onlineCheckedAt,
+      ].whereType<DateTime>().fold<DateTime?>(
+            null,
+            (latest, at) => latest == null || at.isAfter(latest) ? at : latest,
+          );
   bool get uploadingReports => _uploadingReports;
 
   /// נגזר מהקונטרולר ולא מועתק: העתק נשאר תקוע על "פתוחה" אחרי שנסגרה.
@@ -238,7 +273,7 @@ class AppSession extends ChangeNotifier {
     isActive: () => isActive,
     prepare: _prepareOffer,
     runDialog: prompts.runDialog,
-    perform: prompts.performReportOffer,
+    perform: recountReportsToCollect,
   );
 
   bool get isDownloading => _downloads.isDownloading;
@@ -248,22 +283,26 @@ class AppSession extends ChangeNotifier {
   void start() {
     final s = settings.settings;
     unawaited(_faq.load());
-    if (!readOnly) unawaited(_searchFeedback.refreshOutbox());
-    if (!readOnly) unawaited(_errorReports.refreshOutbox());
-    _errorReportsIntro = _showErrorReportsIntro();
+    // ספירה בלבד — גם בכונן מוגן, כדי שהבית יאמר שיש בו דיווחים.
+    unawaited(_searchFeedback.refreshOutbox());
+    unawaited(_errorReports.refreshOutbox());
+    _errorReportsIntro = _loadReportsIntro();
     settings.addListener(_onChange);
     _applySettings(s);
 
     unawaited(_plugins.load());
     unawaited(_customApps.load());
     if (s.autoCheckUpdates) {
-      unawaited(checkAll());
+      unawaited(_asCheck(checkAll));
     } else {
       unawaited(refreshProcessState());
       unawaited(_launcherFlow.checkMirror());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!isActive) return;
-        unawaited(_otzaria.ensureChecked().then((_) => _offers.request()));
+        unawaited(_asCheck(() async {
+          await _otzaria.ensureChecked();
+          _markChecked();
+        }).then((_) => _offers.request()));
       });
     }
     if (appReports case final reports?) {
@@ -319,35 +358,69 @@ class AppSession extends ChangeNotifier {
     _applySettings(settings.settings);
     _syncRunningPoll();
     notifyListeners();
-    unawaited(_maybeOfferElevation());
-    unawaited(_maybeAnnouncePlugins());
   }
 
   void _onReportsChange() {
     if (!isActive) return;
     _syncSleepInhibition();
     _offers.resume();
-    unawaited(_maybeOfferElevation());
   }
 
-  Future<void> _maybeAnnouncePlugins() async {
-    if (_announcedPlugins || _plugins.status != PluginsModuleStatus.ready) {
-      return;
+  /// תוספים חדשים בכונן שהבית עוד לא הזכיר — פס בבית עד הכניסה לחנות.
+  List<StorePlugin> get newPluginsForHome =>
+      _plugins.status == PluginsModuleStatus.ready
+          ? _plugins.newPluginsForHome
+          : const [];
+
+  /// הכניסה לחנות: התוספים החדשים נרשמים כמוזכרים, פעם אחת במחשב.
+  Future<void> markPluginsVisited() async {
+    final fresh = newPluginsForHome;
+    if (fresh.isEmpty || _markingPluginsVisited) return;
+    _markingPluginsVisited = true;
+    try {
+      await _plugins.markHomeNotified(fresh);
+    } finally {
+      _markingPluginsVisited = false;
     }
-    _announcedPlugins = true;
-
-    final fresh = _plugins.newPluginsForHome;
-    final hasUpdates = _plugins.updatablePlugins.isNotEmpty;
-    if (fresh.isEmpty && !hasUpdates) return;
-
-    await WidgetsBinding.instance.endOfFrame;
-    await prompts.announcePlugins(fresh: fresh, hasUpdates: hasUpdates);
+    if (isActive) notifyListeners();
   }
 
-  Future<void> _showErrorReportsIntro() async {
-    await WidgetsBinding.instance.endOfFrame;
+  Future<void> _loadReportsIntro() async {
+    final seen = await _notices.hasSeen(NoticesSeenStore.errorReportsIntro);
+    if (!seen && isActive) _update(() => _reportsIntroPending = true);
+  }
+
+  /// "הבנתי" בהודעה — נרשם רק עכשיו, ולא כשהיא הופיעה.
+  Future<void> dismissReportsIntro() async {
+    if (!_reportsIntroPending) return;
+    _update(() => _reportsIntroPending = false);
+    await _notices.markSeen(NoticesSeenStore.errorReportsIntro);
+  }
+
+  /// סופר מה ממתין באוצריא לאיסוף, בלי לאסוף. אוצריא פתוחה נועלת את התור.
+  Future<void> recountReportsToCollect() async {
+    if (readOnly || !isActive) return;
+    if (await refreshProcessState()) return;
+    final reports = await _errorReports.pendingToOffer();
+    final feedback = await _searchFeedback.pendingToOffer();
+    final legacy = _errorReports.unmigratedLegacy.isNotEmpty &&
+        !await _notices.hasSeen(NoticesSeenStore.legacyReportsNotice);
     if (!isActive) return;
-    await prompts.showErrorReportsIntro();
+    _update(() {
+      _errorReportsToCollect = reports;
+      _searchRecordsToCollect = feedback;
+      _legacyReportsNotice = legacy;
+    });
+  }
+
+  Future<void> dismissLegacyReportsNotice() async {
+    if (!_legacyReportsNotice) return;
+    _update(() => _legacyReportsNotice = false);
+    await _notices.markSeen(NoticesSeenStore.legacyReportsNotice);
+  }
+
+  void _markChecked() {
+    if (isActive) _update(() => _checkedAt = DateTime.now());
   }
 
   /// מצב המודולים לאבחון הדיווח — בלי נתיבים ושמות קבצים של המשתמש.
@@ -381,24 +454,26 @@ class AppSession extends ChangeNotifier {
     );
   }
 
-  Future<void> _maybeOfferElevation() async {
-    if (_offeredElevation || !Platform.isWindows) return;
-    if (!_library.needsElevation &&
-        !_otzaria.needsElevation &&
-        !_launcherUpdate.needsElevation) {
-      return;
-    }
-    if (exitWouldInterrupt) return;
-    _offeredElevation = true;
-    await Future<void>.delayed(Duration.zero);
-    if (!isActive) return;
+  bool get _needsElevation =>
+      _library.needsElevation ||
+      _otzaria.needsElevation ||
+      _launcherUpdate.needsElevation;
 
+  /// הפס "הפעלה מחדש כמנהל": רק ב-Windows, ולא בזמן פעולה שיציאה קוטעת.
+  /// "לא עכשיו" מסתיר אותו עד סוף ההרצה.
+  bool get offersElevation =>
+      Platform.isWindows &&
+      _needsElevation &&
+      !_elevationPending &&
+      !_elevationDismissed &&
+      !exitWouldInterrupt;
+
+  void dismissElevation() => _update(() => _elevationDismissed = true);
+
+  Future<void> restartElevated() async {
+    if (!Platform.isWindows || !_needsElevation || _elevationPending) return;
     final t = AppL10n.strings.elevation;
-    final approved = await prompts.offerElevation();
-    if (approved == null) _offeredElevation = false;
-    if (approved != true || !isActive) return;
     if (exitWouldInterrupt) {
-      _offeredElevation = false;
       UiSnack.show(t.busyNotice);
       return;
     }
@@ -478,6 +553,7 @@ class AppSession extends ChangeNotifier {
     if (!isActive) return;
     await _autoInstallIfEnabled();
     if (!isActive) return;
+    _markChecked();
     await _offers.request();
   }
 
@@ -538,20 +614,18 @@ class AppSession extends ChangeNotifier {
     ]);
     if (!isActive) return;
     _update(() => _isCheckingOnline = false);
-    await _promptLauncherUpdate();
+    _markChecked();
   }
 
-  Future<void> _promptLauncherUpdate() async {
+  /// "פרטים ועדכון" בתחתית הבית: מה חדש בגרסה, ואחרי אישור — הורדה.
+  Future<void> reviewLauncherUpdate() async {
     if (!isActive || readOnly) return;
     final c = _launcherUpdate;
     final release = c.onlineRelease;
-    if (release == null || !c.hasOnlineUpdate) return;
-    if (_askedAboutLauncherUpdate || c.isDownloading) return;
-    _askedAboutLauncherUpdate = true;
+    if (release == null || !c.hasOnlineUpdate || c.isDownloading) return;
 
     final whatsNew = c.onlineWhatsNew;
     final approved = await prompts.offerLauncherUpdate(release, whatsNew);
-    if (approved == null) _askedAboutLauncherUpdate = false;
     if (approved != true || !isActive) return;
     _whatsNewAlreadyShown = whatsNew != null;
     try {
@@ -613,8 +687,7 @@ class AppSession extends ChangeNotifier {
     final skippedWhileRunning = await _autoInstall.run(
       enabled: settings.settings.autoInstall,
     );
-    if (!skippedWhileRunning || !isActive) return;
-    await prompts.showAutoInstallSkipped();
+    if (isActive) _update(() => _autoInstallSkipped = skippedWhileRunning);
   }
 
   @visibleForTesting
@@ -744,6 +817,26 @@ class AppSession extends ChangeNotifier {
     return dir == null ? null : p.join(dir, 'custom_apps_trust.json');
   }
 
+  /// "בדוק עכשיו" ו"בדוק שוב" בבית: הכונן והמחשב, ואז האתר. בכונן מוגן —
+  /// רק הבדיקה המקומית. `checkAll` כולל את ההתקנה האוטומטית, אם היא דלוקה.
+  Future<void> checkNow() async {
+    if (checkNowBlocked || isCheckingNow || !isActive) return;
+    await _asCheck(() async {
+      await checkAll();
+      if (!isActive || readOnly) return;
+      await checkOnline();
+    });
+  }
+
+  Future<void> _asCheck(Future<void> Function() check) async {
+    _update(() => _checkingNow = true);
+    try {
+      await check();
+    } finally {
+      if (isActive) _update(() => _checkingNow = false);
+    }
+  }
+
   /// Ctrl+R/F5: קורא מחדש מה מותקן ומה יש על הכונן, בלי ההצעות של העלייה.
   Future<void> refreshFromKeyboard() async {
     if (longTaskRunning) return;
@@ -753,6 +846,7 @@ class AppSession extends ChangeNotifier {
     if (!isActive) return;
     unawaited(_plugins.refreshInstalled());
     await _library.checkForUpdate();
+    _markChecked();
   }
 }
 
@@ -804,7 +898,6 @@ class _SessionDownloadHost implements MirrorDownloadHost {
       AppLogger.instance
           .info('revert after cancelled download failed: $revertError');
     }
-    unawaited(_session._maybeOfferElevation());
     UiSnack.show(
       revertError == null
           ? AppL10n.strings.home.downloadCancelledSnack
@@ -813,7 +906,7 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   }
 
   @override
-  void downloadEnded() => unawaited(_session._maybeOfferElevation());
+  void downloadEnded() {}
 
   @override
   void downloadFinished({

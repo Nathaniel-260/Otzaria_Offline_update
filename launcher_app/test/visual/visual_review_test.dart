@@ -11,14 +11,19 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
+import 'package:launcher_app/src/screens/home/home_page.dart';
+import 'package:launcher_app/src/screens/reports/reports_section.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
+import 'package:launcher_app/src/shell/shell_keys.dart';
+import 'package:launcher_app/src/shell/shell_navigator.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
+import '../home_fixtures.dart';
 import '../test_harness.dart';
 import '../test_support.dart';
 import 'visual_fonts.dart';
@@ -35,22 +40,21 @@ typedef VisualState = ({
   Future<void> Function(WidgetTester tester) open,
 });
 
-Future<void> _tapNav(WidgetTester tester, String label) async {
-  await tester.tap(
-    find.descendant(
-      of: find.widgetWithText(NavRailItem, label),
-      matching: find.byType(IconButton),
-    ),
-  );
+/// מאז שלב 2 אין סרגל: המקטעים נפתחים מהאריחים שבבית.
+Future<void> _tapTile(WidgetTester tester, ShellSection section) async {
+  await tester.tap(find.byKey(ShellKeys.tile(section)));
   await tester.pump();
 }
 
 final List<VisualState> _phase0States = [
   (name: 'home', open: (_) async {}),
-  (name: 'otzaria', open: (t) => _tapNav(t, stringsOf().shell.navApp)),
-  (name: 'library', open: (t) => _tapNav(t, stringsOf().shell.navLibrary)),
-  (name: 'plugins', open: (t) => _tapNav(t, stringsOf().shell.navPlugins)),
-  (name: 'settings', open: (t) => _tapNav(t, stringsOf().shell.navSettings)),
+  (name: 'otzaria', open: (t) => _tapTile(t, ShellSection.otzaria)),
+  (name: 'library', open: (t) => _tapTile(t, ShellSection.library)),
+  (name: 'plugins', open: (t) => _tapTile(t, ShellSection.plugins)),
+  (
+    name: 'settings',
+    open: (t) => _tapTooltip(t, stringsOf().shell.settingsTooltip),
+  ),
 ];
 
 Future<void> _tapTooltip(WidgetTester tester, String tooltip) async {
@@ -59,11 +63,7 @@ Future<void> _tapTooltip(WidgetTester tester, String tooltip) async {
 }
 
 final List<VisualState> _phase1States = [
-  ..._phase0States.where((s) => s.name != 'settings'),
-  (
-    name: 'settings',
-    open: (t) => _tapTooltip(t, stringsOf().shell.settingsTooltip),
-  ),
+  ..._phase0States,
   (name: 'help', open: (t) => _tapTooltip(t, stringsOf().shell.helpTooltip)),
 ];
 
@@ -93,11 +93,38 @@ final List<VisualState> _phase1bStates = [
   (name: 'focus_keyboard', open: (t) => _tab(t, 3)),
 ];
 
+/// שלב 2a: המסגרת האמיתית (הבית ודפי המשנה). מצבי הבית של המוקאפ מצולמים
+/// בנפרד, מהמודל — ראו `home_<scenario>`.
+final List<VisualState> _phase2aStates = [
+  (name: 'shell_home', open: (_) async {}),
+  (name: 'shell_library', open: (t) => _tapTile(t, ShellSection.library)),
+  (name: 'shell_plugins', open: (t) => _tapTile(t, ShellSection.plugins)),
+  (
+    name: 'shell_settings',
+    open: (t) => _tapTooltip(t, stringsOf().shell.settingsTooltip),
+  ),
+];
+
 /// שלב חדש מוסיף כאן את רשימת המצבים שלו.
 final Map<String, List<VisualState>> _statesByPhase = {
   'phase0': _phase0States,
   'phase1': _phase1States,
   'phase1b': _phase1bStates,
+  'phase2a': _phase2aStates,
+  // תיקוני הסקירה של 2a — אותם מצבים, ומצבי הבית החדשים מ-home_fixtures.
+  'phase2a2': _phase2aStates,
+  // סבב 3: הגילוי שבדף הדיווחים — ראו `reports_<variant>`.
+  'phase2a3': _phase2aStates,
+};
+
+/// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
+Set<String> get _homeScenarioPhases =>
+    const {'phase2a', 'phase2a2', 'phase2a3'};
+
+/// דף הדיווחים עם כרטיס האיסוף — המונים מגיעים מהסשן, ולכן מצולם מהווידג'ט.
+const _reportsVariants = {
+  'reports_collect': (reports: 3, searchRecords: 5),
+  'reports_only': (reports: 2, searchRecords: 0),
 };
 
 /// משלב 1 שורת הכותרת מצוירת כולה ב-Flutter, ולכן הכפתורים נכנסים לצילום.
@@ -195,6 +222,109 @@ void main() {
     }
   }
 
+  for (final scenario in homeScenarios) {
+    for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
+      testWidgets('$_phase/home_$scenario$suffix',
+          skip: !_enabled || !_homeScenarioPhases.contains(_phase), (
+        tester,
+      ) async {
+        await tester.runAsync(loadVisualFonts);
+        WidgetsApp.debugAllowBannerOverride = false;
+        try {
+          useViewSize(tester, size);
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: boundary,
+              child: wrap(
+                Scaffold(
+                  backgroundColor: const Color(0xFFF6EDE5),
+                  body: Column(
+                    children: [
+                      AppTitleBar(
+                        onHelp: () {},
+                        onSettings: () {},
+                        showWindowButtons: true,
+                      ),
+                      Expanded(
+                        child: HomePage(model: homeScenario(scenario)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+          await settle(tester);
+          await capture(
+            tester,
+            p.join(
+              'build',
+              'visual_review',
+              _phase,
+              'home_$scenario$suffix.png',
+            ),
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          WidgetsApp.debugAllowBannerOverride = true;
+        }
+      });
+    }
+  }
+
+  for (final MapEntry(key: name, value: counts) in _reportsVariants.entries) {
+    for (final MapEntry(key: suffix, value: size) in _sizes.entries) {
+      testWidgets('$_phase/$name$suffix',
+          skip: !_enabled || _phase != 'phase2a3', (tester) async {
+        await tester.runAsync(loadVisualFonts);
+        WidgetsApp.debugAllowBannerOverride = false;
+        try {
+          useViewSize(tester, size);
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: boundary,
+              child: wrap(
+                Scaffold(
+                  backgroundColor: const Color(0xFFF6EDE5),
+                  body: Column(
+                    children: [
+                      AppTitleBar(
+                        onHelp: () {},
+                        onSettings: () {},
+                        showWindowButtons: true,
+                      ),
+                      Expanded(
+                        child: ReportsSection(
+                          errorReports: null,
+                          searchFeedback: null,
+                          connection: null,
+                          isUploadingAll: false,
+                          busy: false,
+                          reportsToCollect: counts.reports,
+                          searchRecordsToCollect: counts.searchRecords,
+                          onCollect: () {},
+                          onUpload: null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+          await settle(tester);
+          await capture(
+            tester,
+            p.join('build', 'visual_review', _phase, '$name$suffix.png'),
+          );
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          WidgetsApp.debugAllowBannerOverride = true;
+        }
+      });
+    }
+  }
+
   // גלריית רכיבים: שדות, סגמנט, תפריט, מתג, פירור, אריחים וכרטיסים.
   testWidgets('$_phase/gallery', skip: !_enabled || _phase == 'phase0', (
     tester,
@@ -238,8 +368,8 @@ class _Gallery extends StatelessWidget {
               onBack: () {},
               onHome: () {},
               trail: [
-                (label: s.shell.navSettings, onTap: () {}),
-                (label: s.shell.navPlugins, onTap: null),
+                (label: s.guide.tileReports, onTap: () {}),
+                (label: s.guide.tilePlugins, onTap: null),
               ],
             ),
             Row(
@@ -247,8 +377,8 @@ class _Gallery extends StatelessWidget {
                 Expanded(
                   child: RtlTextField(
                     decoration: InputDecoration(
-                      labelText: s.shell.navApp,
-                      helperText: s.shell.navLibrary,
+                      labelText: s.guide.tileApp,
+                      helperText: s.guide.tileLibrary,
                     ),
                   ),
                 ),
@@ -268,9 +398,9 @@ class _Gallery extends StatelessWidget {
               children: [
                 AppSegmentedControl<int>(
                   options: [
-                    SegmentOption(value: 0, label: s.shell.navHome),
-                    SegmentOption(value: 1, label: s.shell.navApp),
-                    SegmentOption(value: 2, label: s.shell.navLibrary),
+                    SegmentOption(value: 0, label: s.shell.breadcrumbHome),
+                    SegmentOption(value: 1, label: s.guide.tileApp),
+                    SegmentOption(value: 2, label: s.guide.tileLibrary),
                   ],
                   currentValue: 1,
                   onChanged: (_) {},
@@ -278,8 +408,8 @@ class _Gallery extends StatelessWidget {
                 AppDropdownField<int>(
                   value: 0,
                   entries: [
-                    AppMenuEntry(value: 0, label: s.shell.navHome),
-                    AppMenuEntry(value: 1, label: s.shell.navApp),
+                    AppMenuEntry(value: 0, label: s.shell.breadcrumbHome),
+                    AppMenuEntry(value: 1, label: s.guide.tileApp),
                   ],
                   onSelected: (_) {},
                 ),
@@ -306,15 +436,15 @@ class _Gallery extends StatelessWidget {
             const SizedBox(height: 16),
             AppCard.section(
               children: [
-                ListTile(title: Text(s.shell.navHome)),
-                ListTile(title: Text(s.shell.navApp)),
+                ListTile(title: Text(s.shell.breadcrumbHome)),
+                ListTile(title: Text(s.guide.tileApp)),
               ],
             ),
             const SizedBox(height: 16),
             OptionCard(
               icon: FluentIcons.arrow_download_24_regular,
-              title: s.shell.navLibrary,
-              description: s.shell.navPlugins,
+              title: s.guide.tileLibrary,
+              description: s.guide.tilePlugins,
               selected: true,
               onSelected: () {},
             ),

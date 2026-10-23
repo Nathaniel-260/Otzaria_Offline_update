@@ -222,28 +222,30 @@ void main() {
         GuidancePrimary.downloadToDrive,
         download: [_app],
       ),
+      // בכונן מוגן אין בדיקה ברשת (`AppSession.checkOnline`): online נשאר null,
+      // ואין שורה משנית — לא "בדוק עכשיו" ולא הורדה.
       _case(
-        'כונן מוגן עם עדכון כאן וחדש ברשת — ההורדה נעולה',
+        'כונן מוגן עם עדכון כאן — עדכון כאן, בלי שורה משנית',
         const GuidanceFacts(
           readOnly: true,
-          online: true,
-          onlineApp: true,
           libraryStatus: LibraryStatusFact.updateAvailable,
         ),
         GuidancePrimary.updateHere,
-        secondary: GuidanceSecondary.downloadLocked,
         here: [_library],
       ),
       _case(
-        'כונן מלא עם חדש ברשת בלבד — לא מציע הורדה',
+        'כונן מלא והכול מעודכן — בלי "בדוק עכשיו"',
+        const GuidanceFacts(readOnly: true, driveFull: true),
+        GuidancePrimary.upToDate,
+      ),
+      _case(
+        'כונן מוגן, גם אם הגיעה עובדה מקוונת — לא מציע הורדה',
         const GuidanceFacts(
           readOnly: true,
-          driveFull: true,
           online: true,
           onlineApp: true,
         ),
         GuidancePrimary.upToDate,
-        secondary: GuidanceSecondary.downloadLocked,
       ),
       _case(
         'התקנה ראשונה: תוכנה ואז ספרייה, בלי תוספים',
@@ -506,6 +508,67 @@ void main() {
         deriveTileStatus(_plugins, const GuidanceFacts()),
         TileStatus.upToDate,
       );
+    });
+
+    test('רכיב שההורדה מביאה — "חדש באינטרנט", גם כשהוא חסר בכונן', () {
+      TileStatus tile(GuidanceItem item, GuidanceFacts f) =>
+          deriveTileStatus(item, f, download: [item]);
+      expect(
+        tile(_app, const GuidanceFacts()),
+        TileStatus.onlineAvailable,
+      );
+      expect(
+        tile(
+          _library,
+          const GuidanceFacts(libraryStatus: LibraryStatusFact.needsDownload),
+        ),
+        TileStatus.onlineAvailable,
+      );
+      expect(
+        tile(_plugins, const GuidanceFacts(pluginUpdatesOnDrive: 2)),
+        TileStatus.onlineAvailable,
+      );
+      // מה שלא נכלל בהורדה — כמו קודם.
+      expect(
+        deriveTileStatus(_library, const GuidanceFacts(), download: [_app]),
+        TileStatus.upToDate,
+      );
+    });
+
+    test('פעולה רצה, בדיקה, תקלה והסכמה גוברות על "חדש באינטרנט"', () {
+      TileStatus app(AppStatusFact s) => deriveTileStatus(
+            _app,
+            GuidanceFacts(otzariaStatus: s),
+            download: const [_app],
+          );
+      expect(app(AppStatusFact.installing), TileStatus.working);
+      expect(app(AppStatusFact.checking), TileStatus.checking);
+      expect(app(AppStatusFact.error), TileStatus.attention);
+      expect(
+        deriveTileStatus(
+          _library,
+          const GuidanceFacts(semanticConsentRequired: true),
+          download: const [_library],
+        ),
+        TileStatus.needsConsent,
+      );
+    });
+
+    test('הגיבור והאריח מסכימים: כל מה שבהורדה מסומן באריח', () {
+      const f = GuidanceFacts(
+        online: true,
+        onlineApp: true,
+        onlineLibrary: true,
+        libraryStatus: LibraryStatusFact.needsDownload,
+      );
+      final g = deriveHomeGuidance(f);
+      expect(g.downloadItems, [_app, _library]);
+      for (final item in g.downloadItems) {
+        expect(
+          deriveTileStatus(item, f, download: g.downloadItems),
+          TileStatus.onlineAvailable,
+        );
+      }
     });
   });
 

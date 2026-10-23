@@ -91,6 +91,13 @@ uploading the error reports the drive collected (§5.10). The two deliberate
 exceptions, sent without a click, are the launcher's **own** problem reports
 and the smart-search feedback the drive carries (§5.10).
 
+**The home page does not choose a mode either — it reads the state.**
+`deriveHomeGuidance` (`launcher_app/lib/src/shell/home_guidance.dart`, pure Dart,
+table-tested) turns what is installed here, what is on the drive and whether a check
+reached the network into one sentence and one primary button: update here, download
+to the drive, or "everything is up to date". "No internet" is a hint there, never an
+error. Nothing about it is a stored flag or a question to the user.
+
 | Step | API | Network |
 | --- | --- | --- |
 | Download library updates + companions | `LibraryManager.downloadToMirror()` | **yes**, heavy |
@@ -1118,9 +1125,11 @@ and compare as 0.
 **The FULL package is gone; a first install now runs the app wizard and then the
 library.** `otzaria-<ver>-windows-full.exe` was the ordinary installer with the
 library inside — i.e. a second copy of the ~1.5GB already on the drive, for one
-saved click. `HomeScreen._confirmAppInstall` offers both when
+saved click. `installOtzariaHere` (`flows/home_flows.dart`, the home page's
+"install here") offers both when
 `otzaria.currentVersion == null && library.isFreshInstall`, and
-`_installLibraryAfterApp` runs the second half.
+`_installLibraryAfterApp` runs the second half. "Update here" (`updateHere`) keeps
+`AutoInstallFlow`'s order: library first, then the app.
 
 - **App first, never the library first.** Where the DB goes follows what the wizard
   chose: a portable install keeps it beside the exe, an ordinary one under
@@ -1216,9 +1225,12 @@ periodic refresh only runs while Otzaria is already open.
 
 **A skipped auto-install is announced.** Otzaria being open blocks both paths, and the
 skip used to be silent — which reads as a setting that does not work.
-`AutoInstallFlow.run` returns `skippedWhileRunning` and `_autoInstallIfEnabled` ends in
-a `showSingleActionDialog`; a startup snackbar disappears before it is read, and this one
-asks the user to do something.
+`AutoInstallFlow.run` returns `skippedWhileRunning`, which `_autoInstallIfEnabled` keeps
+in `AppSession.autoInstallSkipped`: the lead of the home page's "Otzaria is open right
+now" banner, shown while Otzaria is open and the drive has something to install here.
+The banner has no button — the hero's "update here" asks to close Otzaria first
+(`updateHere` → `_closedForUpdate`), and declining any step stops the ones after it. A
+startup snackbar disappears before it is read.
 
 **Auto-install only ever *updates*; a first install is never automatic.** Both paths
 are gated (`!isFreshInstall` for the library, `currentVersion != null` for the app) and
@@ -1538,11 +1550,14 @@ deleted", because only the first is fixed by downloading again.
 **"New plugin" notices are once per machine, and an empty catalog is not a
 baseline.** `KnownPluginsStore` (`plugins_known.json`, keyed by hostname like
 `AnnouncedAppsStore`) keeps two lists: what the store toast has shown and what
-the home-screen dialog has mentioned — one list would let the dialog swallow the
-toast. The first *non-empty* load only records the catalog as known; recording
-on an empty one would make the first sync announce the whole store. Updates, unlike
-new plugins, are announced once per run. `PluginsModuleController.newPlugins`,
-`newPluginsForHome`, `AppSession._maybeAnnouncePlugins`, `PluginNewToast`.
+the home page has mentioned — one list would let the home banner swallow the
+toast. The home banner ("N new plugins on the drive") stays until the store is
+visited; entering it records them (`AppSession.markPluginsVisited`). The first
+*non-empty* load only records the catalog as known; recording on an empty one would
+make the first sync announce the whole store. Updates are never a popup: a count on
+the plugins tile and a bar at the top of the store that opens the update list.
+`PluginsModuleController.newPlugins`, `newPluginsForHome`,
+`AppSession.newPluginsForHome`, `PluginNewToast`.
 
 ### 5.7 Custom apps
 
@@ -1686,8 +1701,9 @@ band, reintroduced from the other end.
 unlike the version before the card grid: the open category lives in the
 controller, and a tap in the side rail rebuilt nothing when the screen relied on
 `AppShell` rebuilding it from outside. Both listeners are fine; the screen is
-still built lazily on first visit, which is what makes the pending dialog fire
-there.
+still built lazily on first visit, and that visit is what marks pending programs as
+seen on this computer (`markAnnounced`) — until then the "waiting to install" chip on
+the home tile stands out. There is no pending dialog.
 
 ### 5.8 Packaging, distribution and self-update
 
@@ -1855,8 +1871,8 @@ exe into `mirror/launcher/`, copies it over the stub (two renames, rollback on f
   `_elevationPending`, part of `longTaskRunning`) the shell is wrapped in
   `AbsorbPointer`/`ExcludeFocus`, `downloadAll` refuses, queued dialogs wait and the
   auto-install skips, since `exit(0)` follows. "Restart as administrator" obeys the same
-  guard: the offer is deferred during such a task (and re-offered when a download ends),
-  and `Elevation.restartElevated` waits for `ShellExecuteExW` "runas"
+  guard: the home banner (`AppSession.offersElevation`) is hidden during such a task and
+  `restartElevated` refuses with a notice, and `Elevation.restartElevated` waits for `ShellExecuteExW` "runas"
   (`ElevatedProcess.start`, in an isolate) and quits only on success, so a
   declined UAC leaves the launcher running. Dart FFI clobbers `GetLastError`
   after a non-leaf call, so a decline is read from `hInstApp`
@@ -1934,8 +1950,9 @@ user refused UAC"). `Elevation` recognises that by **OS error code** (5 / `EACCE
 never by message text: a Hebrew Windows says "הגישה נדחתה". A file merely *in use*
 (error 32, Otzaria open on the DB) is deliberately **not** counted — elevating fixes
 nothing. The sqlite path has no `OSError` at all, so a read-only DB is matched on
-sqlite's own untranslated `readonly database`. `AppSession` offers the restart once per
-run, from the shared listener, so the offer lives in one place.
+sqlite's own untranslated `readonly database`. The offer is a banner on the home page,
+derived from state (`AppSession.offersElevation`), so it lives in one place and never
+pops up.
 
 **`Elevation` has two pieces of advice, and only one is actionable per platform.**
 macOS has no "run as administrator" — an app cannot elevate itself (`osascript … with
@@ -1967,13 +1984,31 @@ written before `notifyProgress` (byte counters, stage text, sync message/warning
 export progress) must sit inside `ListenableBuilder(listenable: controller.progress)`,
 or it freezes until the next state change.
 
-**`AppShell` builds screens lazily.** `IndexedStack` builds every child, so the plugin
-store — a card grid with one `Image.file` per plugin — was built and decoded at launch,
-before the user opened that tab. Screens are created on first visit (`ShellNavigator.isBuilt`)
-and kept after. Consequence: the "plugin updates available" dialog fires on first visit
-to the plugins tab, not at launch. `IndexedStack` does not disable tickers, so each
-built screen is wrapped in `TickerMode(enabled: screen == _screen)`; otherwise a hidden
-screen's spinner keeps requesting frames for the whole operation.
+**`AppShell` builds sections lazily.** There is no side rail: the body is the home
+page or a sub-page opened from a home tile or the title-bar gear (`ShellNavigator`;
+back button, breadcrumb and Esc return; a plugin or custom-app detail page is a
+`PluginDetailRoute`/`CustomAppDetailRoute`, so its single back and Esc lead to the
+list). `IndexedStack` builds every child, so the
+plugin store — a card grid with one `Image.file` per plugin — was built and decoded at
+launch, before the user opened it. Sections are created on first visit
+(`ShellNavigator.isBuilt`) and kept after. `IndexedStack` does not disable tickers, so
+each built section is wrapped in `TickerMode(enabled: section == current)`; otherwise a
+hidden section's spinner keeps requesting frames for the whole operation.
+
+**No dialog at startup except the crash prompt.** What used to pop up on launch is a
+row on the home page: the reports explainer, unmigrated legacy report queues, the
+skipped auto-install, new plugins, plugin updates, pending custom apps (marked seen only
+while their page is shown — `TickerMode`), a newer launcher (the bottom line), "restart
+as administrator" (dismissable once per run, also on the welcome screen), and reports
+waiting in Otzaria (a count on the reports tile; locked on a read-only drive). The crash
+prompt alone stays a `DialogQueue` dialog. "Check now" sits next to "checked at" in the
+bottom line (`AppSession.checkNow`: `checkAll`, then `checkOnline`; on a read-only drive
+`checkAll` only). `checkAll` includes `_autoInstallIfEnabled`, so with auto-install on,
+"check now" can start an install without a dialog. The link, the hero's "check again" and
+the action share one block (`checkNowBlocked` = `longTaskRunning`), and the startup check
+counts as a running check (`isCheckingNow`). Ctrl+R/F5 stay local-only. Collecting reports
+has no dialog: the reports page shows the full disclosure (what is copied, unencrypted on
+the drive, who receives it) above "Collect to the drive", so the click is the consent.
 
 **Store images must pass `cacheWidth`.** Without it Flutter decodes at source
 resolution; a 1200×800 catalogue image is ~3.8MB of RAM, times every plugin. See
@@ -2004,11 +2039,15 @@ Otzaria queues book, app and plugin reports it could not send; this package carr
 them on the drive. **Otzaria is not changed for this**: the launcher reads and writes
 Otzaria's own queue in `user_state.db` directly and builds the request body itself —
 every `sqlite3` call inside `Isolate.run`, the offer after the first frame (§5.9).
-UI for *Otzaria's* reports is deliberately one startup dialog plus **one** button in
-the download card (`ReportsUploadSection` → `uploadAllReports`, reports only) — no
-screen, no nav item, no setting. The button appears only while some module's last online check
-succeeded (`_connection` in `HomeScreen`); otherwise only a caption says reports are
-waiting. Paths, table
+UI for *Otzaria's* reports: a "reports" tile on the home page that appears only when
+there is something to collect or send, and the reports page behind it — "collect from
+Otzaria" (`offerErrorReportCollection`, which still confirms) and **one** upload button
+(`ReportsUploadSection` → `uploadAllReports`, which uploads the reports and the
+smart-search feedback in sequence and reports one summary). `ReportOfferCoordinator`
+still decides *when*, but its `perform` only counts (`recountReportsToCollect`); nothing
+is collected without a click. The upload button appears only while some module's last
+online check succeeded (`onlineState` / `connectionOf`); otherwise only a caption says
+reports are waiting. Paths, table
 layout and the transaction are tabulated in `error_reports_manager/README.md`.
 
 **The launcher's own reports are a port of Otzaria's app reports, told apart
@@ -2060,13 +2099,13 @@ limit): the same README.
 The README lists what is masked and that file names can still appear in the
 log excerpt.
 
-**The one-time explainer is separate from the offer, and shown before it.** The
-offer needs pending reports; the explainer (`showErrorReportsIntroOnce`) is for
-everyone, once per computer, so `_prepareOffer` awaits it. "Shown" is
+**The one-time explainer is separate from the count, and loaded before it.** The
+count needs pending reports; the explainer is for everyone, once per computer — a
+notice on the home page (`AppSession.showsReportsIntro`) until "got it"
+(`dismissReportsIntro`), and `_prepareOffer` awaits its load. "Shown" is
 `NoticesSeenStore` (`notices_seen.json` in `stateDir/logs`, per hostname; the next
-one-time notice adds a key, not a file), written only *after* the dialog closes.
+one-time notice adds a key, not a file), written only *after* the tap.
 Read-only drives get it too, with a text saying collecting is impossible there.
-It never opens over another dialog and gives up unrecorded after a minute.
 
 **The request body is a port, and it must be kept in step with Otzaria.**
 `lib/src/port/` translates `toApiPayload`, `apiErrorDetails` (the fallback block, word

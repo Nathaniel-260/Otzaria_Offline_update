@@ -283,7 +283,6 @@ void main() {
           collected
             ..['panel'] = AppSurfaces.panelBackground(context)
             ..['topBar'] = AppSurfaces.topBarBackground(context)
-            ..['navRail'] = AppSurfaces.navRailBackground(context)
             ..['divider'] = AppSurfaces.shellDivider(context)
             ..['card'] = AppSurfaces.card(context)
             ..['selected'] = AppSurfaces.cardSelected(context)
@@ -296,7 +295,6 @@ void main() {
       final cs = AppThemeData.colorScheme;
       expect(collected['panel'], const Color(0xFFF6EDE5));
       expect(collected['topBar'], cs.surfaceContainerHigh);
-      expect(collected['navRail'], collected['panel']);
       expect(collected['divider'], const Color(0xFFE1D4C8));
       expect(collected['card'], cs.surface);
       expect(collected['selected'], const Color(0xFFFEF0E3));

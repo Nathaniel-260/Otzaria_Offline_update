@@ -9,6 +9,30 @@ import 'rtl_icon.dart';
 /// פריט בפירור הלחם. בלי [onTap] — המיקום הנוכחי.
 typedef Crumb = ({String label, VoidCallback? onTap});
 
+/// מוסר את ראש דף המשנה פנימה, אל [ScreenBody] או [StoreBody] — המסגרת עוטפת
+/// בו מסך קיים, והמסך עצמו אינו צריך לדעת שהוא דף משנה.
+class SubPageHeaderScope extends InheritedWidget {
+  const SubPageHeaderScope({
+    super.key,
+    required this.header,
+    required super.child,
+  });
+
+  /// `null` — מסך שכבר הציג את הראש בעצמו (מעל שכבה שמכסה את גופו).
+  final Widget? header;
+
+  static Widget? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SubPageHeaderScope>()?.header;
+
+  /// בתוך דף משנה: החזרה והפירור כבר בראש הדף, ואין צורך בכפתור חזרה משלו.
+  static bool isSubPage(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SubPageHeaderScope>() != null;
+
+  @override
+  bool updateShouldNotify(SubPageHeaderScope oldWidget) =>
+      header != oldWidget.header;
+}
+
 /// ראש דף משנה (`.subhead`): כפתור חזרה ופירור "בית › … › הדף".
 class SubPageHeader extends StatelessWidget {
   const SubPageHeader({

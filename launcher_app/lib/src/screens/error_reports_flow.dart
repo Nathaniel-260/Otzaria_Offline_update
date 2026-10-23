@@ -5,32 +5,6 @@ import '../controllers/error_reports_controller.dart';
 import '../services/notices_seen_store.dart';
 import '../widgets/widgets_exports.dart';
 
-Future<bool> showErrorReportsIntroOnce(
-  BuildContext context,
-  NoticesSeenStore store, {
-  bool readOnly = false,
-  bool driveFull = false,
-  Future<bool> Function()? waitUntilFree,
-}) async {
-  if (await store.hasSeen(NoticesSeenStore.errorReportsIntro)) return false;
-  if (waitUntilFree != null && !await waitUntilFree()) return false;
-  if (!context.mounted) return false;
-
-  final t = context.strings.errorReports;
-  await showSingleActionDialog(
-    context: context,
-    title: t.introDialogTitle,
-    content: !readOnly
-        ? t.introDialogContent
-        : driveFull
-            ? t.introDialogContentReadOnlyDriveFull
-            : t.introDialogContentReadOnly,
-    confirmText: t.introDialogConfirm,
-  );
-  await store.markSeen(NoticesSeenStore.errorReportsIntro);
-  return true;
-}
-
 enum ReportOfferOutcome { notOffered, declined, otzariaOpened, collected }
 
 Future<ReportOfferOutcome> offerErrorReportCollection(
@@ -39,6 +13,7 @@ Future<ReportOfferOutcome> offerErrorReportCollection(
   bool readOnly = false,
   required Future<bool> Function() isOtzariaRunning,
   NoticesSeenStore? notices,
+  bool confirm = true,
 }) async {
   if (readOnly) return ReportOfferOutcome.notOffered;
   if (await isOtzariaRunning()) return ReportOfferOutcome.notOffered;
@@ -64,7 +39,7 @@ Future<ReportOfferOutcome> offerErrorReportCollection(
     return ReportOfferOutcome.notOffered;
   }
 
-  final approved = await showTwoActionsDialog(
+  final approved = !confirm || await showTwoActionsDialog(
     context: context,
     title: t.collectDialogTitle,
     content: t.collectDialogContent(count),

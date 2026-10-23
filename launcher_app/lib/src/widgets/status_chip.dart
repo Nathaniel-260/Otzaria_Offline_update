@@ -21,10 +21,20 @@ class StatusChip extends StatelessWidget {
   final StatusKind kind;
   final String label;
 
-  const StatusChip({super.key, required this.kind, required this.label});
+  /// גובר על סמל ברירת המחדל של [kind] — למשל הורדה או שליחה בשבב אריח.
+  final IconData? icon;
 
-  IconData get _icon => switch (kind) {
-        StatusKind.ok => FluentIcons.checkmark_circle_16_filled,
+  const StatusChip({
+    super.key,
+    required this.kind,
+    required this.label,
+    this.icon,
+  });
+
+  IconData get _icon =>
+      icon ??
+      switch (kind) {
+        StatusKind.ok => FluentIcons.checkmark_16_filled,
         StatusKind.updateAvailable => FluentIcons.arrow_sync_16_regular,
         StatusKind.working => FluentIcons.arrow_sync_16_regular,
         StatusKind.needsAction => FluentIcons.info_16_regular,

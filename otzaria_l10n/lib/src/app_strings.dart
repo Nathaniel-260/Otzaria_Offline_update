@@ -13,6 +13,7 @@ abstract class AppStrings {
   CommonStrings get common;
   ShellStrings get shell;
   HomeStrings get home;
+  GuidanceStrings get guide;
   AppScreenStrings get appScreen;
   LibraryScreenStrings get libraryScreen;
   SettingsScreenStrings get settings;
@@ -87,12 +88,6 @@ abstract class ShellStrings {
 
   String get appTitle;
   String get otzariaLogoLabel;
-  String get navHome;
-  String get navApp;
-  String get navLibrary;
-  String get navPlugins;
-  String get navCustomApps;
-  String get navSettings;
 
   /// נאמר כשלא ניתן לפתוח את תיקיית הלוגים בסייר הקבצים.
   String logPathFallback(String path);
@@ -124,19 +119,8 @@ abstract class ShellStrings {
 abstract class HomeStrings {
   const HomeStrings();
 
-  String get title;
-
   String get otzariaRunningTitle;
   String get otzariaRunningSubtitle;
-
-  String get appTileTitle;
-  String get libraryTileTitle;
-
-  String get appNoInstallFound;
-  String get appNothingDownloaded;
-
-  String get noActionAvailable;
-  String get moreDetails;
 
   String get appInstallDialogTitle;
   String get appInstallConfirm;
@@ -155,14 +139,13 @@ abstract class HomeStrings {
   String get closeOtzariaForAppInstallDialogTitle;
   String get closeOtzariaForAppInstallPrompt;
   String get closeOtzariaAndInstallConfirm;
+
+  /// "עדכון כאן" כשאוצריא פתוחה — לפני הספרייה, שהיא נועלת את קובץ המסד.
+  String get closeOtzariaForUpdatePrompt;
+  String get closeOtzariaAndUpdateConfirm;
   String get elevatedAsOtherUserWarning;
 
   String get otzariaOpenSnack;
-
-  /// ההתקנה האוטומטית דילגה כי אוצריא פתוחה — דיאלוג ולא snackbar, כי
-  /// המשתמש ביקש שההתקנה תיעשה לבדה והיא לא נעשתה.
-  String get autoInstallSkippedTitle;
-  String get autoInstallSkippedContent;
 
   String get libraryUpdateDialogTitle;
   String libraryFreshInstallPrompt(String targetVersion);
@@ -177,44 +160,8 @@ abstract class HomeStrings {
   /// הנשלף, ושליפתו באמצע ההחלה קוטעת את העדכון.
   String get doNotRemoveDriveWarning;
 
-  // ── כרטיס בדיקת העדכונים ברשת ───────────────────────────────────────────
-  String get onlineCardTitle;
-  String get onlineCardHint;
-  String get onlineChecking;
-  String get onlineNeverChecked;
-  String get onlineOffline;
-  String get onlineHasUpdates;
-  String get onlineNoUpdates;
+  // ── ההורדה לכונן ─────────────────────────────────────────────────────────
 
-  /// מה בדיוק התחדש ברשת בתוכנה ובספרייה — בלי השורות האלה "נמצאו עדכונים"
-  /// פירט רק את התוספים, ועדכון ספרייה נראה כאילו לא נמצא כלל.
-  String onlineAppUpdate(String version);
-  String onlineLibraryUpdate(String version);
-
-  /// נלווים שהמראה חסרה או שיצאו בגרסה חדשה — מתעדכנים בלי קשר למסד.
-  String onlineLibraryCompanions(String names);
-
-  /// כמו [onlinePluginsSyncOff], לתוכנה ולספרייה.
-  String get onlineAppSyncOff;
-  String get onlineLibrarySyncOff;
-
-  /// פירוט מה נמצא בחנות התוספים — לתוספים אין מספר גרסה אחד להשוות אליו,
-  /// ולכן הם נספרים.
-  String onlineNewPlugins(int count);
-  String onlineUpdatedPlugins(int count);
-
-  /// תוספים שהקטלוג מכיר אבל קובץ ההתקנה שלהם חסר בתיקייה.
-  String onlineMissingPlugins(int count);
-  String onlineRemovedPlugins(int count);
-
-  /// גרסה חדשה של **תוכנת** החנות (הקובץ שמעתיקים למחשב אחר), שאינה
-  /// קשורה לקטלוג התוספים ונבדקת מול גיטהאב בנפרד.
-  String onlineStoreAppUpdate(String version);
-
-  /// נאמר כשנמצאו תוספים ברשת אך "הורדת תוספים" כבויה בהגדרות — אחרת
-  /// "הורד עכשיו" מדלג עליהם בשקט.
-  String get onlinePluginsSyncOff;
-  String get checkForUpdatesButton;
   String get downloadNowButton;
 
   /// ביטול ההורדה שרצה — מוצג רק בזמנה. הביטול **מוחק** את מה שההורדה הזו
@@ -238,7 +185,6 @@ abstract class HomeStrings {
   /// סוף הורדה שהצליחה. בלעדיה ההורדה — שאורכת עשרות דקות — נגמרה בכך שמד
   /// ההתקדמות פשוט נעלם מהמסך.
   String get downloadDoneSnack;
-  String lastCheckedAt(String time);
 
   String get downloadingApp;
   String get downloadingLibrary;
@@ -252,6 +198,177 @@ abstract class HomeStrings {
   String get libraryNothingDownloaded;
   String get libraryNeedsManualPath;
   String get libraryPersonalOtherMachine;
+}
+
+// ── דף הבית: הכוונה לפי המצב ───────────────────────────────────────────────────
+
+/// דף הבית: הגיבור ("מה לעשות עכשיו"), האריחים, ההודעות שבמקום דיאלוגי העלייה,
+/// שורת התחתית ומסך הפתיחה של כונן ריק. כל מספר מופיע בטקסט גם ב-1.
+abstract class GuidanceStrings {
+  const GuidanceStrings();
+
+  // ── שורת "המחשב הזה" שמעל הכותרת ──
+  String get eyebrowOnline;
+  String get eyebrowOffline;
+
+  /// כשעוד לא ידוע אם יש אינטרנט — בלי לנחש.
+  String get eyebrowThisComputer;
+  String eyebrowOtzaria(String version);
+  String get eyebrowNotInstalled;
+
+  // ── הגיבור ──
+  String get checkingTitle;
+  String get checkingBody;
+  String get installHereTitle;
+  String get installHereBody;
+  String get installHereButton;
+  String get updateHereTitle;
+  String get updateHereBody;
+  String get updateHereButton;
+  String get whatsNewButton;
+  String get downloadTitle;
+  String get downloadBody;
+  String get downloadButton;
+  String get updateHereTooButton;
+
+  /// [version] — גרסת אוצריא שבכונן, כשהיא חלק מהעדכון.
+  String updateHereTooNote(String? version);
+
+  /// מה שכבוי בהגדרות ולכן לא יירד.
+  String syncOffNote({
+    required bool app,
+    required bool library,
+    required bool plugins,
+  });
+  String get noSyncSelectionNote;
+  String get changeInSettingsLink;
+  String get chooseInSettingsLink;
+  String get libraryRetryNote;
+  String get upToDateTitle;
+  String upToDateBody(String? version, {required bool offline});
+  String get launchButton;
+  String get recheckButton;
+  String get offlineNote;
+  String get checkOnlineNowNote;
+  String get newerTitle;
+  String newerBody(String installed, String onDrive);
+  String get newerNote;
+  String get attentionAppTitle;
+  String get attentionLibraryTitle;
+  String get attentionBody;
+  String get attentionAppButton;
+  String get attentionLibraryButton;
+  String get taskDownloadingTitle;
+  String get taskDownloadingBody;
+  String get taskInstallingAppTitle;
+  String get taskUpdatingLibraryTitle;
+  String get taskBusyTitle;
+  String get taskBusyBody;
+
+  // ── מה ייכלל ──
+  String pillApp(String version);
+  String get pillLibraryUpdate;
+  String get pillLibraryFull;
+  String pillLibraryCompanions(String names);
+  String pillPluginUpdates(int count);
+  String pillPlugins(int count);
+  String get pillPluginsCatalog;
+
+  /// גרסה חדשה לחנות התוספים שבאוצריא — בלי מספר: אינה רכיב שהמשתמש מכיר.
+  String get pillStoreApp;
+  String pillPluginsWithStore(int count);
+
+  // ── הודעות ופסים ──
+  String get otzariaOpenTitle;
+  String get otzariaOpenBody;
+
+  /// לפני [otzariaOpenBody] כשההתקנה האוטומטית דילגה בגלל אוצריא הפתוחה.
+  String get autoInstallSkippedLead;
+  String newPluginsTitle(int count);
+
+  /// [names] — שמות התוספים, עד שלושה; [more] — כמה עוד יש מעבר להם.
+  String newPluginsBody(List<String> names, int more);
+  String get toPluginsButton;
+
+  // ── האריחים ──
+  String get tilesLabel;
+  String get tileApp;
+  String get tileLibrary;
+  String get tilePlugins;
+  String get tileCustomApps;
+  String get tileReports;
+  String chipAppUpToDate(String version);
+  String chipAppUpdate(String version);
+  String chipAppInstalled(String version);
+  String get chipReadyToInstall;
+  String get chipNewerHere;
+  String get chipNotOnDrive;
+  String get chipChecking;
+  String get chipInstalling;
+  String get chipUpdating;
+  String get chipAttention;
+  String get chipLibraryUpToDate;
+  String get chipLibraryUpdate;
+  String chipPluginUpdates(int count);
+  String chipPluginsInstalled(int count);
+  String chipPluginsOnDrive(int count);
+  String get chipNoPlugins;
+  String chipAppsPending(int count);
+  String chipAppsInstalled(int count);
+  String chipReportsToSend(int count);
+  String chipReportsToCollect(int count);
+  String get chipReportsSending;
+  String get chipReportsLocked;
+
+  /// רכיב שההורדה לכונן תביא — כמו "מה ייכלל" בגיבור.
+  String get chipNewOnline;
+
+  // ── שורת התחתית ──
+  String launcherOnline(String version);
+  String launcherOnDrive(String version);
+  String get launcherDetailsLink;
+  String get launcherDownloading;
+  String checkedAt(String time);
+  String get recheckHint;
+  String get checkNowLink;
+  String drive(String name);
+  String get driveReadOnlySuffix;
+  String get driveFullSuffix;
+
+  // ── מסך הפתיחה ──
+  String get welcomeTitle;
+  String get welcomeLeadOnline;
+  String get welcomeLeadOffline;
+  String step(int number);
+  String get youAreHere;
+  String get step1Title;
+  String get step1BodyOnline;
+  String get step1BodyOffline;
+  String get step2Title;
+  String get step2Body;
+  String get step3Title;
+  String get step3BodyOnline;
+  String get step3BodyOffline;
+  String get welcomeDownloadButton;
+  String get welcomeDownloadNote;
+  String get welcomeHelpButton;
+  String get welcomeOfflineNote;
+
+  /// מה עוד יש בכונן ריק מאוצריא — קישורים לדפים שלהם.
+  String get welcomeAlsoOnDrive;
+
+  // ── דף הדיווחים ──
+  String reportsCollectTitle(
+      {required int reports, required int searchRecords});
+
+  /// הגילוי שמעל כפתור האיסוף: מה יועתק לכונן, איך נשמר ולמי נשלח.
+  String get reportsCollectBody;
+  String get reportsDisclosureReports;
+  String get reportsDisclosureSearch;
+  String get reportsDisclosureStorage;
+  String get reportsCollectButton;
+  String get reportsNothing;
+  String reportsLockedNote({required bool driveFull});
 }
 
 // ── מסך תוכנת אוצריא ──────────────────────────────────────────────────────────
@@ -589,7 +706,8 @@ abstract class PluginsStrings {
   String syncedAt(String time);
   String get syncDirUnknownTooltip;
   String updatesAvailableChip(int count);
-  String get updatesChipTooltip;
+  String get updatesBarBody;
+  String get updatesBarButton;
 
   String get saveDialogTitle;
   String get saveDoneSnack;
@@ -745,12 +863,6 @@ abstract class PluginsStrings {
   String newToastMany(int count);
   String get newToastView;
   String get newToastClose;
-  String get homeNoticeTitle;
-  String get homeNoticeUpdates;
-  String get homeNoticeNewOne;
-  String homeNoticeNewMany(int count);
-  String get homeNoticeUpdatesAndNew;
-  String get homeNoticeOpenButton;
 
   // ── גלריית צילומי המסך ──────────────────────────────────────────────────
   String get screenshotPrevious;
@@ -975,10 +1087,11 @@ abstract class ElevationStrings {
   /// אליו, או לתת לתוכנה גישה מלאה לדיסק בהגדרות המערכת.
   String get macHint;
 
-  String get dialogTitle;
-  String get dialogContent;
-  String get dialogConfirm;
-  String get dialogCancel;
+  /// הפס בדף הבית כשפעולה נכשלה על הרשאות.
+  String get bannerTitle;
+  String get bannerContent;
+  String get bannerConfirm;
+  String get bannerDismiss;
 
   /// ההרמה עצמה נכשלה (למשל PowerShell חסום) — נשארת הדרך הידנית.
   String restartFailedSnack(String error);
@@ -1009,27 +1122,12 @@ abstract class PayloadMismatchStrings {
 abstract class LauncherUpdateStrings {
   const LauncherUpdateStrings();
 
-  // ── הכרטיס בדף הבית ─────────────────────────────────────────────────────
-  String get cardTitle;
-  String get cardHint;
+  // ── שורת העדכון בתחתית הבית, וגרסת הכלי בהגדרות ───────────────────────────
   String installedVersion(String version);
 
-  /// הגרסה שכבר יושבת בתיקייה שלצד התוכנה ומחכה להתקנה.
-  String downloadedVersion(String version);
-
-  /// הגרסה שהבדיקה הקלה מצאה ברשת ועדיין לא הורדה.
-  String onlineVersion(String version);
-
-  String get statusUpToDate;
-  String get statusUpdateAvailable;
-  String get statusReadyToInstall;
-  String get statusDownloading;
-  String get statusInstalling;
-
-  String get downloadButton;
   String get installButton;
 
-  // ── דיאלוג ההצעה, בפתיחת התוכנה ─────────────────────────────────────────
+  // ── דיאלוג "פרטים ועדכון" ──────────────────────────────────────────────
   String get availableDialogTitle;
   String availableDialogContent(String version);
   String availableDialogDetail(String size);
@@ -1758,22 +1856,6 @@ abstract class CustomAppsStrings {
   String get noDetectRules;
   String storedInstaller(String version);
   String get noStoredInstaller;
-
-  // ── הודעת הכניסה למסך: מה שעל הכונן וטרם הותקן ──
-
-  /// נפתחת פעם אחת בכניסה למסך, ורק כשיש מה לומר. הכול נקרא מהדיסק —
-  /// אין כאן בדיקה ברשת.
-  String pendingDialogTitle(int count);
-  String get pendingDialogIntro;
-
-  /// תוכנה שקובץ ההתקנה שלה על הכונן, והיא כלל אינה מותקנת כאן.
-  String pendingDialogNotInstalledRow(String storedVersion);
-
-  /// תוכנה מותקנת שעל הכונן יושבת לה גרסה חדשה יותר.
-  String pendingDialogUpdateRow(String installedVersion, String storedVersion);
-
-  /// השבב שמחליף את כפתור ההתקנה בשורה שכבר הותקנה מתוך החלון.
-  String get pendingDialogInstalledLabel;
 
   String get downloadButton;
   String get downloadingLabel;
