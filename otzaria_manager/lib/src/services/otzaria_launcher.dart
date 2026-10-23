@@ -11,6 +11,9 @@ import 'package:path/path.dart' as p;
 class OtzariaLauncher {
   const OtzariaLauncher();
 
+  /// נקרא לפני כל הפעלה. בבדיקות זורק, כדי שאף בדיקה לא תפעיל התקנה אמיתית.
+  static void Function(String launchPath)? debugLaunchGuard;
+
   /// מפעיל את אוצריא כתהליך עצמאי (לא ממתין לסיום שלו — אחרת הלאנצ'ר
   /// ייחסם כל עוד אוצריא פתוחה).
   ///
@@ -18,6 +21,7 @@ class OtzariaLauncher {
   /// `OtzariaDeepLinks`. מסירה ישירה לקובץ ההרצה ולא דרך מטפל הפרוטוקול של
   /// מערכת ההפעלה, כדי שזה יעבוד גם בהתקנה ניידת שאינה רושמת את הסכימה.
   Future<void> launch(String launchPath, {String? withUri}) async {
+    debugLaunchGuard?.call(launchPath);
     final isAppBundle = p.basename(launchPath).toLowerCase().endsWith('.app');
 
     // חבילת .app היא **תיקייה**, לא קובץ — בדיקת File.exists עליה תחזיר

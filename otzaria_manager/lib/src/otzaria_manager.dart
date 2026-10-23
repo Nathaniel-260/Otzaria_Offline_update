@@ -18,6 +18,7 @@ import 'services/otzaria_app_mirror.dart';
 import 'services/otzaria_changelog_client.dart';
 import 'services/otzaria_installer.dart';
 import 'services/otzaria_launcher.dart';
+import 'services/otzaria_process_closer.dart';
 import 'services/otzaria_release_client.dart';
 import 'services/otzaria_state_store.dart';
 import 'services/running_otzaria_locator.dart';
@@ -75,6 +76,14 @@ class OtzariaManager {
         }
       }
     };
+    final temp = Directory.systemTemp.path;
+    OtzariaLauncher.debugLaunchGuard = (path) {
+      if (!p.isWithin(temp, path)) {
+        throw AssertionError('A test tried to launch a real program: $path');
+      }
+    };
+    OtzariaProcessCloser.debugCloseGuard =
+        () => throw AssertionError('A test tried to close the running Otzaria');
   }
 
   OtzariaManager({
@@ -92,6 +101,9 @@ class OtzariaManager {
     InstalledVersionReader? versionReader,
     OtzariaArch? machineArch,
     OtzariaArch? Function(String exePath)? exeArchOf,
+
+    /// ברירת המחדל: [legacyWindowsInstallDirsFor] על הסביבה.
+    List<String>? legacyInstallDirs,
     this.preferPrerelease = false,
   })  : _platform =
             platform ?? OtzariaTargetPlatform.detect(Platform.operatingSystem),
@@ -109,6 +121,8 @@ class OtzariaManager {
     // הכול נבנה בגוף ה-constructor ולא ברשימת האתחול, כדי שכולם יקבלו את
     // [_platform] שכבר נפתר — במקום לפתור את `Platform.operatingSystem`
     // מחדש בכל אחד מהם.
+    _legacyInstallDirs =
+        legacyInstallDirs ?? legacyWindowsInstallDirsFor(_environment);
     _appLocator = OtzariaAppLocator(platform: _platform);
     _versionReader = versionReader ?? installedVersionReaderFor(_platform);
     _releaseClient = OtzariaReleaseClient(platform: _platform);
@@ -224,10 +238,16 @@ class OtzariaManager {
     return home == null || home.isEmpty ? null : p.join(home, 'Applications');
   }
 
-  /// גיבוי משני בווינדוס — לא ברירת המחדל האמיתית. ייתכן שזה עדיין נכון
-  /// בהתקנות ישנות (אומת מול מפתחי אוצריא: "אם קיימת התקנה קודמת — המתקין
-  /// נשאר בנתיב שלה, למשל C:\אוצריא או {Program Files}\אוצריא").
-  static const String _legacyWindowsInstallDir = r'C:\אוצריא';
+  /// גיבוי משני בווינדוס: `C:\אוצריא` של המתקינים הישנים, שכתבו C: קבוע.
+  /// `SystemDrive` משמש רק כמתג: סביבה מוזרקת בלעדיו אינה מגיעה להתקנה שבמחשב.
+  static List<String> legacyWindowsInstallDirsFor(
+    Map<String, String> environment,
+  ) {
+    final drive = environment['SystemDrive'];
+    return drive == null || drive.isEmpty ? const [] : const [r'C:\אוצריא'];
+  }
+
+  late final List<String> _legacyInstallDirs;
 
   List<({String dir, bool sharedDir})> get _windowsRealDefaultDirs {
     final dirs = <({String dir, bool sharedDir})>[];
@@ -248,7 +268,9 @@ class OtzariaManager {
       dirs.add((dir: p.join(programFiles, 'Otzaria'), sharedDir: false));
       dirs.add((dir: p.join(programFiles, 'אוצריא'), sharedDir: false));
     }
-    dirs.add((dir: _legacyWindowsInstallDir, sharedDir: false));
+    for (final dir in _legacyInstallDirs) {
+      dirs.add((dir: dir, sharedDir: false));
+    }
 
     return dirs;
   }
@@ -267,7 +289,8 @@ class OtzariaManager {
   /// המיקום, וכי ב-macOS זה כן היעד בפועל.
   Future<String> resolveDefaultInstallDir() async {
     if (_platform == OtzariaTargetPlatform.windows) {
-      return _windowsRealDefaultDirs.first.dir;
+      final dirs = _windowsRealDefaultDirs;
+      return dirs.isEmpty ? r'C:\אוצריא' : dirs.first.dir;
     }
     // `/Applications` קיימת תמיד, אבל בחשבון שאינו מנהל אי אפשר לכתוב בה.
     if (await _isWritableDir(_macApplicationsDir)) return _macApplicationsDir;
