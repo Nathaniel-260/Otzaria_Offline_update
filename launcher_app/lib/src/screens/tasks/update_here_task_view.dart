@@ -140,7 +140,7 @@ class UpdateHereTaskView extends StatelessWidget {
 
   Widget _running(BuildContext context) {
     final t = context.strings.task;
-    final narrow = TaskFrame.isNarrow(context);
+    final narrow = TaskFrame.isCompact(context);
     final stage = task.currentStage;
     final closing = task.phase == UpdateHereTaskPhase.closeOtzaria;
     final first = task.firstInstall;
@@ -351,7 +351,7 @@ class UpdateHereTaskView extends StatelessWidget {
     final t = context.strings.task;
     final g = context.strings.guide;
     final cs = Theme.of(context).colorScheme;
-    final narrow = TaskFrame.isNarrow(context);
+    final narrow = TaskFrame.isCompact(context);
     final outcomes = task.outcomes;
     final appDone = outcomes[GuidanceItem.app] == StageOutcome.done;
     final libraryDone = outcomes[GuidanceItem.library] == StageOutcome.done;
@@ -440,6 +440,7 @@ class UpdateHereTaskView extends StatelessWidget {
               app: appDone,
               library: libraryDone,
               plugins: pluginsSent,
+              libraryNote: task.libraryNote != null,
             ),
           );
     return TaskResult(
@@ -676,8 +677,14 @@ class UpdateHereTaskView extends StatelessWidget {
           kind: ResultBadgeKind.error,
           icon: FluentIcons.important_24_filled,
         ),
-        title: t.permissionFailedTitle,
-        body: library ? t.permissionLibraryBody : t.permissionAppBody,
+        title: task.firstInstall
+            ? t.permissionInstallFailedTitle
+            : t.permissionFailedTitle,
+        body: library
+            ? t.permissionLibraryBody
+            : task.firstInstall
+                ? t.permissionAppInstallBody
+                : t.permissionAppBody,
         extra: [
           const SizedBox(height: 16),
           NoticeBanner(
@@ -704,7 +711,15 @@ class UpdateHereTaskView extends StatelessWidget {
         ],
       );
     }
-    final keep = library ? t.libraryFailedKeep : t.appFailedKeep;
+    final plugins = failure.stage == GuidanceItem.plugins;
+    final keep = library
+        ? t.libraryFailedKeep
+        : plugins
+            ? t.pluginsFailedKeep(
+                firstInstall: task.firstInstall,
+                appDone: task.outcomes[GuidanceItem.app] == StageOutcome.done,
+              )
+            : t.appFailedKeep;
     final lead = message.body;
     return TaskResult(
       badge: const ResultBadge(
@@ -715,7 +730,9 @@ class UpdateHereTaskView extends StatelessWidget {
           ? (task.firstInstall
               ? t.libraryInstallFailedTitle
               : t.libraryFailedTitle)
-          : t.appFailedTitle,
+          : plugins
+              ? t.pluginsFailedTitle
+              : t.appFailedTitle,
       body: lead == null ? keep : '$lead $keep',
       extra: [
         if (message.details case final details?) TechDetails(text: details),
@@ -732,7 +749,11 @@ class UpdateHereTaskView extends StatelessWidget {
         ),
         ActionButton.neutral(
           key: ShellKeys.taskSecondary,
-          text: library ? t.toLibraryPage : t.toAppPage,
+          text: switch (failure.stage) {
+            GuidanceItem.library => t.toLibraryPage,
+            GuidanceItem.app => t.toAppPage,
+            GuidanceItem.plugins => t.toPluginsPage,
+          },
           expand: true,
           onPressed: () => actions.onOpenPage(failure.stage),
         ),

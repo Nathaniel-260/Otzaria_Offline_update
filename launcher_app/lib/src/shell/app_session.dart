@@ -743,10 +743,14 @@ class AppSession extends ChangeNotifier {
   /// קודם עוד רץ. זרימה שחזרה בלי להתחיל סוגרת אותו.
   Future<void> downloadAll() async {
     if (_blockedByReadOnly() || tasks.isRunning) return;
+    final request = ++_downloadRequest;
     tasks.prepareDownload();
     await _downloads.downloadAll();
-    if (isActive) tasks.abandonDownload();
+    // בקשה שבוטלה לא סוגרת את המסך של בקשה חדשה שנפתחה אחריה.
+    if (isActive && request == _downloadRequest) tasks.abandonDownload();
   }
+
+  int _downloadRequest = 0;
 
   /// "ביטול" ב"מתכונן להורדה": המסך נסגר, והזרימה עוצרת אחרי הבדיקה ברשת.
   void abandonPreparingDownload() {
@@ -922,11 +926,8 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   AppSettings get settings => _session.settings.settings;
 
   @override
-  Future<void> refreshStaleOnlineChecks(AppSettings s) {
-    // מכאן ההורדה בטוח מתחילה (או שואלת) — מסך המשימה כבר פתוח.
-    _session.tasks.prepareDownload();
-    return _session._refreshStaleOnlineChecks(s);
-  }
+  Future<void> refreshStaleOnlineChecks(AppSettings s) =>
+      _session._refreshStaleOnlineChecks(s);
 
   @override
   Future<bool?> confirmSemanticSearch() => _session.tasks.askBeforeDownload();

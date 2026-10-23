@@ -33,7 +33,7 @@ class ResultBadge extends StatelessWidget {
         ),
     };
     // חלון צר: 56/48 (`.win.narrow .badge`).
-    final narrow = TaskFrame.isNarrow(context);
+    final narrow = TaskFrame.isCompact(context);
     return Container(
       width: narrow ? 56 : 72,
       height: narrow ? 56 : 72,

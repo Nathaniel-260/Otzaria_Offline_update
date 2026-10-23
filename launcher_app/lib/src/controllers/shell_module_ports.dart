@@ -161,13 +161,15 @@ class LibraryModulePort
     return _applyResult;
   }
 
-  /// `_apply` משאיר הודעה גם אחרי החלה מוצלחת (מיקום שצריך לכוון, קובץ
-  /// נלווה שנכשל) — מה שקובע הוא שההחלה הגיעה לסופה.
+  /// מה שקובע הוא שההחלה הגיעה לסופה; רק הערה מוכרת הופכת אותה ל"עם הערה".
   LibraryApplyResult get _applyResult => !_library.lastApplyCompleted
       ? LibraryApplyResult.failed
-      : _library.errorMessage == null
+      : _library.applyNote == null
           ? LibraryApplyResult.applied
           : LibraryApplyResult.appliedWithNote;
+
+  @override
+  String? get applyNote => _library.applyNote;
 }
 
 class PluginsModulePort implements PluginsMirrorModule, UpdateHerePlugins {

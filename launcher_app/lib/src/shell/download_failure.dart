@@ -4,15 +4,15 @@ import '../controllers/download_plan.dart' show MirrorComponent;
 import 'shell_tasks.dart';
 
 final RegExp _network = RegExp(
-  r'SocketException|ClientException|TimeoutException|'
+  r'SocketException|ClientException|TimeoutException|HandshakeException|'
   r'Failed host lookup|Connection (reset|closed|refused|timed out|aborted)|'
   r'Network is unreachable',
 );
 
 /// התעודה נדחתה — בנטפרי וכדומה בלי תעודת המסנן. "נסה שוב" לבדו לא יעזור.
-final RegExp _blocked = RegExp(
-  r'HandshakeException|CERTIFICATE_VERIFY_FAILED|CertificateException',
-);
+/// ניתוק אחר בלחיצת היד הוא רשת רגילה.
+final RegExp _blocked =
+    RegExp(r'CERTIFICATE_VERIFY_FAILED|CertificateException');
 
 /// מסווג את סוף ההורדה למסך הכשל. [errors] — ההודעה של כל רכיב שנכשל
 /// (`null` כשאין), [shabbat] — האתר דחה את התוספים כי שבת.

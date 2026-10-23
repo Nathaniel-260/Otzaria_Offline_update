@@ -2,6 +2,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/byte_size.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 
@@ -45,7 +46,7 @@ class TaskHeading extends StatelessWidget {
 }
 
 /// דף תוצאה (`resPage`): תג, כותרת, גוף, תוספת, ועמודת פעולות ברוחב 352.
-/// בחלון צר הפעולות קבועות בתחתית (`.win.narrow .res-actions`), כדי שהפעולה
+/// בחלון צר או נמוך הפעולות קבועות בתחתית (`.win.narrow .res-actions`), כדי שהפעולה
 /// הראשית תיראה בלי גלילה.
 class TaskResult extends StatelessWidget {
   const TaskResult({
@@ -68,7 +69,7 @@ class TaskResult extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final narrow = TaskFrame.isNarrow(context);
+    final narrow = TaskFrame.isCompact(context);
     final content = Column(
       children: [
         badge,
@@ -190,7 +191,8 @@ class _TechDetailsState extends State<TechDetails> {
                 icon: FluentIcons.copy_20_regular,
                 size: ActionButtonSize.sm,
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: widget.text));
+                  await Clipboard.setData(
+                      ClipboardData(text: withoutBidiMarks(widget.text)));
                   UiSnack.show(t.detailsCopied);
                 },
               ),
@@ -206,13 +208,13 @@ final RegExp _rtlChar = RegExp('[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]');
 final RegExp _ltrChar = RegExp('[A-Za-z\u00C0-\u024F]');
 
 /// הכיוון לפי התו החזק הראשון — "library: Bad state: אין מספיק מקום" הוא
-/// LTR, והודעה עברית מקומית היא RTL, ופיסוק לא מתהפך באף אחת.
-TextDirection textDirectionOf(String text) {
+/// LTR, והודעה עברית מקומית יורשת את כיוון השפה (`null`), ופיסוק לא מתהפך.
+TextDirection? textDirectionOf(String text) {
   final rtl = _rtlChar.firstMatch(text)?.start;
   final ltr = _ltrChar.firstMatch(text)?.start;
   if (rtl == null) return TextDirection.ltr;
-  if (ltr == null) return TextDirection.rtl;
-  return rtl < ltr ? TextDirection.rtl : TextDirection.ltr;
+  if (ltr == null || rtl < ltr) return null;
+  return TextDirection.ltr;
 }
 
 /// "אל תנתקו את הכונן עד הסוף" (`.keep`).

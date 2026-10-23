@@ -284,11 +284,13 @@ abstract class TaskStrings {
   String get updatedTitle;
 
   /// בנוי ממה שבאמת הושלם: [app], [library], [plugins] (נשלחו).
+  /// [libraryNote] — הספרייה הותקנה, אבל יש הערה בשורה שלה.
   String doneHereBody({
     required bool firstInstall,
     required bool app,
     required bool library,
     required bool plugins,
+    bool libraryNote = false,
   });
 
   /// אחרי "הפסק להמתין": לא ידוע אם ההתקנה הסתיימה.
@@ -314,9 +316,15 @@ abstract class TaskStrings {
   String get libraryFailedKeep;
   String get appFailedKeep;
 
+  /// כשל בשלב התוספים — אוצריא כבר הותקנה או עודכנה כש-[appDone].
+  String get pluginsFailedTitle;
+  String pluginsFailedKeep({required bool firstInstall, required bool appDone});
+
   /// כשל הרשאות: גוף ידידותי; ההודעה הגולמית בפרטים הטכניים.
   String get permissionFailedTitle;
+  String get permissionInstallFailedTitle;
   String get permissionAppBody;
+  String get permissionAppInstallBody;
   String get permissionLibraryBody;
   String get elevateTitle;
   String get elevateBody;
@@ -324,6 +332,7 @@ abstract class TaskStrings {
 
   String get toLibraryPage;
   String get toAppPage;
+  String get toPluginsPage;
   String get showProgress;
 }
 

@@ -158,6 +158,16 @@ void main() {
       expect(content, contains('[WARN] אזהרה'));
     });
 
+    test('גודל ביומן — בלי תווי בידוד ועם רווח רגיל, כדי שחיפוש ימצא אותו',
+        () async {
+      final logger = await AppLogger.init(tmp.path);
+      logger.info('ניקוי פינה \u2066403\u00a0MB\u2069');
+      await logger.flush();
+      final content = logFile().readAsStringSync();
+      expect(content, contains('ניקוי פינה 403 MB'));
+      expect(content, isNot(contains('\u2066')));
+    });
+
     test('filePath ו-logDir מצביעים על <dataDir>/logs', () async {
       final logger = await AppLogger.init(tmp.path);
 

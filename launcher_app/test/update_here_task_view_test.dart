@@ -197,6 +197,29 @@ void main() {
     expect(calls, ['retry', 'page library']);
   });
 
+  testWidgets('כשל בשלב התוספים: אוצריא עודכנה, והתוספים לא נשלחו',
+      (tester) async {
+    await show(tester, 'pluginsFail');
+    expect(find.text(t.pluginsFailedTitle), findsOneWidget);
+    expect(find.text(t.appFailedTitle), findsNothing);
+    final keep = t.pluginsFailedKeep(firstInstall: false, appDone: true);
+    expect(find.text(keep), findsOneWidget);
+    expect(keep, contains('עודכנה'));
+    expect(find.textContaining(t.appFailedKeep), findsNothing);
+    expect(find.textContaining('FileSystemException'), findsNothing);
+    await tester.tap(find.text(t.toPluginsPage));
+    expect(calls, ['page plugins']);
+  });
+
+  testWidgets('כשל הרשאות בהתקנה ראשונה: "ההתקנה נכשלה", בלי "מותקנת לכל"',
+      (tester) async {
+    await show(tester, 'firstFailAdmin');
+    expect(find.text(t.permissionInstallFailedTitle), findsOneWidget);
+    expect(find.text(t.permissionFailedTitle), findsNothing);
+    expect(find.text(t.permissionAppInstallBody), findsOneWidget);
+    expect(find.text(t.permissionAppBody), findsNothing);
+  });
+
   testWidgets('כשל הרשאות: גוף ידידותי, השגיאה בפרטים, בלי "לדף התוכנה"',
       (tester) async {
     await show(tester, 'instFailAdmin');
@@ -291,6 +314,16 @@ void main() {
       expect(badge(tester).kind, ResultBadgeKind.ok);
       expect(find.textContaining('בחרו אותה בהגדרות'), findsOneWidget);
       expect(find.text(t.libraryFailedTitle), findsNothing);
+      // הגוף לא מבטיח "מוכנות ללימוד" כשההערה אומרת שאוצריא לא תמצא אותה.
+      final body = t.doneHereBody(
+        firstInstall: true,
+        app: true,
+        library: true,
+        plugins: false,
+        libraryNote: true,
+      );
+      expect(find.text(body), findsOneWidget);
+      expect(body, isNot(contains('מוכנות ללימוד')));
     });
 
     testWidgets('ממתין לסגירת אוצריא — מנעול ולא טבעת מסתובבת', (tester) async {
@@ -342,28 +375,55 @@ void main() {
     test('כיוון הפרטים הטכניים לפי התו החזק הראשון', () {
       expect(
           textDirectionOf('library: Bad state: אין מקום'), TextDirection.ltr);
-      expect(textDirectionOf('אין מספיק מקום (C:)'), TextDirection.rtl);
+      // עברית יורשת את כיוון השפה — לא TextDirection.rtl מפורש.
+      expect(textDirectionOf('אין מספיק מקום (C:)'), isNull);
       expect(textDirectionOf('12345'), TextDirection.ltr);
     });
   });
 
-  group('חלון צר (760×560)', () {
-    for (final name in taskScenarioNames) {
-      testWidgets('$name: הפעולה הראשית גלויה בלי גלילה', (tester) async {
-        await pumpScreen(
-          tester,
-          taskScenarioInWindow(name),
-          size: const Size(760, 560),
-        );
-        await tester.pump();
-        expect(tester.takeException(), isNull);
-        final primary = find.byKey(ShellKeys.taskPrimary);
-        if (primary.evaluate().isEmpty) return;
-        final rect = tester.getRect(primary);
-        expect(rect.top, greaterThanOrEqualTo(36), reason: name);
-        expect(rect.bottom, lessThanOrEqualTo(560), reason: name);
-      });
+  group('חלון צר או נמוך', () {
+    // 1000×580: מחשב נייד 1366×768 בהגדלה של 125% — רחב, אבל נמוך.
+    const sizes = [
+      Size(760, 560),
+      Size(900, 560),
+      Size(1000, 560),
+      Size(801, 600),
+      Size(1000, 580),
+      Size(1000, 720),
+    ];
+    for (final size in sizes) {
+      for (final name in taskScenarioNames) {
+        testWidgets(
+            '$name ב-${size.width.toInt()}×${size.height.toInt()}: '
+            'הפעולה הראשית גלויה בלי גלילה', (tester) async {
+          await pumpScreen(tester, taskScenarioInWindow(name), size: size);
+          await tester.pump();
+          expect(tester.takeException(), isNull);
+          final primary = find.byKey(ShellKeys.taskPrimary);
+          if (primary.evaluate().isEmpty) return;
+          final rect = tester.getRect(primary);
+          expect(rect.top, greaterThanOrEqualTo(36), reason: name);
+          expect(rect.bottom, lessThanOrEqualTo(size.height), reason: name);
+        });
+      }
     }
+
+    testWidgets('בחלון רחב ונמוך פעולות התוצאה קבועות בתחתית', (tester) async {
+      await pumpScreen(
+        tester,
+        taskScenarioInWindow('installDone'),
+        size: const Size(1000, 580),
+      );
+      final bar = find.byKey(const ValueKey('task.result.actions'));
+      expect(bar, findsOneWidget);
+      expect(tester.getRect(bar).bottom, 580);
+      await pumpScreen(
+        tester,
+        taskScenarioInWindow('installDone'),
+        size: const Size(1000, 800),
+      );
+      expect(find.byKey(const ValueKey('task.result.actions')), findsNothing);
+    });
 
     testWidgets('שורות השלב קומפקטיות, והתג 56', (tester) async {
       await pumpScreen(

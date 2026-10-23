@@ -234,6 +234,30 @@ final Map<String, UpdateHereTask> updateScenarios = {
       needsElevation: true,
     ),
   ),
+  'firstFailAdmin': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.failed,
+    stages: [GuidanceItem.app, GuidanceItem.library],
+    firstInstall: true,
+    failure: UpdateFailure(
+      GuidanceItem.app,
+      message: 'Access is denied (OS Error 5)',
+      needsElevation: true,
+    ),
+  ),
+  'pluginsFail': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.failed,
+    stages: _update,
+    stageIndex: 2,
+    appVersion: '0.10.4',
+    outcomes: {
+      GuidanceItem.library: StageOutcome.done,
+      GuidanceItem.app: StageOutcome.done,
+    },
+    failure: UpdateFailure(
+      GuidanceItem.plugins,
+      message: 'FileSystemException: Cannot copy file',
+    ),
+  ),
   'firstClose': const UpdateHereTask(
     phase: UpdateHereTaskPhase.closeOtzaria,
     stages: [GuidanceItem.app, GuidanceItem.library],
@@ -290,7 +314,8 @@ Widget taskScenario(String name, {List<String>? calls}) {
       onRetry: () => call('retry'),
       onOpenPage: (stage) => call('page ${stage.name}'),
       onReindex: name == 'installDone' ? () => call('reindex') : null,
-      onRestartElevated: name == 'instFailAdmin' ? () => call('elevate') : null,
+      onRestartElevated:
+          name.endsWith('FailAdmin') ? () => call('elevate') : null,
     ),
   );
 }

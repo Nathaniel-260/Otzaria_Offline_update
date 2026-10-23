@@ -217,7 +217,7 @@ class _Task extends TaskStrings {
   String get semanticYesTitle => 'כן, גם חיפוש חכם';
   @override
   String get semanticYesBody =>
-      'הקבצים תופסים כמה ג׳יגה־בייט, וההורדה תהיה ארוכה יותר. השימוש בחיפוש החכם באוצריא מחייב הסכמה לאיסוף נתוני אימון; ההורדה אינה משנה את ההסכמה.';
+      'הקבצים תופסים כמה \u2066GB\u2069, וההורדה תהיה ארוכה יותר. השימוש בחיפוש החכם באוצריא מחייב הסכמה לאיסוף נתוני אימון; ההורדה אינה משנה את ההסכמה.';
   @override
   String get back => 'חזרה';
   @override
@@ -413,7 +413,7 @@ class _Task extends TaskStrings {
   String libraryBody(int? lowMinutes, int? highMinutes) =>
       lowMinutes == null || highMinutes == null
           ? 'זה עשוי להימשך זמן מה, לפי גודל העדכון ומהירות המחשב.'
-          : 'צפוי כ-$lowMinutes עד $highMinutes דקות, לפי מהירות המחשב.';
+          : 'צפוי ${_minutesRange(lowMinutes, highMinutes)}, לפי מהירות המחשב.';
   @override
   String get pluginsBody =>
       'הכלי שולח את התוספים לאוצריא, אחד אחד. את ההתקנה מאשרים בחלון של אוצריא.';
@@ -481,8 +481,12 @@ class _Task extends TaskStrings {
     required bool app,
     required bool library,
     required bool plugins,
+    bool libraryNote = false,
   }) {
     if (firstInstall) {
+      if (library && libraryNote) {
+        return 'אוצריא והספרייה הותקנו במחשב הזה, אבל נשאר דבר אחד לעשות — ראו בשורת הספרייה. אפשר לנתק את הכונן.';
+      }
       return library
           ? 'אוצריא והספרייה מותקנות במחשב הזה ומוכנות ללימוד. אפשר לנתק את הכונן.'
           : 'אוצריא מותקנת במחשב הזה. אפשר לנתק את הכונן.';
@@ -496,6 +500,7 @@ class _Task extends TaskStrings {
                 : null;
     return [
       if (done != null) done,
+      if (library && libraryNote) 'נשאר דבר אחד לעשות — ראו בשורת הספרייה.',
       if (plugins) 'התוספים מחכים לאישור שלכם באוצריא.',
       'אפשר לנתק את הכונן.',
     ].join(' ');
@@ -551,10 +556,25 @@ class _Task extends TaskStrings {
   @override
   String get appFailedKeep => 'אוצריא נשארה בגרסה הקודמת.';
   @override
+  String get pluginsFailedTitle => 'שליחת התוספים נכשלה';
+  @override
+  String pluginsFailedKeep(
+          {required bool firstInstall, required bool appDone}) =>
+      !appDone
+          ? 'התוספים לא נשלחו לאוצריא.'
+          : firstInstall
+              ? 'אוצריא הותקנה, אבל התוספים לא נשלחו אליה.'
+              : 'אוצריא עודכנה, אבל התוספים לא נשלחו אליה.';
+  @override
   String get permissionFailedTitle => 'העדכון נכשל';
+  @override
+  String get permissionInstallFailedTitle => 'ההתקנה נכשלה';
   @override
   String get permissionAppBody =>
       'אין לכלי הרשאה לעדכן את אוצריא, כי היא מותקנת לכל המשתמשים במחשב.';
+  @override
+  String get permissionAppInstallBody =>
+      'אין לכלי הרשאה להתקין את אוצריא במחשב הזה.';
   @override
   String get permissionLibraryBody =>
       'אין לכלי הרשאה לשנות את התיקייה שבה נמצאת הספרייה.';
@@ -569,6 +589,8 @@ class _Task extends TaskStrings {
   String get toLibraryPage => 'לדף הספרייה';
   @override
   String get toAppPage => 'לדף התוכנה';
+  @override
+  String get toPluginsPage => 'לדף התוספים';
   @override
   String get showProgress => 'הצג התקדמות';
 }
@@ -704,7 +726,7 @@ class _Pages extends PageStrings {
   String libFullMeta({String? size, int? lowMinutes, int? highMinutes}) => [
         size == null ? 'הספרייה המלאה שבכונן' : 'הספרייה המלאה שבכונן: $size',
         if (lowMinutes != null && highMinutes != null)
-          'צפוי כ-$lowMinutes עד $highMinutes דקות',
+          'צפוי ${_minutesRange(lowMinutes, highMinutes)}',
       ].join(' · ');
   @override
   String get libFullUnavailable =>
@@ -1395,7 +1417,7 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get syncTargetsHint =>
       'תוכנה — קובץ ההתקנה של הגרסה האחרונה. ספרייה — הרכיב הכבד, המסד המלא '
-      'הוא כ-1.5GB. תוספים — הקטלוג וקובצי ההתקנה של כל התוספים.';
+      'הוא כ-\u20661.5\u00a0GB\u2069. תוספים — הקטלוג וקובצי ההתקנה של כל התוספים.';
   @override
   String get syncTargetAll => 'הכל';
   @override
@@ -1414,13 +1436,13 @@ class _Settings extends SettingsScreenStrings {
       'רק קובצי העדכון מהגרסה שמותקנת אצלך ומעלה, בלי המסד המלא';
   @override
   String get personalModeHint =>
-      'המסד המלא הוא כ-1.5GB. את גרסת המסד שלכם מזהים בלחיצה, במסך הספרייה.';
+      'המסד המלא הוא כ-\u20661.5\u00a0GB\u2069. את גרסת המסד שלכם מזהים בלחיצה, במסך הספרייה.';
   @override
   String get personalModeDialogTitle => 'להפעיל עדכון אישי?';
   @override
   String get personalModeDialogContent =>
-      'ההורדה תביא רק את קובצי העדכון מהגרסה שמותקנת אצלך ומעלה — עשרות MB '
-      'במקום כמה ג\'יגה-בייט.\n\n'
+      'ההורדה תביא רק את קובצי העדכון מהגרסה שמותקנת אצלך ומעלה — עשרות \u2066MB\u2069 '
+      'במקום כמה \u2066GB\u2069.\n\n'
       'התוכנה אינה קוראת את גרסת המסד מעצמה: במסך הספרייה יש ללחוץ על '
       '"זהה את גרסת המסד שלי", וזאת דווקא במחשב שאוצריא שלכם מותקנת בו. '
       'הלחיצה נשמרת על הכונן ונוסעת איתו למחשב המקוון, כך שאוצריא שמותקנת '
@@ -2029,7 +2051,7 @@ class _Faq extends FaqStrings {
       'בהחלט. בלחיצה על התקנה תופיע האפשרות לבחור בחבילת ההתקנה המלאה, וזו '
       'האפשרות המומלצת: היא מביאה בפעולה אחת גם את התוכנה וגם את הספרים. '
       'התקנה רגילה במחשב שאין בו אוצריא עלולה לגרום לשיבושים בשימוש. שימו לב '
-      'שהחבילה המלאה גדולה (כ-2 ג׳יגה) ולכן אינה יורדת מעצמה — יש לסמן אותה '
+      'שהחבילה המלאה גדולה (כ-\u20662\u00a0GB\u2069) ולכן אינה יורדת מעצמה — יש לסמן אותה '
       'בהגדרות לפני ההורדה.';
 
   @override
@@ -2944,7 +2966,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String fileTooLargeForVolume(String dir) =>
       'הכונן שבו נמצא $dir מפורמט ב-FAT32, שאינו יכול להכיל קבצים גדולים '
-      'מ-4GB, ומסד הספרייה גדול מזה. בחרו למסד מיקום בכונן NTFS או exFAT.';
+      'מ-\u20664\u00a0GB\u2069, ומסד הספרייה גדול מזה. בחרו למסד מיקום בכונן NTFS או exFAT.';
   @override
   String installDirNotWritable(String dir, String detail) =>
       'לא ניתן ליצור את התיקייה $dir ($detail). בחרו מיקום אחר למסד דרך '
@@ -4267,3 +4289,8 @@ class _AppReports extends AppReportsStrings {
   @override
   String get crashFallbackTitle => 'סגירה לא צפויה';
 }
+
+/// "כ-3 עד 5 דקות"; טווח שהתמזג — "כשתי דקות", לא "כ-2 עד 2 דקות".
+String _minutesRange(int low, int high) => low == high
+    ? plural(low, one: 'כדקה', two: 'כשתי דקות', many: 'כ-$low דקות')
+    : 'כ-$low עד $high דקות';

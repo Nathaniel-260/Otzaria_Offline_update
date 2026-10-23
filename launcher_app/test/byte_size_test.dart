@@ -108,4 +108,14 @@ void main() {
       expect(formatBytesProgress(1024, 2048), '1 KB of 2 KB');
     });
   });
+
+  test('ליומן ול"העתק פרטים" — בלי תווי בידוד ועם רווח רגיל', () {
+    final shown = formatBytes(1024 * 1024 * 403);
+    expect(shown, isNot('403 MB'));
+    expect(withoutBidiMarks(shown), '403 MB');
+    expect(
+      withoutBidiMarks(formatRate(6.8 * 1024 * 1024)),
+      '6.8 MB/s',
+    );
+  });
 }

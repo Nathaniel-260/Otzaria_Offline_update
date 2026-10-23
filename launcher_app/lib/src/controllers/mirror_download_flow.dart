@@ -93,7 +93,13 @@ class MirrorDownloadFlow {
   Future<void>? get pendingSweep => _sweep;
 
   Future<void> downloadAll() async {
-    if (_isPreparing) return;
+    if (_isPreparing) {
+      // "ביטול" ואז "הורדה" לפני שהזרימה שבוטלה חזרה: מחכים לה ומתחילים מחדש.
+      final abandoned = _run;
+      if (!_abandonRequested || abandoned == null) return;
+      await abandoned.then((_) {}, onError: (_) {});
+      if (_isPreparing || !host.isActive) return;
+    }
     _isPreparing = true;
     _abandonRequested = false;
     final run = _run = _downloadAll();
@@ -128,7 +134,7 @@ class MirrorDownloadFlow {
   Future<void> _downloadAll() async {
     if (_sweep case final sweep?) {
       await sweep;
-      if (!host.isActive) return;
+      if (!host.isActive || _abandonRequested) return;
     }
     final s = host.settings;
     if (!s.hasSyncSelection || host.isBlocked) return;

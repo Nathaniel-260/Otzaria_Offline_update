@@ -171,9 +171,12 @@ class LibraryModuleController extends ChangeNotifier
   /// שאינו מתאים למסד שלו נשאר תקוע לנצח (issue #19).
   bool canRetryWithFullDownload = false;
 
-  /// ההחלה האחרונה הגיעה לסופה — המסד הוחלף. [errorMessage] שנשאר אחריה
-  /// הוא הערה (מיקום שצריך לכוון, קובץ נלווה שנכשל), לא כשל.
+  /// ההחלה האחרונה הגיעה לסופה — המסד הוחלף.
   bool lastApplyCompleted = false;
+
+  /// הערה מוכרת אחרי החלה שהצליחה (מיקום שצריך לכוון, קובץ נלווה שנכשל).
+  /// חריג גולמי שנזרק אחרי ההחלה לא נכנס לכאן.
+  String? applyNote;
 
   /// הכשל האחרון היה "אין הרשאה" — ראו [Elevation]. `AppSession` מציע על סמך
   /// זה להפעיל מחדש כמנהל, ולכן זה נדלק בכשל ונכבה בכל ניסיון חדש.
@@ -801,9 +804,10 @@ class LibraryModuleController extends ChangeNotifier
       _apply(useFullDownloadFallback: true);
 
   Future<void> _apply({required bool useFullDownloadFallback}) async {
+    lastApplyCompleted = false;
+    applyNote = null;
     if (_applying) return;
     _applying = true;
-    lastApplyCompleted = false;
     final inFlight = _checkInFlight;
     if (inFlight != null) {
       notifyListeners();
@@ -904,7 +908,7 @@ class LibraryModuleController extends ChangeNotifier
           (status == LibraryModuleStatus.updateAvailable ||
               companionFailures.containsKey(
                   AppL10n.strings.libraryDomain.companionSemanticName))) {
-        errorMessage = AppL10n.strings.libraryDomain
+        errorMessage = applyNote = AppL10n.strings.libraryDomain
             .companionsInstallFailed(companionFailures.keys.join(', '));
         needsElevation = companionFailures.values.any(Elevation.isAccessDenied);
         if (companionFailures
@@ -917,7 +921,7 @@ class LibraryModuleController extends ChangeNotifier
       // הגדולה מבין השתיים.
       final notSet = locationNotSetFor;
       if (notSet != null) {
-        errorMessage = AppL10n.strings.libraryDomain
+        errorMessage = applyNote = AppL10n.strings.libraryDomain
             .libraryLocationNeedsManualSetting(notSet);
       }
     } catch (e, st) {

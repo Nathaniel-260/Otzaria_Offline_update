@@ -714,6 +714,7 @@ void main() {
         ),
       );
       final opened = <ShellSection>[];
+      Future<void>? saved;
       await tester.pumpWidget(
         ListenableBuilder(
           listenable: settings,
@@ -721,7 +722,7 @@ void main() {
             HomePage(
               model: homeScenario('first'),
               actions: HomeActions(
-                onToggleLanguage: () => unawaited(toggleAppLanguage(settings)),
+                onToggleLanguage: () => saved = toggleAppLanguage(settings),
                 onOpenSection: opened.add,
               ),
             ),
@@ -732,9 +733,10 @@ void main() {
       final pageState = tester.element(find.byType(HomePage));
       expect(Directionality.of(pageState), TextDirection.rtl);
 
+      // מחכים לשמירה עצמה: קריאה בזמן ה-rename שלה נכשלת בווינדוס ב-OS Error 5.
       await tester.runAsync(() async {
         await tester.tap(find.byKey(ShellKeys.welcomeLanguage));
-        await Future<void>.delayed(const Duration(milliseconds: 50));
+        await saved;
       });
       await tester.pump();
 
@@ -1062,7 +1064,8 @@ void main() {
         session.indexOf('class _SessionDownloadHost'),
         session.indexOf('class _SessionUpdateHost'),
       );
-      expect(host, contains('_session.tasks.prepareDownload();'));
+      // "מתכונן" נפתח רק ב-downloadAll — ניקוי שהסתיים אחרי "ביטול" לא פותח אותו שוב.
+      expect(host, isNot(contains('prepareDownload')));
       expect(host, contains('_session.tasks.askBeforeDownload()'));
       expect(host,
           contains('_session.tasks.downloadRunning(flow.activeComponents)'));

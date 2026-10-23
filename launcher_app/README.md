@@ -178,8 +178,8 @@ outline, רקע לבן, בפוקוס primary ב-2) — בלי `border` מקומ�
 
 **להיעדר התור יש שתי השלכות שחוזרות בקוד.** שתי קריאות `UiSnack` באותו
 רגע אינן שתי הודעות אלא אחת — השנייה דורסת את הראשונה מיד — ולכן פעולה
-שיש לה כמה תוצאות מסכמת אותן להודעה אחת לפי סדר חומרה (ראו
-`controllers/download_summary.dart`). וההודעה עצמה מוגבלת לשלוש שורות:
+שיש לה כמה תוצאות מסכמת אותן להודעה אחת לפי סדר חומרה. וההודעה עצמה
+מוגבלת לשלוש שורות:
 טוסט הוא שורה, וכשהודעת שגיאה נושאת איתה לוג התקנה, מקומו של הלוג הוא
 דיאלוג ה"פרטים" של `InfoErrorRow` — שמציג את השורה הראשונה ופותח את
 השאר בלחיצה — ויומן הפעילות.
@@ -988,7 +988,7 @@ lib/
     ├── services/
     │   ├── app_logger.dart            — לוג לקובץ תחת <dataDir>/logs
     │   ├── file_reveal.dart           — פתיחת תיקייה ב-Explorer/Finder
-    │   ├── report_offer_coordinator.dart, report_offer_trigger.dart, offer_decline.dart — מתי להציע איסוף
+    │   ├── report_offer_coordinator.dart, report_offer_trigger.dart — מתי להציע איסוף
     │   ├── search_feedback_auto_sync.dart — איסוף והעלאה של משוב החיפוש ברקע
     │   └── hebrew_date.dart           — המרה לתאריך עברי + גימטריה
     ├── shell/

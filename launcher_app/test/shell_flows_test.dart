@@ -713,6 +713,35 @@ void main() {
       expect(flow.isPreparing, isFalse);
       expect(componentsRun(), hasLength(4));
     });
+
+    test('"ביטול" בזמן הניקוי הקודם — הזרימה עוצרת לפני הבדיקה ברשת', () async {
+      host.sweepGate = Completer<void>();
+      await flow.downloadAll();
+      log.clear();
+
+      final next = flow.downloadAll();
+      flow.abandonPreparing();
+      host.sweepGate!.complete();
+      host.sweepGate = null;
+      await next;
+      expect(log, isEmpty);
+    });
+
+    test('"הורדה" מיד אחרי "ביטול" — מחכה לזרימה שבוטלה ומתחילה מחדש',
+        () async {
+      final refreshGate = Completer<void>();
+      host.onRefresh = (_) => refreshGate.future;
+      final abandoned = flow.downloadAll();
+      flow.abandonPreparing();
+
+      final again = flow.downloadAll();
+      host.onRefresh = null;
+      refreshGate.complete();
+      await abandoned;
+      await again;
+      expect(log.where((e) => e == 'refresh'), hasLength(2));
+      expect(componentsRun(), hasLength(4));
+    });
   });
 
   group('AutoInstallFlow', () {

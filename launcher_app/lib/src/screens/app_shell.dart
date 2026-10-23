@@ -800,11 +800,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             },
             onHome: _dismissTask,
             onRetry: _updateHere,
-            onOpenPage: (stage) => _leaveTaskTo(
-              stage == GuidanceItem.library
-                  ? ShellSection.library
-                  : ShellSection.otzaria,
-            ),
+            onOpenPage: (stage) => _leaveTaskTo(switch (stage) {
+              GuidanceItem.library => ShellSection.library,
+              GuidanceItem.app => ShellSection.otzaria,
+              GuidanceItem.plugins => ShellSection.plugins,
+            }),
             onReindex: library.hasPendingReindex
                 ? () => unawaited(s.deliverLibraryReindex())
                 : null,

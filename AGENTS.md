@@ -366,6 +366,15 @@ Hebrew is the source, English a free translation of it.
   identical in both languages. On a `Text`, pass `textDirection: TextDirection.ltr`
   only for inherently LTR content (paths, emails, versions, hashes, URLs); never
   pass `TextDirection.rtl` — the locale already sets it.
+- **Counts go through `plural(count, one:, two:, many:)`**, never `'$n דקות'`: the
+  singular is spelled out ("תוסף אחד") and so is the Hebrew dual ("שתי דקות"). Such a
+  field is listed in `_spelledOne` / `_spelledTwoInHebrew` in
+  `otzaria_l10n/test/strings_completeness_test.dart`, which otherwise demands the digit.
+- **Sizes go through `formatBytes` / `formatRate`** (`services/byte_size.dart`): in
+  Hebrew the number and Latin unit sit inside LRI…PDI with a non-breaking space, GB
+  with one decimal, MB whole. A size typed into Hebrew text uses the same form
+  (`otzaria_l10n/test/units_format_test.dart`). The log and "copy details" drop those
+  marks through `withoutBidiMarks`, so a search for "403 MB" finds them.
 
 ---
 

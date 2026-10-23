@@ -31,10 +31,16 @@ class TaskFrame extends StatelessWidget {
   /// חלון צר (`.win.narrow`) — אותו סף כמו בבית (`HomePage.narrowWidth`).
   static const double narrowWidth = 800;
 
-  static bool isNarrow(BuildContext context) =>
-      MediaQuery.sizeOf(context).width <= narrowWidth;
+  /// חלון נמוך: גם ברוחב מלא הפעולה הראשית של דף התוצאה נדחקת מתחת לקו.
+  static const double shortHeight = 700;
 
-  static EdgeInsets mainPadding(BuildContext context) => isNarrow(context)
+  /// פריסה קומפקטית (`.win.narrow`): חלון צר או נמוך.
+  static bool isCompact(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return size.width <= narrowWidth || size.height < shortHeight;
+  }
+
+  static EdgeInsets mainPadding(BuildContext context) => isCompact(context)
       ? const EdgeInsets.fromLTRB(24, 20, 24, 16)
       : const EdgeInsets.fromLTRB(24, 32, 24, 24);
 

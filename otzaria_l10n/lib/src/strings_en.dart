@@ -422,7 +422,7 @@ class _Task extends TaskStrings {
   String libraryBody(int? lowMinutes, int? highMinutes) => lowMinutes == null ||
           highMinutes == null
       ? 'This may take a while, depending on the update and the computer.'
-      : 'Expected to take about $lowMinutes to $highMinutes minutes, depending on the computer.';
+      : 'Expected to take ${_minutesRange(lowMinutes, highMinutes)}, depending on the computer.';
   @override
   String get pluginsBody =>
       'This tool sends the plugins to Otzaria one by one. You approve the installation in the Otzaria window.';
@@ -491,8 +491,12 @@ class _Task extends TaskStrings {
     required bool app,
     required bool library,
     required bool plugins,
+    bool libraryNote = false,
   }) {
     if (firstInstall) {
+      if (library && libraryNote) {
+        return 'Otzaria and the library were installed on this computer, but one thing is left to do — see the library row. You can disconnect the drive.';
+      }
       return library
           ? 'Otzaria and the library are installed on this computer and ready for study. You can disconnect the drive.'
           : 'Otzaria is installed on this computer. You can disconnect the drive.';
@@ -506,6 +510,8 @@ class _Task extends TaskStrings {
                 : null;
     return [
       if (done != null) done,
+      if (library && libraryNote)
+        'One thing is left to do — see the library row.',
       if (plugins) 'The plugins are waiting for your approval in Otzaria.',
       'You can disconnect the drive.',
     ].join(' ');
@@ -562,10 +568,25 @@ class _Task extends TaskStrings {
   @override
   String get appFailedKeep => 'Otzaria stayed on the previous version.';
   @override
+  String get pluginsFailedTitle => 'Sending the plugins failed';
+  @override
+  String pluginsFailedKeep(
+          {required bool firstInstall, required bool appDone}) =>
+      !appDone
+          ? 'The plugins were not sent to Otzaria.'
+          : firstInstall
+              ? 'Otzaria was installed, but the plugins were not sent to it.'
+              : 'Otzaria was updated, but the plugins were not sent to it.';
+  @override
   String get permissionFailedTitle => 'The update failed';
+  @override
+  String get permissionInstallFailedTitle => 'The installation failed';
   @override
   String get permissionAppBody =>
       'This tool is not allowed to update Otzaria, because it is installed for all users of the computer.';
+  @override
+  String get permissionAppInstallBody =>
+      'This tool is not allowed to install Otzaria on this computer.';
   @override
   String get permissionLibraryBody =>
       'This tool is not allowed to change the folder that holds the library.';
@@ -580,6 +601,8 @@ class _Task extends TaskStrings {
   String get toLibraryPage => 'To the library page';
   @override
   String get toAppPage => 'To the app page';
+  @override
+  String get toPluginsPage => 'To the plugins page';
   @override
   String get showProgress => 'Show progress';
 }
@@ -724,7 +747,7 @@ class _Pages extends PageStrings {
             ? 'The full library on the drive'
             : 'The full library on the drive: $size',
         if (lowMinutes != null && highMinutes != null)
-          'about $lowMinutes to $highMinutes minutes',
+          _minutesRange(lowMinutes, highMinutes),
       ].join(' · ');
   @override
   String get libFullUnavailable =>
@@ -4531,3 +4554,8 @@ class _AppReports extends AppReportsStrings {
   @override
   String get crashFallbackTitle => 'Unexpected exit';
 }
+
+/// "about 3 to 5 minutes"; a collapsed range — "about 2 minutes".
+String _minutesRange(int low, int high) => low == high
+    ? plural(low, one: 'about a minute', many: 'about $low minutes')
+    : 'about $low to $high minutes';

@@ -160,6 +160,8 @@ const _spelledOne = {
   'task.donePluginsValue#0',
   'task.pluginsWaiting#0',
   'pages.repSendStoredButton#0',
+  'task.libraryBody#0',
+  'pages.libFullMeta#0',
 };
 
 /// הזוגי העברי ("שתי דקות") — אותו כלל ב-2, בעברית בלבד.
@@ -167,6 +169,8 @@ const _spelledTwoInHebrew = {
   'task.minutesLeft#0',
   'task.donePluginsValue#0',
   'task.pluginsWaiting#0',
+  'task.libraryBody#0',
+  'pages.libFullMeta#0',
 };
 
 /// המונה כמספר עומד בפני עצמו — "1" בתוך "ARG1" אינו נחשב.

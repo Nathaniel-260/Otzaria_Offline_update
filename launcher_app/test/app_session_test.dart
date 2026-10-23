@@ -334,6 +334,26 @@ void main() {
       expect(s.tasks.hasTask, isFalse);
     });
 
+    test('"ביטול" ואז "הורדה" — הבקשה שבוטלה לא סוגרת את המסך החדש', () async {
+      final s = session();
+      // בלי בחירה הזרימות חוזרות מיד, בלי רשת ובלי הורדה.
+      await settings.update(settings.settings.copyWith(
+        syncApp: false,
+        syncPlugins: false,
+        syncLibrary: false,
+        personalUpdateMode: false,
+      ));
+      final abandoned = s.downloadAll();
+      s.abandonPreparingDownload();
+      expect(s.tasks.hasTask, isFalse);
+
+      final again = s.downloadAll();
+      expect(s.tasks.hasTask, isTrue);
+      await abandoned;
+      expect(s.tasks.hasTask, isTrue);
+      await again;
+    });
+
     test('שומר הסגירה שואל רק בזמן משימה, ומכבד את התשובה', () async {
       final s = session();
       expect(await s.confirmClose(), isTrue);

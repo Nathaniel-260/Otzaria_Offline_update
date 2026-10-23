@@ -23,6 +23,13 @@ String formatRate(double bytesPerSecond) {
   return units.perSecond(size);
 }
 
+final RegExp _bidiIsolates = RegExp('[\u2066-\u2069]');
+
+/// [text] בלי תווי הבידוד ועם רווח רגיל במקום הקשיח — ליומן ול"העתק פרטים",
+/// כדי שחיפוש "403 MB" ימצא את השורה.
+String withoutBidiMarks(String text) =>
+    text.replaceAll(_bidiIsolates, '').replaceAll('\u00a0', ' ');
+
 /// "412 MB מתוך 1.1 GB" לשורת ההתקדמות. `null` כשעוד לא הגיע דיווח בייטים,
 /// ובלי היעד — רק כמה ירד עד כה. גם 0 מתוך 0 הוא `null`: זו הורדה שכל
 /// קבציה כבר על הכונן, ו-"0 בייט" רק מבלבל.

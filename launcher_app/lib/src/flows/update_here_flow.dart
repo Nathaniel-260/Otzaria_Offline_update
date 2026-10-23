@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../services/app_logger.dart';
 import '../shell/home_guidance.dart' show GuidanceItem;
 import '../shell/shell_tasks.dart';
 
@@ -43,8 +44,11 @@ abstract interface class UpdateHereLibrary {
   bool get hasUpdateAvailable;
   int? get targetVersion;
 
-  /// אחרי [LibraryApplyResult.appliedWithNote] — ההערה עצמה.
+  /// הכשל, אחרי [LibraryApplyResult.failed].
   String? get errorMessage;
+
+  /// אחרי [LibraryApplyResult.appliedWithNote] — ההערה עצמה.
+  String? get applyNote;
   bool get needsElevation;
 
   /// בכונן יש ספרייה מלאה שאפשר להתקין במקום עדכון שנכשל.
@@ -167,7 +171,9 @@ class UpdateHereFlow {
         reinstallApp: reinstallApp,
         fullLibrary: fullLibrary,
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
+      AppLogger.maybeInstance
+          ?.error('העדכון במחשב הזה נעצר בחריג', error, stackTrace);
       _failIfRunning(id, error);
     }
     return true;
@@ -284,7 +290,7 @@ class UpdateHereFlow {
       GuidanceItem.library,
       StageOutcome.done,
       note: result == LibraryApplyResult.appliedWithNote
-          ? library.errorMessage
+          ? library.applyNote
           : null,
     );
     return true;

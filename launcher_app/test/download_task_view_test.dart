@@ -110,6 +110,50 @@ void main() {
       expect(calls, ['cancel']);
     });
 
+    testWidgets('האחוז לא יורד כשהרכיב מפסיק לדווח חלק, ובלי בייטים אין מהירות',
+        (tester) async {
+      final progress = ValueNotifier(0);
+      var snapshot = const DownloadSnapshot(
+        current: MirrorComponent.library,
+        fraction: 0.42,
+        received: 42,
+        total: 100,
+      );
+      await pumpScreen(
+        tester,
+        DownloadTaskView(
+          task: downloadScenarios['download']!,
+          progress: progress,
+          snapshot: () => snapshot,
+          actions: DownloadTaskActions(
+            onAnswer: (_) {},
+            onCancel: () {},
+            onRetry: () {},
+            onHome: () {},
+            onHere: () {},
+          ),
+        ),
+      );
+      expect(percent(tester), '47%');
+
+      // הספרייה: התקבלו בייטים, אבל הסכום לא ידוע — `fraction` חוזר null.
+      snapshot = const DownloadSnapshot(
+        current: MirrorComponent.library,
+        received: 60,
+      );
+      progress.value++;
+      await tester.pump();
+      expect(percent(tester), '47%');
+
+      snapshot = const DownloadSnapshot(current: MirrorComponent.plugins);
+      progress.value++;
+      await tester.pump();
+      expect(percent(tester), '66%');
+      expect(line(tester, 'task.download.speed'), ' ');
+      await tester.pump(const Duration(seconds: 10));
+      expect(line(tester, 'task.download.speed'), ' ');
+    });
+
     testWidgets('מהירות וזמן שנותר אחרי שנייה של מדידה', (tester) async {
       final progress = ValueNotifier(0);
       var now = DateTime(2026, 10, 23);

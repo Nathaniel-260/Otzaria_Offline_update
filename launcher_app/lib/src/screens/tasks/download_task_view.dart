@@ -236,7 +236,7 @@ class DownloadTaskView extends StatelessWidget {
   Widget _done(BuildContext context) {
     final t = context.strings.task;
     final cs = Theme.of(context).colorScheme;
-    final narrow = TaskFrame.isNarrow(context);
+    final narrow = TaskFrame.isCompact(context);
     final skipped = task.skipped
         .where((c) => !task.components.contains(c))
         .map((c) => componentName(context, c))
@@ -494,6 +494,7 @@ class _DownloadProgress extends StatefulWidget {
 class _DownloadProgressState extends State<_DownloadProgress> {
   late final TransferRateMeter _meter = TransferRateMeter(clock: widget.clock);
   MirrorComponent? _measuring;
+  double? _peak;
 
   /// הגודל האחרון שנראה לכל רכיב — לשורה "הושלם · X" אחרי שעבר.
   final Map<MirrorComponent, int> _sizes = {};
@@ -537,7 +538,7 @@ class _DownloadProgressState extends State<_DownloadProgress> {
   Widget _content(BuildContext context, DownloadSnapshot s) {
     final t = context.strings.task;
     final cs = Theme.of(context).colorScheme;
-    final narrow = TaskFrame.isNarrow(context);
+    final narrow = TaskFrame.isCompact(context);
     final components = widget.components;
     final current = s.current;
     if (current != _measuring) {
@@ -552,18 +553,25 @@ class _DownloadProgressState extends State<_DownloadProgress> {
     }
     final index = current == null ? -1 : components.indexOf(current);
     final fraction = s.fraction?.clamp(0.0, 1.0);
-    // הפס הכללי מונוטוני: מה שהסתיים ועוד החלק של הנוכחי, ולא חזרה ל-0%
-    // בכל רכיב.
-    final overall = components.isEmpty || index < 0
+    // הפס הכללי מונוטוני: מה שהסתיים ועוד החלק של הנוכחי. רכיב שמפסיק לדווח
+    // חלק (הספרייה בלי סכום ידוע) לא מוריד את מה שכבר הוצג.
+    final computed = components.isEmpty || index < 0
         ? null
         : (index + (fraction ?? 0)) / components.length;
+    final peak = _peak;
+    final overall =
+        computed == null || peak == null || computed >= peak ? computed : peak;
+    _peak = overall ?? peak;
     final rate = _meter.bytesPerSecond;
     final left = total != null && total > 0 ? _meter.remaining(total) : null;
     final shown = current ?? components.firstOrNull;
     final sizeOfCurrent =
         total != null && total > 0 ? formatBytes(total) : null;
     final String speedLine;
-    if (rate != null) {
+    if (received == null) {
+      // רכיב שלא מדווח בייטים — אין מהירות לחשב.
+      speedLine = ' ';
+    } else if (rate != null) {
       speedLine = [
         formatRate(rate),
         if (left != null)

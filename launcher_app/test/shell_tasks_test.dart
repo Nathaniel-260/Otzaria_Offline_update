@@ -282,6 +282,18 @@ void main() {
       expect(failure.details, contains('CERTIFICATE_VERIFY_FAILED'));
     });
 
+    test('ניתוק בלחיצת היד בלי תעודה — רשת, לא "מסנן"', () {
+      final failure = classifyDownloadFailure(
+        failed: const [MirrorComponent.library],
+        errors: const {
+          MirrorComponent.library: 'HandshakeException: Connection terminated '
+              'during handshake',
+        },
+        shabbat: false,
+      );
+      expect(failure.kind, DownloadFailureKind.network);
+    });
+
     test('ניתוק רשת — רגוע, עם הפרטים הטכניים', () {
       final failure = classifyDownloadFailure(
         failed: const [MirrorComponent.library],

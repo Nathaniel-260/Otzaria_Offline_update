@@ -5,6 +5,7 @@ import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/controllers/shell_module_ports.dart';
+import 'package:launcher_app/src/flows/update_here_flow.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -119,6 +120,25 @@ void main() {
     expect(port.downloadNeedsRetry, isTrue);
   });
 
+  test(
+      'a raw error after a completed apply is not a note on the success screen',
+      () async {
+    final applied = _AppliedLibrary(tempDir.path);
+    addTearDown(applied.dispose);
+    final port = LibraryModulePort(applied);
+
+    // checkForUpdate שאחרי ההחלה זרק — ההודעה גולמית, והמסד כבר הוחלף.
+    applied.after = (l) => l.errorMessage = 'SqliteException(5): locked';
+    expect(await port.apply(), LibraryApplyResult.applied);
+    expect(port.applyNote, isNull);
+
+    applied.after = (l) => l
+      ..errorMessage = 'כוונו את אוצריא לספרייה'
+      ..applyNote = 'כוונו את אוצריא לספרייה';
+    expect(await port.apply(), LibraryApplyResult.appliedWithNote);
+    expect(port.applyNote, 'כוונו את אוצריא לספרייה');
+  });
+
   test('the plugins port keeps the catalog and store-app checks apart', () {
     final port = PluginsModulePort(plugins);
     final catalogAt = DateTime(2026, 10, 1);
@@ -152,4 +172,18 @@ class _NeverRunningLocator extends RunningOtzariaLocator {
   @override
   Future<RunningOtzariaProbe> probe() async =>
       (isRunning: false, launchPath: null);
+}
+
+/// החלה שהגיעה לסופה, ו-[after] קובע מה נשאר אחריה.
+class _AppliedLibrary extends LibraryModuleController {
+  _AppliedLibrary(String dataDir) : super(dataDir: dataDir);
+
+  void Function(LibraryModuleController library) after = (_) {};
+
+  @override
+  Future<void> update() async {
+    lastApplyCompleted = true;
+    errorMessage = applyNote = null;
+    after(this);
+  }
 }

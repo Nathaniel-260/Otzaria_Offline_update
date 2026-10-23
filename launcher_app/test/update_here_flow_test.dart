@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/flows/update_here_flow.dart';
+import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/shell/shell_tasks.dart';
+
+import 'test_support.dart';
 
 class _App implements UpdateHereApp {
   _App(this.log);
@@ -85,9 +89,12 @@ class _Library implements UpdateHereLibrary {
   @override
   ({int low, int high})? applyEstimate({bool full = false}) => estimate;
 
+  @override
+  String? applyNote;
+
   LibraryApplyResult get _result {
     if (!succeeds) return LibraryApplyResult.failed;
-    errorMessage = noteAfterApply;
+    errorMessage = applyNote = noteAfterApply;
     return noteAfterApply == null
         ? LibraryApplyResult.applied
         : LibraryApplyResult.appliedWithNote;
@@ -643,6 +650,22 @@ void main() {
       expect(task()!.failure!.stage, GuidanceItem.app);
       expect(task()!.failure!.message, contains('boom'));
       expect(host.tasks.isRunning, isFalse);
+    });
+
+    test('run שזורק — החריג נרשם ביומן עם ה-stack trace', () async {
+      final dir = await Directory.systemTemp.createTemp('update-here-log-');
+      AppLogger.resetForTest();
+      final logger = await AppLogger.init(dir.path);
+      addTearDown(() async {
+        AppLogger.resetForTest();
+        await deleteTempDir(dir);
+      });
+      app.throws = StateError('boom');
+      await flow.run(const [GuidanceItem.app]);
+      await logger.flush();
+      final log = await File(logger.filePath).readAsString();
+      expect(log, contains('Bad state: boom'));
+      expect(log, contains('#0'));
     });
 
     test('הסשן פורק בזמן שאלה — הזרימה אינה נוגעת במשימה', () async {
