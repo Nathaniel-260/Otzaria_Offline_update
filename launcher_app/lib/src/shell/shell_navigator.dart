@@ -170,11 +170,17 @@ class ShellNavigator extends ChangeNotifier {
         showTask();
         return SynchronousFuture(showsTask);
       case FaqEditRoute():
-        return _enter(route.section, [
-          const HomeRoute(),
-          const SectionRoute(ShellSection.settings),
-          route,
-        ]);
+        // ההגדרות נכנסות למחסנית, ולכן עוברות את השער שלהן — אחרת "חזרה"
+        // הייתה נוחתת בהן בלי סיסמה.
+        return _enter(
+          route.section,
+          [
+            const HomeRoute(),
+            const SectionRoute(ShellSection.settings),
+            route,
+          ],
+          via: ShellSection.settings,
+        );
       case PluginDetailRoute() ||
             CustomAppDetailRoute() ||
             CustomAppsManageRoute():
@@ -206,10 +212,18 @@ class ShellNavigator extends ChangeNotifier {
     _changed();
   }
 
-  Future<bool> _enter(ShellSection section, List<ShellRoute> routes) async {
+  Future<bool> _enter(
+    ShellSection section,
+    List<ShellRoute> routes, {
+    ShellSection? via,
+  }) async {
     if (showsTask) return false;
-    final allowed = canEnter?.call(section) ?? true;
-    if (!(allowed is bool ? allowed : await allowed) || showsTask) return false;
+    for (final gated in [if (via != null) via, section]) {
+      final allowed = canEnter?.call(gated) ?? true;
+      if (!(allowed is bool ? allowed : await allowed) || showsTask) {
+        return false;
+      }
+    }
     _replace(routes);
     return true;
   }

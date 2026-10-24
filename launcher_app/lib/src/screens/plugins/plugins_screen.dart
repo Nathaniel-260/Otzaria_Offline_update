@@ -269,7 +269,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           title: t.storeTitle,
           description: lastSync == null
               ? t.storeSubtitle
-              : '${t.storeSubtitle} ${t.asOfDate(formatStoreDate(lastSync))}',
+              : '${t.storeSubtitle} ${t.asOfDate(formatStoreLocalDate(lastSync))}',
           actions: [
             if (_canSync)
               ActionButton.ghost(

@@ -82,7 +82,7 @@ class PluginRatingSummary extends StatelessWidget {
           Text(
             asOf == null
                 ? t.ratingSourceNote
-                : t.ratingAsOfNote(formatStoreDate(asOf!)),
+                : t.ratingAsOfNote(formatStoreLocalDate(asOf!)),
             style: meta,
           ),
         ],

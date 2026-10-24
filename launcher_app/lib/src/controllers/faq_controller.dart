@@ -53,10 +53,11 @@ class FaqController extends ChangeNotifier {
     _pendingSave = Timer(delay, () => unawaited(_queue.run(_save)));
   }
 
-  /// כותב מיד שינוי שממתין. נקרא ביציאה מהעריכה ולפני סגירת החלון.
+  /// כותב מיד שינוי שממתין, וממתין גם לכתיבה שכבר רצה. נקרא ביציאה מהעריכה
+  /// ולפני סגירת החלון.
   Future<void> flush() {
     final pending = _pendingSave;
-    if (pending == null || !pending.isActive) return Future.value();
+    if (pending == null || !pending.isActive) return _queue.run(() async {});
     pending.cancel();
     return _queue.run(_save);
   }

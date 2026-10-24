@@ -41,8 +41,12 @@ String formatDate(DateTime value) {
 /// תאריך בחנות התוספים ובתוכנות הנוספות — הפורמט האחד לשתיהן. בעברית תאריך
 /// עברי כמו באתר ("ט' חשוון ה'תשפ"ז"), באנגלית "October 18, 2026".
 ///
-/// הרגע נקרא ב-UTC, כמו בחנות שבאתר — כך אותו תוסף מקבל אותו תאריך בשניהם.
+/// לרגע מהקטלוג: נקרא ב-UTC, כמו בחנות שבאתר — כך אותו תוסף מקבל אותו
+/// תאריך בשניהם. לרגע שנרשם במחשב הזה — [formatStoreLocalDate].
 String formatStoreDate(DateTime value) => _storeDay(value.toUtc());
+
+/// [formatStoreDate] לרגע שנרשם במחשב הזה (סנכרון, הוספה): היום בלוח המקומי.
+String formatStoreLocalDate(DateTime value) => _storeDay(value.toLocal());
 
 /// [formatStoreDate] למחרוזת תאריך מה-API (`YYYY-MM-DD` או ISO-8601 מלא).
 /// מחרוזת שאינה תאריך מוחזרת כמות שהיא — עדיף על שגיאה במסך.

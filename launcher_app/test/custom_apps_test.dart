@@ -341,6 +341,44 @@ void main() {
       expect(stateNotifications, 0);
     });
 
+    testWidgets('"נוסף לכונן" אחרי חצות מוצג ביום המקומי', (tester) async {
+      // addedAt נרשם כזמן מקומי; קריאה ב-UTC הייתה מראה את אתמול (י"ב).
+      controller.apps = [
+        CustomAppView(
+          entry: CustomAppEntry(
+            descriptor: const AppDescriptor(
+              id: 'late',
+              name: 'נוספה בלילה',
+              sourceKind: AppSourceKind.manual,
+              detect: AppDetectRules(),
+            ),
+            installer: StoredInstaller(
+              fileName: 'App.exe',
+              version: '1.0.0',
+              sizeBytes: 1,
+              addedAt: DateTime(2026, 10, 24, 0, 30),
+            ),
+          ),
+        ),
+      ];
+
+      await pumpScreen(
+        tester,
+        CustomAppDetailView(
+          controller: controller,
+          app: controller.apps.single,
+          readOnly: false,
+          onInstall: () {},
+          onLaunch: () {},
+          onDownload: () {},
+          onPickLocation: () {},
+          onCategorySelected: (_) {},
+        ),
+      );
+
+      expect(find.text('י"ג חשוון ה\'תשפ"ז'), findsOneWidget);
+    });
+
     testWidgets('שורת "הורדת הכול" מתעדכנת מדיווח התקדמות בלבד', (
       tester,
     ) async {

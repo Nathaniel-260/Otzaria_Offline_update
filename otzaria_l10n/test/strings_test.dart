@@ -16,6 +16,11 @@ void main() {
         contains('other personal details may still be sent'));
   });
 
+  test('כפתור השער אינו "Enter" — שם המקש, לא פעולה', () {
+    expect(const EnglishStrings().saferMode.enterButton, 'Unlock');
+    expect(const HebrewStrings().saferMode.enterButton, 'כניסה');
+  });
+
   test('AppL10n.use מחליף את כל המחרוזות', () {
     AppL10n.use(AppLanguage.english);
     expect(AppL10n.strings.shell.appTitle, 'Otzaria Updates');

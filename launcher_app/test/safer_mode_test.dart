@@ -344,11 +344,29 @@ void main() {
       expect(find.text(t.wrongPassword), findsOneWidget);
       expect(settings.settings.hasSaferModePassword, isTrue);
 
+      // Enter עם שדה ריק או סיסמה שגויה מראה את השגיאה — לא ממקד בשקט את
+      // הביטול, ש-Enter נוסף היה סוגר.
+      await tester.enterText(find.byType(TextField), '');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(find.text(t.passwordRequired), findsOneWidget);
+      await tester.enterText(find.byType(TextField), '9999');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(find.text(t.wrongPassword), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
+          isEmpty);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(find.text(t.clearDialogTitle), findsOneWidget);
+
       // Enter בשדה אינו מוחק: הביטול מקבל את המיקוד, ו-Enter נוסף מבטל.
       await tester.enterText(find.byType(TextField), '1234');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pumpAndSettle();
       expect(find.text(t.clearDialogTitle), findsOneWidget);
+      expect(find.text(t.wrongPassword), findsNothing);
+      expect(find.text(t.passwordRequired), findsNothing);
       expect(settings.settings.hasSaferModePassword, isTrue);
       final cancel = find.widgetWithText(
         FilledButton,

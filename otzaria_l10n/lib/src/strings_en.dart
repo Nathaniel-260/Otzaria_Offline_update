@@ -1580,7 +1580,7 @@ class _SaferMode extends SaferModeStrings {
   @override
   String get verifyDisableHint => 'To turn the lock off, type the password.';
   @override
-  String get enterButton => 'Enter';
+  String get enterButton => 'Unlock';
   @override
   String get passwordLabel => 'Password';
   @override

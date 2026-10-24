@@ -166,6 +166,24 @@ void main() {
       expect(gated.current, const CustomAppsManageRoute());
     });
 
+    test('עריכת השאלות עוברת גם בשער ההגדרות — הן במחסנית מתחתיה', () async {
+      final entered = gated.push(const FaqEditRoute());
+      expect(asked, [ShellSection.settings]);
+      expect(gated.current, const HomeRoute());
+      answer.complete(false);
+      expect(await entered, isFalse);
+      expect(gated.current, const HomeRoute());
+      expect(asked, [ShellSection.settings]);
+    });
+
+    test('עריכת השאלות אחרי פתיחת השער — הגדרות ואז עזרה', () async {
+      final entered = gated.push(const FaqEditRoute());
+      answer.complete(true);
+      expect(await entered, isTrue);
+      expect(asked, [ShellSection.settings, ShellSection.help]);
+      expect(gated.current, const FaqEditRoute());
+    });
+
     test('משימה שנפתחה בזמן ההמתנה גוברת על הכניסה', () async {
       final entered = gated.select(ShellSection.settings);
       gated.showTask();

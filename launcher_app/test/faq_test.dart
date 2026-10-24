@@ -4,6 +4,7 @@
 // הבדיקה האחרונה כאן היא השומר החשוב: שדה שאלה/תשובה שנוסף לחוזה המלל ולא
 // נכנס ל-`faqGroups` פשוט לא היה מוצג, בלי שדבר ייפול.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -381,6 +382,15 @@ void main() {
       expect(jsonDecode(file.readAsStringSync())['contact']['name'], 'א');
       // ואין מה לכתוב שוב.
       await faq.flush();
+    });
+
+    test('flush ממתין גם לכתיבה שכבר רצה — הסגירה לא קוטעת אותה', () async {
+      final file = File('${tempDir.path}/faq_customization.json');
+      // שינוי מיידי (הסתרה, מחיקה) שנשלח ממש לפני הסגירה: אין טיימר ממתין.
+      unawaited(faq.update(faq.value.copyWith(contactName: 'ב')));
+
+      await faq.flush();
+      expect(jsonDecode(file.readAsStringSync())['contact']['name'], 'ב');
     });
 
     test('הסתרה ושאלה מתווספת נשמרות ונטענות מקובץ', () async {

@@ -220,10 +220,11 @@ void main() {
     required List<StorePlugin> catalog,
     List<PluginStoreCategory> categories = const [],
     PluginStoreHome home = PluginStoreHome.empty,
+    DateTime? lastSync,
   }) async {
     final store = PluginMirrorStore(tempDir.path);
     await tester.runAsync(() => store.save(PluginCatalog(
-          lastSync: DateTime.utc(2026, 8, 6),
+          lastSync: lastSync ?? DateTime.utc(2026, 8, 6),
           plugins: catalog,
           categories: categories,
           home: home,
@@ -810,6 +811,24 @@ void main() {
       find.descendant(of: panel, matching: find.byType(ButtonStyleButton)),
       findsNothing,
     );
+  });
+
+  testWidgets('"נכון ל־" ותאריך הדירוג: סנכרון אחרי חצות מוצג ביום המקומי',
+      (tester) async {
+    // הסנכרון נרשם כזמן מקומי; קריאה ב-UTC הייתה מראה את אתמול (י"ב).
+    await seed(
+      tester,
+      catalog: [storePlugin('a', name: 'תוסף בחצות')],
+      lastSync: DateTime(2026, 10, 24, 0, 30),
+    );
+    const day = 'י"ג חשוון ה\'תשפ"ז';
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(t.asOfDate(day)), findsOneWidget);
+
+    await openCard(tester, 'תוסף בחצות');
+    expect(find.text(t.ratingAsOfNote(day)), findsOneWidget);
   });
 
   testWidgets('תוסף שטרם דורג — הסעיף אומר זאת, ואין דירוג ריק בכרטיס',

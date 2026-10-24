@@ -258,45 +258,61 @@ class _ClearPasswordDialog extends StatefulWidget {
 
 class _ClearPasswordDialogState extends State<_ClearPasswordDialog> {
   final TextEditingController _password = TextEditingController();
+  final FocusNode _passwordFocus = FocusNode();
   final FocusNode _cancelFocus = FocusNode();
   String? _error;
 
   @override
   void dispose() {
     _password.dispose();
+    _passwordFocus.dispose();
     _cancelFocus.dispose();
     super.dispose();
   }
 
-  void _clear() {
+  /// מציג את השגיאה ומחזיר false כשהסיסמה ריקה או שגויה.
+  bool _check() {
     final t = context.strings.saferMode;
     if (_password.text.isEmpty) {
+      _passwordFocus.requestFocus();
       setState(() => _error = t.passwordRequired);
-      return;
+      return false;
     }
     if (SaferModePassword.verify(widget.storedPassword, _password.text)) {
-      Navigator.of(context).pop(true);
-      return;
+      return true;
     }
     _password.clear();
+    _passwordFocus.requestFocus();
     setState(() => _error = t.wrongPassword);
+    return false;
+  }
+
+  void _clear() {
+    if (_check()) Navigator.of(context).pop(true);
+  }
+
+  /// Enter אינו מוחק: שגיאה נשארת בשדה, ורק סיסמה נכונה ממקדת את הביטול.
+  void _submitted() {
+    if (!_check()) return;
+    setState(() => _error = null);
+    _cancelFocus.requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = context.strings.saferMode;
     // אזהרה: הבטוח (ביטול) מומלץ, והפעולה ההרסנית בקצה — כמו `showWarningDialog`.
-    // Enter בשדה אינו מוחק: הוא ממקד את הביטול, והמחיקה רק בלחיצה.
     return _FormDialog(
       title: t.clearDialogTitle,
       intro: t.clearDialogContent,
       fields: [
         _PasswordField(
           controller: _password,
+          focusNode: _passwordFocus,
           label: t.currentPasswordLabel,
           error: _error,
           autofocus: true,
-          onSubmitted: _cancelFocus.requestFocus,
+          onSubmitted: _submitted,
         ),
       ],
       actions: [

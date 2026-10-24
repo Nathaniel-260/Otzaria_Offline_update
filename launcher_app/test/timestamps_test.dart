@@ -95,5 +95,19 @@ void main() {
         'י"ד ניסן ה\'תשפ"ו',
       );
     });
+
+    test('רגע שנרשם במחשב הזה נקרא בלוח המקומי — גם אחרי חצות', () {
+      // שדות מקומיים: היום יוצא 24/10 בכל אזור זמן; ב-UTC בישראל זה עדיין 23/10.
+      final afterMidnight = DateTime(2026, 10, 24, 0, 30);
+      AppL10n.use(AppLanguage.hebrew);
+      expect(formatStoreLocalDate(afterMidnight), 'י"ג חשוון ה\'תשפ"ז');
+      // כך הוא נשמר ונקרא מהקובץ — ISO בלי היסט, ונקרא כמקומי.
+      expect(
+        formatStoreLocalDate(DateTime.parse(afterMidnight.toIso8601String())),
+        'י"ג חשוון ה\'תשפ"ז',
+      );
+      AppL10n.use(AppLanguage.english);
+      expect(formatStoreLocalDate(afterMidnight), 'October 24, 2026');
+    });
   });
 }
