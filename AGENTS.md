@@ -91,12 +91,13 @@ uploading the error reports the drive collected (§5.10). The two deliberate
 exceptions, sent without a click, are the launcher's **own** problem reports
 and the smart-search feedback the drive carries (§5.10).
 
-**The home page does not choose a mode either — it reads the state.**
-`deriveHomeGuidance` (`launcher_app/lib/src/shell/home_guidance.dart`, pure Dart,
-table-tested) turns what is installed here, what is on the drive and whether a check
-reached the network into one sentence and one primary button: update here, download
-to the drive, or "everything is up to date". "No internet" is a hint there, never an
-error. Nothing about it is a stored flag or a question to the user.
+**There are no modes to choose — the home page derives what to do from the
+state.** `deriveHomeGuidance` (`launcher_app/lib/src/shell/home_guidance.dart`,
+pure Dart, table-tested) turns what is installed here, what is on the drive and
+whether a check reached the network into one sentence and one primary button:
+update this computer from the drive, download updates to the drive, or "everything
+is up to date". "No internet" is a hint there, never an error. Nothing about it is
+a stored flag or a question to the user.
 
 | Step | API | Network |
 | --- | --- | --- |
@@ -196,7 +197,7 @@ only repo tooling; the update engine is an external package (below).
 | `plugins_manager/` | `plugins_manager` | Pure Dart. The **offline plugin store**: syncs `otzaria.org/api/plugins` into the mirror, detects what Otzaria has, installs via `otzaria://`. Converted from `Yehuda-Zakesh/Offline-repository-plugin-store` (itself derived from `Otzaria/Otzaria_Website`); details in `plugins_manager/README.md`. |
 | `custom_apps_manager/` | `custom_apps_manager` | Pure Dart. **User-added programs**: a record filled in a form (name, GitHub repo *or* local installer, install location, detection rules) so the drive can carry a program that is not Otzaria. Not a plugin system — no runtime, no WebView, no permissions, and **no importing a record from a file**, so every repo and file was chosen by the user. |
 | `error_reports_manager/` | `error_reports_manager` | Pure Dart. **Otzaria's unsent book, app and plugin reports**, carried offline → online: read Otzaria's queues in `user_state.db` directly (Otzaria unchanged), port of its `toApiPayload`, a drive outbox, upload to `otzaria.org` in rate-limited batches — **and the launcher's own problem reports** (a port of Otzaria's app reports, routed by `product`), with their queue and crash detection. See §5.10. |
-| `launcher_app/` | `launcher_app` | The Flutter desktop app (Windows + macOS) wiring the modules into one dashboard. Depends on the seven sub-packages by relative `path:`, so it must stay their sibling. |
+| `launcher_app/` | `launcher_app` | The Flutter desktop app (Windows + macOS) wiring the modules into one window. Depends on the seven sub-packages by relative `path:`, so it must stay their sibling. |
 
 Producer vs. consumer: the Kotlin repo `Otzaria/SeforimLibrary` *produces* the DB
 and the patches; this repo only *consumes* them.
@@ -285,7 +286,8 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
   only decided at publish time, so `tool/changelog.sh stamp` (run by
   `set_launcher_version.sh`) adds the `* **0.N**` heading above them, and the
   Release workflow's `guard` job fails when there is nothing unheaded to stamp.
-  That file is what "מה חדש" shows, on the "update this tool" page and in Settings.
+  That file is what "מה חדש" shows, on the "update this tool" page (reached from
+  the home page's bottom line and from Settings → About).
   **Bug fixes alone require neither a changelog entry nor a question about one.**
   For other changes, ask the maintainer whether they warrant a changelog entry
   before editing that file, and follow their answer. Before release, document the
@@ -323,11 +325,15 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
 - Do not create Markdown files for plans, progress logs or summaries — report those
   in the conversation or the PR. Durable references go into an existing document.
 
-**UI in `launcher_app` follows the design language of Otzaria's download
-assistant.** One fixed light theme (seed `#2C1B02`, `Segoe UI`, radius 8, no
-shadows); there is no dark mode and no colour choice. The `ColorScheme` roles plus
-the `AppPalette` theme extension carry every colour, `AppTokens`/`AppTextStyles`
-every size. Use the shared components (`ActionButton` with its sizes,
+**UI in `launcher_app` follows the design language of Otzaria's Download
+Assistant.** One fixed light theme (`AppThemeData.light()`: seed `#2C1B02`,
+`Segoe UI`, radius 8, no shadows); there is no dark mode and no colour choice,
+and the old `ui.themeMode`/`ui.seedColor` keys are dropped on the next save. The
+`ColorScheme` roles plus the `AppPalette` theme extension carry every colour
+(hex-checked against the mockup in `test/theme_test.dart`),
+`AppTokens`/`AppTextStyles` every size. Window size and placement are the
+runner's job and navigation is in-body (both §5.9). Use the shared components
+(`ActionButton` with its sizes,
 `SettingsCard`/`SettingsActionTile`, `AppCard`/`RowsCard`/`AppRow`, `UiSnack`, the
 `show*Dialog` helpers, `AppSegmentedControl`, `StatusChip`, `IconTile`,
 `SectionLabel`, `AdvancedSection`, `OptionCard`, `ResultBadge`, `AppProgressBar`,
@@ -378,6 +384,12 @@ Hebrew is the source, English a free translation of it.
   (`otzaria_l10n/test/units_format_test.dart`). The log, "copy details" and a manual
   copy from the technical details drop those marks through `withoutBidiMarks`, so a
   search for "403 MB" finds them.
+- **Store dates use the website's Hebrew format** (`ט' חשוון ה'תשפ"ז`, English
+  "October 20, 2026") through `services/timestamps.dart`. A catalogue date is read
+  in UTC like the site (`formatStoreDate`, `formatStoreDateRaw`); an instant recorded
+  on this machine ("as of" the sync, "added to the drive") goes through
+  `formatStoreLocalDate` — read in UTC it showed yesterday after midnight. Other
+  timestamps stay Gregorian (`formatTimestamp`, `formatDate`).
 
 ---
 
@@ -1267,7 +1279,7 @@ through Otzaria's `app_preferences.hive`, and `OtzariaSettingsReader` returns `n
 guess then becomes `saveCustomDbPath` in `_finishDbUpdate`, i.e. recorded as the user's
 own choice and checked *before* Otzaria's settings from then on. So one unreadable box
 meant ~5.5GB written where Otzaria does not look and a launcher permanently locked onto
-the wrong path. The home-screen card already offers the button, which is where that
+the wrong path. The home page's hero already offers the button, which is where that
 decision belongs.
 
 **Cancelling the wizard is not a failure.** `OtzariaInstallCancelled` (Inno exit 2/5,
@@ -1548,7 +1560,7 @@ all. The two cannot share a flag: the catalog comes from otzaria.org and the
 program from GitHub, so one being unreachable says nothing about the other, and
 `skipPlugins` (dozens of site calls) must not be decided by a 600KB file.
 `hasCatalogOnlineUpdate` drives `skipPlugins`, `hasStoreAppOnlineUpdate` drives
-`skipStoreApp`, and `hasOnlineUpdate` is the union — the home screen reads the
+`skipStoreApp`, and `hasOnlineUpdate` is the union — the home page reads the
 union, or a new store-program version would not even show the download button.
 A failed store-app download is a log line, never a failed download run.
 
@@ -1717,10 +1729,10 @@ install, launch. Adding, editing, removing, categories and order live on
 Settings. The add/edit form stays a dialog. On a read-only drive the Manage row is
 disabled with the reason, since every management action writes to the drive.
 
-**`CustomAppsScreen` listens to its own controller**, like `PluginsScreen` and
-unlike the version before the card grid: the open category lives in the
-controller, and a tap in the side rail rebuilt nothing when the screen relied on
-`AppShell` rebuilding it from outside. Both listeners are fine; the screen is
+**`CustomAppsScreen` listens to its own controller**, like `PluginsScreen`: the
+open category lives in the controller, and a category tap rebuilt nothing when the
+screen relied on `AppShell` rebuilding it from outside. Both listeners are fine;
+the screen is
 still built lazily on first visit, and that visit is what marks pending programs as
 seen on this computer (`markAnnounced`) — until then the "waiting to install" chip on
 the home tile stands out. There is no pending dialog.
@@ -2004,17 +2016,27 @@ written before `notifyProgress` (byte counters, stage text, sync message/warning
 export progress) must sit inside `ListenableBuilder(listenable: controller.progress)`,
 or it freezes until the next state change.
 
-**`AppShell` builds sections lazily.** There is no side rail: the body is the home
-page or a sub-page opened from a home tile or the title-bar gear or "?" — help is a
-body section hosting the FAQ, not a dialog (`ShellNavigator`;
-back button, breadcrumb and Esc return; a plugin or custom-app detail page is a
-`PluginDetailRoute`/`CustomAppDetailRoute`, so its single back and Esc lead to the
-list). `IndexedStack` builds every child, so the
+**`AppShell` builds sections lazily.** There is no navigation rail: the body is
+the home page or a sub-page opened from a home tile, the title-bar gear or "?" —
+help is a body section hosting the FAQ (`HelpPage` → `FaqBody`), not a dialog.
+The stack is `ShellNavigator`'s (`SectionRoute`, `PluginDetailRoute`,
+`CustomAppDetailRoute`, `CustomAppsManageRoute`, `FaqEditRoute`, `TaskRoute`);
+back button, breadcrumb and Esc pop it, so a detail page's single back leads to
+its list. `IndexedStack` builds every child, so the
 plugin store — a card grid with one `Image.file` per plugin — was built and decoded at
 launch, before the user opened it. Sections are created on first visit
 (`ShellNavigator.isBuilt`) and kept after. `IndexedStack` does not disable tickers, so
 each built section is wrapped in `TickerMode(enabled: section == current)`; otherwise a
 hidden section's spinner keeps requesting frames for the whole operation.
+
+**The safer-mode gate is the navigator's, for every route that puts Settings on the
+stack.** `ShellNavigator.canEnter` (`AppShell._canEnter`) asks the password before
+Settings, `CustomAppsManageRoute` and `FaqEditRoute` (help over Settings, so "back"
+lands there; it passes the Settings gate first). A gate inside `SettingsScreen` stayed
+open for good, because the built screen never leaves the `IndexedStack`. Help itself
+is open; only its edit mode asks. Settings are grouped (General, Other programs,
+Privacy and reports, a collapsed Advanced, About); the app channel lives only on the
+Otzaria page. Details: `launcher_app/README.md`.
 
 **No dialog at startup except the crash prompt.** What used to pop up on launch is a
 row on the home page: the reports explainer, unmigrated legacy report queues, the
@@ -2022,7 +2044,10 @@ skipped auto-install, new plugins, plugin updates, pending custom apps (marked s
 while their page is shown — `TickerMode`), a newer launcher (the bottom line), "restart
 as administrator" (dismissable once per run, also on the welcome screen), and reports
 waiting in Otzaria (a count on the reports tile; locked on a read-only drive). The crash
-prompt alone stays a `DialogQueue` dialog. "Check now" sits next to "checked at" in the
+prompt alone stays a `DialogQueue` dialog. Other dialogs answer a click the user just
+made: confirming the launcher install, cancelling a download or closing during a task
+(warnings), consents, reset, trust, passwords, the custom-app form and the report form.
+"Check now" sits next to "checked at" in the
 bottom line (`AppSession.checkNow`: `checkAll`, then `checkOnline`; on a read-only drive
 `checkAll` only). `checkAll` includes `_autoInstallIfEnabled`, so with auto-install on,
 "check now" can start an install without a dialog. The link, the hero's "check again" and
@@ -2084,7 +2109,7 @@ is collected without a click. The upload button appears only while some module's
 online check succeeded (`onlineState` / `connectionOf`); otherwise only a caption says
 reports are waiting. The same page hosts the launcher's own reports (`AppReportsPanel`:
 queue, history, issue links) and "report a problem with this tool" (`AppReportDialog`);
-Settings keeps only the crash mode and a link to the page. Paths, table
+Settings keeps only the crash mode, a link to the page and the report form. Paths, table
 layout and the transaction are tabulated in `error_reports_manager/README.md`.
 
 **The launcher's own reports are a port of Otzaria's app reports, told apart
@@ -2241,7 +2266,7 @@ verify something new.
 | `RunningOtzariaLocator` FFI half (`QueryFullProcessImageNameW`), Windows `.db` picker filter | Not verified |
 | Plugin store round trip | Unit-tested only — never a real `sync()` against `otzaria.org`, a USB trip, and `install-local` against a real Otzaria |
 | Launcher self-update | Dart side unit-tested end to end (GitHub client against a mock, mirror round trip, location fallbacks, a real swap in a temp dir asserting `OtzariaData/` survives); `stub.c` compiles clean at `/W4`. **Never run for real**: a published tag found by a shipped exe, the `--after-update=<pid>` wait, the re-extract over a live `app-files\`, the macOS bundle swap |
-| Offline-only rework (single mode, exe-adjacent data folder, app mirror, `prerelease` channels) | Unit-tested and analyzer-clean only. Not run on a real removable drive, a genuinely read-only folder, or `OtzariaAppMirror.sync()` against real GitHub; whether the trimmed mirror suffices for a real offline apply is unconfirmed |
+| Offline-only rework (drive-only checks and installs, exe-adjacent data folder, app mirror, `prerelease` channels) | Unit-tested and analyzer-clean only. Not run on a real removable drive, a genuinely read-only folder, or `OtzariaAppMirror.sync()` against real GitHub; whether the trimmed mirror suffices for a real offline apply is unconfirmed |
 | Read-only drive mode (issue #25) | Same — write paths traced and unit-tested, never run from a drive with its lock switch on |
 | Two-channel download (stable + newer pre-release, chosen offline) | Unit-tested only. Not verified what `fetchChannelReleases` returns against the real repo today, nor whether both installers fit comfortably on a typical drive |
 | Companion assets (mirror against the three real repos, installer into a real library folder) | Unit-tested only |
