@@ -64,7 +64,7 @@ void main() {
   group('formatStoreDate — תאריכי החנויות', () {
     test('עברית: תאריך עברי כמו באתר; אנגלית: לועזי בשם חודש', () {
       AppL10n.use(AppLanguage.hebrew);
-      expect(formatStoreDate(DateTime(2026, 10, 20, 12)), 'ט\' בחשוון תשפ"ז');
+      expect(formatStoreDate(DateTime(2026, 10, 20, 12)), 'ט\' חשוון ה\'תשפ"ז');
       AppL10n.use(AppLanguage.english);
       expect(formatStoreDate(DateTime(2026, 10, 20, 12)), 'October 20, 2026');
     });
@@ -79,10 +79,21 @@ void main() {
         expect(formatStoreDateRaw('02/04/2026'), '02/04/2026');
       }
       AppL10n.use(AppLanguage.hebrew);
-      expect(formatStoreDateRaw('2026-01-01'), 'י"ב בטבת תשפ"ו');
-      expect(formatStoreDateRaw('2026-04-02T10:30:00.000Z'), 'ט"ו בניסן תשפ"ו');
+      expect(formatStoreDateRaw('2026-01-01'), 'י"ב טבת ה\'תשפ"ו');
+      expect(
+          formatStoreDateRaw('2026-04-02T10:30:00.000Z'), 'ט"ו ניסן ה\'תשפ"ו');
       AppL10n.use(AppLanguage.english);
       expect(formatStoreDateRaw('2026-01-01'), 'January 1, 2026');
+    });
+
+    test('רגע מלא נקרא ב-UTC, כמו בחנות שבאתר — לא לפי השעון המקומי', () {
+      AppL10n.use(AppLanguage.hebrew);
+      // בישראל זה כבר 2/4 (ט"ו בניסן); באתר — 1/4.
+      expect(formatStoreDateRaw('2026-04-01T22:30:00Z'), 'י"ד ניסן ה\'תשפ"ו');
+      expect(
+        formatStoreDate(DateTime.utc(2026, 4, 1, 22, 30)),
+        'י"ד ניסן ה\'תשפ"ו',
+      );
     });
   });
 }

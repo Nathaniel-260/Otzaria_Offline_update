@@ -12,6 +12,8 @@ class HelpPage extends StatelessWidget {
     required this.faq,
     this.saferMode,
     this.editRequests,
+    this.active = true,
+    this.readOnly = false,
   });
 
   final FaqController faq;
@@ -20,10 +22,20 @@ class HelpPage extends StatelessWidget {
   /// "עריכת השאלות הנפוצות" שבהגדרות — ראו [FaqBody.editRequests].
   final ValueNotifier<bool>? editRequests;
 
+  /// ראו [FaqBody.active].
+  final bool active;
+  final bool readOnly;
+
   @override
   Widget build(BuildContext context) => ScreenBody(
         children: [
-          FaqBody(faq: faq, saferMode: saferMode, editRequests: editRequests),
+          FaqBody(
+            faq: faq,
+            saferMode: saferMode,
+            editRequests: editRequests,
+            active: active,
+            readOnly: readOnly,
+          ),
         ],
       );
 }

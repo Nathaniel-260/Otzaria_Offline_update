@@ -44,6 +44,8 @@ void main() {
     WidgetTester tester, {
     SaferModeGate? saferMode,
     ValueNotifier<bool>? editRequests,
+    bool active = true,
+    bool readOnly = false,
   }) =>
       pumpScreen(
         tester,
@@ -52,6 +54,8 @@ void main() {
             faq: faq,
             saferMode: saferMode,
             editRequests: editRequests,
+            active: active,
+            readOnly: readOnly,
           ),
         ),
       );
@@ -106,6 +110,49 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(t.editTitle), findsOneWidget);
     });
+
+    testWidgets('כשהדף מפסיק להיות מוצג — יוצאים מהעריכה ושומרים מיד',
+        (tester) async {
+      await pumpBody(tester);
+      await enterEditMode(tester);
+
+      final nameField = find.byKey(const ValueKey('faq.contact.name'));
+      await tester.ensureVisible(nameField);
+      await tester.pumpAndSettle();
+      await tester.enterText(nameField, 'ר׳ ישראל');
+      // עוד לפני ההשהיה: שום דבר לא נכתב לדיסק.
+      final file = File('${tempDir.path}/faq_customization.json');
+      expect(file.existsSync(), isFalse);
+
+      // הדף נשאר בעץ (IndexedStack) — רק `active` משתנה.
+      await pumpBody(tester, active: false);
+      // הכתיבה היא I/O אמיתי — נותנים לה לרוץ, בלי לקדם את שעון ההשהיה.
+      for (var i = 0; i < 20 && !file.existsSync(); i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump();
+      }
+      expect(file.existsSync(), isTrue);
+      expect(
+        jsonDecode(file.readAsStringSync())['contact']['name'],
+        'ר׳ ישראל',
+      );
+
+      // חזרה לדף — השאלות, לא העריכה.
+      await pumpBody(tester);
+      expect(find.text(t.editTitle), findsNothing);
+      expect(find.text(t.title), findsOneWidget);
+    });
+
+    testWidgets('בכונן מוגן העריכה אומרת שהשינויים נשמרים במחשב הזה',
+        (tester) async {
+      await pumpBody(tester, readOnly: true);
+      await enterEditMode(tester);
+
+      expect(find.text(t.editIntroThisComputer), findsOneWidget);
+      expect(find.text(t.editIntro), findsNothing);
+    });
   });
 
   group('עריכה במצב סייפר', () {
@@ -142,7 +189,8 @@ void main() {
       expect(find.text(s.verifyFaqHint), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), '9999');
-      await tester.tap(find.text(stringsOf().common.confirm));
+      // הסיסמה פותחת את העריכה — "כניסה" ולא "אישור".
+      await tester.tap(find.text(s.enterButton));
       await tester.pumpAndSettle();
       // השגיאה בתוך הדו-שיח, והוא נשאר פתוח.
       expect(find.text(s.wrongPassword), findsOneWidget);
@@ -154,7 +202,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('faq.edit')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '1234');
-      await tester.tap(find.text(stringsOf().common.confirm));
+      await tester.tap(find.text(s.enterButton));
       await tester.pumpAndSettle();
       expect(find.text(t.editTitle), findsOneWidget);
       expect(gate.isLocked, isFalse);
@@ -319,6 +367,22 @@ void main() {
   });
 
   group('השמירה לדיסק', () {
+    test('שינוי מושהה נכתב רק אחרי ההשהיה, או מיד ב-flush', () async {
+      final file = File('${tempDir.path}/faq_customization.json');
+      faq.updateDeferred(
+        faq.value.copyWith(contactName: 'א'),
+        const Duration(hours: 1),
+      );
+      expect(faq.value.contactName, 'א');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(file.existsSync(), isFalse);
+
+      await faq.flush();
+      expect(jsonDecode(file.readAsStringSync())['contact']['name'], 'א');
+      // ואין מה לכתוב שוב.
+      await faq.flush();
+    });
+
     test('הסתרה ושאלה מתווספת נשמרות ונטענות מקובץ', () async {
       await faq.update(const FaqCustomization(
         hiddenIds: {'qFree'},

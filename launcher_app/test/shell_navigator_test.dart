@@ -72,6 +72,19 @@ void main() {
     expect(nav.current, const HomeRoute());
   });
 
+  test('עריכת השאלות מההגדרות — מעל ההגדרות, וחזרה מובילה אליהן', () {
+    nav.push(const FaqEditRoute());
+    expect(nav.section, ShellSection.help);
+    expect(nav.stack, const [
+      HomeRoute(),
+      SectionRoute(ShellSection.settings),
+      FaqEditRoute(),
+    ]);
+
+    expect(nav.back(), isTrue);
+    expect(nav.current, const SectionRoute(ShellSection.settings));
+  });
+
   test('ניהול תוכנות נוספות שייך להגדרות', () {
     nav.push(const CustomAppsManageRoute());
     expect(nav.section, ShellSection.settings);

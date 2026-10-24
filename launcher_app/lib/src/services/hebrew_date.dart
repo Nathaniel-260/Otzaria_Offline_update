@@ -1,4 +1,4 @@
-/// המרת תאריך לועזי לתאריך עברי בגימטריה — למשל `ט"ו בשבט תשפ"ו`.
+/// המרת תאריך לועזי לתאריך עברי בגימטריה — למשל `ט"ו שבט ה'תשפ"ו`.
 ///
 /// האתר מקבל את זה מ-`Intl` בדפדפן (`he-IL-u-ca-hebrew`), אבל ל-`package:intl`
 /// ב-Dart אין לוח שנה עברי. לכן ההמרה מחושבת כאן: אלגוריתם המולד הסטנדרטי
@@ -12,11 +12,11 @@ class HebrewDate {
   final int month;
   final int day;
 
-  /// כמו `formatHebrewDate` באתר (`src/lib/pageProof/dates.js`): `ט' בחשוון
-  /// תשפ"ז` — שמות החודשים של ICU, והשנה בלי האלפים.
+  /// כמו `formatHebrewDate` של חנות התוספים באתר (`src/lib/hebrewDate.ts`):
+  /// `ט' חשוון ה'תשפ"ז` — שמות החודשים של ICU, והשנה עם האלפים.
   @override
   String toString() =>
-      '${toHebrewNumeral(day)} ב$monthName ${toHebrewNumeral(year % 1000)}';
+      '${toHebrewNumeral(day)} $monthName ${toHebrewNumeral(year)}';
 
   String get monthName {
     if (month == 12 && isLeapYear(year)) return 'אדר א׳';
@@ -57,13 +57,11 @@ class HebrewDate {
         12 * ((year - 1) % 19) +
         (7 * ((year - 1) % 19) + 1) ~/ 19;
     final partsElapsed = 204 + 793 * (monthsElapsed % 1080);
-    final hoursElapsed = 11 +
+    // מולד בהר"ד: ב' בשבוע, 5 שעות ור"ד (204) חלקים.
+    final hoursElapsed = 5 +
         12 * monthsElapsed +
         793 * (monthsElapsed ~/ 1080) +
         partsElapsed ~/ 1080;
-    // ה-+1 מיישר את יום המולד לעוגן [_epoch]. בלעדיו יום השבוע של המולד
-    // יוצא מוסט, ולכן הדחיות למטה מופעלות על היום הלא נכון — וראש השנה
-    // נופל בטעות יום או שניים מוקדם מדי בחלק מהשנים.
     final day = 29 * monthsElapsed + hoursElapsed ~/ 24 + 1;
     final parts = (hoursElapsed % 24) * 1080 + partsElapsed % 1080;
 

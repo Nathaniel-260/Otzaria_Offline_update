@@ -351,6 +351,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       context,
       storedPassword: widget.settings.settings.saferModePassword,
       hint: context.strings.saferMode.verifySettingsHint,
+      confirmText: context.strings.saferMode.enterButton,
     );
     if (!unlocked || !mounted) return false;
     saferMode.unlock();
@@ -362,9 +363,12 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   /// "עריכת השאלות הנפוצות" בהגדרות — דף העזרה נכנס לעריכה כשהוא מוצג.
   final ValueNotifier<bool> _faqEditRequest = ValueNotifier(false);
 
+  /// מעל ההגדרות, כך שחזרה מהעריכה מחזירה אליהן. הבקשה אחרי הניווט: ניווט
+  /// שנחסם לא משאיר את הדף במצב עריכה.
   Future<void> _editFaq() async {
-    _faqEditRequest.value = true;
-    if (!await _goTo(ShellSection.help)) _faqEditRequest.value = false;
+    if (await _navigator.push(const FaqEditRoute())) {
+      _faqEditRequest.value = true;
+    }
   }
 
   void _toggleLanguage() => unawaited(toggleAppLanguage(widget.settings));
@@ -663,6 +667,8 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           faq: s.faq,
           saferMode: s.saferMode,
           editRequests: _faqEditRequest,
+          active: _navigator.section == ShellSection.help,
+          readOnly: widget.readOnly,
         ),
       ShellSection.home => const SizedBox.shrink(),
     };

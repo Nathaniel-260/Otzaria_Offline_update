@@ -5,6 +5,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
@@ -365,27 +366,31 @@ void main() {
       ),
     );
 
+    // שלושה שבבים, אחד לכל רכיב — בלי "הכול".
+    final chips = tester
+        .widgetList<StoreFilterChip>(find.byType(StoreFilterChip))
+        .map((c) => c.label)
+        .toList();
+    expect(chips, [t.syncTargetApp, t.syncTargetLibrary, t.syncTargetPlugins]);
+
     expect(settings.settings.syncLibrary, isTrue);
     await tester.tap(find.text(t.syncTargetLibrary));
     await tester.pumpAndSettle();
     expect(settings.settings.syncLibrary, isFalse);
-    // השאר לא זזו, ו"הכל" כבה מעצמו.
+    // השאר לא זזו.
     expect(settings.settings.syncApp, isTrue);
     expect(settings.settings.syncPlugins, isTrue);
 
-    // "הכל" מחזיר את שלושתם בלחיצה אחת.
-    await tester.tap(find.text(t.syncTargetAll));
+    // בחירה ריקה מותרת — היא רק מכבה את כפתור ההורדה.
+    await tester.tap(find.text(t.syncTargetApp));
+    await tester.tap(find.text(t.syncTargetPlugins));
     await tester.pumpAndSettle();
-    expect(settings.settings.hasSyncSelection, isTrue);
-    expect(settings.settings.syncLibrary, isTrue);
+    expect(settings.settings.hasSyncSelection, isFalse);
 
-    // ולחיצה נוספת מכבה את שלושתם — בחירה ריקה מותרת, היא רק מכבה את
-    // כפתור ההורדה.
-    await tester.tap(find.text(t.syncTargetAll));
+    await tester.tap(find.text(t.syncTargetLibrary));
     await tester.pumpAndSettle();
-    expect(settings.settings.syncApp, isFalse);
-    expect(settings.settings.syncLibrary, isFalse);
-    expect(settings.settings.syncPlugins, isFalse);
+    expect(settings.settings.syncLibrary, isTrue);
+    expect(settings.settings.hasSyncSelection, isTrue);
   });
 
   testWidgets('עדכון אישי נועל את "ספרייה" במצב דלוק', (tester) async {
@@ -410,29 +415,32 @@ void main() {
         .toList();
     final library = chips.singleWhere((c) => c.locked);
     expect(library.label, t.syncTargetLibrary);
-    // נעול ומסומן, ולכן גם "הכל" מסומן — כל ארבעת השבבים.
     expect(library.selected, isTrue);
-    expect(chips.where((c) => c.selected), hasLength(4));
+    expect(chips, hasLength(3));
+    expect(chips.where((c) => c.selected), hasLength(3));
+
+    // הסבר צף על השבב הנעול, כמו `title` במוקאפ.
+    expect(
+      find.ancestor(
+        of: find.text(t.syncTargetLibrary),
+        matching: find.byWidgetPredicate(
+          (w) => w is Tooltip && w.message == t.syncLibraryLockedSubtitle,
+        ),
+      ),
+      findsOneWidget,
+    );
 
     // לחיצה על השבב הנעול אינה משנה דבר.
     await tester.tap(find.text(t.syncTargetLibrary), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(settings.settings.syncLibrary, isFalse);
 
-    // "הכל" מכבה את השניים האחרים ואינו נוגע בבחירה השמורה של הספרייה.
-    await tester.tap(find.text(t.syncTargetAll));
+    // השניים האחרים עדיין נלחצים, בלי לגעת בבחירה השמורה של הספרייה.
+    await tester.tap(find.text(t.syncTargetApp));
     await tester.pumpAndSettle();
     expect(settings.settings.syncApp, isFalse);
-    expect(settings.settings.syncPlugins, isFalse);
     expect(settings.settings.syncLibrary, isFalse);
     expect(settings.settings.hasSyncSelection, isTrue);
-
-    // ולחיצה חוזרת מדליקה אותם — עדיין בלי לגעת בספרייה.
-    await tester.tap(find.text(t.syncTargetAll));
-    await tester.pumpAndSettle();
-    expect(settings.settings.syncApp, isTrue);
-    expect(settings.settings.syncPlugins, isTrue);
-    expect(settings.settings.syncLibrary, isFalse);
   });
 
   testWidgets('דף הספרייה: כרטיס מצב, ובמתקדם התיקייה שממנה מעדכנים', (
@@ -1026,26 +1034,23 @@ void main() {
     expect(find.byType(SegmentedButton<Object?>), findsNothing);
   });
 
-  testWidgets('"יומן שינויים" בשורת הגרסה פותח את היומן הארוז', (tester) async {
+  testWidgets('אודות היא שורה אחת — בלי שורת "יומן שינויים" נוספת', (
+    tester,
+  ) async {
     await pumpScreen(
       tester,
       SettingsScreen(
         controller: settings,
         onOpenLog: () {},
-        launcherVersion: launcherVersion,
+        launcherVersion: '3.3.0-beta',
       ),
     );
 
-    await tester.ensureVisible(find.text('יומן שינויים'));
-    await tester.tap(find.text('יומן שינויים'));
-    // טעינת הנכס היא I/O אמיתי — ראו AGENTS.md §3.
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 200)),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('יומן שינויים בתוכנה'), findsOneWidget);
-    expect(find.text('לא נמצא קובץ יומן שינויים.'), findsNothing);
+    final t = stringsOf().settings;
+    expect(find.text(stringsOf().launcherUpdate.changelogButton), findsNothing);
+    // הגרסה עטופה בבידוד כיוון, כדי ש-"3.3.0-beta" לא תתהפך בכותרת עברית.
+    expect(t.aboutTitle('3.3.0-beta'), contains('\u20663.3.0-beta\u2069'));
+    expect(find.text(t.aboutTitle('3.3.0-beta')), findsOneWidget);
   });
 
   testWidgets('אודות פותח את דף הכלי, ומתקדם פותח את עריכת השאלות', (
@@ -1156,6 +1161,13 @@ void main() {
     await tester.tap(find.text(t.languageSystem));
     await tester.pumpAndSettle();
     expect(find.byType(OptionCard), findsNWidgets(3));
+    // בדו-שיח "כמו במחשב" אומר לאיזו שפה הוא מתורגם בפועל.
+    final systemOption = t.languageSystemAs(
+      AppLanguagePreference.system.resolve().isRtl
+          ? t.languageHebrew
+          : t.languageEnglish,
+    );
+    expect(find.text(systemOption), findsOneWidget);
     await tester.tap(find.text('English').last);
     await tester.pumpAndSettle();
     expect(find.byType(OptionCard), findsNothing);
@@ -1178,13 +1190,14 @@ void main() {
     );
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text(t.languageSystem).last);
+    await tester.tap(find.text(systemOption));
     await tester.pumpAndSettle();
 
     expect(settings.settings.languagePreference, AppLanguagePreference.system);
   });
 
   testWidgets('הפעלת התקנה אוטומטית דורשת אישור באזהרה', (tester) async {
+    final t = stringsOf().settings;
     await pumpScreen(
       tester,
       SettingsScreen(
@@ -1194,26 +1207,33 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text(stringsOf().settings.autoInstallTitle));
+    await tester.tap(find.text(t.autoInstallTitle));
     await tester.pumpAndSettle();
 
+    expect(find.text(t.autoInstallDialogTitle), findsOneWidget);
+    expect(find.text(t.autoInstallDialogContent), findsOneWidget);
+    // אזהרה: הביטול הוא הכפתור המומלץ והממוקד, וההפעלה בצבע אזהרה. בלי
+    // שורה אדומה נוספת — הגוף אחד, כמו במוקאפ.
+    final cancel = find.widgetWithText(FilledButton, stringsOf().common.cancel);
+    expect(cancel, findsOneWidget);
     expect(
-      find.text(stringsOf().settings.autoInstallDialogTitle),
+        Focus.of(tester.element(find.text(stringsOf().common.cancel))).hasFocus,
+        isTrue);
+    expect(
+      find.widgetWithText(TextButton, t.autoInstallDialogConfirm),
       findsOneWidget,
     );
-    // ביטול משאיר את ההגדרה כבויה.
-    await tester.tap(find.text('ביטול'));
+    expect(find.textContaining('ההתקנה מחליפה קבצים'), findsNothing);
+
+    // Enter אינו מפעיל: הוא לוחץ על הביטול הממוקד.
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
+    expect(find.text(t.autoInstallDialogTitle), findsNothing);
     expect(settings.settings.autoInstall, isFalse);
 
-    await tester.tap(find.text(stringsOf().settings.autoInstallTitle));
+    await tester.tap(find.text(t.autoInstallTitle));
     await tester.pumpAndSettle();
-    // האזהרה עצמה נאמרת בדו-שיח.
-    expect(
-      find.text(stringsOf().settings.autoInstallDialogWarning),
-      findsOneWidget,
-    );
-    await tester.tap(find.text(stringsOf().settings.autoInstallDialogConfirm));
+    await tester.tap(find.text(t.autoInstallDialogConfirm));
     await tester.pumpAndSettle();
 
     expect(settings.settings.autoInstall, isTrue);
@@ -1558,8 +1578,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(t.personalModeDialogTitle), findsOneWidget);
-    // האזהרה עצמה חייבת להיאמר: מכאן והלאה הכונן אינו משרת מחשב אחר.
-    expect(find.text(t.personalModeDialogWarning), findsOneWidget);
+    // נוסח פשוט, והעובדה החשובה נאמרת: הספרייה המלאה תימחק.
+    expect(find.text(t.personalModeDialogContent), findsOneWidget);
+    expect(
+      t.personalModeDialogContent,
+      contains('הספרייה המלאה שבכונן תימחק בהורדה הבאה'),
+    );
+    expect(find.textContaining('גרסת המסד'), findsNothing);
+    expect(find.textContaining('מגה'), findsNothing);
+    // עדיין אזהרה — הביטול מומלץ.
+    expect(
+      find.widgetWithText(FilledButton, stringsOf().common.cancel),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text(stringsOf().common.cancel));
     await tester.pumpAndSettle();

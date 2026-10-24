@@ -39,8 +39,10 @@ String formatDate(DateTime value) {
 }
 
 /// תאריך בחנות התוספים ובתוכנות הנוספות — הפורמט האחד לשתיהן. בעברית תאריך
-/// עברי כמו באתר ("ט' בחשוון תשפ"ז"), באנגלית "October 18, 2026".
-String formatStoreDate(DateTime value) => _storeDay(value.toLocal());
+/// עברי כמו באתר ("ט' חשוון ה'תשפ"ז"), באנגלית "October 18, 2026".
+///
+/// הרגע נקרא ב-UTC, כמו בחנות שבאתר — כך אותו תוסף מקבל אותו תאריך בשניהם.
+String formatStoreDate(DateTime value) => _storeDay(value.toUtc());
 
 /// [formatStoreDate] למחרוזת תאריך מה-API (`YYYY-MM-DD` או ISO-8601 מלא).
 /// מחרוזת שאינה תאריך מוחזרת כמות שהיא — עדיף על שגיאה במסך.
@@ -48,8 +50,8 @@ String formatStoreDateRaw(String? raw) {
   if (raw == null || raw.isEmpty) return '';
   final date = DateTime.tryParse(raw);
   if (date == null) return raw;
-  // תאריך בלי שעה הוא יום בלוח, לא רגע — המרה לשעון המקומי הייתה מזיזה אותו.
-  return _storeDay(raw.length <= 10 ? date : date.toLocal());
+  // תאריך בלי שעה הוא יום בלוח, לא רגע — המרה הייתה מזיזה אותו.
+  return _storeDay(raw.length <= 10 ? date : date.toUtc());
 }
 
 String _storeDay(DateTime day) => AppL10n.language.isRtl

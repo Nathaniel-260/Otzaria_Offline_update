@@ -4,12 +4,17 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
+import 'package:launcher_app/src/controllers/app_reports_controller.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/screens/reports/reports_page.dart';
@@ -251,6 +256,75 @@ final List<VisualState> _phase5States = [
   ),
 ];
 
+/// תיקוני שלב 5: אותם מצבים, ועוד "פרטיות ודיווחים" (עם דיווחי הכלי),
+/// אזהרת העדכון למחשב מסוים, שגיאת החלפה ועריכה שנפתחה מההגדרות.
+final List<VisualState> _phase5bStates = [
+  ..._phase5States,
+  (
+    name: 'settings_privacy',
+    open: (t) async {
+      await _openSettings(t);
+      await _tapVisible(t, find.text(stringsOf().settings.groupPrivacy));
+    },
+  ),
+  (
+    name: 'dlg_personal',
+    open: (t) async {
+      await _openSettingsAdvanced(t);
+      await _tapVisible(t, find.text(stringsOf().settings.personalModeTitle));
+    },
+  ),
+  (
+    name: 'dlg_pw_change_error',
+    open: (t) async {
+      await _setPassword(t);
+      await _tapVisible(t, find.text(stringsOf().saferMode.changeButton));
+      final fields = find.byType(TextField);
+      await t.enterText(fields.at(0), '9999');
+      await t.enterText(fields.at(1), '5678');
+      await t.enterText(fields.at(2), '5678');
+      await t.tap(
+        find
+            .widgetWithText(ActionButton, stringsOf().saferMode.changeButton)
+            .last,
+      );
+      await t.pump(const Duration(milliseconds: 400));
+    },
+  ),
+  (
+    name: 'help_edit_from_settings',
+    open: (t) async {
+      await _openSettingsAdvanced(t);
+      await _tapVisible(t, find.text(stringsOf().settings.faqEditTitle));
+    },
+  ),
+];
+
+/// דיווחי הכלי בלי רשת ובלי קבצים — רק כדי ש"פרטיות ודיווחים" תוצג.
+class _QuietReportService extends AppReportService {
+  _QuietReportService()
+      : super(
+          directory: '',
+          client: MockClient((_) async => http.Response('', 500)),
+        );
+
+  @override
+  void startAutomaticFlush() {}
+  @override
+  Future<int> getPendingReportsCount() async => 0;
+  @override
+  Future<int> getSentReportsTotal() async => 0;
+}
+
+class _QuietCollector implements AppReportAttachmentsCollector {
+  @override
+  Future<AppReportAttachments> collect() async =>
+      const AppReportAttachments(diagnostics: {}, errorLog: '');
+}
+
+/// השלבים שמצלמים את ההגדרות עם דיווחי הכלי.
+const _appReportsPhases = {'phase5b'};
+
 /// שלב חדש מוסיף כאן את רשימת המצבים שלו.
 final Map<String, List<VisualState>> _statesByPhase = {
   'phase0': _phase0States,
@@ -272,6 +346,7 @@ final Map<String, List<VisualState>> _statesByPhase = {
   // החנות והתוכנות הנוספות מצולמות מה-fixtures — ראו `store_<scenario>`.
   'phase4': const [],
   'phase5': _phase5States,
+  'phase5b': _phase5bStates,
 };
 
 /// השלבים שמצלמים את מצבי החנות.
@@ -309,11 +384,19 @@ void main() {
     tempDir = Directory.systemTemp.createTempSync('visual_review');
     await AppLogger.init(tempDir.path);
     settings = SettingsController(dataDir: tempDir.path);
-    await settings.update(const AppSettings(autoCheckUpdates: false));
+    // עברית במפורש: "כמו במחשב" במכונת הבדיקה היא אנגלית, וההגדרות מציבות
+    // אותה ב-`AppL10n` בכל שמירה — וכך "Cancel" נכנס לדו-שיחים בצילום.
+    await settings.update(
+      const AppSettings(
+        autoCheckUpdates: false,
+        languagePreference: AppLanguagePreference.hebrew,
+      ),
+    );
   });
 
   tearDown(() async {
     if (!_enabled) return;
+    LauncherCrashSession.resetForTest();
     settings.dispose();
     AppLogger.resetForTest();
     await deleteTempDir(tempDir);
@@ -350,8 +433,19 @@ void main() {
         debugDisableShadows = false;
         // כמו `debugShowCheckedModeBanner: false` שב-main.dart.
         WidgetsApp.debugAllowBannerOverride = false;
+        final reports = _appReportsPhases.contains(_phase)
+            ? AppReportsController(
+                service: _QuietReportService(),
+                collector: _QuietCollector(),
+                settings: settings,
+                logsDirectory: tempDir.path,
+                redactor: AppReportRedactor(environment: const {}),
+                isProcessAlive: (_) => false,
+              )
+            : null;
         try {
           useViewSize(tester, size);
+          AppL10n.use(AppLanguage.hebrew);
           await tester.pumpWidget(
             RepaintBoundary(
               key: boundary,
@@ -364,6 +458,7 @@ void main() {
                     seen: {NoticesSeenStore.errorReportsIntro},
                   ),
                   showWindowButtons: _showWindowButtons,
+                  appReports: reports,
                 ),
               ),
             ),
@@ -378,6 +473,7 @@ void main() {
           );
           await tester.pumpWidget(const SizedBox.shrink());
         } finally {
+          reports?.dispose();
           debugDisableShadows = true;
           WidgetsApp.debugAllowBannerOverride = true;
         }

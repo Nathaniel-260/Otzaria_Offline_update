@@ -26,6 +26,8 @@ class FaqBody extends StatefulWidget {
     required this.faq,
     this.saferMode,
     this.editRequests,
+    this.active = true,
+    this.readOnly = false,
   });
 
   final FaqController faq;
@@ -36,6 +38,13 @@ class FaqBody extends StatefulWidget {
   /// `true` מבקש להיכנס לעריכה ("עריכת השאלות הנפוצות" שבהגדרות); הגוף
   /// מאפס אותו כשטיפל. נקרא גם בבנייה הראשונה — הדף נבנה רק בכניסה אליו.
   final ValueNotifier<bool>? editRequests;
+
+  /// הדף מוצג. הדף נשאר בעץ גם כשיוצאים ממנו, ולכן היציאה ממנו מסיימת את
+  /// העריכה ושומרת — "?" אחר כך פותח את השאלות ולא את העריכה.
+  final bool active;
+
+  /// כונן מוגן: ההתאמות נשמרות במחשב הזה, וההסבר בעריכה אומר זאת.
+  final bool readOnly;
 
   @override
   State<FaqBody> createState() => _FaqBodyState();
@@ -50,7 +59,6 @@ class _FaqBodyState extends State<FaqBody> {
       TextEditingController(text: widget.faq.value.contactName);
   late final TextEditingController _phone =
       TextEditingController(text: widget.faq.value.contactPhone);
-  Timer? _contactSave;
 
   FaqCustomization get _custom => widget.faq.value;
 
@@ -65,12 +73,14 @@ class _FaqBodyState extends State<FaqBody> {
   }
 
   @override
+  void didUpdateWidget(FaqBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active && !widget.active && _editing) _finishEditing();
+  }
+
+  @override
   void dispose() {
-    // הקלדה שטרם נשמרה בגלל ההשהיה — זה הרגע האחרון לשמור.
-    if (_contactSave?.isActive ?? false) {
-      _contactSave!.cancel();
-      unawaited(_saveContact());
-    }
+    unawaited(widget.faq.flush());
     widget.faq.removeListener(_onChange);
     widget.editRequests?.removeListener(_onEditRequest);
     _name.dispose();
@@ -89,13 +99,18 @@ class _FaqBodyState extends State<FaqBody> {
     if (!_editing) unawaited(_toggleEditing());
   }
 
-  Future<void> _saveContact() => widget.faq.update(
+  void _scheduleContactSave() => widget.faq.updateDeferred(
         _custom.copyWith(contactName: _name.text, contactPhone: _phone.text),
+        _contactSaveDelay,
       );
 
-  void _scheduleContactSave() {
-    _contactSave?.cancel();
-    _contactSave = Timer(_contactSaveDelay, () => unawaited(_saveContact()));
+  /// יציאה מהעריכה: מה שהוקלד ועוד לא נשמר נכתב מיד.
+  void _finishEditing() {
+    unawaited(widget.faq.flush());
+    setState(() {
+      _editing = false;
+      _openKey = null;
+    });
   }
 
   Future<void> _addQuestion() async {
@@ -131,23 +146,20 @@ class _FaqBodyState extends State<FaqBody> {
   /// במצב סייפר הכניסה *לעריכה* נשאלת סיסמה — היציאה ממנה לא, ומי שכבר
   /// אומת בהרצה הזו אינו נשאל שוב.
   Future<void> _toggleEditing() async {
-    if (!_editing) {
-      final gate = widget.saferMode;
-      if (gate != null && gate.isLocked) {
-        final unlocked = await showSaferModePasswordDialog(
-          context,
-          storedPassword: gate.settings.settings.saferModePassword,
-          hint: context.strings.saferMode.verifyFaqHint,
-        );
-        if (!unlocked || !mounted) return;
-        gate.unlock();
-      }
-    } else {
-      _contactSave?.cancel();
-      unawaited(_saveContact());
+    if (_editing) return _finishEditing();
+    final gate = widget.saferMode;
+    if (gate != null && gate.isLocked) {
+      final unlocked = await showSaferModePasswordDialog(
+        context,
+        storedPassword: gate.settings.settings.saferModePassword,
+        hint: context.strings.saferMode.verifyFaqHint,
+        confirmText: context.strings.saferMode.enterButton,
+      );
+      if (!unlocked || !mounted) return;
+      gate.unlock();
     }
     setState(() {
-      _editing = !_editing;
+      _editing = true;
       _openKey = null;
     });
   }
@@ -181,7 +193,9 @@ class _FaqBodyState extends State<FaqBody> {
               ),
               const SizedBox(height: 6),
               Text(
-                _editing ? t.editIntro : t.intro,
+                _editing
+                    ? (widget.readOnly ? t.editIntroThisComputer : t.editIntro)
+                    : t.intro,
                 style: AppTextStyles.body.copyWith(color: cs.onSurfaceVariant),
               ),
             ],
@@ -271,12 +285,14 @@ class _FaqBodyState extends State<FaqBody> {
             actions: [
               IconButton(
                 key: ValueKey('faq-extra-edit-$i'),
+                style: _toolStyle,
                 tooltip: t.editQuestionTooltip,
                 icon: const Icon(FluentIcons.edit_20_regular, size: 18),
                 onPressed: () => unawaited(_editQuestion(i)),
               ),
               IconButton(
                 key: ValueKey('faq-extra-delete-$i'),
+                style: _toolStyle,
                 tooltip: t.deleteQuestionTooltip,
                 color: Theme.of(context).colorScheme.error,
                 icon: const Icon(FluentIcons.delete_20_regular, size: 18),
@@ -431,6 +447,14 @@ class _FaqItem extends StatelessWidget {
   }
 }
 
+/// כלי שורה בעריכה (`.ibtn.sm`): 32, כדי ששורת עריכה לא תהיה גבוהה משורת קריאה.
+final ButtonStyle _toolStyle = IconButton.styleFrom(
+  fixedSize: const Size.square(32),
+  minimumSize: const Size.square(32),
+  padding: EdgeInsets.zero,
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);
+
 /// הסתרה/הצגה של שאלה מובנית.
 class _IconAction extends StatelessWidget {
   const _IconAction({
@@ -446,6 +470,7 @@ class _IconAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.strings.faq;
     return IconButton(
+      style: _toolStyle,
       tooltip: hidden ? t.restoreTooltip : t.hideTooltip,
       icon: Icon(
         hidden ? FluentIcons.eye_20_regular : FluentIcons.eye_off_20_regular,

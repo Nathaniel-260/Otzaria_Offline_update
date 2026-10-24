@@ -2,13 +2,11 @@ import 'dart:async';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../controllers/app_reports_controller.dart';
 import '../controllers/custom_apps_controller.dart';
 import '../controllers/launcher_update_controller.dart';
-import '../self_update/launcher_changelog.dart';
 import '../services/app_paths.dart';
 import '../settings/app_settings.dart';
 import '../settings/safer_mode.dart';
@@ -216,7 +214,16 @@ class SettingsScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 10),
                 child: OptionCard(
                   icon: icon,
-                  title: _languageLabel(t, value),
+                  title: value == AppLanguagePreference.system
+                      ? t.languageSystemAs(
+                          _languageLabel(
+                            t,
+                            AppLanguagePreference.system.resolve().isRtl
+                                ? AppLanguagePreference.hebrew
+                                : AppLanguagePreference.english,
+                          ),
+                        )
+                      : _languageLabel(t, value),
                   selected: value == current,
                   onSelected: () {
                     Navigator.of(dialogContext).pop();
@@ -230,7 +237,8 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  /// התקנה אוטומטית מחליפה קבצים בלי לשאול — ולכן ההפעלה דורשת אישור.
+  /// התקנה אוטומטית מחליפה קבצים בלי לשאול — ולכן ההפעלה דורשת אישור,
+  /// באזהרה: הביטול ממוקד, ו-Enter אינו מפעיל.
   Future<void> _confirmAutoInstall(
     BuildContext context, {
     required bool enabled,
@@ -241,37 +249,26 @@ class SettingsScreen extends StatelessWidget {
     }
 
     final t = context.strings.settings;
-    final approved = await showTwoActionsDialog(
+    final approved = await showWarningDialog(
       context: context,
       title: t.autoInstallDialogTitle,
       content: t.autoInstallDialogContent,
-      subtitle: t.autoInstallDialogWarning,
       confirmText: t.autoInstallDialogConfirm,
     );
     if (!approved) return;
     await _set(_s.copyWith(autoInstall: true));
   }
 
-  /// [_SyncTarget.all] אינו הגדרה בפני עצמו — הוא דלוק כששלושת הרכיבים
-  /// דלוקים, ולחיצה עליו מדליקה או מכבה את שלושתם יחד.
   Set<_SyncTarget> get _selectedSyncTargets => {
         if (_s.syncApp) _SyncTarget.app,
         if (_s.downloadsLibrary) _SyncTarget.library,
         if (_s.syncPlugins) _SyncTarget.plugins,
-        if (_s.syncApp && _s.downloadsLibrary && _s.syncPlugins)
-          _SyncTarget.all,
       };
 
   Future<void> _toggleSyncTarget(_SyncTarget target) {
     final on = !_selectedSyncTargets.contains(target);
     return _set(
       switch (target) {
-        // בעדכון למחשב מסוים הספרייה נעולה — "הכול" נוגע רק בשני האחרים.
-        _SyncTarget.all => _s.copyWith(
-            syncApp: on,
-            syncLibrary: _s.personalUpdateMode ? null : on,
-            syncPlugins: on,
-          ),
         _SyncTarget.app => _s.copyWith(syncApp: on),
         _SyncTarget.library => _s.copyWith(syncLibrary: on),
         _SyncTarget.plugins => _s.copyWith(syncPlugins: on),
@@ -302,17 +299,26 @@ class SettingsScreen extends StatelessWidget {
           runSpacing: 8,
           children: [
             for (final (target, label) in [
-              (_SyncTarget.all, t.syncTargetAll),
               (_SyncTarget.app, t.syncTargetApp),
               (_SyncTarget.library, t.syncTargetLibrary),
               (_SyncTarget.plugins, t.syncTargetPlugins),
             ])
-              StoreFilterChip(
-                label: label,
-                selected: selected.contains(target),
-                locked: personal && target == _SyncTarget.library,
-                onTap: () => unawaited(_toggleSyncTarget(target)),
-              ),
+              if (personal && target == _SyncTarget.library)
+                Tooltip(
+                  message: t.syncLibraryLockedSubtitle,
+                  child: StoreFilterChip(
+                    label: label,
+                    selected: selected.contains(target),
+                    locked: true,
+                    onTap: null,
+                  ),
+                )
+              else
+                StoreFilterChip(
+                  label: label,
+                  selected: selected.contains(target),
+                  onTap: () => unawaited(_toggleSyncTarget(target)),
+                ),
           ],
         ),
       ),
@@ -373,8 +379,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  /// הפעלה דורשת אישור: מכאן והלאה הכונן אינו מתקין ספרייה במחשב אחר, וגם
-  /// ההתקנה המלאה כשקובץ עדכון אינו מתאים נעלמת ממנו.
+  /// הפעלה דורשת אישור באזהרה: הספרייה המלאה שבכונן נמחקת בהורדה הבאה.
   Future<void> _confirmPersonalMode(
     BuildContext context, {
     required bool enabled,
@@ -389,7 +394,6 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       title: t.personalModeDialogTitle,
       content: t.personalModeDialogContent,
-      subtitle: t.personalModeDialogWarning,
       confirmText: t.personalModeDialogConfirm,
     );
     if (!approved) return;
@@ -463,7 +467,10 @@ class SettingsScreen extends StatelessWidget {
   /// סיסמה ראשונה נשמרת ומפעילה את הנעילה — מי שבחר אותה מתכוון לנעול.
   Future<void> _setPassword(BuildContext context) async {
     final t = context.strings.saferMode;
-    final encoded = await showSaferModeSetPasswordDialog(context);
+    final encoded = await showSaferModeSetPasswordDialog(
+      context,
+      onThisComputer: readOnly,
+    );
     if (encoded == null) return;
     // לפני השמירה: הנעילה נכנסת לתוקף בשמירה, ומי שקבע אותה לא יישאל עליה.
     saferMode?.unlock();
@@ -522,7 +529,6 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _about(BuildContext context) {
     final t = context.strings.settings;
-    final u = context.strings.launcherUpdate;
     Widget versionRow() {
       final line =
           launcherUpdate == null ? null : launcherLineOf(launcherUpdate!);
@@ -550,45 +556,13 @@ class SettingsScreen extends StatelessWidget {
           ListenableBuilder(listenable: c, builder: (_, __) => versionRow())
         else
           versionRow(),
-        AppRow(
-          key: const ValueKey('settings.changelog'),
-          leading: const IconTile(
-            icon: FluentIcons.history_24_regular,
-            size: _tile,
-            tone: _quiet,
-          ),
-          title: u.changelogButton,
-          subtitle: t.changelogSubtitle,
-          onTap: () => unawaited(_showChangelog(context)),
-        ),
       ],
-    );
-  }
-
-  /// יומן השינויים המלא, מהעותק שנארז בתוכנה — בלי רשת.
-  Future<void> _showChangelog(BuildContext context) async {
-    String? changelog;
-    try {
-      changelog = await rootBundle.loadString(launcherChangelogAsset);
-    } catch (_) {
-      changelog = null;
-    }
-    if (!context.mounted) return;
-    final t = context.strings.launcherUpdate;
-    await showSingleActionDialog(
-      context: context,
-      title: t.changelogDialogTitle,
-      confirmText: context.strings.common.close,
-      customContent: WhatsNewView(
-        markdown: changelog,
-        emptyText: t.changelogNotFound,
-      ),
     );
   }
 }
 
-/// אפשרויות שבבי ההורדה. `all` הוא קיצור לשלושתם, לא רכיב.
-enum _SyncTarget { all, app, library, plugins }
+/// אפשרויות שבבי ההורדה.
+enum _SyncTarget { app, library, plugins }
 
 /// כפתור בורר (`.dd`): 40, לבן עם מסגרת outline, התווית והחץ בקצוות.
 class _LanguageButton extends StatelessWidget {

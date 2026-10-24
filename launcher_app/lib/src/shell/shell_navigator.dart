@@ -99,6 +99,21 @@ final class CustomAppsManageRoute extends ShellRoute {
   int get hashCode => (CustomAppsManageRoute).hashCode;
 }
 
+/// עריכת השאלות הנפוצות מתוך ההגדרות — דף העזרה מעל ההגדרות, כך שחזרה
+/// מובילה אליהן.
+final class FaqEditRoute extends ShellRoute {
+  const FaqEditRoute();
+
+  @override
+  ShellSection get section => ShellSection.help;
+
+  @override
+  bool operator ==(Object other) => other is FaqEditRoute;
+
+  @override
+  int get hashCode => (FaqEditRoute).hashCode;
+}
+
 /// שכבת משימה (הורדה/עדכון) מעל המקטע. נסגרת רק ב-[ShellNavigator.endTask].
 final class TaskRoute extends ShellRoute {
   const TaskRoute(this.section);
@@ -154,6 +169,12 @@ class ShellNavigator extends ChangeNotifier {
       case TaskRoute():
         showTask();
         return SynchronousFuture(showsTask);
+      case FaqEditRoute():
+        return _enter(route.section, [
+          const HomeRoute(),
+          const SectionRoute(ShellSection.settings),
+          route,
+        ]);
       case PluginDetailRoute() ||
             CustomAppDetailRoute() ||
             CustomAppsManageRoute():

@@ -10,26 +10,32 @@ import 'rtl_text_field.dart';
 /// מבקש את סיסמת מצב הסייפר. מחזיר `true` רק כשהוזנה הסיסמה הנכונה.
 ///
 /// [hint] אומר *למה* מבקשים אותה עכשיו — כניסה להגדרות, עריכת השאלות,
-/// הפעלת הנעילה או כיבויה.
+/// הפעלת הנעילה או כיבויה. [confirmText] — ברירת המחדל "אישור".
 Future<bool> showSaferModePasswordDialog(
   BuildContext context, {
   required String storedPassword,
   required String hint,
+  String? confirmText,
 }) async =>
     await showDialog<bool>(
       context: context,
       builder: (_) => _VerifyDialog(
         storedPassword: storedPassword,
         hint: hint,
+        confirmText: confirmText,
       ),
     ) ??
     false;
 
 /// קביעת סיסמה ראשונה. מחזיר את הערך המעורבל לשמירה, או `null` בביטול.
-Future<String?> showSaferModeSetPasswordDialog(BuildContext context) =>
+/// [onThisComputer] — בכונן מוגן ההגדרות נשמרות במחשב, וההסבר אומר זאת.
+Future<String?> showSaferModeSetPasswordDialog(
+  BuildContext context, {
+  bool onThisComputer = false,
+}) =>
     showDialog<String>(
       context: context,
-      builder: (_) => const _SetPasswordDialog(),
+      builder: (_) => _SetPasswordDialog(onThisComputer: onThisComputer),
     );
 
 /// החלפת סיסמה: הנוכחית והחדשה פעמיים בדו-שיח אחד. מחזיר את הערך המעורבל
@@ -55,10 +61,15 @@ Future<bool> showSaferModeClearPasswordDialog(
     false;
 
 class _VerifyDialog extends StatefulWidget {
-  const _VerifyDialog({required this.storedPassword, required this.hint});
+  const _VerifyDialog({
+    required this.storedPassword,
+    required this.hint,
+    this.confirmText,
+  });
 
   final String storedPassword;
   final String hint;
+  final String? confirmText;
 
   @override
   State<_VerifyDialog> createState() => _VerifyDialogState();
@@ -95,11 +106,11 @@ class _VerifyDialogState extends State<_VerifyDialog> {
     return _FormDialog(
       title: t.verifyTitle,
       intro: widget.hint,
-      error: _error,
       fields: [
         _PasswordField(
           controller: _password,
           label: t.passwordLabel,
+          error: _error,
           autofocus: true,
           onSubmitted: _verify,
         ),
@@ -110,7 +121,7 @@ class _VerifyDialogState extends State<_VerifyDialog> {
           onPressed: () => Navigator.of(context).pop(false),
         ),
         ActionButton.recommended(
-          text: context.strings.common.confirm,
+          text: widget.confirmText ?? context.strings.common.confirm,
           onPressed: _verify,
         ),
       ],
@@ -120,9 +131,10 @@ class _VerifyDialogState extends State<_VerifyDialog> {
 
 /// קביעה, ועם [storedPassword] — החלפה (שדה הסיסמה הנוכחית נוסף בראש).
 class _SetPasswordDialog extends StatefulWidget {
-  const _SetPasswordDialog({this.storedPassword});
+  const _SetPasswordDialog({this.storedPassword, this.onThisComputer = false});
 
   final String? storedPassword;
+  final bool onThisComputer;
 
   @override
   State<_SetPasswordDialog> createState() => _SetPasswordDialogState();
@@ -132,9 +144,12 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
   final TextEditingController _current = TextEditingController();
   final TextEditingController _password = TextEditingController();
   final TextEditingController _confirm = TextEditingController();
+  final FocusNode _currentFocus = FocusNode();
   final FocusNode _passwordFocus = FocusNode();
   final FocusNode _confirmFocus = FocusNode();
-  String? _error;
+
+  /// השגיאה מוצגת מתחת לשדה שגרם לה.
+  ({TextEditingController field, String message})? _error;
 
   bool get _changing => widget.storedPassword != null;
 
@@ -143,23 +158,34 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
     _current.dispose();
     _password.dispose();
     _confirm.dispose();
+    _currentFocus.dispose();
     _passwordFocus.dispose();
     _confirmFocus.dispose();
     super.dispose();
   }
 
+  String? _errorOf(TextEditingController field) =>
+      _error?.field == field ? _error!.message : null;
+
   void _save() {
     final t = context.strings.saferMode;
+    if (_changing &&
+        !SaferModePassword.verify(widget.storedPassword!, _current.text)) {
+      _current.clear();
+      _currentFocus.requestFocus();
+      setState(() => _error = (field: _current, message: t.wrongPassword));
+      return;
+    }
     final error = switch (_password.text) {
-      _
-          when _changing &&
-              !SaferModePassword.verify(
-                  widget.storedPassword!, _current.text) =>
-        t.wrongPassword,
-      '' => t.passwordRequired,
-      final p when p.length < SaferModePassword.minLength =>
-        t.passwordTooShort(SaferModePassword.minLength),
-      final p when p != _confirm.text => t.passwordsDoNotMatch,
+      '' => (field: _password, message: t.passwordRequired),
+      final p when p.length < SaferModePassword.minLength => (
+          field: _password,
+          message: t.passwordTooShort(SaferModePassword.minLength),
+        ),
+      final p when p != _confirm.text => (
+          field: _confirm,
+          message: t.passwordsDoNotMatch,
+        ),
       _ => null,
     };
     if (error != null) {
@@ -175,13 +201,19 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
     final t = context.strings.saferMode;
     return _FormDialog(
       title: _changing ? t.changeTitle : t.setTitle,
-      intro: _changing ? null : t.setIntro(SaferModePassword.minLength),
-      error: _error,
+      intro: _changing
+          ? null
+          : t.setIntro(
+              SaferModePassword.minLength,
+              onThisComputer: widget.onThisComputer,
+            ),
       fields: [
         if (_changing)
           _PasswordField(
             controller: _current,
+            focusNode: _currentFocus,
             label: t.currentPasswordLabel,
+            error: _errorOf(_current),
             autofocus: true,
             onSubmitted: _passwordFocus.requestFocus,
           ),
@@ -189,6 +221,7 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
           controller: _password,
           focusNode: _passwordFocus,
           label: _changing ? t.newPasswordLabel : t.passwordLabel,
+          error: _errorOf(_password),
           autofocus: !_changing,
           onSubmitted: _confirmFocus.requestFocus,
         ),
@@ -196,6 +229,7 @@ class _SetPasswordDialogState extends State<_SetPasswordDialog> {
           controller: _confirm,
           focusNode: _confirmFocus,
           label: t.confirmPasswordLabel,
+          error: _errorOf(_confirm),
           onSubmitted: _save,
         ),
       ],
@@ -224,16 +258,22 @@ class _ClearPasswordDialog extends StatefulWidget {
 
 class _ClearPasswordDialogState extends State<_ClearPasswordDialog> {
   final TextEditingController _password = TextEditingController();
+  final FocusNode _cancelFocus = FocusNode();
   String? _error;
 
   @override
   void dispose() {
     _password.dispose();
+    _cancelFocus.dispose();
     super.dispose();
   }
 
   void _clear() {
     final t = context.strings.saferMode;
+    if (_password.text.isEmpty) {
+      setState(() => _error = t.passwordRequired);
+      return;
+    }
     if (SaferModePassword.verify(widget.storedPassword, _password.text)) {
       Navigator.of(context).pop(true);
       return;
@@ -246,20 +286,22 @@ class _ClearPasswordDialogState extends State<_ClearPasswordDialog> {
   Widget build(BuildContext context) {
     final t = context.strings.saferMode;
     // אזהרה: הבטוח (ביטול) מומלץ, והפעולה ההרסנית בקצה — כמו `showWarningDialog`.
+    // Enter בשדה אינו מוחק: הוא ממקד את הביטול, והמחיקה רק בלחיצה.
     return _FormDialog(
       title: t.clearDialogTitle,
       intro: t.clearDialogContent,
-      error: _error,
       fields: [
         _PasswordField(
           controller: _password,
           label: t.currentPasswordLabel,
+          error: _error,
           autofocus: true,
-          onSubmitted: _clear,
+          onSubmitted: _cancelFocus.requestFocus,
         ),
       ],
       actions: [
         ActionButton.recommended(
+          focusNode: _cancelFocus,
           text: context.strings.common.cancel,
           onPressed: () => Navigator.of(context).pop(false),
         ),
@@ -269,26 +311,23 @@ class _ClearPasswordDialogState extends State<_ClearPasswordDialog> {
   }
 }
 
-/// דו-שיח שדות (`.dialog.form`): 440, ריפוד 24, הסבר, שדות עם תווית מעליהם
-/// ושורת שגיאה (`.errline`) — השגיאה בתוך הדו-שיח, לא בהודעה צפה.
+/// דו-שיח שדות (`.dialog.form`): 440, ריפוד 24, הסבר ושדות עם תווית מעליהם.
+/// השגיאה בתוך הדו-שיח, מתחת לשדה שלה — לא בהודעה צפה.
 class _FormDialog extends StatelessWidget {
   const _FormDialog({
     required this.title,
     required this.fields,
     required this.actions,
     this.intro,
-    this.error,
   });
 
   final String title;
   final String? intro;
   final List<Widget> fields;
-  final String? error;
   final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     const pad = AppTokens.spaceLG;
     return AlertDialog(
       insetPadding: const EdgeInsets.all(pad),
@@ -306,15 +345,8 @@ class _FormDialog extends StatelessWidget {
             children: [
               if (intro != null) ...[Text(intro!), const SizedBox(height: 16)],
               for (var i = 0; i < fields.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
+                if (i > 0) const SizedBox(height: 14),
                 fields[i],
-              ],
-              if (error != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  error!,
-                  style: AppTextStyles.rowSub.copyWith(color: cs.error),
-                ),
               ],
             ],
           ),
@@ -338,13 +370,15 @@ class _FormDialog extends StatelessWidget {
   }
 }
 
-/// שדה סיסמה (`.field`): תווית 13/600 מעליו וכפתור "הצג/הסתר" בקצה.
+/// שדה סיסמה (`.field`): תווית 13/600 מעליו, כפתור "הצג/הסתר" בקצה ושורת
+/// שגיאה (`.errline`) מתחתיו.
 class _PasswordField extends StatefulWidget {
   const _PasswordField({
     required this.controller,
     required this.label,
     required this.onSubmitted,
     this.focusNode,
+    this.error,
     this.autofocus = false,
   });
 
@@ -352,6 +386,7 @@ class _PasswordField extends StatefulWidget {
   final String label;
   final VoidCallback onSubmitted;
   final FocusNode? focusNode;
+  final String? error;
   final bool autofocus;
 
   @override
@@ -400,6 +435,10 @@ class _PasswordFieldState extends State<_PasswordField> {
             ),
           ),
         ),
+        if (widget.error case final error?) ...[
+          const SizedBox(height: 6),
+          Text(error, style: AppTextStyles.rowSub.copyWith(color: cs.error)),
+        ],
       ],
     );
   }

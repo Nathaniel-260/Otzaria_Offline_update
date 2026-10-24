@@ -1557,6 +1557,35 @@ void main() {
     expect(snacks.single, contains(t.updateAllStoppedSnack(1)));
   });
 
+  testWidgets('"עדכון הכול": עצירה יחד עם כישלון — ההודעה אומרת שנעצר',
+      (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: threeUpdates(),
+      installed: threeInstalled,
+    );
+    final hold = Completer<void>();
+    controller.holds['a'] = hold;
+    controller.failingIds.add('a');
+    final (messages: snacks, :restore) = captureSnacks();
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.updateAllButton));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(ActionButton, t.syncStopButton));
+    await tester.pump();
+    hold.complete();
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.delivered, ['a']);
+    expect(plugins.isUpdatingAll, isFalse);
+    restore();
+    expect(snacks.single, contains(t.updateAllStoppedPrefix));
+    expect(snacks.single, contains(t.updateAllNoneSentSnack('ראשון')));
+  });
+
   testWidgets('"עדכון הכול" הוא משימה ארוכה: רענון וייצוא מושבתים, ויש הסבר',
       (tester) async {
     await seedRecording(
@@ -1858,7 +1887,7 @@ void main() {
     final version = tester.widget<Text>(find.text('1.0.0'));
     expect(version.textDirection, TextDirection.ltr);
     // תאריך עברי כמו באתר — לא "18 באוקטובר 2026".
-    expect(find.text('ז\' בחשוון תשפ"ז'), findsOneWidget);
+    expect(find.text('ז\' חשוון ה\'תשפ"ז'), findsOneWidget);
   });
 
   testWidgets('דיאלוג סיום הייצוא מוצג גם אחרי שעברו לדף תוסף', (tester) async {

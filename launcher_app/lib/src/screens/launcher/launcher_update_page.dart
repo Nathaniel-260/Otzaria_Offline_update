@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import '../../controllers/launcher_update_controller.dart';
+import '../../self_update/launcher_changelog.dart';
 import '../../services/byte_size.dart';
 import '../../shell/shell_keys.dart';
 import '../../theme/theme_exports.dart';
@@ -10,6 +14,7 @@ import '../../widgets/widgets_exports.dart';
 
 /// דף "עדכון הכלי הזה" — מהשורה שבתחתית הבית: הגרסה הפתוחה מול החדשה, מה
 /// חדש בה, ופעולה אחת לפי המצב (הורדה, התקנה, החלפה ידנית, הפעלה כמנהל).
+/// יומן השינויים המלא נפתח מכאן — שורת "אודות" בהגדרות מובילה לדף הזה.
 class LauncherUpdatePage extends StatelessWidget {
   const LauncherUpdatePage({
     super.key,
@@ -252,6 +257,35 @@ class LauncherUpdatePage extends StatelessWidget {
         if (busy && (ready || online)) Text(u.busyNotice, style: sub),
       ],
       actions: [if (primary != null) primary],
+      endActions: [
+        ActionButton.ghost(
+          key: const ValueKey('launcher.changelog'),
+          text: u.changelogButton,
+          icon: FluentIcons.history_24_regular,
+          onPressed: () => unawaited(_showChangelog(context)),
+        ),
+      ],
+    );
+  }
+
+  /// יומן השינויים המלא, מהעותק שנארז בתוכנה — בלי רשת.
+  Future<void> _showChangelog(BuildContext context) async {
+    String? changelog;
+    try {
+      changelog = await rootBundle.loadString(launcherChangelogAsset);
+    } catch (_) {
+      changelog = null;
+    }
+    if (!context.mounted) return;
+    final t = context.strings.launcherUpdate;
+    await showSingleActionDialog(
+      context: context,
+      title: t.changelogDialogTitle,
+      confirmText: context.strings.common.close,
+      customContent: WhatsNewView(
+        markdown: changelog,
+        emptyText: t.changelogNotFound,
+      ),
     );
   }
 }

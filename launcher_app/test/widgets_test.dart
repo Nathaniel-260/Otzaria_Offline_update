@@ -1342,12 +1342,12 @@ void main() {
           context: context,
           title: he.settings.resetDialogTitle,
           content: he.settings.resetDialogContent,
-          subtitle: he.settings.personalModeDialogWarning,
+          subtitle: he.settings.resetSubtitle,
           confirmText: he.settings.resetDialogConfirm,
         ),
       );
 
-      expect(find.text(he.settings.personalModeDialogWarning), findsOneWidget);
+      expect(find.text(he.settings.resetSubtitle), findsOneWidget);
       // האישור ההרסני הוא ווריאנט האזהרה, והביטול הוא ה-FilledButton.
       expect(
         find.widgetWithText(FilledButton, he.common.cancel),
@@ -1488,7 +1488,7 @@ void main() {
                 selected: const {1, 2},
                 onToggled: (_) {},
                 options: [
-                  SegmentOption(value: 0, label: he.settings.syncTargetAll),
+                  const SegmentOption(value: 0, label: 'הכול'),
                   SegmentOption(value: 1, label: he.settings.syncTargetApp),
                   SegmentOption(value: 2, label: he.settings.syncTargetLibrary),
                   SegmentOption(value: 3, label: he.settings.syncTargetPlugins),

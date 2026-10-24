@@ -270,6 +270,20 @@ void main() {
 
     expect(navigatorOf(tester).section, ShellSection.help);
     expect(find.text(stringsOf().faq.editTitle), findsOneWidget);
+
+    // חזרה מהעריכה מחזירה להגדרות שמהן באו, ולא לבית.
+    await back(tester);
+    await tester.pump();
+    expect(navigatorOf(tester).section, ShellSection.settings);
+    expect(screen(SettingsScreen), findsOneWidget);
+
+    // והעריכה הסתיימה ביציאה: "?" פותח את השאלות.
+    await tester.tap(find.byTooltip(shell.helpTooltip));
+    await tester.pump();
+    await tester.pump();
+    expect(navigatorOf(tester).section, ShellSection.help);
+    expect(find.text(stringsOf().faq.editTitle), findsNothing);
+    expect(find.text(stringsOf().faq.editButton), findsOneWidget);
   });
 
   testWidgets('גלגל השיניים בשורת הכותרת פותח את ההגדרות ומסומן', (
@@ -1954,7 +1968,7 @@ void main() {
       await open(tester, ShellSection.settings);
       await tester.pump();
       await tester.enterText(find.byType(TextField), '9999');
-      await tester.tap(find.text(stringsOf().common.confirm));
+      await tester.tap(find.text(stringsOf().saferMode.enterButton));
       await tester.pump();
 
       expect(screen(SettingsScreen), findsNothing);
@@ -1971,7 +1985,7 @@ void main() {
       await open(tester, ShellSection.settings);
       await tester.pump();
       await tester.enterText(find.byType(TextField), '1234');
-      await tester.tap(find.text(stringsOf().common.confirm));
+      await tester.tap(find.text(stringsOf().saferMode.enterButton));
       await tester.pump();
 
       expect(screen(SettingsScreen), findsOneWidget);

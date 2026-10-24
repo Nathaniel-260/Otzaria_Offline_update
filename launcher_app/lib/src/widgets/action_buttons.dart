@@ -32,6 +32,9 @@ class ActionButton extends StatelessWidget {
   /// דיאלוג. ראו `AppDialog`.
   final bool autofocus;
 
+  /// למיקוד יזום — למשל "ביטול" אחרי Enter בשדה של דו-שיח הרסני.
+  final FocusNode? focusNode;
+
   final ActionButtonSize size;
 
   /// ממלא את רוחב ההורה — ערימת פעולות בדף תוצאה.
@@ -46,6 +49,7 @@ class ActionButton extends StatelessWidget {
     this.spinning = false,
     this.icon,
     this.autofocus = false,
+    this.focusNode,
     this.size = ActionButtonSize.md,
     this.expand = false,
   }) : _variant = _Variant.recommended;
@@ -58,6 +62,7 @@ class ActionButton extends StatelessWidget {
     this.spinning = false,
     this.icon,
     this.autofocus = false,
+    this.focusNode,
     this.size = ActionButtonSize.md,
     this.expand = false,
   }) : _variant = _Variant.neutral;
@@ -70,6 +75,7 @@ class ActionButton extends StatelessWidget {
     this.spinning = false,
     this.icon,
     this.autofocus = false,
+    this.focusNode,
     this.size = ActionButtonSize.md,
     this.expand = false,
   }) : _variant = _Variant.outlined;
@@ -82,6 +88,7 @@ class ActionButton extends StatelessWidget {
     this.spinning = false,
     this.icon,
     this.autofocus = false,
+    this.focusNode,
     this.size = ActionButtonSize.md,
     this.expand = false,
   }) : _variant = _Variant.ghost;
@@ -94,6 +101,7 @@ class ActionButton extends StatelessWidget {
     this.spinning = false,
     this.icon,
     this.autofocus = false,
+    this.focusNode,
     this.size = ActionButtonSize.md,
     this.expand = false,
   }) : _variant = _Variant.warning;
@@ -191,24 +199,28 @@ class ActionButton extends StatelessWidget {
             onPressed: onPressed,
             style: style,
             autofocus: autofocus,
+            focusNode: focusNode,
             child: child,
           ),
         _Variant.neutral => FilledButton.tonal(
             onPressed: onPressed,
             style: style,
             autofocus: autofocus,
+            focusNode: focusNode,
             child: child,
           ),
         _Variant.outlined => OutlinedButton(
             onPressed: onPressed,
             style: style,
             autofocus: autofocus,
+            focusNode: focusNode,
             child: child,
           ),
         _Variant.ghost || _Variant.warning => TextButton(
             onPressed: onPressed,
             style: style,
             autofocus: autofocus,
+            focusNode: focusNode,
             child: child,
           ),
       };
@@ -220,6 +232,7 @@ class ActionButton extends StatelessWidget {
           onPressed: onPressed,
           style: style,
           autofocus: autofocus,
+          focusNode: focusNode,
           icon: leading,
           label: label,
         ),
@@ -227,12 +240,14 @@ class ActionButton extends StatelessWidget {
           onPressed: onPressed,
           style: style,
           autofocus: autofocus,
+          focusNode: focusNode,
           icon: leading,
           label: label,
         ),
       _Variant.outlined => OutlinedButton.icon(
           onPressed: onPressed,
           autofocus: autofocus,
+          focusNode: focusNode,
           icon: leading,
           label: label,
           style: style,
@@ -243,6 +258,7 @@ class ActionButton extends StatelessWidget {
           label: label,
           style: style,
           autofocus: autofocus,
+          focusNode: focusNode,
         ),
     };
   }

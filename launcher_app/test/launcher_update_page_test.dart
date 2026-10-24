@@ -59,6 +59,21 @@ void main() {
     expect(find.byKey(ShellKeys.statusPrimary), findsNothing);
   });
 
+  testWidgets('"יומן שינויים" בדף הכלי פותח את היומן הארוז', (tester) async {
+    final u = stringsOf().launcherUpdate;
+    await pumpScreen(tester, page());
+
+    await tester.tap(find.byKey(const ValueKey('launcher.changelog')));
+    // טעינת הנכס היא I/O אמיתי — ראו AGENTS.md §3.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(u.changelogDialogTitle), findsOneWidget);
+    expect(find.text(u.changelogNotFound), findsNothing);
+  });
+
   testWidgets('גרסה באתר — מה חדש בדף, ו"הורדה והפעלה מחדש"', (tester) async {
     c.onlineRelease = const LauncherRelease(
       tagName: 'v99.1.2',

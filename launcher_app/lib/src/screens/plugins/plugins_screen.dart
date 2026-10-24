@@ -182,13 +182,18 @@ class _PluginsScreenState extends State<PluginsScreen> {
     if (outcome.failed.isNotEmpty) {
       final names =
           t.joinNames([for (final f in outcome.failed) f.plugin.name]);
-      UiSnack.showError(sent == 0
+      final failure = sent == 0
           ? t.updateAllNoneSentSnack(names)
-          : t.updateAllPartlySentSnack(sent, names));
+          : t.updateAllPartlySentSnack(sent, names);
+      UiSnack.showError(
+        outcome.stopped ? '${t.updateAllStoppedPrefix} $failure' : failure,
+      );
     } else if (sent > 0) {
       UiSnack.show(outcome.stopped
           ? t.updateAllStoppedSnack(sent)
           : t.updatesSentSnack(sent));
+    } else if (outcome.stopped) {
+      UiSnack.show(t.updateAllStoppedNoneSnack);
     }
   }
 

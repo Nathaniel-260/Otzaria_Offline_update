@@ -730,6 +730,8 @@ class AppSession extends ChangeNotifier {
   /// [LauncherCrashSession.closeGuard]: שואל רק בזמן פעולה ארוכה, ומבטל
   /// הורדה (עם שחזור המראה) לפני שהחלון נסגר.
   Future<bool> confirmClose() async {
+    // הסגירה מסתיימת ב-`exit`, ושום dispose לא ירוץ אחריה.
+    await _faq.flush().timeout(const Duration(seconds: 1), onTimeout: () {});
     if (!isActive || !longTaskRunning) return true;
     final approved = await prompts.confirmClose(
       downloading: _downloads.isDownloading,

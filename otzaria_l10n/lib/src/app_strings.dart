@@ -752,6 +752,9 @@ abstract class SettingsScreenStrings {
   /// גם כותרת הדו-שיח שבוחרים בו.
   String get languageTitle;
   String get languageSystem;
+
+  /// בדו-שיח השפה בלבד: "כמו במחשב" עם השפה שהיא מתורגמת אליה בפועל.
+  String languageSystemAs(String language);
   String get languageHebrew;
   String get languageEnglish;
 
@@ -764,19 +767,17 @@ abstract class SettingsScreenStrings {
   String get autoInstallSubtitle;
   String get autoInstallDialogTitle;
   String get autoInstallDialogContent;
-  String get autoInstallDialogWarning;
   String get autoInstallDialogConfirm;
 
   // ── מה להוריד לכונן ──
-  /// שבבי סימון: "הכול" ושלושת הרכיבים. "הכול" הוא קיצור, לא הגדרה.
+  /// שבבי סימון, אחד לכל רכיב.
   String get syncTargetsTitle;
   String get syncTargetsSubtitle;
-  String get syncTargetAll;
   String get syncTargetApp;
   String get syncTargetLibrary;
   String get syncTargetPlugins;
 
-  /// נוסף לשורה כשעדכון למחשב מסוים נועל את "הספרייה" במצב דלוק.
+  /// נוסף לשורה, וגם הסבר צף לשבב, כשעדכון למחשב מסוים נועל את "הספרייה".
   String get syncLibraryLockedSubtitle;
 
   // ── עדכון למחשב מסוים ──
@@ -789,7 +790,6 @@ abstract class SettingsScreenStrings {
   String get personalModeRegisterLink;
   String get personalModeDialogTitle;
   String get personalModeDialogContent;
-  String get personalModeDialogWarning;
   String get personalModeDialogConfirm;
 
   // ── מתקדם ──
@@ -814,7 +814,6 @@ abstract class SettingsScreenStrings {
   /// כשאין גרסה חדשה ידועה — הדף עצמו אומר אם יש.
   String get aboutSubtitle;
   String aboutNewVersion(String version);
-  String get changelogSubtitle;
 }
 
 // ── מצב סייפר ─────────────────────────────────────────────────────────────────
@@ -850,6 +849,9 @@ abstract class SaferModeStrings {
   String get verifyFaqHint;
   String get verifyEnableHint;
   String get verifyDisableHint;
+
+  /// כפתור האישור כשהסיסמה פותחת דף (הגדרות, עריכת השאלות).
+  String get enterButton;
   String get passwordLabel;
   String get wrongPassword;
   String get passwordRequired;
@@ -858,7 +860,9 @@ abstract class SaferModeStrings {
 
   // ── קביעה והחלפה ──
   String get setTitle;
-  String setIntro(int minLength);
+
+  /// [onThisComputer] — בכונן מוגן ההגדרות נשמרות במחשב ולא בכונן.
+  String setIntro(int minLength, {bool onThisComputer = false});
   String get setConfirm;
   String get changeTitle;
   String get currentPasswordLabel;
@@ -1032,6 +1036,12 @@ abstract class PluginsStrings {
   String updateAllNoneSentSnack(String names);
   String updateAllPartlySentSnack(int sent, String names);
   String updateAllStoppedSnack(int sent);
+
+  /// נעצר לפני שנשלח דבר — אישור שהעצירה נקלטה.
+  String get updateAllStoppedNoneSnack;
+
+  /// לפני הודעת הכישלון, כשהריצה גם נעצרה.
+  String get updateAllStoppedPrefix;
   String get updateAllStoppingLabel;
   String get actionsBlockedSyncing;
   String get actionsBlockedExporting;
@@ -1181,6 +1191,9 @@ abstract class FaqStrings {
   String get editDoneButton;
   String get editTitle;
   String get editIntro;
+
+  /// בכונן מוגן ההתאמות נשמרות במחשב הזה ולא בכונן.
+  String get editIntroThisComputer;
 
   String get hideTooltip;
   String get restoreTooltip;

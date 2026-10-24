@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/screens/settings_screen.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
@@ -154,16 +155,18 @@ void main() {
       addTearDown(() => dir.deleteSync(recursive: true));
     });
 
-    Widget screen() => SettingsScreen(
+    Widget screen({bool readOnly = false}) => SettingsScreen(
           controller: settings,
           onOpenLog: () {},
           launcherVersion: '0.8.0',
           saferMode: gate,
+          readOnly: readOnly,
         );
 
     /// הנעילה יושבת תחת "מתקדם", שמקופל בכניסה.
-    Future<void> pumpAdvanced(WidgetTester tester) async {
-      await pumpScreen(tester, screen());
+    Future<void> pumpAdvanced(WidgetTester tester,
+        {bool readOnly = false}) async {
+      await pumpScreen(tester, screen(readOnly: readOnly));
       await tester.tap(find.text(stringsOf().pages.advancedTitle));
       await tester.pumpAndSettle();
     }
@@ -236,6 +239,20 @@ void main() {
       expect(gate.isLocked, isFalse);
     });
 
+    testWidgets('בכונן מוגן ההסבר אומר שההגדרות שבמחשב הזה', (tester) async {
+      await pumpAdvanced(tester, readOnly: true);
+
+      await tester.tap(find.text(t.setPasswordButton));
+      await tester.pumpAndSettle();
+      final intro = t.setIntro(
+        SaferModePassword.minLength,
+        onThisComputer: true,
+      );
+      expect(find.text(intro), findsOneWidget);
+      expect(intro, contains('שבמחשב הזה'));
+      expect(intro, isNot(contains('שבכונן')));
+    });
+
     testWidgets('עם סיסמה — מתג, החלפה ומחיקה', (tester) async {
       await withPassword(tester);
       await pumpAdvanced(tester);
@@ -274,6 +291,27 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(t.wrongPassword), findsOneWidget);
       expect(settings.settings.saferModePassword, before);
+      // השגיאה מתחת לשדה הנוכחית (ולא מתחת לאחרון), והשדה נוקה ומוקד.
+      final errorTop = tester.getTopLeft(find.text(t.wrongPassword)).dy;
+      expect(errorTop, greaterThan(tester.getBottomLeft(fields.at(0)).dy));
+      expect(errorTop, lessThan(tester.getTopLeft(fields.at(1)).dy));
+      final current = tester.widget<EditableText>(
+        find.descendant(of: fields.at(0), matching: find.byType(EditableText)),
+      );
+      expect(current.controller.text, isEmpty);
+      expect(current.focusNode.hasFocus, isTrue);
+
+      // אי-התאמה — מתחת לשדה האימות.
+      await tester.enterText(fields.at(0), '1234');
+      await tester.enterText(fields.at(2), '5679');
+      await tester.tap(find.widgetWithText(ActionButton, t.changeButton).last);
+      await tester.pumpAndSettle();
+      expect(find.text(t.wrongPassword), findsNothing);
+      expect(
+        tester.getTopLeft(find.text(t.passwordsDoNotMatch)).dy,
+        greaterThan(tester.getBottomLeft(fields.at(2)).dy),
+      );
+      await tester.enterText(fields.at(2), '5678');
 
       await tester.enterText(fields.at(0), '1234');
       await tester.tap(find.widgetWithText(ActionButton, t.changeButton).last);
@@ -294,12 +332,42 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(t.clearDialogTitle), findsOneWidget);
 
+      // שדה ריק — "יש להקליד סיסמה", לא "הסיסמה לא נכונה".
+      await tester.tap(find.widgetWithText(ActionButton, t.clearButton).last);
+      await tester.pumpAndSettle();
+      expect(find.text(t.passwordRequired), findsOneWidget);
+      expect(find.text(t.wrongPassword), findsNothing);
+
       await tester.enterText(find.byType(TextField), '9999');
       await tester.tap(find.widgetWithText(ActionButton, t.clearButton).last);
       await tester.pumpAndSettle();
       expect(find.text(t.wrongPassword), findsOneWidget);
       expect(settings.settings.hasSaferModePassword, isTrue);
 
+      // Enter בשדה אינו מוחק: הביטול מקבל את המיקוד, ו-Enter נוסף מבטל.
+      await tester.enterText(find.byType(TextField), '1234');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(find.text(t.clearDialogTitle), findsOneWidget);
+      expect(settings.settings.hasSaferModePassword, isTrue);
+      final cancel = find.widgetWithText(
+        FilledButton,
+        stringsOf().common.cancel,
+      );
+      expect(
+          Focus.of(tester.element(find.descendant(
+            of: cancel,
+            matching: find.text(stringsOf().common.cancel),
+          ))).hasFocus,
+          isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.text(t.clearDialogTitle), findsNothing);
+      expect(settings.settings.hasSaferModePassword, isTrue);
+
+      // מחיקה רק בלחיצה מפורשת.
+      await tester.tap(find.text(t.clearButton));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), '1234');
       await tester.tap(find.widgetWithText(ActionButton, t.clearButton).last);
       await tester.pumpAndSettle();
@@ -321,6 +389,8 @@ void main() {
 
       await tester.tap(find.text(t.lockTitle));
       await tester.pumpAndSettle();
+      // בהפעלה ובכיבוי "אישור"; "כניסה" רק כשהסיסמה פותחת דף.
+      expect(find.text(t.enterButton), findsNothing);
       await tester.enterText(find.byType(TextField), '1234');
       await tester.tap(find.text(stringsOf().common.confirm));
       await tester.pumpAndSettle();

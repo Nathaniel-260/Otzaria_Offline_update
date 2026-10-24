@@ -1388,6 +1388,8 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get languageSystem => 'כמו במחשב';
   @override
+  String languageSystemAs(String language) => 'כמו במחשב ($language)';
+  @override
   String get languageHebrew => 'עברית';
   @override
   String get languageEnglish => 'English';
@@ -1409,17 +1411,12 @@ class _Settings extends SettingsScreenStrings {
       'בכל פעם שהכלי ייפתח במחשב שיש בכונן עדכון בשבילו, העדכון יותקן מיד. '
       'אם אוצריא תהיה פתוחה, העדכון יחכה לפעם הבאה.';
   @override
-  String get autoInstallDialogWarning =>
-      'ההתקנה מחליפה קבצים במחשב בלי לשאול. אם אינכם בטוחים, השאירו את זה כבוי.';
-  @override
   String get autoInstallDialogConfirm => 'הפעלה';
 
   @override
   String get syncTargetsTitle => 'מה להוריד לכונן';
   @override
   String get syncTargetsSubtitle => 'מה שלא מסומן לא יירד, גם אם יש לו עדכון.';
-  @override
-  String get syncTargetAll => 'הכול';
   @override
   String get syncTargetApp => 'תוכנת אוצריא';
   @override
@@ -1440,16 +1437,8 @@ class _Settings extends SettingsScreenStrings {
   String get personalModeDialogTitle => 'להפעיל עדכון למחשב מסוים?';
   @override
   String get personalModeDialogContent =>
-      'ההורדה תביא רק את קובצי העדכון מהגרסה שמותקנת אצלכם ומעלה — עשרות מגה־בייט '
-      'במקום כמה ג׳יגה־בייט.\n\n'
-      'הכלי אינו קורא את גרסת הספרייה מעצמו: בדף הספרייה יש ללחוץ על '
-      '"זהה את גרסת המסד שלי", וזאת דווקא במחשב שאוצריא שלכם מותקנת בו. '
-      'הלחיצה נשמרת על הכונן ונוסעת איתו למחשב המחובר, כך שאוצריא שמותקנת '
-      'שם לא תיקבע במקומה.';
-  @override
-  String get personalModeDialogWarning =>
-      'הכונן לא ישמש עוד להתקנה במחשב אחר: הספרייה המלאה תימחק ממנו בהורדה '
-      'הבאה, וגם ההתקנה המלאה כשקובץ עדכון אינו מתאים לא תהיה זמינה.';
+      'מעכשיו הכונן יוריד רק את מה שחסר למחשב שתרשמו. במחשבים אחרים העדכון '
+      'הזה לא יתאים, עד שתכבו את זה. הספרייה המלאה שבכונן תימחק בהורדה הבאה.';
   @override
   String get personalModeDialogConfirm => 'הפעלה';
 
@@ -1463,7 +1452,7 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get logSubtitle => 'לשליחה לתמיכה כשמשהו לא עובד.';
   @override
-  String get openLogFolderButton => 'פתח את התיקייה';
+  String get openLogFolderButton => 'פתיחת התיקייה';
 
   @override
   String get resetTitle => 'איפוס הגדרות';
@@ -1482,14 +1471,12 @@ class _Settings extends SettingsScreenStrings {
   String get resetDoneSnack => 'ההגדרות אופסו';
 
   @override
-  String aboutTitle(String version) => 'עדכוני אוצריא $version';
+  String aboutTitle(String version) => 'עדכוני אוצריא \u2066$version\u2069';
   @override
-  String get aboutSubtitle => 'מה חדש, ובדיקה אם יש גרסה חדשה';
+  String get aboutSubtitle => 'בדיקה אם יש גרסה חדשה';
   @override
   String aboutNewVersion(String version) =>
       'יש גרסה חדשה: $version · מה חדש ועדכון';
-  @override
-  String get changelogSubtitle => 'מה השתנה בכלי, גרסה אחר גרסה';
 }
 
 class _SaferMode extends SaferModeStrings {
@@ -1532,6 +1519,8 @@ class _SaferMode extends SaferModeStrings {
   @override
   String get verifyDisableHint => 'כדי לכבות את הנעילה, הקלידו את הסיסמה.';
   @override
+  String get enterButton => 'כניסה';
+  @override
   String get passwordLabel => 'סיסמה';
   @override
   String get wrongPassword => 'הסיסמה לא נכונה. נסו שוב.';
@@ -1545,10 +1534,10 @@ class _SaferMode extends SaferModeStrings {
   @override
   String get setTitle => 'קביעת סיסמה';
   @override
-  String setIntro(int minLength) =>
+  String setIntro(int minLength, {bool onThisComputer = false}) =>
       'הסיסמה תידרש לכניסה להגדרות, לבחירת גרסה ניסיונית ולעריכת השאלות '
       'הנפוצות. לפחות $minLength תווים. סיסמה שנשכחה אי אפשר לשחזר — רק '
-      'למחוק את קובץ ההגדרות שבכונן.';
+      'למחוק את קובץ ההגדרות ${onThisComputer ? 'שבמחשב הזה' : 'שבכונן'}.';
   @override
   String get setConfirm => 'שמירה והפעלת הנעילה';
   @override
@@ -1838,6 +1827,10 @@ class _Plugins extends PluginsStrings {
   String updateAllStoppedSnack(int sent) => plural(sent,
       one: 'העדכון נעצר. עדכון אחד נשלח לאוצריא — אשרו שם',
       many: 'העדכון נעצר. $sent עדכונים נשלחו לאוצריא — אשרו שם');
+  @override
+  String get updateAllStoppedNoneSnack => 'העדכון נעצר. לא נשלח דבר לאוצריא.';
+  @override
+  String get updateAllStoppedPrefix => 'העדכון נעצר.';
   @override
   String get updateAllStoppingLabel => 'עוצר אחרי התוסף הנוכחי…';
   @override
@@ -2162,6 +2155,9 @@ class _Faq extends FaqStrings {
   String get editTitle => 'עריכת השאלות הנפוצות';
   @override
   String get editIntro => 'שאלות מוסתרות לא יוצגו. השינויים נשמרים בכונן.';
+  @override
+  String get editIntroThisComputer =>
+      'שאלות מוסתרות לא יוצגו. השינויים נשמרים במחשב הזה.';
 
   @override
   String get hideTooltip => 'הסתרה';

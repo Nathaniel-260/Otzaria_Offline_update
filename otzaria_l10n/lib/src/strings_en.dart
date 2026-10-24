@@ -1439,6 +1439,9 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get languageSystem => 'Same as the computer';
   @override
+  String languageSystemAs(String language) =>
+      'Same as the computer ($language)';
+  @override
   String get languageHebrew => 'עברית';
   @override
   String get languageEnglish => 'English';
@@ -1461,9 +1464,6 @@ class _Settings extends SettingsScreenStrings {
       'Whenever the tool opens on a computer the drive has an update for, the update '
       'is installed right away. If Otzaria is open, the update waits for next time.';
   @override
-  String get autoInstallDialogWarning =>
-      'Installing replaces files on the computer without asking. If you are not sure, leave this off.';
-  @override
   String get autoInstallDialogConfirm => 'Turn on';
 
   @override
@@ -1471,8 +1471,6 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get syncTargetsSubtitle =>
       'Anything not selected is not downloaded, even if it has an update.';
-  @override
-  String get syncTargetAll => 'All';
   @override
   String get syncTargetApp => 'Otzaria';
   @override
@@ -1495,17 +1493,9 @@ class _Settings extends SettingsScreenStrings {
       'Turn on updates for a specific computer?';
   @override
   String get personalModeDialogContent =>
-      'The download brings only the update files from the version you have installed '
-      'onwards — tens of megabytes instead of several gigabytes.\n\n'
-      'The tool does not read the library version by itself: on the Library page, click '
-      '"Detect my database version" — on the computer where your Otzaria is installed. '
-      'The click is saved on the drive and travels with it to the connected computer, '
-      'so the Otzaria installed there is not taken instead.';
-  @override
-  String get personalModeDialogWarning =>
-      'The drive will no longer install on another computer: the full library is '
-      'removed from it on the next download, and the full installation for when an '
-      'update file does not fit will not be available either.';
+      'From now on the drive downloads only what the computer you register is '
+      'missing. On other computers this update will not fit until you turn this '
+      'off. The full library on the drive is deleted on the next download.';
   @override
   String get personalModeDialogConfirm => 'Turn on';
 
@@ -1542,13 +1532,10 @@ class _Settings extends SettingsScreenStrings {
   @override
   String aboutTitle(String version) => 'Otzaria Updates $version';
   @override
-  String get aboutSubtitle => 'What is new, and whether a new version exists';
+  String get aboutSubtitle => 'Check whether a new version exists';
   @override
   String aboutNewVersion(String version) =>
       'New version: $version · what is new and update';
-  @override
-  String get changelogSubtitle =>
-      'What changed in the tool, version by version';
 }
 
 class _SaferMode extends SaferModeStrings {
@@ -1593,6 +1580,8 @@ class _SaferMode extends SaferModeStrings {
   @override
   String get verifyDisableHint => 'To turn the lock off, type the password.';
   @override
+  String get enterButton => 'Enter';
+  @override
   String get passwordLabel => 'Password';
   @override
   String get wrongPassword => 'The password is wrong. Try again.';
@@ -1606,10 +1595,11 @@ class _SaferMode extends SaferModeStrings {
   @override
   String get setTitle => 'Set a password';
   @override
-  String setIntro(int minLength) =>
+  String setIntro(int minLength, {bool onThisComputer = false}) =>
       'The password will be needed to open Settings, choose a pre-release version and '
       'edit the common questions. At least $minLength characters. A forgotten password '
-      'cannot be recovered — only the settings file on the drive can be deleted.';
+      'cannot be recovered — only the settings file '
+      '${onThisComputer ? 'on this computer' : 'on the drive'} can be deleted.';
   @override
   String get setConfirm => 'Save and turn the lock on';
   @override
@@ -1911,6 +1901,11 @@ class _Plugins extends PluginsStrings {
           'there',
       many: 'Updating stopped. $sent updates were sent to Otzaria — approve '
           'them there');
+  @override
+  String get updateAllStoppedNoneSnack =>
+      'Updating stopped. Nothing was sent to Otzaria.';
+  @override
+  String get updateAllStoppedPrefix => 'Updating stopped.';
   @override
   String get updateAllStoppingLabel => 'Stopping after the current plugin…';
   @override
@@ -2263,6 +2258,9 @@ class _Faq extends FaqStrings {
   @override
   String get editIntro =>
       'Hidden questions are not shown. Changes are saved on the drive.';
+  @override
+  String get editIntroThisComputer =>
+      'Hidden questions are not shown. Changes are saved on this computer.';
 
   @override
   String get hideTooltip => 'Hide';
