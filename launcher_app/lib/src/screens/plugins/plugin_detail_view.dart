@@ -220,11 +220,7 @@ class PluginDetailView extends StatelessWidget {
           ),
           StoreInfoEntry(
             label: t.infoUpdated,
-            value: HebrewDate.format(
-              plugin.originalDate.isNotEmpty
-                  ? plugin.originalDate
-                  : plugin.updatedAt,
-            ),
+            value: HebrewDate.format(plugin.displayUpdatedDate),
           ),
           StoreInfoEntry(
             label: t.infoNetwork,

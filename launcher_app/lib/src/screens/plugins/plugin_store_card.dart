@@ -179,9 +179,7 @@ class PluginStoreCard extends StatelessWidget {
                 Flexible(
                   child: Text(
                     t.cardUpdatedOn(
-                      HebrewDate.format(plugin.originalDate.isNotEmpty
-                          ? plugin.originalDate
-                          : plugin.updatedAt),
+                      HebrewDate.format(plugin.displayUpdatedDate),
                     ),
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(

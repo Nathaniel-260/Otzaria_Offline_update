@@ -32,6 +32,8 @@ void main() {
     String shortDescription = '',
     String author = '',
     String? manifestId,
+    String? publishedAt,
+    String? fileUpdatedAt,
   }) =>
       StorePlugin.fromApi({
         'id': id,
@@ -42,6 +44,8 @@ void main() {
         'isPinned': featured,
         'shortDescription': shortDescription,
         'author': author,
+        'publishedAt': publishedAt,
+        'fileUpdatedAt': fileUpdatedAt,
       }, 'https://otzaria.org')
           .copyWith(manifestId: manifestId);
 
@@ -354,6 +358,7 @@ void main() {
       controller.setStatusFilter(PluginStatusFilter.all);
       controller.setTagFilter(null);
       controller.setHideInstalled(controller.hideInstalled);
+      controller.setSortMode(PluginSortMode.recommended);
 
       expect(notifications, 0);
     });
@@ -367,6 +372,72 @@ void main() {
 
       expect(notifications, 1);
       expect(controller.filtered, hasLength(1));
+    });
+  });
+
+  group('מיון', () {
+    setUp(() async {
+      await saveCatalog(
+        PluginCatalog(
+          plugins: [
+            plugin(
+              'featured',
+              'נבחר',
+              featured: true,
+              publishedAt: '2026-01-01T00:00:00.000Z',
+              fileUpdatedAt: '2026-01-02',
+            ),
+            plugin(
+              'new',
+              'חדש',
+              publishedAt: '2026-05-01T00:00:00.000Z',
+              fileUpdatedAt: '2026-05-01',
+            ),
+            plugin(
+              'old',
+              'ישן',
+              publishedAt: '2025-03-01T00:00:00.000Z',
+              fileUpdatedAt: '2026-09-01',
+            ),
+            plugin('legacy', 'קטלוג ישן'),
+            plugin(
+              'same-day',
+              'אותו יום',
+              publishedAt: '2026-05-01T00:00:00.000Z',
+              fileUpdatedAt: '2026-05-01',
+            ),
+          ],
+        ),
+      );
+      await controller.load();
+      controller.installed = const {};
+    });
+
+    test('מומלצים — סדר הקטלוג', () {
+      expect(
+        controller.filtered.map((p) => p.id),
+        ['featured', 'new', 'old', 'legacy', 'same-day'],
+      );
+    });
+
+    test('החדשים ביותר ועודכנו לאחרונה; בלי תאריך בסוף, שוויון לפי הקטלוג', () {
+      controller.setSortMode(PluginSortMode.newest);
+      expect(
+        controller.filtered.map((p) => p.id),
+        ['new', 'same-day', 'featured', 'old', 'legacy'],
+      );
+
+      controller.setSortMode(PluginSortMode.updated);
+      expect(
+        controller.filtered.map((p) => p.id),
+        ['old', 'new', 'same-day', 'featured', 'legacy'],
+      );
+    });
+
+    test('המיון חל אחרי הסינון', () {
+      controller.setSortMode(PluginSortMode.updated);
+      controller.setSearch('חדש');
+      expect(controller.filtered.map((p) => p.id), ['new']);
     });
   });
 

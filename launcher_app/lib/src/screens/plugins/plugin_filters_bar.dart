@@ -6,7 +6,7 @@ import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 import '../store_kit/store_kit.dart';
 
-/// שורת החיפוש והסינון של "כל התוספים" — חיפוש, סטטוס ושורת תגיות מתקפלת.
+/// שורת החיפוש והסינון של "כל התוספים" — חיפוש, סטטוס, מיון ושורת תגיות מתקפלת.
 /// פריסה של שדות בשורה אחת, כמו בחנות המקורית, ולא שורות
 /// `SettingsActionTile`.
 ///
@@ -69,6 +69,8 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
         Expanded(child: _searchField(context)),
         const SizedBox(width: AppTokens.spaceMD),
         SizedBox(width: _statusWidth, child: _statusField(context)),
+        const SizedBox(width: AppTokens.spaceMD),
+        SizedBox(width: _statusWidth, child: _sortField(context)),
       ],
     );
   }
@@ -80,6 +82,8 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
         _searchField(context),
         const SizedBox(height: AppTokens.spaceMD),
         _statusField(context),
+        const SizedBox(height: AppTokens.spaceMD),
+        _sortField(context),
       ],
     );
   }
@@ -120,15 +124,41 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
 
   /// תפריט נפתח, לא `AppSegmentedControl` — כדי לשבת בשורה אחת עם שדה
   /// החיפוש בלי לתפוס יותר מקום ממנו.
-  Widget _statusField(BuildContext context) {
+  Widget _statusField(BuildContext context) => _dropdownField(
+        label: context.strings.plugins.filterStatusLabel,
+        value: widget.controller.statusFilter,
+        labels: _statusLabels(context),
+        onChanged: widget.controller.setStatusFilter,
+      );
+
+  Widget _sortField(BuildContext context) {
+    final t = context.strings.plugins;
+    return _dropdownField(
+      label: t.filterSortLabel,
+      value: widget.controller.sortMode,
+      labels: {
+        PluginSortMode.recommended: t.sortRecommended,
+        PluginSortMode.newest: t.sortNewest,
+        PluginSortMode.updated: t.sortUpdated,
+      },
+      onChanged: widget.controller.setSortMode,
+    );
+  }
+
+  Widget _dropdownField<T>({
+    required String label,
+    required T value,
+    required Map<T, String> labels,
+    required void Function(T) onChanged,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        StoreFieldLabel(context.strings.plugins.filterStatusLabel),
-        DropdownButtonFormField<PluginStatusFilter>(
-          initialValue: widget.controller.statusFilter,
+        StoreFieldLabel(label),
+        DropdownButtonFormField<T>(
+          initialValue: value,
           onChanged: (value) {
-            if (value != null) widget.controller.setStatusFilter(value);
+            if (value != null) onChanged(value);
           },
           isDense: true,
           isExpanded: true,
@@ -138,7 +168,7 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
             isDense: true,
           ),
           items: [
-            for (final entry in _statusLabels(context).entries)
+            for (final entry in labels.entries)
               DropdownMenuItem(value: entry.key, child: Text(entry.value)),
           ],
         ),

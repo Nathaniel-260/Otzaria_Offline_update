@@ -1090,6 +1090,14 @@ class _Plugins extends PluginsStrings {
   @override
   String get filterStatusLabel => 'סטטוס';
   @override
+  String get filterSortLabel => 'מיון';
+  @override
+  String get sortRecommended => 'מומלצים';
+  @override
+  String get sortNewest => 'החדשים ביותר';
+  @override
+  String get sortUpdated => 'עודכנו לאחרונה';
+  @override
   String get filterTagsLabel => 'תגיות';
   @override
   String get filterAllTags => 'כל התגיות';

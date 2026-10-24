@@ -113,6 +113,35 @@ void main() {
   });
 
   group('StorePlugin.fromApi', () {
+    test('תאריכי פרסום ועדכון קובץ נקראים ונשמרים בקטלוג', () {
+      final plugin = StorePlugin.fromApi({
+        'id': 'x',
+        'updatedAt': '2026-10-22',
+        'originalDate': '2026-10-22',
+        'publishedAt': '2025-11-02T00:00:00.000Z',
+        'fileUpdatedAt': '2026-06-01',
+      }, 'https://otzaria.org');
+
+      expect(plugin.publishedAt, '2025-11-02T00:00:00.000Z');
+      expect(plugin.displayUpdatedDate, '2026-06-01');
+
+      final restored = StorePlugin.fromJson(plugin.toJson());
+      expect(restored.publishedAt, plugin.publishedAt);
+      expect(restored.fileUpdatedAt, plugin.fileUpdatedAt);
+      expect(restored.copyWith(manifestId: 'm').fileUpdatedAt, '2026-06-01');
+    });
+
+    test('קטלוג ישן בלי fileUpdatedAt מציג את התאריך המקורי', () {
+      final plugin = StorePlugin.fromJson(const {
+        'id': 'x',
+        'updatedAt': '2026-10-22',
+        'originalDate': '2026-02-03',
+      });
+
+      expect(plugin.publishedAt, '');
+      expect(plugin.displayUpdatedDate, '2026-02-03');
+    });
+
     test('הופך downloadUrl יחסי לכתובת מוחלטת', () {
       final plugin = StorePlugin.fromApi({
         'id': 'x',

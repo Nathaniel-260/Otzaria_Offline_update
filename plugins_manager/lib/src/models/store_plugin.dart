@@ -128,6 +128,8 @@ class StorePlugin extends Equatable {
     this.ratingCount = 0,
     this.ratingVerifiedCount = 0,
     this.ratingBreakdown = const [0, 0, 0, 0, 0],
+    this.publishedAt = '',
+    this.fileUpdatedAt = '',
   });
 
   /// מזהה מסד-הנתונים של האתר. **אינו** המזהה שאוצריא משתמשת בו לתיקיית
@@ -143,6 +145,20 @@ class StorePlugin extends Equatable {
   final String author;
   final String updatedAt;
   final String originalDate;
+
+  /// מועד הפרסום הראשון בחנות (ISO) — למיון "החדשים ביותר". ריק = קטלוג ישן.
+  final String publishedAt;
+
+  /// מתי קובץ התוסף עצמו הוחלף לאחרונה — זה ה"עודכן" של האתר. `updatedAt` זז
+  /// גם באישורים ועריכות מטא-דאטה. ריק = קטלוג ישן.
+  final String fileUpdatedAt;
+
+  /// התאריך שמוצג כ"עודכן", כמו `displayUpdatedDate` של האתר.
+  String get displayUpdatedDate => fileUpdatedAt.isNotEmpty
+      ? fileUpdatedAt
+      : originalDate.isNotEmpty
+          ? originalDate
+          : updatedAt;
   final String compatibleWith;
   final String? maxAppVersion;
   final bool requiresNetwork;
@@ -334,6 +350,8 @@ class StorePlugin extends Equatable {
       ratingCount: ratingCount,
       ratingVerifiedCount: ratingVerifiedCount,
       ratingBreakdown: ratingBreakdown,
+      publishedAt: publishedAt,
+      fileUpdatedAt: fileUpdatedAt,
     );
   }
 
@@ -357,6 +375,8 @@ class StorePlugin extends Equatable {
       author: _string(json['author']),
       updatedAt: _string(json['updatedAt']),
       originalDate: _string(json['originalDate']),
+      publishedAt: _string(json['publishedAt']),
+      fileUpdatedAt: _string(json['fileUpdatedAt']),
       compatibleWith: _string(json['compatibleWith']),
       maxAppVersion: json['maxAppVersion'] is String
           ? json['maxAppVersion'] as String
@@ -401,6 +421,8 @@ class StorePlugin extends Equatable {
         'author': author,
         'updatedAt': updatedAt,
         'originalDate': originalDate,
+        'publishedAt': publishedAt,
+        'fileUpdatedAt': fileUpdatedAt,
         'compatibleWith': compatibleWith,
         'maxAppVersion': maxAppVersion,
         'requiresNetwork': requiresNetwork,
@@ -443,6 +465,8 @@ class StorePlugin extends Equatable {
       author: _string(json['author']),
       updatedAt: _string(json['updatedAt']),
       originalDate: _string(json['originalDate']),
+      publishedAt: _string(json['publishedAt']),
+      fileUpdatedAt: _string(json['fileUpdatedAt']),
       compatibleWith: _string(json['compatibleWith']),
       maxAppVersion: json['maxAppVersion'] is String
           ? json['maxAppVersion'] as String
