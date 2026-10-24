@@ -302,7 +302,7 @@ class _CustomAppsScreenState extends State<CustomAppsScreen> {
       return EmptyState(
         icon: FluentIcons.apps_add_in_24_regular,
         title: t.manageEmptyTitle,
-        body: t.manageEmptyBody,
+        body: widget.readOnly ? t.emptyReadOnlyBody : t.manageEmptyBody,
         actions: [
           if (widget.onOpenManage case final open?)
             ActionButton.recommended(

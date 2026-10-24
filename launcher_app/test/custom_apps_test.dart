@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import 'package:custom_apps_manager/custom_apps_manager.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/custom_apps_controller.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_app_detail_view.dart';
@@ -175,10 +176,17 @@ void main() {
       await tester.tap(find.text(t.openManagerButton));
       expect(opened, 1);
 
-      // בכונן מוגן אין כניסה לניהול — וגם אין כפתור.
-      await pumpScreen(tester, CustomAppsScreen(controller: controller));
+      expect(find.text(t.manageEmptyBody), findsOneWidget);
+
+      // בכונן מוגן אין כניסה לניהול — וגם אין כפתור, ולא מבטיחים הוספה.
+      await pumpScreen(
+        tester,
+        CustomAppsScreen(controller: controller, readOnly: true),
+      );
       await tester.pump();
       expect(find.text(t.openManagerButton), findsNothing);
+      expect(find.text(t.manageEmptyBody), findsNothing);
+      expect(find.text(t.emptyReadOnlyBody), findsOneWidget);
     });
 
     testWidgets('שם ותיאור מוצגים כפי שהם — תוכן שאינו מתורגם', (tester) async {
@@ -1970,12 +1978,14 @@ void main() {
     });
 
     testWidgets('כרטיס עמוס בכרטיס הצר ביותר אינו גולש', (tester) async {
+      const longName = 'שם ארוך במיוחד לתוכנה שנועד לתפוס שתי שורות שלמות';
+      var tilesChecked = 0;
       final slug = await addCategory(tester, 'כלי לימוד');
       for (var i = 0; i < 4; i++) {
         await addApp(
           tester,
           id: 'app-$i',
-          name: 'שם ארוך במיוחד לתוכנה שנועד לתפוס שתי שורות שלמות',
+          name: longName,
           description:
               'תקציר ארוך שנמשך על פני כמה שורות כדי לבדוק שהכרטיס אינו '
               'גולש גם כשהטקסט מגיע למקסימום השורות המותר בו',
@@ -1989,7 +1999,7 @@ void main() {
       for (final manage in [false, true]) {
         for (final width in [584.0, 760.0, 840.0, 1160.0]) {
           for (final language in AppLanguage.values) {
-            for (final scale in [0.9, 1.0, 1.15, 1.3, 1.5]) {
+            for (final scale in [0.9, 1.0, 1.15, 1.3, 1.5, 1.75, 2.0]) {
               // עץ נקי בין שילוב לשילוב: `RenderFlex` מדווח על גלישה **פעם
               // אחת** לכל render object, ובלי איפוס שילוב גולש נבלע בשקט.
               useViewSize(tester, Size(width, 1400));
@@ -2014,11 +2024,24 @@ void main() {
                 reason: 'הכרטיס גלש ברוחב $width, שפה $language, '
                     'הגדלה $scale, ניהול $manage',
               );
+              final card = find.byType(StoreItemCard).first;
+              if (!manage &&
+                  tester.getSize(card).height == storeTileCardExtent(scale)) {
+                final name = tester.renderObject<RenderParagraph>(
+                  find.descendant(of: card, matching: find.text(longName)),
+                );
+                final line = name.getFullHeightForCaret(
+                  const TextPosition(offset: 0),
+                );
+                expect(name.size.height, greaterThan(line * 1.5));
+                tilesChecked++;
+              }
             }
           }
         }
       }
       AppL10n.use(AppLanguage.hebrew);
+      expect(tilesChecked, greaterThan(0), reason: 'אף אריח לא נבדק');
     });
   });
 

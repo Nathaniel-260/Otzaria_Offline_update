@@ -1664,8 +1664,6 @@ class _Plugins extends PluginsStrings {
   @override
   String get statusStable => 'יציב';
   @override
-  String get statusBeta => 'בטא';
-  @override
   String get statusExperimental => 'ניסיוני';
   @override
   String get statusUnknown => 'לא ידוע';
@@ -1831,11 +1829,15 @@ class _Plugins extends PluginsStrings {
       one: 'העדכון נשלח לאוצריא — אשרו שם',
       many: '$count עדכונים נשלחו לאוצריא — אשרו שם');
   @override
-  String updateAllFailedSnack(int sent, int failed, String names) =>
-      '$sent נשלחו לאוצריא, $failed נכשלו: $names';
+  String updateAllNoneSentSnack(String names) => 'לא נשלחו לאוצריא: $names';
   @override
-  String updateAllStoppedSnack(int sent) =>
-      'העדכון נעצר. נשלחו לאוצריא: $sent.';
+  String updateAllPartlySentSnack(int sent, String names) => plural(sent,
+      one: 'עדכון אחד נשלח לאוצריא — אשרו שם. לא נשלחו: $names',
+      many: '$sent עדכונים נשלחו לאוצריא — אשרו שם. לא נשלחו: $names');
+  @override
+  String updateAllStoppedSnack(int sent) => plural(sent,
+      one: 'העדכון נעצר. עדכון אחד נשלח לאוצריא — אשרו שם',
+      many: 'העדכון נעצר. $sent עדכונים נשלחו לאוצריא — אשרו שם');
   @override
   String get updateAllStoppingLabel => 'עוצר אחרי התוסף הנוכחי…';
   @override
@@ -1847,6 +1849,9 @@ class _Plugins extends PluginsStrings {
   @override
   String get actionsBlockedUpdatingAll =>
       'בזמן "עדכון הכול" אי אפשר להתקין או לשמור תוספים אחרים.';
+  @override
+  String get actionsBlockedElsewhere =>
+      'משימה אחרת רצה עכשיו. בינתיים אי אפשר להתקין או לשמור תוספים.';
   @override
   String get howItWorksButton => 'איך זה עובד?';
   @override
@@ -1892,6 +1897,8 @@ class _Plugins extends PluginsStrings {
   @override
   String get noteFileMissing =>
       'הקובץ עוד לא בכונן — יירד בהתקנה (צריך אינטרנט)';
+  @override
+  String get noteFileMissingOnline => 'הקובץ עוד לא בכונן — יירד עכשיו מהאתר';
   @override
   String get fileNotOnDriveLabel => 'הקובץ לא ירד לכונן';
   @override
@@ -3880,6 +3887,9 @@ class _CustomApps extends CustomAppsStrings {
   String updateToButton(String version) => 'עדכון ל-$version';
   @override
   String get onlineNotChecked => 'עוד לא נבדק';
+  @override
+  String get emptyReadOnlyBody =>
+      'הכונן הזה מוגן מכתיבה, ולכן אי אפשר להוסיף אליו תוכנות.';
   @override
   String get manageEmptyTitle => 'עוד לא נוספו תוכנות';
   @override

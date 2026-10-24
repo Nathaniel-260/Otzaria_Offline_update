@@ -1,13 +1,12 @@
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
-/// חותמות זמן של **המסגרת** — "סונכרן ב…", "נבדק לאחרונה ב…".
+import 'hebrew_date.dart';
+
+/// חותמות זמן ותאריכים לתצוגה.
 ///
-/// נפרד מ-`hebrew_date.dart` בכוונה: שם מדובר בתאריכי **תוכן** שמגיעים
-/// מ-otzaria.org (מתי תוסף פורסם), ולכן הם מוצגים בלוח השנה העברי. כאן
-/// מדובר בזמן שהתוכנה עצמה עשתה משהו, ולוח שנה עברי לחותמת כזו רק מקשה
-/// על השוואה בין שתי הרצות.
-///
-/// שני מעצבים כאלה נכתבו בעבר inline בשני מסכים שונים, וכל אחד פורמט אחרת.
+/// חותמות של **המסגרת** ("סונכרן ב…", "נבדק לאחרונה ב…") מספריות בלוח הלועזי:
+/// כך קל להשוות בין שתי הרצות. תאריכי **החנויות** ([formatStoreDate]) — בלוח
+/// העברי בעברית, כמו באתר.
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -19,9 +18,8 @@ String formatClock(DateTime value) {
 
 /// תאריך ושעה מלאים.
 ///
-/// סדר התאריך נגזר משפת הממשק, לפי התקדים שכבר קיים ב-`HebrewDate.format`:
-/// `dd.mm.yyyy` בעברית, ו-ISO (`yyyy-mm-dd`) באנגלית — שם `dd.mm.yyyy` נקרא
-/// כתאריך אמריקאי שהפכו בו את היום והחודש.
+/// סדר התאריך נגזר משפת הממשק: `dd.mm.yyyy` בעברית, ו-ISO (`yyyy-mm-dd`)
+/// באנגלית — שם `dd.mm.yyyy` נקרא כתאריך אמריקאי שהפכו בו את היום והחודש.
 String formatTimestamp(DateTime value) {
   final local = value.toLocal();
   final time = '${formatClock(local)}:${_two(local.second)}';
@@ -40,19 +38,20 @@ String formatDate(DateTime value) {
   return '${_two(local.day)}.${_two(local.month)}.${local.year}';
 }
 
-/// תאריך בשם חודש — הפורמט האחיד של החנויות: "18 באוקטובר 2026".
-String formatLongDate(DateTime value) {
-  final local = value.toLocal();
-  return AppL10n.strings.units.longDate(local.day, local.month, local.year);
-}
+/// תאריך בחנות התוספים ובתוכנות הנוספות — הפורמט האחד לשתיהן. בעברית תאריך
+/// עברי כמו באתר ("ט' בחשוון תשפ"ז"), באנגלית "October 18, 2026".
+String formatStoreDate(DateTime value) => _storeDay(value.toLocal());
 
-/// [formatLongDate] למחרוזת תאריך מה-API (`YYYY-MM-DD` או ISO-8601 מלא).
+/// [formatStoreDate] למחרוזת תאריך מה-API (`YYYY-MM-DD` או ISO-8601 מלא).
 /// מחרוזת שאינה תאריך מוחזרת כמות שהיא — עדיף על שגיאה במסך.
-String formatLongDateRaw(String? raw) {
+String formatStoreDateRaw(String? raw) {
   if (raw == null || raw.isEmpty) return '';
   final date = DateTime.tryParse(raw);
   if (date == null) return raw;
   // תאריך בלי שעה הוא יום בלוח, לא רגע — המרה לשעון המקומי הייתה מזיזה אותו.
-  final day = raw.length <= 10 ? date : date.toLocal();
-  return AppL10n.strings.units.longDate(day.day, day.month, day.year);
+  return _storeDay(raw.length <= 10 ? date : date.toLocal());
 }
+
+String _storeDay(DateTime day) => AppL10n.language.isRtl
+    ? HebrewDate.fromDateTime(day).toString()
+    : AppL10n.strings.units.longDate(day.day, day.month, day.year);

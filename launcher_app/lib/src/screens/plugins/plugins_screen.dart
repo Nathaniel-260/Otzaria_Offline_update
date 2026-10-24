@@ -180,15 +180,15 @@ class _PluginsScreenState extends State<PluginsScreen> {
     if (outcome == null) return;
     final sent = outcome.sent.length;
     if (outcome.failed.isNotEmpty) {
-      UiSnack.showError(t.updateAllFailedSnack(
-        sent,
-        outcome.failed.length,
-        t.joinNames([for (final f in outcome.failed) f.plugin.name]),
-      ));
-    } else if (outcome.stopped) {
-      UiSnack.show(t.updateAllStoppedSnack(sent));
+      final names =
+          t.joinNames([for (final f in outcome.failed) f.plugin.name]);
+      UiSnack.showError(sent == 0
+          ? t.updateAllNoneSentSnack(names)
+          : t.updateAllPartlySentSnack(sent, names));
     } else if (sent > 0) {
-      UiSnack.show(t.updatesSentSnack(sent));
+      UiSnack.show(outcome.stopped
+          ? t.updateAllStoppedSnack(sent)
+          : t.updatesSentSnack(sent));
     }
   }
 
@@ -199,6 +199,8 @@ class _PluginsScreenState extends State<PluginsScreen> {
     if (_c.isSyncing) return t.actionsBlockedSyncing;
     if (_c.isExporting) return t.actionsBlockedExporting;
     if (_c.isUpdatingAll) return t.actionsBlockedUpdatingAll;
+    // הורדה, החלת ספרייה או התקנת אוצריא — המראה עשויה להתחלף באמצע.
+    if (widget.busyElsewhere) return t.actionsBlockedElsewhere;
     return null;
   }
 
@@ -262,7 +264,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           title: t.storeTitle,
           description: lastSync == null
               ? t.storeSubtitle
-              : '${t.storeSubtitle} ${t.asOfDate(formatLongDate(lastSync))}',
+              : '${t.storeSubtitle} ${t.asOfDate(formatStoreDate(lastSync))}',
           actions: [
             if (_canSync)
               ActionButton.ghost(
@@ -425,7 +427,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           if (deliverable)
             ActionButton.recommended(
               text: t.updateAllButton,
-              onPressed: _c.isSyncing || _c.isExporting
+              onPressed: _blockedReason(context) != null
                   ? null
                   : () => unawaited(_updateAll()),
             ),
@@ -471,6 +473,7 @@ class _PluginsScreenState extends State<PluginsScreen> {
           ),
           isNew: _c.isNewThisRun(plugin),
           blocked: blocked,
+          online: widget.online,
           onOpenDetail: () => _select(plugin.id),
           onSave: () => _save(plugin),
           onInstall: () => _install(plugin),

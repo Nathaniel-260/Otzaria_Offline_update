@@ -33,6 +33,16 @@ typedef StoreAppOnlineAnswers = ({
 /// סינון לפי יציבות: "ניסיוני" כולל גם את מה שהאתר מסמן כבטא.
 enum PluginStatusFilter { all, stable, experimental }
 
+/// סטטוס של גרסה שעוד לא יציבה. האתר שולח `beta`/`experimental`; השאר —
+/// לחומרה. סטטוס לא מוכר אינו נספר כאן וגם לא כיציב: מופיע רק תחת "הכול".
+bool isExperimentalPluginStatus(String status) => const {
+      'beta',
+      'experimental',
+      'alpha',
+      'rc',
+      'preview',
+    }.contains(status.toLowerCase());
+
 /// סיכום "עדכון הכול": מה נשלח, מה נכשל ולמה, והאם נעצר באמצע.
 typedef PluginUpdateAllOutcome = ({
   List<StorePlugin> sent,
@@ -783,12 +793,20 @@ class PluginsModuleController extends ChangeNotifier
   /// התוסף נמסר לאוצריא ברגע זה — לכל תוסף בנפרד.
   bool isDelivering(StorePlugin plugin) => _delivering.contains(plugin.id);
 
-  /// [directInstall] עם סימון "בשליחה" על התוסף עד שהמסירה חוזרת.
+  /// [directInstall] עם סימון "בשליחה" על התוסף עד שהמסירה חוזרת. חריגה
+  /// (דיסק, תהליך) חוזרת ככישלון של התוסף הזה, ולא עוצרת רצף מסירות.
   Future<PluginInstallResult> deliver(StorePlugin plugin) async {
     _delivering.add(plugin.id);
     notifyListeners();
     try {
       return await directInstall(plugin);
+    } catch (error, stackTrace) {
+      AppLogger.instance.error(
+        'מסירת ${plugin.name} לאוצריא נכשלה',
+        error,
+        stackTrace,
+      );
+      return const PluginInstallResult.failure(null);
     } finally {
       _delivering.remove(plugin.id);
       if (!isDisposed) notifyListeners();
@@ -815,21 +833,29 @@ class PluginsModuleController extends ChangeNotifier
     updateAllRun = (done: 0, total: targets.length);
     notifyListeners();
     final failed = <({StorePlugin plugin, String? error})>[];
-    final sent = await deliverUpdates(
-      plugins: targets,
-      isCancelled: () => _stopUpdateAll,
-      onDelivered: (plugin, result) {
-        if (!result.success) failed.add((plugin: plugin, error: result.error));
-        final run = updateAllRun;
-        if (run != null) updateAllRun = (done: run.done + 1, total: run.total);
-      },
-    );
-    final stopped =
-        _stopUpdateAll && sent.length + failed.length < targets.length;
-    updateAllRun = null;
-    _stopUpdateAll = false;
-    if (!isDisposed) notifyListeners();
-    return (sent: sent, failed: failed, stopped: stopped);
+    try {
+      final sent = await deliverUpdates(
+        plugins: targets,
+        isCancelled: () => _stopUpdateAll,
+        onDelivered: (plugin, result) {
+          if (!result.success) {
+            failed.add((plugin: plugin, error: result.error));
+          }
+          final run = updateAllRun;
+          if (run != null) {
+            updateAllRun = (done: run.done + 1, total: run.total);
+          }
+        },
+      );
+      final stopped =
+          _stopUpdateAll && sent.length + failed.length < targets.length;
+      return (sent: sent, failed: failed, stopped: stopped);
+    } finally {
+      // אחרת longTaskRunning נשאר תקוע עד סוף ההרצה.
+      updateAllRun = null;
+      _stopUpdateAll = false;
+      if (!isDisposed) notifyListeners();
+    }
   }
 
   /// מוסר לאוצריא, אחד אחרי השני, את העדכונים שאפשר להתקין ישירות
@@ -979,7 +1005,7 @@ class PluginsModuleController extends ChangeNotifier
             return false;
           }
           if (statusFilter == PluginStatusFilter.experimental &&
-              plugin.status == 'stable') {
+              !isExperimentalPluginStatus(plugin.status)) {
             return false;
           }
           if (tagFilter != null && !plugin.tags.contains(tagFilter)) {

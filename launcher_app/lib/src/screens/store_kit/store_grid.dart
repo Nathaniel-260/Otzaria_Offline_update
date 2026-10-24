@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 // SliverConstraints ו-SliverGridLayout מגיעים מ-rendering, לא מ-material.
 import 'package:flutter/rendering.dart';
 
@@ -12,7 +14,11 @@ const double kStoreRowCardWidth = 480;
 /// הטקסט. הגובה **קבוע** — התיאור תמיד בשתי שורות שמורות — כדי שהרשת לא
 /// תצטרך למדוד אף כרטיס.
 double storeRowCardExtent(double textScale) => 32 + 100 * textScale;
-double storeTileCardExtent(double textScale) => 112 + 104 * textScale;
+
+/// באריח, בהגדלה גדולה הסמל והכפתור כבר אינם הגבוהים: שם בשתי שורות, מטא,
+/// תיאור והערה בשתי שורות — כולם טקסט, ולכן הגובה גדל מהר יותר מ-1.4 ומעלה.
+double storeTileCardExtent(double textScale) =>
+    math.max(112 + 104 * textScale, 52 + 146 * textScale);
 
 /// פריסת רשת הכרטיסים: עמודה אחת של שורות, או שתיים של כרטיסים.
 ///

@@ -33,8 +33,8 @@ void main() {
     });
 
     // באנגלית `03.08.2026` נקרא כ-3 באוגוסט או כ-8 במרץ, תלוי בקורא. ISO
-    // חד-משמעי — וזה גם מה ש-`HebrewDate.format` כבר עושה שם.
-    test('אנגלית: ISO, כמו התקדים ב-HebrewDate.format', () {
+    // חד-משמעי.
+    test('אנגלית: ISO', () {
       AppL10n.use(AppLanguage.english);
       expect(formatTimestamp(noon), '2026-08-03 14:05:09');
     });
@@ -61,21 +61,28 @@ void main() {
     });
   });
 
-  group('formatLongDate — הפורמט האחיד של החנויות', () {
-    test('יום, שם חודש ושנה בשתי השפות', () {
+  group('formatStoreDate — תאריכי החנויות', () {
+    test('עברית: תאריך עברי כמו באתר; אנגלית: לועזי בשם חודש', () {
       AppL10n.use(AppLanguage.hebrew);
-      expect(formatLongDate(DateTime(2026, 10, 18, 12)), '18 באוקטובר 2026');
+      expect(formatStoreDate(DateTime(2026, 10, 20, 12)), 'ט\' בחשוון תשפ"ז');
       AppL10n.use(AppLanguage.english);
-      expect(formatLongDate(DateTime(2026, 10, 18, 12)), 'October 18, 2026');
+      expect(formatStoreDate(DateTime(2026, 10, 20, 12)), 'October 20, 2026');
     });
 
     test('מחרוזת מה-API: תאריך בלבד אינו זז, ומה שאינו תאריך חוזר כמות שהוא',
         () {
+      for (final language in AppLanguage.values) {
+        AppL10n.use(language);
+        expect(formatStoreDateRaw(''), '');
+        expect(formatStoreDateRaw(null), '');
+        expect(formatStoreDateRaw('לא תאריך'), 'לא תאריך');
+        expect(formatStoreDateRaw('02/04/2026'), '02/04/2026');
+      }
       AppL10n.use(AppLanguage.hebrew);
-      expect(formatLongDateRaw('2026-01-01'), '1 בינואר 2026');
-      expect(formatLongDateRaw(''), '');
-      expect(formatLongDateRaw(null), '');
-      expect(formatLongDateRaw('לא תאריך'), 'לא תאריך');
+      expect(formatStoreDateRaw('2026-01-01'), 'י"ב בטבת תשפ"ו');
+      expect(formatStoreDateRaw('2026-04-02T10:30:00.000Z'), 'ט"ו בניסן תשפ"ו');
+      AppL10n.use(AppLanguage.english);
+      expect(formatStoreDateRaw('2026-01-01'), 'January 1, 2026');
     });
   });
 }

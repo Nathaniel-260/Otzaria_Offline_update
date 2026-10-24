@@ -15,6 +15,7 @@ import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_detail_view.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_rating_panel.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_store_card.dart';
+import 'package:launcher_app/src/screens/plugins/plugin_visuals.dart';
 import 'package:launcher_app/src/screens/plugins/plugins_screen.dart';
 import 'package:launcher_app/src/screens/plugins/store_app_export_flow.dart';
 import 'package:launcher_app/src/screens/store_kit/store_kit.dart';
@@ -106,6 +107,9 @@ class _RecordingController extends PluginsModuleController {
   final Set<String> failingIds = {};
   final Map<String, Completer<void>> holds = {};
 
+  /// תוספים שהמסירה שלהם זורקת — דיסק או תהליך שנכשלו באמצע.
+  final Set<String> throwingIds = {};
+
   /// מה שנשלח בהצלחה וממתין לאישור באוצריא — כמו ההמתנה האמיתית, בלי
   /// הטיימר שסורק את הדיסק. מתבטל כשהסריקה מגלה שהגרסה כבר מותקנת.
   final Set<String> sentIds = {};
@@ -114,6 +118,9 @@ class _RecordingController extends PluginsModuleController {
   Future<PluginInstallResult> directInstall(StorePlugin plugin) async {
     delivered.add(plugin.id);
     await holds[plugin.id]?.future;
+    if (throwingIds.contains(plugin.id)) {
+      throw const FileSystemException('הקובץ נעול');
+    }
     if (!succeeds || failingIds.contains(plugin.id)) {
       return const PluginInstallResult.failure('אוצריא לא נפתחה');
     }
@@ -552,6 +559,14 @@ void main() {
     expect(button(tester, t.installInOtzariaButton).onPressed, isNotNull);
     expect(find.text(t.noteFileMissing), findsOneWidget);
 
+    // כשידוע שיש אינטרנט — בלי "(צריך אינטרנט)": הקובץ יירד מיד.
+    await pumpScreen(tester, PluginsScreen(controller: plugins, online: true));
+    await tester.pumpAndSettle();
+    expect(find.text(t.noteFileMissingOnline), findsOneWidget);
+    expect(find.text(t.noteFileMissing), findsNothing);
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+
     await openCard(tester, 'תוסף שטרם ירד');
 
     expect(find.text(t.fileMissingTitle), findsOneWidget);
@@ -945,24 +960,38 @@ void main() {
       storePlugin('b',
           name: 'בטא עם תגית', status: 'beta', tags: const ['תגית-בדיקה-א']),
       storePlugin('c', name: 'בטא בלי', status: 'beta', tags: const []),
+      storePlugin('d', name: 'סטטוס זר', status: 'deprecated', tags: const []),
     ]);
 
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
 
+    // בכרטיס, כמו בסינון: בטא מוצג כ"ניסיוני", וסטטוס לא מוכר — בלי שבב.
+    expect(
+      find.widgetWithText(StoreMetaChip, t.statusExperimental),
+      findsNWidgets(2),
+    );
     expect(find.text(t.filterStatusLabel), findsNothing);
     await tester.tap(find.text(t.moreFilters));
     await tester.pumpAndSettle();
     expect(find.text(t.filterStatusLabel), findsOneWidget);
 
     // "יציבות": הכול / יציב / ניסיוני — ו"ניסיוני" כולל את הבטא.
-    expect(find.widgetWithText(StoreFilterChip, t.statusBeta), findsNothing);
+    expect(find.widgetWithText(StoreFilterChip, 'בטא'), findsNothing);
+    await tester.tap(find.widgetWithText(StoreFilterChip, t.statusStable));
+    await tester.pumpAndSettle();
+    expect(find.text('יציב עם תגית'), findsOneWidget);
+    expect(find.text('בטא בלי'), findsNothing);
+    expect(find.text('סטטוס זר'), findsNothing);
+
     await tester
         .tap(find.widgetWithText(StoreFilterChip, t.statusExperimental));
     await tester.pumpAndSettle();
     expect(plugins.statusFilter, PluginStatusFilter.experimental);
     expect(find.text('יציב עם תגית'), findsNothing);
     expect(find.text('בטא בלי'), findsOneWidget);
+    // סטטוס לא מוכר אינו "ניסיוני" — רק תחת "הכול".
+    expect(find.text('סטטוס זר'), findsNothing);
 
     await tester.tap(find.widgetWithText(StoreFilterChip, 'תגית-בדיקה-א'));
     await tester.pumpAndSettle();
@@ -1438,7 +1467,65 @@ void main() {
     // הודעה לכל כישלון הייתה נדרסת מיד בהודעת "נשלחו" — עכשיו יש אחת.
     restore();
     expect(snacks, hasLength(1));
-    expect(snacks.single, contains(t.updateAllFailedSnack(2, 1, 'שלישי')));
+    expect(snacks.single, contains(t.updateAllPartlySentSnack(2, 'שלישי')));
+  });
+
+  testWidgets('"עדכון הכול": מסירה שזורקת אינה משאירה את הריצה תקועה',
+      (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: threeUpdates(),
+      installed: threeInstalled,
+    );
+    controller.throwingIds.addAll(['a', 'b']);
+    final (messages: snacks, :restore) = captureSnacks();
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.updateAllButton));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 2; i++) {
+      await tester.pump(pluginUpdateDeliverySpacing);
+      await tester.pump();
+    }
+
+    // החריגה נרשמת ככישלון של אותו תוסף, והרצף ממשיך לתוסף הבא.
+    expect(controller.delivered, ['a', 'b', 'c']);
+    expect(plugins.isUpdatingAll, isFalse);
+    expect(plugins.isDelivering(threeUpdates().first), isFalse);
+    expect(find.text(t.actionsBlockedUpdatingAll), findsNothing);
+    restore();
+    expect(
+      snacks.single,
+      contains(t.updateAllPartlySentSnack(1, t.joinNames(['ראשון', 'שני']))),
+    );
+  });
+
+  testWidgets('"עדכון הכול": כשאף עדכון לא נשלח — בלי "0 נשלחו"',
+      (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: threeUpdates(),
+      installed: threeInstalled,
+    );
+    controller.succeeds = false;
+    final (messages: snacks, :restore) = captureSnacks();
+
+    await pumpScreen(tester, PluginsScreen(controller: plugins));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.updateAllButton));
+    await tester.pump();
+    await tester.pump();
+    for (var i = 0; i < 2; i++) {
+      await tester.pump(pluginUpdateDeliverySpacing);
+      await tester.pump();
+    }
+
+    restore();
+    final names = t.joinNames(['ראשון', 'שני', 'שלישי']);
+    expect(snacks.single, contains(t.updateAllNoneSentSnack(names)));
+    expect(snacks.single, isNot(contains('0')));
   });
 
   testWidgets('"עדכון הכול": "עצירה" עוצרת אחרי התוסף הנוכחי', (tester) async {
@@ -1495,6 +1582,28 @@ void main() {
     await tester.pump(pluginUpdateDeliverySpacing);
     await tester.pump();
     expect(plugins.isUpdatingAll, isFalse);
+  });
+
+  testWidgets('משימה אחרת רצה: "עדכון הכול" וההתקנה מושבתים, ויש הסבר',
+      (tester) async {
+    final controller = await seedRecording(
+      tester,
+      catalog: threeUpdates(),
+      installed: threeInstalled,
+    );
+
+    await pumpScreen(
+      tester,
+      PluginsScreen(controller: plugins, busyElsewhere: true),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.actionsBlockedElsewhere), findsOneWidget);
+    expect(button(tester, t.updateAllButton).onPressed, isNull);
+    for (final element in find.byType(PluginAction).evaluate()) {
+      expect((element.widget as PluginAction).blocked, isTrue);
+    }
+    expect(controller.delivered, isEmpty);
   });
 
   testWidgets('"בשליחה" לכל תוסף בנפרד — סיום אחד אינו מחזיר את השני',
@@ -1748,8 +1857,8 @@ void main() {
 
     final version = tester.widget<Text>(find.text('1.0.0'));
     expect(version.textDirection, TextDirection.ltr);
-    final longDate = stringsOf().units.longDate(18, 10, 2026);
-    expect(find.text(longDate), findsOneWidget);
+    // תאריך עברי כמו באתר — לא "18 באוקטובר 2026".
+    expect(find.text('ז\' בחשוון תשפ"ז'), findsOneWidget);
   });
 
   testWidgets('דיאלוג סיום הייצוא מוצג גם אחרי שעברו לדף תוסף', (tester) async {

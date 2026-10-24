@@ -158,6 +158,8 @@ const _spelledOne = {
   'pages.libFullMeta#0',
   'plugins.updatesAvailable#0',
   'plugins.updatesSentSnack#0',
+  'plugins.updateAllPartlySentSnack#0',
+  'plugins.updateAllStoppedSnack#0',
 };
 
 /// הזוגי העברי ("שתי דקות") — אותו כלל ב-2, בעברית בלבד.

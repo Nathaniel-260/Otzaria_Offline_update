@@ -159,7 +159,7 @@ Future<bool> _showIntroDialog(
       chips: [
         t.storeAppChipWindows,
         t.storeAppChipSize(formatBytes(release.sizeBytes)),
-        if (updated != null) t.storeAppChipUpdated(formatLongDate(updated)),
+        if (updated != null) t.storeAppChipUpdated(formatStoreDate(updated)),
       ],
     ),
   );

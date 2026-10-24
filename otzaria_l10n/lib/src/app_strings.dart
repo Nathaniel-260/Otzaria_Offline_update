@@ -933,7 +933,6 @@ abstract class PluginsStrings {
   String get sourcePageButton;
 
   String get statusStable;
-  String get statusBeta;
   String get statusExperimental;
   String get statusUnknown;
 
@@ -1030,12 +1029,14 @@ abstract class PluginsStrings {
   String get updateAllButton;
   String updatingAllLabel(int current, int total);
   String updatesSentSnack(int count);
-  String updateAllFailedSnack(int sent, int failed, String names);
+  String updateAllNoneSentSnack(String names);
+  String updateAllPartlySentSnack(int sent, String names);
   String updateAllStoppedSnack(int sent);
   String get updateAllStoppingLabel;
   String get actionsBlockedSyncing;
   String get actionsBlockedExporting;
   String get actionsBlockedUpdatingAll;
+  String get actionsBlockedElsewhere;
   String get howItWorksButton;
   String get updatesSentTitle;
   String get updatesSentBody;
@@ -1057,6 +1058,7 @@ abstract class PluginsStrings {
   String get noteSaveOnly;
   String get noteDisabled;
   String get noteFileMissing;
+  String get noteFileMissingOnline;
   String get fileNotOnDriveLabel;
   String get noteNextDriveDownload;
   String get incompatibleTitle;
@@ -2088,6 +2090,7 @@ abstract class CustomAppsStrings {
   String get onlineNotChecked;
   String get manageEmptyTitle;
   String get manageEmptyBody;
+  String get emptyReadOnlyBody;
   String get noCategoriesTitle;
   String get orderSectionTitle;
   String get formStepSource;

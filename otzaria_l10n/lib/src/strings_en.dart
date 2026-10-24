@@ -1727,8 +1727,6 @@ class _Plugins extends PluginsStrings {
   @override
   String get statusStable => 'Stable';
   @override
-  String get statusBeta => 'Beta';
-  @override
   String get statusExperimental => 'Experimental';
   @override
   String get statusUnknown => 'Unknown';
@@ -1900,11 +1898,19 @@ class _Plugins extends PluginsStrings {
       one: 'The update was sent to Otzaria — approve it there',
       many: '$count updates were sent to Otzaria — approve them there');
   @override
-  String updateAllFailedSnack(int sent, int failed, String names) =>
-      '$sent sent to Otzaria, $failed failed: $names';
+  String updateAllNoneSentSnack(String names) => 'Not sent to Otzaria: $names';
   @override
-  String updateAllStoppedSnack(int sent) =>
-      'Updating stopped. Sent to Otzaria: $sent.';
+  String updateAllPartlySentSnack(int sent, String names) => plural(sent,
+      one: 'One update was sent to Otzaria — approve it there. '
+          'Not sent: $names',
+      many: '$sent updates were sent to Otzaria — approve them there. '
+          'Not sent: $names');
+  @override
+  String updateAllStoppedSnack(int sent) => plural(sent,
+      one: 'Updating stopped. One update was sent to Otzaria — approve it '
+          'there',
+      many: 'Updating stopped. $sent updates were sent to Otzaria — approve '
+          'them there');
   @override
   String get updateAllStoppingLabel => 'Stopping after the current plugin…';
   @override
@@ -1916,6 +1922,9 @@ class _Plugins extends PluginsStrings {
   @override
   String get actionsBlockedUpdatingAll =>
       'Other plugins cannot be installed or saved during "Update All".';
+  @override
+  String get actionsBlockedElsewhere =>
+      'Another task is running. Plugins cannot be installed or saved meanwhile.';
   @override
   String get howItWorksButton => 'How Does This Work?';
   @override
@@ -1962,6 +1971,9 @@ class _Plugins extends PluginsStrings {
   @override
   String get noteFileMissing =>
       'Not on the drive yet — downloaded on install (needs internet)';
+  @override
+  String get noteFileMissingOnline =>
+      'Not on the drive yet — it downloads from the website now';
   @override
   String get fileNotOnDriveLabel => 'The file is not on the drive';
   @override
@@ -4119,6 +4131,9 @@ class _CustomApps extends CustomAppsStrings {
   String updateToButton(String version) => 'Update to $version';
   @override
   String get onlineNotChecked => 'Not checked yet';
+  @override
+  String get emptyReadOnlyBody =>
+      'This drive is write-protected, so programs cannot be added to it.';
   @override
   String get manageEmptyTitle => 'No programs added yet';
   @override

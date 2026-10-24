@@ -4,13 +4,17 @@ import 'package:launcher_app/src/services/hebrew_date.dart';
 void main() {
   group('HebrewDate.fromDateTime', () {
     // עוגנים היסטוריים מוכרים — כל אחד מהם תפס באג אמיתי בחישוב ההדחיות.
+    // הערכים הם הפלט של `formatHebrewDate` באתר (src/lib/pageProof/dates.js).
     const anchors = {
-      '1948-05-14': "ה' באייר ה'תש\"ח", // הכרזת העצמאות
-      '2023-10-07': 'כ"ב בתשרי ה\'תשפ"ד', // שמיני עצרת תשפ"ד
-      '2024-03-24': 'י"ד באדר ב׳ ה\'תשפ"ד', // פורים בשנה מעוברת
-      '2025-09-23': 'א\' בתשרי ה\'תשפ"ו', // ראש השנה תשפ"ו
-      '2026-04-02': 'ט"ו בניסן ה\'תשפ"ו', // פסח תשפ"ו
-      '2000-01-01': 'כ"ג בטבת ה\'תש"ס',
+      '1948-05-14': 'ה\' באייר תש"ח', // הכרזת העצמאות
+      '2023-10-07': 'כ"ב בתשרי תשפ"ד', // שמיני עצרת תשפ"ד
+      '2024-03-24': 'י"ד באדר ב׳ תשפ"ד', // פורים בשנה מעוברת
+      '2025-09-23': 'א\' בתשרי תשפ"ו', // ראש השנה תשפ"ו
+      '2026-04-02': 'ט"ו בניסן תשפ"ו', // פסח תשפ"ו
+      '2000-01-01': 'כ"ג בטבת תש"ס',
+      '2026-10-20': 'ט\' בחשוון תשפ"ז',
+      '2025-06-01': 'ה\' בסיוון תשפ"ה',
+      '2027-02-15': 'ח\' באדר א׳ תשפ"ז',
     };
 
     anchors.forEach((iso, expected) {
@@ -66,14 +70,14 @@ void main() {
 
       expect(names, {
         'תשרי',
-        'חשון',
+        'חשוון',
         'כסלו',
         'טבת',
         'שבט',
         'אדר',
         'ניסן',
         'אייר',
-        'סיון',
+        'סיוון',
         'תמוז',
         'אב',
         'אלול',
@@ -134,7 +138,7 @@ void main() {
       final night = HebrewDate.fromDateTime(DateTime(2026, 4, 2, 23, 59));
 
       expect(morning.toString(), night.toString());
-      expect(morning.toString(), 'ט"ו בניסן ה\'תשפ"ו');
+      expect(morning.toString(), 'ט"ו בניסן תשפ"ו');
     });
   });
 
@@ -178,40 +182,6 @@ void main() {
     test('גבול העליון של הטווח', () {
       expect(HebrewDate.toHebrewNumeral(9999), isNot('9999'));
       expect(HebrewDate.toHebrewNumeral(10000), '10000');
-    });
-  });
-
-  group('HebrewDate.format — קלטים מהאתר', () {
-    test('חותם זמן עם היסט נקרא לפי ה-UTC שלו', () {
-      // `DateTime.parse` מחזיר UTC, ולכן חצות בירושלים נופלת ביום הקודם.
-      // מקובל כאן: התאריך משמש ל"עודכן ב-" בחנות בלבד.
-      expect(HebrewDate.format('2026-04-02T00:30:00+03:00'),
-          HebrewDate.format('2026-04-01'));
-      expect(HebrewDate.format('2026-04-02T12:00:00Z'),
-          HebrewDate.format('2026-04-02'));
-    });
-
-    test('תאריך בפורמט לא צפוי מוחזר כמו שהוא', () {
-      expect(HebrewDate.format('02/04/2026'), '02/04/2026');
-    });
-  });
-
-  group('HebrewDate.format', () {
-    test('מפרמט YYYY-MM-DD מה-API', () {
-      expect(HebrewDate.format('2026-04-02'), 'ט"ו בניסן ה\'תשפ"ו');
-    });
-
-    test('מפרמט ISO-8601 מלא', () {
-      expect(
-        HebrewDate.format('2026-04-02T10:30:00.000Z'),
-        'ט"ו בניסן ה\'תשפ"ו',
-      );
-    });
-
-    test('קלט ריק או לא-תאריך אינו מפיל את המסך', () {
-      expect(HebrewDate.format(null), '');
-      expect(HebrewDate.format(''), '');
-      expect(HebrewDate.format('לא תאריך'), 'לא תאריך');
     });
   });
 }

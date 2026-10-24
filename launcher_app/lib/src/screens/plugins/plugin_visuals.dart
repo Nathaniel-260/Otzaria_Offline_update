@@ -11,16 +11,14 @@ import '../store_kit/store_kit.dart';
 /// רכיבי התצוגה **של התוספים בלבד**: מטא, מצב מול ההתקנה והפעולה שנגזרת
 /// ממנו. מה שמשותף לשתי החנויות יושב ב-`screens/store_kit/`.
 
-/// תווית סטטוס התוסף כפי שהאתר מדווח אותו (`stable`/`beta`/`experimental`).
+/// תווית סטטוס התוסף. בטא וניסיוני הם "ניסיוני" אחד — כמו בסינון.
 /// המפתחות מגיעים מה-API ואינם מתורגמים — רק התוויות שמוצגות.
 String pluginStatusLabel(String status) {
   final t = AppL10n.strings.plugins;
-  return switch (status) {
-    'stable' => t.statusStable,
-    'beta' => t.statusBeta,
-    'experimental' => t.statusExperimental,
-    _ => t.statusUnknown,
-  };
+  if (status == 'stable') return t.statusStable;
+  return isExperimentalPluginStatus(status)
+      ? t.statusExperimental
+      : t.statusUnknown;
 }
 
 /// הממוצע כפי שהאתר מציג אותו — ספרה אחת אחרי הנקודה, תמיד.
@@ -152,8 +150,9 @@ String? pluginNoteOf(
   BuildContext context,
   PluginsModuleController controller,
   StorePlugin plugin,
-  PluginCardState state,
-) {
+  PluginCardState state, {
+  bool? online,
+}) {
   final t = context.strings.plugins;
   switch (state) {
     case PluginCardState.incompatible:
@@ -170,7 +169,8 @@ String? pluginNoteOf(
           controller.isDisabledInOtzaria(plugin)) {
         return t.noteDisabled;
       }
-      return controller.hasFileFor(plugin) ? null : t.noteFileMissing;
+      if (controller.hasFileFor(plugin)) return null;
+      return online == true ? t.noteFileMissingOnline : t.noteFileMissing;
     case PluginCardState.sending ||
           PluginCardState.sent ||
           PluginCardState.development ||
@@ -299,7 +299,7 @@ class PluginMeta extends StatelessWidget {
             icon: FluentIcons.arrow_download_16_regular,
           ),
         StoreMetaItem(t.pluginVersionBadge(controller.versionOf(plugin))),
-        if (status == 'beta' || status == 'experimental')
+        if (isExperimentalPluginStatus(status))
           StoreMetaChip(pluginStatusLabel(status)),
         if (network)
           StoreMetaChip(

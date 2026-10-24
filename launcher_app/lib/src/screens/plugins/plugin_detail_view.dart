@@ -67,7 +67,8 @@ class PluginDetailView extends StatelessWidget {
       for (final relative in plugin.screenshotPaths)
         if (controller.assetPath(relative) case final path?) path,
     ];
-    final note = pluginNoteOf(context, controller, plugin, state);
+    final note =
+        pluginNoteOf(context, controller, plugin, state, online: online);
     final canSave = controller.hasFileFor(plugin) &&
         state != PluginCardState.saveOnly &&
         state != PluginCardState.development;
@@ -292,7 +293,7 @@ class PluginDetailView extends StatelessWidget {
       ),
       StoreInfoEntry(
         label: t.infoUpdated,
-        value: formatLongDateRaw(
+        value: formatStoreDateRaw(
           plugin.displayUpdatedDate,
         ),
       ),
@@ -356,7 +357,7 @@ class _Versions extends StatelessWidget {
               if (entry.isLatest) t.versionLatestTag,
               if (entry.version == installed) t.versionInstalledTag,
               if (entry.releasedAt.isNotEmpty)
-                formatLongDateRaw(entry.releasedAt),
+                formatStoreDateRaw(entry.releasedAt),
             ].join(' · '),
             trailing: entry.fileSize > 0
                 ? Text(formatBytes(entry.fileSize), style: meta)

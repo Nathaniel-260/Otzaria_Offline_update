@@ -226,7 +226,7 @@ class CustomAppDetailView extends StatelessWidget {
         ),
         StoreInfoEntry(
           label: t.infoStoredAdded,
-          value: formatLongDate(stored.addedAt),
+          value: formatStoreDate(stored.addedAt),
         ),
       ],
     ];

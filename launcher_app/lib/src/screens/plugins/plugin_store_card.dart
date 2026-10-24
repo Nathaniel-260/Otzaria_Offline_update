@@ -18,6 +18,7 @@ class PluginStoreCard extends StatelessWidget {
     required this.onInstall,
     this.isNew = false,
     this.blocked = false,
+    this.online,
   });
 
   final StorePlugin plugin;
@@ -30,6 +31,9 @@ class PluginStoreCard extends StatelessWidget {
 
   /// "עדכון הכול" רץ — כפתורי הכרטיסים מושבתים בינתיים.
   final bool blocked;
+
+  /// `true` — יש אינטרנט, וקובץ חסר יירד מיד בהתקנה.
+  final bool? online;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +51,7 @@ class PluginStoreCard extends StatelessWidget {
         onSave: onSave,
         blocked: blocked,
       ),
-      note: pluginNoteOf(context, controller, plugin, state),
+      note: pluginNoteOf(context, controller, plugin, state, online: online),
     );
   }
 }
