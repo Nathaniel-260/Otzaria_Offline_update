@@ -11,6 +11,7 @@ import 'models/otzaria_install_state.dart';
 import 'models/otzaria_release.dart';
 import 'models/otzaria_release_channel.dart';
 import 'models/otzaria_update_check_result.dart';
+import 'otzaria_user_error.dart';
 import 'services/installed_version_reader.dart';
 import 'services/mac_app_version_reader.dart';
 import 'services/otzaria_app_locator.dart';
@@ -474,7 +475,7 @@ class OtzariaManager {
     final mirrored = await _mirrorFor(check.currentState);
     final selected = mirrored.select(preferPrerelease: preferPrerelease);
     if (selected == null) {
-      throw StateError(AppL10n.strings.appDomain.mirrorEmptyRunDownload);
+      throw OtzariaUserError(AppL10n.strings.appDomain.mirrorEmptyRunDownload);
     }
 
     await _refuseIfRunningOnMac();
@@ -516,7 +517,8 @@ class OtzariaManager {
   Future<void> _refuseIfRunningOnMac() async {
     if (_platform != OtzariaTargetPlatform.macos) return;
     if (!(await _runningLocator.probe()).isRunning) return;
-    throw StateError(AppL10n.strings.appDomain.macCloseOtzariaBeforeInstall);
+    throw OtzariaUserError(
+        AppL10n.strings.appDomain.macCloseOtzariaBeforeInstall);
   }
 
   Future<String?> _installDirFor(OtzariaInstallState? existing) async {
@@ -539,7 +541,7 @@ class OtzariaManager {
   Future<void> launch({String? withUri}) async {
     final state = (await _loadVerifiedState()) ?? (await _detectInKnownDirs());
     if (state == null) {
-      throw StateError(AppL10n.strings.appDomain.noOtzariaInstallFound);
+      throw OtzariaUserError(AppL10n.strings.appDomain.noOtzariaInstallFound);
     }
     await _launcher.launch(state.launchPath, withUri: withUri);
   }

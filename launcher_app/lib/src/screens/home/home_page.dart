@@ -9,11 +9,13 @@ import '../../shell/shell_keys.dart';
 import '../../shell/shell_navigator.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
+import '../reports/reports_page.dart' show showReportsDisclosure;
 import 'home_view_model.dart';
 import 'welcome_view.dart';
 
 void _noop() {}
 void _noopSection(ShellSection _) {}
+Future<bool> _notClosed() async => false;
 
 /// מה שהבית מפעיל. הכול מוזרק, כך שבדיקה וצילום בונים את הדף בלי סשן.
 class HomeActions {
@@ -35,6 +37,12 @@ class HomeActions {
     this.onDismissElevation = _noop,
     this.onOpenLauncherUpdate = _noop,
     this.onShowProgress = _noop,
+    this.onWhatsNew = _noop,
+    this.onRecheckApp = _noop,
+    this.onCloseOtzaria = _notClosed,
+    this.onPickLibraryFolder = _noop,
+    this.onRegisterThisComputer = _noop,
+    this.onGrantSemanticConsent = _noop,
   });
 
   final VoidCallback onInstallHere;
@@ -60,8 +68,23 @@ class HomeActions {
   /// "עדכון זמין" בשורת המצב — דף "עדכון הכלי הזה".
   final VoidCallback onOpenLauncherUpdate;
 
-  /// "הצג התקדמות" בגיבור של התקנה שרצה מחוץ למסך משימה — הדף שבו היא רצה.
+  /// "הצג התקדמות" בגיבור של עדכון ספרייה שרץ מחוץ למסך משימה.
   final VoidCallback onShowProgress;
+
+  /// "מה חדש?" — חלון מעל הבית.
+  final VoidCallback onWhatsNew;
+
+  /// "בדוק שוב" כשהבדיקה המקומית של התוכנה נכשלה — מהכונן בלבד, בלי
+  /// `checkAll`, שעלול להתקין לבד.
+  final VoidCallback onRecheckApp;
+
+  /// "סגירת אוצריא" בפס, כשאין מה להתקין. מחזירה אם היא אכן נסגרה.
+  final Future<bool> Function() onCloseOtzaria;
+
+  /// הודעות הספרייה: בחירת מיקום, רישום המחשב הזה והסכמה לחיפוש חכם.
+  final VoidCallback onPickLibraryFolder;
+  final VoidCallback onRegisterThisComputer;
+  final VoidCallback onGrantSemanticConsent;
 }
 
 /// דף הבית: הודעות, הגיבור ("מה לעשות עכשיו"), אריחים ושורת תחתית. בכונן
@@ -102,6 +125,7 @@ class HomePage extends StatelessWidget {
             notices: [
               ..._driveNotices(context),
               ..._notices(context),
+              ..._libraryNotices(context),
               if (foundNothingText(context, model) case final text?)
                 NoticeBanner(
                   key: ShellKeys.heroFoundNothing,
@@ -119,6 +143,10 @@ class HomePage extends StatelessWidget {
           );
         }
         const padding = LayoutConstraints.pagePadding;
+        final below = [
+          ..._libraryNotices(context),
+          if (model.showsNewPlugins) _newPluginsBanner(context),
+        ];
         final list = Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
@@ -136,9 +164,9 @@ class HomePage extends StatelessWidget {
                   narrow: narrow,
                   progress: taskProgress,
                 ),
-                if (model.showsNewPlugins) ...[
+                if (below.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  _newPluginsBanner(context),
+                  ...below,
                   // הפס נושא מרווח תחתון של 12; המקטע שאחריו מתחיל ב-28.
                   const SizedBox(height: 16),
                   SectionLabel(context.strings.guide.tilesLabel, first: true),
@@ -195,9 +223,15 @@ class HomePage extends StatelessWidget {
           kind: NoticeKind.banner,
           leading: const IconTile(child: OtzariaLogo()),
           title: g.otzariaOpenTitle,
-          body: model.autoInstallSkipped
-              ? '${g.autoInstallSkippedLead}${g.otzariaOpenBody}'
-              : g.otzariaOpenBody,
+          body: !model.guidance.otzariaOpenBlocksUpdate
+              ? g.otzariaOpenIdleBody
+              : model.autoInstallSkipped
+                  ? '${g.autoInstallSkippedLead}${g.otzariaOpenBody}'
+                  : g.otzariaOpenBody,
+          actions: [
+            if (!model.guidance.otzariaOpenBlocksUpdate)
+              CloseOtzariaButton(onClose: actions.onCloseOtzaria),
+          ],
         ),
       if (model.offersElevation)
         NoticeBanner(
@@ -215,6 +249,65 @@ class HomePage extends StatelessWidget {
             ActionButton.neutral(
               text: elevation.bannerConfirm,
               onPressed: actions.onRestartElevated,
+            ),
+          ],
+        ),
+    ];
+  }
+
+  /// מתחת לגיבור, כדי שבחלון נמוך הפעולה הראשית לא תיגלל החוצה. "לא נמצאה"
+  /// ו"מחשב אחר" — בגיבור עצמו כשהוא "צריך בדיקה" עליהן.
+  List<Widget> _libraryNotices(BuildContext context) {
+    final m = model;
+    final g = context.strings.guide;
+    final t = context.strings.pages;
+    final blocked = m.checkBlocked;
+    final inHero = _libraryInHero(m);
+    return [
+      if (m.libraryNotFound && !inHero)
+        NoticeBanner(
+          key: ShellKeys.libraryNotFoundNotice,
+          leading: const IconTile(icon: FluentIcons.library_24_regular),
+          title: t.libNotFoundTitle,
+          body: t.libNotFoundBody,
+          actions: [
+            ActionButton.neutral(
+              text: t.libPickFolderButton,
+              icon: FluentIcons.folder_open_24_regular,
+              onPressed: blocked ? null : actions.onPickLibraryFolder,
+            ),
+          ],
+        ),
+      if (m.libraryElsewhereFrom case final from? when !inHero)
+        NoticeBanner(
+          key: ShellKeys.libraryElsewhereNotice,
+          leading: const IconTile(
+            icon: FluentIcons.person_24_regular,
+            tone: IconTileTone.quiet,
+          ),
+          title: context.strings.libraryScreen.personalOtherMachineTitle,
+          body: _elsewhereBody(context, m, from),
+          actions: _elsewhereActions(context, m, actions),
+        ),
+      if (m.semanticConsent)
+        NoticeBanner(
+          key: ShellKeys.semanticConsentNotice,
+          leading: const IconTile(icon: FluentIcons.sparkle_24_regular),
+          title: t.libSemanticSection,
+          body: g.semanticConsentBody,
+          actions: [
+            ActionButton.neutral(
+              text: t.libSemanticGrant,
+              onPressed: blocked ? null : actions.onGrantSemanticConsent,
+            ),
+            ActionButton.ghost(
+              key: ShellKeys.semanticConsentWhatIsSent,
+              text: t.repWhatIsSent,
+              onPressed: () => showReportsDisclosure(
+                context,
+                reports: false,
+                search: true,
+              ),
             ),
           ],
         ),
@@ -307,6 +400,42 @@ class HomePage extends StatelessWidget {
   }
 }
 
+/// הגיבור במצב "צריך בדיקה" על ספרייה שלא נמצאה או שהכונן הוכן למחשב אחר —
+/// והוא שמציע את הפעולה, במקום ההודעה.
+bool _libraryInHero(HomeViewModel m) =>
+    m.guidance.primary == GuidancePrimary.attention &&
+    m.guidance.attentionItem == GuidanceItem.library &&
+    (m.libraryNotFound || m.libraryElsewhereFrom != null);
+
+String _elsewhereBody(BuildContext context, HomeViewModel m, String from) {
+  final body = context.strings.libraryScreen.personalOtherMachineSubtitle(
+    from.isEmpty ? context.strings.common.unknownValue : from,
+  );
+  // כמו בדף הספרייה: בכונן מוגן אין לאן לרשום.
+  return m.readOnly
+      ? '$body ${context.strings.pages.libPersonalReadOnly}'
+      : body;
+}
+
+List<Widget> _elsewhereActions(
+  BuildContext context,
+  HomeViewModel m,
+  HomeActions actions,
+) {
+  final s = context.strings.libraryScreen;
+  return [
+    ActionButton.neutral(
+      text: s.personalOtherMachineCaptureButton,
+      onPressed:
+          m.readOnly || m.checkBlocked ? null : actions.onRegisterThisComputer,
+    ),
+    ActionButton.ghost(
+      text: s.personalOtherMachineSettingsButton,
+      onPressed: actions.onOpenSettings,
+    ),
+  ];
+}
+
 /// "הורדה" שלא מצאה מה להביא, כהערה — ראו `AppSession.foundNothing`.
 String? foundNothingText(BuildContext context, HomeViewModel m) {
   final g = context.strings.guide;
@@ -367,11 +496,15 @@ class _HeroSpec {
     this.free,
     this.actions = const [],
     this.notes = const [],
+    this.extra = const [],
     this.eyebrow = true,
   });
 
   final String title;
   final String? body;
+
+  /// מתחת לגוף — למשל השגיאה של בדיקת התוכנה.
+  final List<Widget> extra;
   final List<_Item> items;
 
   /// שורת הסיכום שבתחתית הרשימה.
@@ -484,6 +617,10 @@ class _Hero extends StatelessWidget {
             ),
           ),
         ],
+        if (spec.extra.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ...spec.extra,
+        ],
         if (spec.items.isNotEmpty) ...[
           const SizedBox(height: 16),
           _ItemList(items: spec.items, total: spec.total, free: spec.free),
@@ -587,9 +724,18 @@ class _Hero extends StatelessWidget {
           onPressed: actions.onLaunch,
         ),
     ];
+    final whatsNew = [
+      if (m.whatsNew)
+        ActionButton.ghost(
+          key: ShellKeys.heroWhatsNew,
+          text: g.whatsNewButton,
+          onPressed: actions.onWhatsNew,
+        ),
+    ];
     // במחשב לא מחובר "בדוק עכשיו" נשאר בשורת המצב בלבד.
     final quietActions = [
       launch,
+      ...whatsNew,
       if (!offline)
         secondary(
           g.recheckButton,
@@ -628,6 +774,35 @@ class _Hero extends StatelessWidget {
     ];
     String? installed() =>
         m.installedVersion == null ? null : displayVersion(m.installedVersion!);
+    // שגיאת התוכנה כשהגיבור על משהו אחר, האשף וגרסה שממתינה בערוץ.
+    final pickFolder = m.appErrorPicksFolder;
+    final appNotes = [
+      if (m.appError case final error?)
+        _Note(
+          key: ShellKeys.heroAppErrorNote,
+          FluentIcons.warning_16_regular,
+          error.split('\n').first,
+          link: pickFolder
+              ? context.strings.pages.appAdvancedPageTitle
+              : g.recheckButton,
+          onLink: pickFolder
+              ? () => actions.onOpenSection(ShellSection.otzaria)
+              : m.checkBlocked
+                  ? null
+                  : actions.onRecheckApp,
+        ),
+      if (m.appSetupNotice case final notice?)
+        _Note(FluentIcons.info_16_regular, notice),
+      if (m.appAwaitsNewerStable case final stable?)
+        _Note(
+          key: ShellKeys.appAwaitsNewer,
+          FluentIcons.info_16_regular,
+          context.strings.pages.appAwaitsNewer(stable: stable),
+        ),
+    ];
+    final libraryNotes = _libraryNotes(context, failedShown: true);
+    // ב"צריך בדיקה" אין הערת "נסה שוב" — הקבצים החסרים נאמרים בכל מקרה.
+    final attentionNotes = _libraryNotes(context, failedShown: false);
 
     switch (_g.primary) {
       case GuidancePrimary.checking || GuidancePrimary.welcome:
@@ -644,7 +819,12 @@ class _Hero extends StatelessWidget {
           body: g.installHereBody,
           items: _hereItems(context),
           actions: [primary(g.installHereButton, actions.onInstallHere)],
-          notes: [...recheckNote, ...downloadNotes],
+          notes: [
+            ...recheckNote,
+            ...appNotes,
+            ...libraryNotes,
+            ...downloadNotes,
+          ],
         );
       case GuidancePrimary.updateHere:
         return _HeroSpec(
@@ -653,12 +833,15 @@ class _Hero extends StatelessWidget {
           items: _hereItems(context),
           actions: [
             primary(g.updateHereButton, actions.onUpdateHere),
-            secondary(g.whatsNewButton, () {
-              actions.onOpenSection(_whatsNewSection());
-            }),
+            ...whatsNew,
             ...launchToo,
           ],
-          notes: [...recheckNote, ...downloadNotes],
+          notes: [
+            ...recheckNote,
+            ...appNotes,
+            ...libraryNotes,
+            ...downloadNotes,
+          ],
         );
       case GuidancePrimary.downloadToDrive:
         final hereToo = _g.secondary == GuidanceSecondary.updateHereToo;
@@ -701,6 +884,8 @@ class _Hero extends StatelessWidget {
             // הכפתור הראשי כבר מנסה אותם שוב.
             if (m.failedDownloads != null) failedNote(retry: false),
             ...recheckNote,
+            ...appNotes,
+            ...libraryNotes,
             ..._syncOffNotes(context),
             if (hereToo)
               _Note(
@@ -745,6 +930,7 @@ class _Hero extends StatelessWidget {
             if (m.online != true)
               _Note(FluentIcons.usb_stick_20_regular, g.newerNote),
             ..._quietNotes(context, offline: false),
+            ...libraryNotes,
             ...downloadNotes,
           ],
         );
@@ -769,10 +955,14 @@ class _Hero extends StatelessWidget {
                   foundNothingTitle ? m.foundNothing : null,
                   m.onlineCheckedAt
                 )) {
-                  (FoundNothing.rechecked, final at?) =>
-                    g.recheckNothingBody(formatClock(at)),
-                  (FoundNothing.earlierCheck, final at?) =>
-                    g.nothingNewBody(formatClock(at)),
+                  (FoundNothing.rechecked, final at?) => g.recheckNothingBody(
+                      formatClock(at),
+                      upToDate: !m.semanticOffer,
+                    ),
+                  (FoundNothing.earlierCheck, final at?) => g.nothingNewBody(
+                      formatClock(at),
+                      upToDate: !m.semanticOffer,
+                    ),
                   _ => g.upToDateBody(installed()),
                 },
           items: others,
@@ -781,6 +971,7 @@ class _Hero extends StatelessWidget {
           notes: [
             if (!foundNothingTitle) ...recheckNote,
             ..._quietNotes(context, offline: true),
+            ...libraryNotes,
             ...downloadNotes,
           ],
         );
@@ -805,22 +996,89 @@ class _Hero extends StatelessWidget {
               icon: FluentIcons.arrow_sync_24_regular,
             ),
           ],
-          notes: [...recheckNote, ...downloadNotes],
+          notes: [...recheckNote, ...libraryNotes, ...downloadNotes],
+        );
+      case GuidancePrimary.attention when _g.attentionItem == GuidanceItem.app:
+        // הבדיקה של התוכנה בלבד: "בדוק עכשיו" מריץ גם התקנה אוטומטית.
+        return _HeroSpec(
+          title: g.attentionAppTitle,
+          extra: [
+            if (m.appError case final error?)
+              Material(
+                type: MaterialType.transparency,
+                child:
+                    InfoErrorRow(key: ShellKeys.heroAppError, message: error),
+              ),
+          ],
+          actions: [
+            primary(
+              g.recheckButton,
+              m.checkBlocked ? null : actions.onRecheckApp,
+              icon: FluentIcons.arrow_sync_24_regular,
+            ),
+            if (pickFolder)
+              ActionButton.ghost(
+                key: ShellKeys.heroAppAdvanced,
+                text: context.strings.pages.appAdvancedPageTitle,
+                onPressed: () => actions.onOpenSection(ShellSection.otzaria),
+              ),
+            ...launchToo,
+          ],
+          notes: [...recheckNote, ...attentionNotes],
         );
       case GuidancePrimary.attention:
-        final library = _g.attentionItem == GuidanceItem.library;
+        final t = context.strings.pages;
+        final s = context.strings.libraryScreen;
+        final toLibrary = ActionButton.ghost(
+          key: ShellKeys.heroSecondary,
+          text: g.attentionLibraryButton,
+          onPressed: () => actions.onOpenSection(ShellSection.library),
+        );
+        if (m.libraryNotFound) {
+          return _HeroSpec(
+            title: t.libNotFoundTitle,
+            body: t.libNotFoundBody,
+            actions: [
+              primary(
+                t.libPickFolderButton,
+                m.checkBlocked ? null : actions.onPickLibraryFolder,
+                icon: FluentIcons.folder_open_24_regular,
+              ),
+              toLibrary,
+            ],
+            notes: [...recheckNote, ...attentionNotes],
+          );
+        }
+        if (m.libraryElsewhereFrom case final from?) {
+          return _HeroSpec(
+            title: s.personalOtherMachineTitle,
+            body: _elsewhereBody(context, m, from),
+            actions: [
+              primary(
+                s.personalOtherMachineCaptureButton,
+                m.readOnly || m.checkBlocked
+                    ? null
+                    : actions.onRegisterThisComputer,
+              ),
+              ActionButton.ghost(
+                key: ShellKeys.heroSecondary,
+                text: s.personalOtherMachineSettingsButton,
+                onPressed: actions.onOpenSettings,
+              ),
+            ],
+            notes: [...recheckNote, ...attentionNotes],
+          );
+        }
         return _HeroSpec(
-          title: library ? g.attentionLibraryTitle : g.attentionAppTitle,
+          title: g.attentionLibraryTitle,
           body: g.attentionBody,
           actions: [
             primary(
-              library ? g.attentionLibraryButton : g.attentionAppButton,
-              () => actions.onOpenSection(
-                library ? ShellSection.library : ShellSection.otzaria,
-              ),
+              g.attentionLibraryButton,
+              () => actions.onOpenSection(ShellSection.library),
             ),
           ],
-          notes: recheckNote,
+          notes: [...recheckNote, ...attentionNotes],
         );
       case GuidancePrimary.taskInProgress:
         Widget showProgress() => ActionButton.recommended(
@@ -835,9 +1093,9 @@ class _Hero extends StatelessWidget {
               body: g.taskDownloadingBody,
               items: _downloadItems(context),
             ),
+          // ההתקדמות ו"הפסק להמתין" בגיבור עצמו — `HomeTaskProgress`.
           HomeTask.installingApp => _HeroSpec(
               title: g.taskInstallingAppTitle,
-              actions: [showProgress()],
             ),
           HomeTask.updatingLibrary => _HeroSpec(
               title: g.taskUpdatingLibraryTitle,
@@ -851,11 +1109,26 @@ class _Hero extends StatelessWidget {
     }
   }
 
-  ShellSection _whatsNewSection() {
-    final items = _g.hereItems;
-    if (items.contains(GuidanceItem.app)) return ShellSection.otzaria;
-    if (items.contains(GuidanceItem.library)) return ShellSection.library;
-    return ShellSection.plugins;
+  /// קבצים נלווים שחסרים בכונן — אין כאן מה ללחוץ, ולכן הערה מתחת לפעולה.
+  /// [failedShown] — הגיבור כבר אומר אותם ב"נסה שוב" של קבצים שלא ירדו.
+  List<_Note> _libraryNotes(BuildContext context, {required bool failedShown}) {
+    final g = context.strings.guide;
+    final m = model;
+    if (failedShown && m.failedDownloads != null) return const [];
+    return [
+      if (m.libraryMissingNames case final names?)
+        _Note(
+          key: ShellKeys.libraryMissingNotice,
+          FluentIcons.warning_16_regular,
+          g.libraryMissingFilesBody(names),
+        ),
+      if (m.libraryCompanionsAbsent)
+        _Note(
+          key: ShellKeys.libraryAbsentNotice,
+          FluentIcons.warning_16_regular,
+          g.libraryCompanionsAbsentBody,
+        ),
+    ];
   }
 
   List<_Note> _quietNotes(BuildContext context, {required bool offline}) {

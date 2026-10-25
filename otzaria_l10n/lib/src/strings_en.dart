@@ -446,7 +446,7 @@ class _Task extends TaskStrings {
   String get appWizardOpen => 'The setup wizard is open — continue in it';
   @override
   String get appStoppedWaiting =>
-      'Stopped waiting · check on the app page whether the installation finished';
+      'Stopped waiting · check on the home page whether the installation finished';
   @override
   String get appSkipped => 'No installation was needed';
   @override
@@ -533,15 +533,15 @@ class _Task extends TaskStrings {
   String stoppedWaitingBody(
           {required bool firstInstall, required bool libraryDone}) =>
       firstInstall
-          ? 'If the wizard is still open, finish it. Then check on the app page that Otzaria was installed; you can install the library from there too.'
+          ? 'If the wizard is still open, finish it. Then check on the home page that Otzaria was installed; you can install the library from there too.'
           : libraryDone
-              ? 'The library was updated. Finish the installation in the wizard window, and check on the app page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.'
-              : 'Finish the installation in the wizard window, and check on the app page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.';
+              ? 'The library was updated. Finish the installation in the wizard window, and check on the home page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.'
+              : 'Finish the installation in the wizard window, and check on the home page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.';
   @override
   String get wizardStillOpenTitle => 'The setup wizard is still open';
   @override
   String get wizardStillOpenBody =>
-      'Finish the installation in the wizard window, then check the app page again. Do not disconnect the drive until the wizard finishes.';
+      'Finish the installation in the wizard window, then check again on the home page. Do not disconnect the drive until the wizard finishes.';
   @override
   String get reindexTitle => 'Rebuilding search is recommended';
   @override
@@ -610,8 +610,6 @@ class _Task extends TaskStrings {
   @override
   String get toLibraryPage => 'To the library page';
   @override
-  String get toAppPage => 'To the app page';
-  @override
   String get toPluginsPage => 'To the plugins page';
   @override
   String get showProgress => 'Show progress';
@@ -643,14 +641,12 @@ class _Pages extends PageStrings {
   @override
   String get appChipNotInstalled => 'Not installed on this computer';
   @override
-  String appUpdateButton(String version) => 'Update to $version';
-  @override
-  String get appInstallButton => 'Install Otzaria';
-  @override
-  String get appNeedsDownloadNote =>
-      'The Otzaria app is not on the drive yet. Download it on a computer with internet, from the home page.';
-  @override
   String appWhatsNew(String version) => "What's new in Otzaria $version";
+  @override
+  String get appInstalledNotesCaption =>
+      'The version installed on this computer';
+  @override
+  String get appAdvancedPageTitle => 'Otzaria — advanced';
   @override
   String appAwaitsNewer({required bool stable}) => stable
       ? 'A beta version newer than the stable one on the drive is installed here. You will move to the stable version when a stable version newer than the installed one comes out.'
@@ -711,7 +707,7 @@ class _Pages extends PageStrings {
       'Otzaria is not installed on this computer, and the program is not on the drive. To install the library, first download the program on a computer with internet.';
   @override
   String get libUpdateNeedsApp =>
-      'Otzaria is not installed on this computer. Install it first on the program page, and then the library can be installed here.';
+      'Otzaria is not installed on this computer. Install it first from the home page, and then the library can be installed here.';
   @override
   String get libUpdateButton => 'Update the library';
   @override
@@ -976,18 +972,21 @@ class _Guide extends GuidanceStrings {
   String get recheckNothingTitle =>
       'Checked again — nothing new on the Otzaria site';
   @override
-  String recheckNothingBody(String time) =>
-      'There are no new updates on the Otzaria site (checked at $time), so '
-      'nothing was downloaded. The drive and this computer are up to date.';
+  String recheckNothingBody(String time, {required bool upToDate}) => [
+        'There are no new updates on the Otzaria site (checked at $time), so '
+            'nothing was downloaded.',
+        if (upToDate) 'The drive and this computer are up to date.',
+      ].join(' ');
   @override
   String recheckNothingNote(String time) =>
       'Checked again — nothing new on the Otzaria site · checked at $time';
   @override
   String get nothingNewTitle => 'Nothing new on the Otzaria site';
   @override
-  String nothingNewBody(String time) =>
-      'The check at $time found no new updates, so nothing was downloaded. '
-      'The drive and this computer are up to date.';
+  String nothingNewBody(String time, {required bool upToDate}) => [
+        'The check at $time found no new updates, so nothing was downloaded.',
+        if (upToDate) 'The drive and this computer are up to date.',
+      ].join(' ');
   @override
   String nothingNewNote(String time) =>
       'Nothing new on the Otzaria site · checked at $time';
@@ -1084,8 +1083,6 @@ class _Guide extends GuidanceStrings {
   @override
   String get attentionBody => 'Its page explains what happened and what to do.';
   @override
-  String get attentionAppButton => 'To the program page';
-  @override
   String get attentionLibraryButton => 'To the library page';
   @override
   String get taskDownloadingTitle => 'Downloading updates to the drive';
@@ -1153,6 +1150,10 @@ class _Guide extends GuidanceStrings {
       'When you press "Update", the tool will ask to close it. Your open books '
       'will wait for you.';
   @override
+  String get otzariaOpenIdleBody =>
+      'There is nothing to install right now, so you can keep working in it. '
+      'When there is an update, the tool will ask to close it.';
+  @override
   String get autoInstallSkippedLead =>
       'That is why the automatic update was not installed. ';
   @override
@@ -1170,6 +1171,19 @@ class _Guide extends GuidanceStrings {
 
   @override
   String get toPluginsButton => 'To plugins';
+  @override
+  String libraryMissingFilesBody(String names) =>
+      'Missing on the drive: $names. Downloading to the drive again fills in '
+      'what is missing, and the rest of the update will install as usual.';
+  @override
+  String get libraryCompanionsAbsentBody =>
+      'The drive does not have the Talmud Bavli, the catalog and the '
+      'dictionary, so they will not be installed. Downloading to the drive '
+      'again brings them.';
+  @override
+  String get semanticConsentBody =>
+      'Smart search is on the drive. To turn it on, agree that Otzaria keeps '
+      'your search words and which results helped you.';
 
   @override
   String get tilesLabel => 'On the drive and on this computer';
@@ -1382,8 +1396,6 @@ class _AppScreen extends AppScreenStrings {
   @override
   String get channelPrerelease => 'Beta';
 
-  @override
-  String get installingProgress => 'Installing Otzaria…';
   @override
   String get launchButton => 'Open Otzaria';
 
@@ -3467,8 +3479,6 @@ class _AppDomain extends AppDomainStrings {
   String get setupContinuesElsewhere =>
       'The installer is updating Otzaria in its own window — waiting for it '
       'to finish…';
-  @override
-  String get stopWaitingForSetup => 'Stop waiting';
 
   @override
   String get noInstallableReleaseForPlatform =>
@@ -3551,7 +3561,7 @@ class _AppDomain extends AppDomainStrings {
       'The installation finished, but Otzaria was not found on this computer '
       'within $timeoutSeconds seconds — neither in the list of installed '
       'programs nor in the known locations. If it was installed after all, '
-      'choose its folder manually on the program page.';
+      'choose its folder manually on the "Otzaria — advanced" page.';
   @override
   String launchFileMissing(String launchPath) =>
       'The executable was not found at: $launchPath';

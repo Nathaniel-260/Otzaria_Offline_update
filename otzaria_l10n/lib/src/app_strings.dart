@@ -341,7 +341,6 @@ abstract class TaskStrings {
   String get elevateButton;
 
   String get toLibraryPage;
-  String get toAppPage;
   String get toPluginsPage;
   String get showProgress;
 }
@@ -365,10 +364,13 @@ abstract class PageStrings {
   String get chipUpToDate;
   String get lockedChip;
   String get appChipNotInstalled;
-  String appUpdateButton(String version);
-  String get appInstallButton;
-  String get appNeedsDownloadNote;
   String appWhatsNew(String version);
+
+  /// מתחת לכותרת "מה חדש" כשאין עדכון — ההערות של הגרסה המותקנת.
+  String get appInstalledNotesCaption;
+
+  /// דף המשנה שנפתח מהאריח "תוכנת אוצריא" ומההגדרות.
+  String get appAdvancedPageTitle;
 
   /// מותקנת הגרסה של הערוץ השני, חדשה מזו שנבחרה — לא מורידים גרסה.
   String appAwaitsNewer({required bool stable});
@@ -523,12 +525,14 @@ abstract class GuidanceStrings {
 
   /// "הורדה" שהבדיקה המחודשת שלפניה לא מצאה בה דבר — במקום מסך "לא ירד דבר".
   String get recheckNothingTitle;
-  String recheckNothingBody(String time);
+
+  /// [upToDate] — `false` כשבכונן חסר משהו שנבחר לא להוריד (חיפוש חכם).
+  String recheckNothingBody(String time, {required bool upToDate});
   String recheckNothingNote(String time);
 
   /// אותו מצב בלי בדיקה חדשה: לפי הבדיקה הקודמת, ובשעה שלה.
   String get nothingNewTitle;
-  String nothingNewBody(String time);
+  String nothingNewBody(String time, {required bool upToDate});
   String nothingNewNote(String time);
 
   /// קבצים שנכשלו בהורדה האחרונה — לא מוצעים שוב עד "נסה שוב" או בדיקה ידנית.
@@ -571,7 +575,6 @@ abstract class GuidanceStrings {
   String get attentionAppTitle;
   String get attentionLibraryTitle;
   String get attentionBody;
-  String get attentionAppButton;
   String get attentionLibraryButton;
   String get taskDownloadingTitle;
   String get taskDownloadingBody;
@@ -609,6 +612,9 @@ abstract class GuidanceStrings {
   String get otzariaOpenTitle;
   String get otzariaOpenBody;
 
+  /// כשאין מה להתקין כאן — ואז יש בפס "סגירת אוצריא".
+  String get otzariaOpenIdleBody;
+
   /// לפני [otzariaOpenBody] כשההתקנה האוטומטית דילגה בגלל אוצריא הפתוחה.
   String get autoInstallSkippedLead;
   String newPluginsTitle(int count);
@@ -616,6 +622,11 @@ abstract class GuidanceStrings {
   /// [names] — שמות התוספים, עד שלושה; [more] — כמה עוד יש מעבר להם.
   String newPluginsBody(List<String> names, int more);
   String get toPluginsButton;
+
+  /// הודעות הספרייה בבית — בלי "אינטרנט", גם במחשב לא מחובר.
+  String libraryMissingFilesBody(String names);
+  String get libraryCompanionsAbsentBody;
+  String get semanticConsentBody;
 
   // ── האריחים ──
   String get tilesLabel;
@@ -722,7 +733,6 @@ abstract class AppScreenStrings {
   String get channelStable;
   String get channelPrerelease;
 
-  String get installingProgress;
   String get launchButton;
 
   /// התקנה חוזרת של אותה גרסה — מוצעת דווקא כשהכול מעודכן, כדי לתקן התקנה
@@ -1810,7 +1820,6 @@ abstract class AppDomainStrings {
   String get wizardStillOpen;
   String get wizardEndedWithoutInstall;
   String get setupContinuesElsewhere;
-  String get stopWaitingForSetup;
 
   String get noInstallableReleaseForPlatform;
   String get mirrorEmptyRunDownload;

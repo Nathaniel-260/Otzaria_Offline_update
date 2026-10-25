@@ -60,7 +60,11 @@ Future<void> _tapTile(WidgetTester tester, ShellSection section) async {
 
 final List<VisualState> _phase0States = [
   (name: 'home', open: (_) async {}),
-  (name: 'otzaria', open: (t) => _tapTile(t, ShellSection.otzaria)),
+  // האריח פותח את "אוצריא — מתקדם"; מצב התוכנה עצמו בבית.
+  (
+    name: 'otzaria_advanced',
+    open: (t) => _tapTile(t, ShellSection.otzaria),
+  ),
   (name: 'library', open: (t) => _tapTile(t, ShellSection.library)),
   (name: 'plugins', open: (t) => _tapTile(t, ShellSection.plugins)),
   (
@@ -339,6 +343,25 @@ final List<VisualState> _phase5bStates = [
   ),
 ];
 
+final List<VisualState> _stage3States = [
+  (name: 'shell_home', open: (_) async {}),
+  (
+    name: 'otzaria_advanced',
+    open: (t) => _tapTile(t, ShellSection.otzaria),
+  ),
+  (name: 'shell_settings', open: _openSettings),
+  (
+    name: 'otzaria_advanced_from_settings',
+    open: (t) async {
+      await _openSettings(t);
+      await _tapVisible(
+        t,
+        find.byKey(const ValueKey('settings.otzariaAdvanced')),
+      );
+    },
+  ),
+];
+
 /// דיווחי הכלי בלי רשת ובלי קבצים — רק כדי ש"פרטיות ודיווחים" תוצג.
 class _QuietReportService extends AppReportService {
   _QuietReportService()
@@ -386,14 +409,22 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase4': const [],
   'phase5': _phase5States,
   'phase5b': _phase5bStates,
+  // שלב 3 של הבית: "אוצריא — מתקדם" מהאריח ומההגדרות, ומצבי הבית החדשים.
+  'stage3': _stage3States,
 };
 
 /// השלבים שמצלמים את מצבי החנות.
 const _storePhases = {'phase4', 'phase4b'};
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
-Set<String> get _homeScenarioPhases =>
-    const {'phase2a', 'phase2a2', 'phase2a3', 'phase2b2', 'stage2_home'};
+Set<String> get _homeScenarioPhases => const {
+      'phase2a',
+      'phase2a2',
+      'phase2a3',
+      'phase2b2',
+      'stage2_home',
+      'stage3',
+    };
 
 /// מסכי המשימה מצולמים מהמודל — ראו `task_<scenario>`.
 const _taskPhases = {'phase2b', 'phase2b2'};
@@ -548,7 +579,11 @@ void main() {
                         showWindowButtons: true,
                       ),
                       Expanded(
-                        child: HomePage(model: homeScenario(scenario)),
+                        child: HomePage(
+                          model: homeScenario(scenario),
+                          taskProgress:
+                              homeScenarioProgress(scenario, tempDir.path),
+                        ),
                       ),
                     ],
                   ),
@@ -687,7 +722,7 @@ void main() {
         final file = '$name${advanced ? '_advanced' : ''}$suffix';
         testWidgets('$_phase/page_$file',
             skip: !_enabled ||
-                !{'phase3', 'phase2b2', 'phase3b'}.contains(_phase),
+                !{'phase3', 'phase2b2', 'phase3b', 'stage3'}.contains(_phase),
             (tester) async {
           await tester.runAsync(loadVisualFonts);
           WidgetsApp.debugAllowBannerOverride = false;
@@ -696,7 +731,7 @@ void main() {
             // מלל התחום (otzaria_l10n) נקרא מהשפה הגלובלית, לא מה-context.
             AppL10n.use(_language);
             final crumb = switch (name.split('_').first) {
-              'otzaria' => stringsOf(_language).guide.tileApp,
+              'otzaria' => stringsOf(_language).pages.appAdvancedPageTitle,
               'library' => stringsOf(_language).guide.tileLibrary,
               'reports' => stringsOf(_language).pages.repCrumb,
               _ => stringsOf(_language).pages.selfCrumb,

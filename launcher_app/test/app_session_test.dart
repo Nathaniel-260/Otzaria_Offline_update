@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:error_reports_manager/error_reports_manager.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
 import 'package:launcher_app/src/controllers/app_reports_controller.dart';
@@ -58,6 +59,7 @@ void main() {
     bool readOnly = false,
     SleepInhibitor? sleep,
     NoticesSeenStore? notices,
+    OtzariaLauncher launcher = const _FailingLauncher(),
   }) {
     final s = AppSession(
       dataDir: tempDir.path,
@@ -69,6 +71,7 @@ void main() {
       noticesStore: notices ??
           MemoryNoticesStore(seen: {NoticesSeenStore.errorReportsIntro}),
       sleepInhibitor: sleep,
+      otzariaLauncher: launcher,
     );
     sessions.add(s);
     return s;
@@ -291,6 +294,125 @@ void main() {
 
       s.otzaria.awaitsNewerInSelectedChannel = false;
       expect(homeViewModelOf(s).appAwaitsNewerStable, isNull);
+    });
+
+    test('שגיאת התוכנה והאשף שלא ידוע אם הסתיים — בבית', () {
+      final s = session();
+      s.otzaria
+        ..status = OtzariaModuleStatus.error
+        ..errorMessage = 'broken';
+      expect(homeViewModelOf(s).appError, 'broken');
+
+      s.otzaria
+        ..status = OtzariaModuleStatus.updateAvailable
+        ..lastInstallResult = OtzariaInstallResult.wizardStillOpen
+        ..lastInstallNotice = 'still open';
+      final m = homeViewModelOf(s);
+      expect(m.appError, isNull);
+      expect(m.appSetupNotice, 'still open');
+
+      // ההתקנה זוהתה — אין עוד מה לומר על האשף.
+      s.otzaria.status = OtzariaModuleStatus.upToDate;
+      expect(homeViewModelOf(s).appSetupNotice, isNull);
+    });
+
+    test('האשף שבוטל או עוד פתוח — הנוסח של ההתקנה, לא סירוב מאוחר יותר', () {
+      final s = session();
+      for (final result in [
+        OtzariaInstallResult.cancelled,
+        OtzariaInstallResult.wizardStillOpen,
+      ]) {
+        s.otzaria
+          ..status = OtzariaModuleStatus.updateAvailable
+          ..lastInstallResult = result
+          ..lastInstallNotice = 'wizard'
+          // סירוב להפעיל בזמן עדכון ספרייה כותב לשם — ואינו נוגע בהערה.
+          ..noticeMessage = 'library apply active';
+        expect(homeViewModelOf(s).appSetupNotice, 'wizard', reason: '$result');
+      }
+    });
+
+    test('התקנה שלא נמצאה — הבית מציע את "אוצריא — מתקדם"', () {
+      final s = session();
+      s.otzaria
+        ..status = OtzariaModuleStatus.error
+        ..errorMessage = 'not found'
+        ..installNotDetected = true;
+      expect(homeViewModelOf(s).appErrorPicksFolder, isTrue);
+      s.otzaria.installNotDetected = false;
+      expect(homeViewModelOf(s).appErrorPicksFolder, isFalse);
+    });
+
+    test('פתיחת אוצריא שנכשלה — הודעת שגיאה, לא שקט', () async {
+      final messages = <String>[];
+      final previousPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message?.startsWith('UiSnack') ?? false) messages.add(message!);
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      final s = session();
+
+      await s.launchOtzaria();
+
+      expect(s.otzaria.errorMessage, isNotNull);
+      expect(messages, hasLength(1));
+      expect(
+        messages.single,
+        contains(s.otzaria.errorMessage!.split('\n').first),
+      );
+      // הנוסח מתורגם ב-`otzaria_manager`; הקידומת של `StateError` אינה למשתמש.
+      expect(messages.single, isNot(contains('Bad state')));
+      expect(s.otzaria.errorMessage, isNot(contains('Bad state')));
+    });
+
+    test('הפעלה שנכשלה אינה דורסת את שגיאת ההתקנה שבגיבור', () async {
+      final messages = <String>[];
+      final previousPrint = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message?.startsWith('UiSnack') ?? false) messages.add(message!);
+      };
+      addTearDown(() => debugPrint = previousPrint);
+      final s = session();
+      s.otzaria
+        ..status = OtzariaModuleStatus.error
+        ..errorMessage = 'install failed'
+        ..installNotDetected = true;
+
+      await s.launchOtzaria();
+
+      expect(s.otzaria.errorMessage, 'install failed');
+      expect(homeViewModelOf(s).appErrorPicksFolder, isTrue);
+      expect(messages, hasLength(1));
+      expect(messages.single, isNot(contains('install failed')));
+    });
+
+    test('הודעות הספרייה שדורשות פעולה מגיעות לבית', () {
+      final s = session();
+      final l = s.library
+        ..status = LibraryModuleStatus.upToDate
+        ..unavailableCompanions = {CompanionAsset.talmud}
+        ..semanticPending = true;
+      var m = homeViewModelOf(s);
+      expect(m.libraryMissingNames, l.unavailableCompanionNames);
+      expect(m.semanticConsent, isTrue);
+      expect(m.libraryNotFound, isFalse);
+      expect(m.libraryElsewhereFrom, isNull);
+
+      l
+        ..unavailableCompanions = const {}
+        ..semanticConsentGranted = true
+        ..status = LibraryModuleStatus.needsManualPath;
+      m = homeViewModelOf(s);
+      expect(m.libraryMissingNames, isNull);
+      expect(m.semanticConsent, isFalse);
+      expect(m.libraryNotFound, isTrue);
+
+      l
+        ..status = LibraryModuleStatus.personalTargetElsewhere
+        ..personalFromVersion = 145;
+      expect(homeViewModelOf(s).libraryElsewhereFrom, '145');
+      l.personalFromVersion = null;
+      expect(homeViewModelOf(s).libraryElsewhereFrom, '');
     });
   });
 
@@ -863,4 +985,13 @@ class _FakePrompts implements SessionPrompts {
     required void Function(bool active) onActiveChanged,
     required void Function(bool uploading) onUploadingChanged,
   }) async {}
+}
+
+/// "ההפעלה נכשלה" — בלי להפעיל את אוצריא האמיתית של מי שמריץ את הבדיקה.
+class _FailingLauncher extends OtzariaLauncher {
+  const _FailingLauncher();
+
+  @override
+  Future<void> launch(String launchPath, {String? withUri}) async =>
+      throw OtzariaUserError('הפעלה מדומה שנכשלה');
 }

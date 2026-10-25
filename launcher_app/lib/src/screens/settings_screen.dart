@@ -20,7 +20,8 @@ import 'home/home_view_model.dart' show launcherLineOf, LauncherLineKind;
 import 'store_kit/store_visuals.dart' show StoreFilterChip;
 
 /// אין כאן בכוונה הגדרות רשת (הזמן הקצוב בלקוחות), נתיבים (צמודים לקובץ
-/// ההרצה, כדי שהכונן יישאר נייד) או ערוץ גרסאות (בדף התוכנה).
+/// ההרצה, כדי שהכונן יישאר נייד) או ערוץ גרסאות — הוא ב"אוצריא — מתקדם",
+/// שאינו נעול כמו ההגדרות; כאן רק קישור אליו.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     super.key,
@@ -38,6 +39,8 @@ class SettingsScreen extends StatelessWidget {
     this.onOpenLauncherUpdate,
     this.onEditFaq,
     this.onOpenLibrary,
+    this.onOpenOtzariaAdvanced,
+    this.otzariaChannelChoice = false,
   });
 
   final SettingsController controller;
@@ -76,6 +79,12 @@ class SettingsScreen extends StatelessWidget {
   /// דף הספרייה — שם רושמים את המחשב לעדכון למחשב מסוים.
   final VoidCallback? onOpenLibrary;
 
+  /// "אוצריא — מתקדם". `null` בבדיקות שאינן נוגעות בו.
+  final VoidCallback? onOpenOtzariaAdvanced;
+
+  /// בכונן שתי גרסאות — הקישור מזכיר את בחירת הגרסה.
+  final bool otzariaChannelChoice;
+
   AppSettings get _s => controller.settings;
 
   Future<void> _set(AppSettings next) => controller.update(next);
@@ -93,6 +102,26 @@ class SettingsScreen extends StatelessWidget {
             const SizedBox(height: 20),
             SectionLabel(t.groupGeneral, first: true),
             _general(context),
+            if (onOpenOtzariaAdvanced case final open?) ...[
+              SectionLabel(context.strings.guide.tileApp),
+              RowsCard(
+                children: [
+                  AppRow(
+                    key: const ValueKey('settings.otzariaAdvanced'),
+                    leading: const IconTile(
+                      size: _tile,
+                      tone: _quiet,
+                      child: OtzariaLogo(size: 18),
+                    ),
+                    title: context.strings.pages.appAdvancedPageTitle,
+                    subtitle: context.strings.pages.appAdvancedSummary(
+                      channel: otzariaChannelChoice,
+                    ),
+                    onTap: open,
+                  ),
+                ],
+              ),
+            ],
             if (customApps case final apps?) ...[
               SectionLabel(context.strings.customApps.settingsCardTitle),
               CustomAppsSettingsCard(

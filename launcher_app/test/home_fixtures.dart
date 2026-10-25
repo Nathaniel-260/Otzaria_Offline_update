@@ -3,8 +3,14 @@
 // היה מחליט, ולא מה שהבדיקה מניחה. אחרי מצבי המוקאפ — מצבים נוספים שאין
 // להם מקבילה במוקאפ (בדיקה, הורדה בלבד, כונן ריק עם תוכנות נוספות).
 
+import 'package:flutter/widgets.dart';
+import 'package:launcher_app/src/controllers/library_module_controller.dart';
+import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
+import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
+import 'package:launcher_app/src/screens/home/home_progress.dart';
 import 'package:launcher_app/src/screens/home/home_view_model.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 const homeScenarios = [
   'offline',
@@ -22,6 +28,12 @@ const homeScenarios = [
   'uptodateOnline',
   'checkFailed',
   'othersPending',
+  'openIdle',
+  'installingApp',
+  'appError',
+  'libraryNotices',
+  'libraryNotFound',
+  'libraryElsewhere',
 ];
 
 final _checkedAt = DateTime(2026, 10, 23, 23, 14);
@@ -53,6 +65,12 @@ HomeViewModel _model(
   int? appDownloadBytes,
   int? libraryDownloadBytes,
   int? driveFreeBytes,
+  String? appError,
+  bool whatsNew = false,
+  String? libraryMissingNames,
+  bool libraryNotFound = false,
+  String? libraryElsewhereFrom,
+  bool semanticConsent = false,
 }) {
   final guidance = deriveHomeGuidance(f);
   TileStatus tile(GuidanceItem item) => deriveTileStatus(
@@ -92,6 +110,13 @@ HomeViewModel _model(
     failedDownloads: failedDownloads,
     foundNothing: foundNothing,
     onlineCheckedAt: f.online == true ? _checkedAt : null,
+    appError: appError,
+    whatsNew: whatsNew,
+    libraryMissingNames: libraryMissingNames,
+    libraryNotFound: libraryNotFound,
+    libraryElsewhereFrom: libraryElsewhereFrom,
+    semanticConsent: semanticConsent,
+    task: f.installing ? HomeTask.installingApp : HomeTask.other,
     appTile: tile(GuidanceItem.app),
     libraryTile: tile(GuidanceItem.library),
     pluginsTile: tile(GuidanceItem.plugins),
@@ -344,5 +369,67 @@ HomeViewModel homeScenario(String name) => switch (name) {
             version: '3.3.0',
           ),
         ),
+      // אוצריא פתוחה, ואין מה להתקין — הפס עם "סגירת אוצריא".
+      'openIdle' => _model(
+          const GuidanceFacts(online: false, otzariaRunning: true),
+          installed: '0.10.4',
+          whatsNew: true,
+          customApps: 3,
+        ),
+      // התקנה שרצה מחוץ למסך משימה; המד מ-[homeScenarioProgress].
+      'installingApp' => _model(
+          const GuidanceFacts(
+            otzariaStatus: AppStatusFact.installing,
+            installing: true,
+            online: false,
+          ),
+        ),
+      'appError' => _model(
+          const GuidanceFacts(
+              otzariaStatus: AppStatusFact.error, online: false),
+          installed: '0.10.4',
+          appError: 'לא הצלחנו לקרוא את התיקייה שבכונן\n'
+              'FileSystemException: Access is denied',
+        ),
+      // יש מה להתקין, ובספרייה קבצים חסרים והסכמה לחיפוש חכם.
+      'libraryNotices' => _model(
+          _driveUpdate,
+          pluginUpdates: 3,
+          whatsNew: true,
+          libraryMissingNames: 'מילון החיפוש המקורב',
+          semanticConsent: true,
+        ),
+      // הגיבור עצמו מציע את הפעולה — בלי הודעה כפולה מעליו.
+      'libraryNotFound' => _model(
+          const GuidanceFacts(
+            libraryStatus: LibraryStatusFact.needsManualPath,
+            online: false,
+          ),
+          installed: '0.10.4',
+          libraryNotFound: true,
+        ),
+      // התוכנה מחכה כאן, והכונן הוכן למחשב אחר — ההודעה מעל הגיבור.
+      'libraryElsewhere' => _model(
+          const GuidanceFacts(
+            otzariaStatus: AppStatusFact.updateAvailable,
+            libraryStatus: LibraryStatusFact.personalTargetElsewhere,
+            online: false,
+          ),
+          libraryElsewhereFrom: '145',
+        ),
       _ => throw ArgumentError.value(name, 'name'),
     };
+
+/// מד ההתקדמות של [homeScenario] — רק להתקנה, עם אשף שממשיך בחלון משלו.
+Widget? homeScenarioProgress(String name, String dataDir) {
+  if (name != 'installingApp') return null;
+  final otzaria = OtzariaModuleController(dataDir: dataDir)
+    ..status = OtzariaModuleStatus.installing
+    ..installStage = AppL10n.strings.appDomain.setupContinuesElsewhere;
+  return HomeTaskProgress(
+    task: HomeTask.installingApp,
+    otzaria: otzaria,
+    library: LibraryModuleController(dataDir: dataDir),
+    plugins: PluginsModuleController(mirrorRootDir: dataDir),
+  );
+}

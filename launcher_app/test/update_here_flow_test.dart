@@ -508,7 +508,7 @@ void main() {
     });
   });
 
-  group('מדף התוכנה ומדף הספרייה', () {
+  group('מ"אוצריא — מתקדם" ומדף הספרייה', () {
     test('התקנה מחדש: אותה גרסה רצה באשף, ורק כשהיא בכונן', () async {
       app.hasUpdateAvailable = false;
       expect(await flow.run(const [GuidanceItem.app]), isFalse);

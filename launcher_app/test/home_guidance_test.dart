@@ -14,6 +14,7 @@ typedef _Case = ({
   List<GuidanceItem> here,
   List<GuidanceItem> download,
   bool banner,
+  bool blocks,
 });
 
 _Case _case(
@@ -24,6 +25,7 @@ _Case _case(
   List<GuidanceItem> here = const [],
   List<GuidanceItem> download = const [],
   bool banner = false,
+  bool? blocks,
 }) =>
     (
       name: name,
@@ -33,6 +35,8 @@ _Case _case(
       here: here,
       download: download,
       banner: banner,
+      // "עדכון כאן" יבקש לסגור אותה — בדרך כלל כשיש פס.
+      blocks: blocks ?? banner,
     );
 
 const _app = GuidanceItem.app;
@@ -268,9 +272,16 @@ void main() {
         here: [_plugins],
       ),
       _case(
-        'אוצריא פתוחה בלי מה לעדכן — אין פס',
+        'אוצריא פתוחה בלי מה לעדכן — פס עם "סגירת אוצריא"',
         const GuidanceFacts(online: true, otzariaRunning: true),
         GuidancePrimary.upToDate,
+        banner: true,
+        blocks: false,
+      ),
+      _case(
+        'אוצריא פתוחה בזמן משימה — בלי פס',
+        const GuidanceFacts(otzariaRunning: true, longTaskRunning: true),
+        GuidancePrimary.taskInProgress,
       ),
       _case(
         'אוצריא לא מותקנת אבל בכונן יש אותה — לא "ברוך הבא"',
@@ -337,7 +348,7 @@ void main() {
         GuidancePrimary.checking,
       ),
       _case(
-        'אוצריא פתוחה ורק תוספים לעדכן — בלי פס',
+        'אוצריא פתוחה ורק תוספים לעדכן — הפס לא חוסם את העדכון',
         const GuidanceFacts(
           online: false,
           otzariaRunning: true,
@@ -345,6 +356,8 @@ void main() {
         ),
         GuidancePrimary.updateHere,
         here: [_plugins],
+        banner: true,
+        blocks: false,
       ),
       _case(
         'אוצריא פתוחה, תוכנה ותוספים לעדכן — פס',
@@ -948,6 +961,7 @@ void _runCases(List<_Case> cases) {
       expect(g.hereItems, c.here, reason: '$g');
       expect(g.downloadItems, c.download, reason: '$g');
       expect(g.showOtzariaOpenBanner, c.banner, reason: '$g');
+      expect(g.otzariaOpenBlocksUpdate, c.blocks, reason: '$g');
     });
   }
 }

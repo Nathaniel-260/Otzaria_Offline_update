@@ -59,6 +59,8 @@ class AppSession extends ChangeNotifier {
     NoticesSeenStore? noticesStore,
     this.appReports,
     SleepInhibitor? sleepInhibitor,
+    @visibleForTesting
+    OtzariaLauncher otzariaLauncher = const OtzariaLauncher(),
   })  : _noticesStore = noticesStore,
         _injectedSleepInhibitor = sleepInhibitor {
     final s = settings.settings;
@@ -68,6 +70,7 @@ class AppSession extends ChangeNotifier {
       stateDir: stateFilesDir,
       preferPrerelease: s.preferAppPrerelease,
       runningLocator: runningLocator,
+      launcher: otzariaLauncher,
       pendingLaunchUri: () async =>
           _library.hasPendingReindex ? OtzariaDeepLinks.libraryReindex : null,
       onLaunchUriDelivered: () => _library.markReindexRequestDelivered(),
@@ -852,8 +855,8 @@ class AppSession extends ChangeNotifier {
     tasks.abandonDownload();
   }
 
-  /// "עדכון כאן". מדף התוכנה [reinstallApp] — אותה גרסה שוב; מדף הספרייה
-  /// [fullLibrary] — הספרייה המלאה במקום עדכון שנכשל.
+  /// "עדכון כאן". מ"אוצריא — מתקדם" [reinstallApp] — אותה גרסה שוב; מדף
+  /// הספרייה [fullLibrary] — הספרייה המלאה במקום עדכון שנכשל.
   Future<void> updateHere(
     List<GuidanceItem> items, {
     bool reinstallApp = false,
@@ -875,6 +878,15 @@ class AppSession extends ChangeNotifier {
   }
 
   void stopWaitingForSetup() => _updateHere.stopWaiting();
+
+  /// "פתיחת אוצריא". הכשל נאמר מיד: הבית מציג את `errorMessage` רק כשהבדיקה
+  /// עצמה נכשלה, ובלי זה הלחיצה נראתה כאילו לא קרתה.
+  Future<void> launchOtzaria() async {
+    final error = await _otzaria.launch();
+    if (error != null && isActive) {
+      UiSnack.showError(error.split('\n').first);
+    }
+  }
 
   Future<bool> _refreshStaleOnlineChecks(AppSettings s) async {
     final stale = StaleOnlineChecks.of(

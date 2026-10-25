@@ -34,6 +34,10 @@ class HomeViewModel {
     this.installedVersion,
     this.driveAppVersion,
     this.appAwaitsNewerStable,
+    this.appError,
+    this.appErrorPicksFolder = false,
+    this.appSetupNotice,
+    this.whatsNew = false,
     this.onlineAppVersion,
     this.onlineAppLatest,
     this.libraryHereVersion,
@@ -58,6 +62,11 @@ class HomeViewModel {
     this.failedDownloads,
     this.foundNothing,
     this.onlineCheckedAt,
+    this.libraryMissingNames,
+    this.libraryCompanionsAbsent = false,
+    this.libraryNotFound = false,
+    this.libraryElsewhereFrom,
+    this.semanticConsent = false,
     this.appTile = TileStatus.upToDate,
     this.libraryTile = TileStatus.upToDate,
     this.pluginsTile = TileStatus.upToDate,
@@ -94,6 +103,18 @@ class HomeViewModel {
   /// מותקנת גרסה חדשה מהערוץ שנבחר, וממתינים לגרסה חדשה יותר בו: `true`
   /// לערוץ היציב. `null` כשזה לא המצב.
   final bool? appAwaitsNewerStable;
+
+  /// הבדיקה או ההתקנה של התוכנה נכשלו — בגיבור, עם "בדוק שוב".
+  final String? appError;
+
+  /// ההתקנה הסתיימה ואוצריא לא נמצאה — הקישור הוא ל"אוצריא — מתקדם".
+  final bool appErrorPicksFolder;
+
+  /// ההתקנה בוטלה באשף או שהאשף עוד פתוח, והגרסה החדשה עוד לא כאן.
+  final String? appSetupNotice;
+
+  /// יש מה להראות ב"מה חדש?" — של התוכנה או של הספרייה.
+  final bool whatsNew;
   final String? onlineAppVersion;
 
   /// הגרסה שברשת לפי בדיקה שהצליחה, גם כשאין בה חדש — "ברשת:" באריח.
@@ -146,6 +167,16 @@ class HomeViewModel {
   /// הבדיקה האחרונה ברשת שהצליחה — לשעה ב-[FoundNothing.earlierCheck]
   /// ובשורת המצב (במחשב מחובר בלבד).
   final DateTime? onlineCheckedAt;
+
+  /// הודעות הספרייה שדורשות פעולה (ראו דף הספרייה): קבצים נלווים שחסרים
+  /// בכונן, ספרייה שלא נמצאה, כונן שהוכן למחשב אחר, הסכמה לחיפוש חכם.
+  final String? libraryMissingNames;
+  final bool libraryCompanionsAbsent;
+  final bool libraryNotFound;
+
+  /// הכונן הוכן למחשב אחר — הגרסה שממנה הוכן, או "לא ידוע".
+  final String? libraryElsewhereFrom;
+  final bool semanticConsent;
   final TileStatus appTile;
   final TileStatus libraryTile;
   final TileStatus pluginsTile;
@@ -232,6 +263,20 @@ HomeViewModel homeViewModelOf(AppSession s) {
     driveAppVersion: otzaria.latestVersion,
     appAwaitsNewerStable:
         otzaria.awaitsNewerInSelectedChannel ? !otzaria.preferPrerelease : null,
+    appError: otzaria.status == OtzariaModuleStatus.error
+        ? otzaria.errorMessage
+        : null,
+    appErrorPicksFolder: otzaria.status == OtzariaModuleStatus.error &&
+        otzaria.installNotDetected,
+    appSetupNotice: switch (otzaria.lastInstallResult) {
+      OtzariaInstallResult.cancelled ||
+      OtzariaInstallResult.wizardStillOpen
+          when otzaria.status == OtzariaModuleStatus.updateAvailable =>
+        otzaria.lastInstallNotice,
+      _ => null,
+    },
+    whatsNew:
+        whatsNewAppNotes(otzaria) != null || library.changesNotes.isNotEmpty,
     onlineAppVersion:
         otzaria.hasOnlineUpdate ? otzaria.onlineUpdateVersion : null,
     onlineAppLatest: otzaria.onlineCheckError != null
@@ -268,6 +313,16 @@ HomeViewModel homeViewModelOf(AppSession s) {
             ? library.failedDownloadNames
             : null,
     foundNothing: s.foundNothing,
+    libraryMissingNames: library.unavailableCompanions.isEmpty
+        ? null
+        : library.unavailableCompanionNames,
+    libraryCompanionsAbsent: library.mirrorLacksCompanions,
+    libraryNotFound: library.status == LibraryModuleStatus.needsManualPath,
+    libraryElsewhereFrom:
+        library.status == LibraryModuleStatus.personalTargetElsewhere
+            ? '${library.personalFromVersion ?? ''}'
+            : null,
+    semanticConsent: library.semanticConsentRequired,
     onlineCheckedAt: latestOnlineCheck([
       if (settings.syncApp) (otzaria.onlineCheckedAt, otzaria.onlineCheckError),
       if (settings.downloadsLibrary)
@@ -313,6 +368,29 @@ HomeViewModel homeViewModelOf(AppSession s) {
     launcher: launcher,
     driveName: driveNameOf(s.dataDir),
   );
+}
+
+/// "מה חדש" של התוכנה: של הגרסה שבכונן כשהיא ממתינה להתקנה, ואחרת של הגרסה
+/// המותקנת ([installed]). `null` — אין הערות להראות.
+({String version, String notes, bool installed})? whatsNewAppNotes(
+  OtzariaModuleController c,
+) {
+  bool has(String? notes) => notes?.trim().isNotEmpty == true;
+  final drive = c.latestVersion;
+  if (c.status == OtzariaModuleStatus.updateAvailable) {
+    return drive != null && has(c.latestReleaseNotes)
+        ? (version: drive, notes: c.latestReleaseNotes!, installed: false)
+        : null;
+  }
+  final installed = c.currentVersion;
+  if (installed != null && has(c.installedReleaseNotes)) {
+    return (
+      version: installed,
+      notes: c.installedReleaseNotes!,
+      installed: true,
+    );
+  }
+  return null;
 }
 
 /// שורת הכלי מציעה גרסה. כשל בלי גרסה ידועה אינו עדכון שמחכה.

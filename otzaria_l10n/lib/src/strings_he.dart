@@ -438,8 +438,7 @@ class _Task extends TaskStrings {
   @override
   String get appWizardOpen => 'אשף ההתקנה פתוח — המשך בו';
   @override
-  String get appStoppedWaiting =>
-      'הפסקנו להמתין · בדוק בדף התוכנה אם ההתקנה הסתיימה';
+  String get appStoppedWaiting => 'הפסקנו להמתין · בדוק בבית אם ההתקנה הסתיימה';
   @override
   String get appSkipped => 'לא נדרשה התקנה';
   @override
@@ -524,15 +523,15 @@ class _Task extends TaskStrings {
   String stoppedWaitingBody(
           {required bool firstInstall, required bool libraryDone}) =>
       firstInstall
-          ? 'אם האשף עדיין פתוח, סיים בו. אחר כך בדוק בדף התוכנה שאוצריא הותקנה, ומשם אפשר להתקין גם את הספרייה.'
+          ? 'אם האשף עדיין פתוח, סיים בו. אחר כך בדוק בבית שאוצריא הותקנה, ומשם אפשר להתקין גם את הספרייה.'
           : libraryDone
-              ? 'הספרייה עודכנה. סיים את ההתקנה בחלון האשף, ובדוק בדף התוכנה שאוצריא עודכנה. אל תנתק את הכונן עד שהאשף יסתיים.'
-              : 'סיים את ההתקנה בחלון האשף, ובדוק בדף התוכנה שאוצריא עודכנה. אל תנתק את הכונן עד שהאשף יסתיים.';
+              ? 'הספרייה עודכנה. סיים את ההתקנה בחלון האשף, ובדוק בבית שאוצריא עודכנה. אל תנתק את הכונן עד שהאשף יסתיים.'
+              : 'סיים את ההתקנה בחלון האשף, ובדוק בבית שאוצריא עודכנה. אל תנתק את הכונן עד שהאשף יסתיים.';
   @override
   String get wizardStillOpenTitle => 'אשף ההתקנה עדיין פתוח';
   @override
   String get wizardStillOpenBody =>
-      'סיים את ההתקנה בחלון האשף, ואז בדוק שוב בדף התוכנה. אל תנתק את הכונן עד שהאשף יסתיים.';
+      'סיים את ההתקנה בחלון האשף, ואז בדוק שוב בבית. אל תנתק את הכונן עד שהאשף יסתיים.';
   @override
   String get reindexTitle => 'כדאי לעדכן את אינדקס החיפוש';
   @override
@@ -600,8 +599,6 @@ class _Task extends TaskStrings {
   @override
   String get toLibraryPage => 'לדף הספרייה';
   @override
-  String get toAppPage => 'לדף התוכנה';
-  @override
   String get toPluginsPage => 'לדף התוספים';
   @override
   String get showProgress => 'הצג התקדמות';
@@ -633,14 +630,11 @@ class _Pages extends PageStrings {
   @override
   String get appChipNotInstalled => 'לא מותקנת במחשב הזה';
   @override
-  String appUpdateButton(String version) => 'עדכון ל-${_ltr(version)}';
-  @override
-  String get appInstallButton => 'התקנת אוצריא';
-  @override
-  String get appNeedsDownloadNote =>
-      'בכונן עוד אין את תוכנת אוצריא. מורידים אותה במחשב עם אינטרנט, מדף הבית.';
-  @override
   String appWhatsNew(String version) => 'מה חדש באוצריא ${_ltr(version)}';
+  @override
+  String get appInstalledNotesCaption => 'הגרסה שמותקנת במחשב הזה';
+  @override
+  String get appAdvancedPageTitle => 'אוצריא — מתקדם';
   @override
   String appAwaitsNewer({required bool stable}) => stable
       ? 'מותקנת כאן גרסה ניסיונית, חדשה מהיציבה שבכונן. תעבור לגרסה היציבה כשתצא גרסה יציבה חדשה יותר מזו שמותקנת.'
@@ -697,7 +691,7 @@ class _Pages extends PageStrings {
       'אוצריא לא מותקנת במחשב הזה, ובכונן אין את התוכנה. כדי להתקין את הספרייה, הורד קודם את התוכנה במחשב עם אינטרנט.';
   @override
   String get libUpdateNeedsApp =>
-      'אוצריא לא מותקנת במחשב הזה. התקן אותה קודם בדף התוכנה, ואז אפשר יהיה להתקין כאן את הספרייה.';
+      'אוצריא לא מותקנת במחשב הזה. התקן אותה קודם מהבית, ואז אפשר יהיה להתקין כאן את הספרייה.';
   @override
   String get libUpdateButton => 'עדכון הספרייה';
   @override
@@ -943,18 +937,20 @@ class _Guide extends GuidanceStrings {
   @override
   String get recheckNothingTitle => 'בדקתי שוב — אין חדש באתר אוצריא';
   @override
-  String recheckNothingBody(String time) =>
-      'באתר אוצריא אין עדכונים חדשים (נבדק ב-${_ltr(time)}), ולכן לא ירד כלום. '
-      'הכונן והמחשב הזה מעודכנים.';
+  String recheckNothingBody(String time, {required bool upToDate}) => [
+        'באתר אוצריא אין עדכונים חדשים (נבדק ב-${_ltr(time)}), ולכן לא ירד כלום.',
+        if (upToDate) 'הכונן והמחשב הזה מעודכנים.',
+      ].join(' ');
   @override
   String recheckNothingNote(String time) =>
       'בדקתי שוב — אין חדש באתר אוצריא · נבדק ב-${_ltr(time)}';
   @override
   String get nothingNewTitle => 'אין חדש באתר אוצריא';
   @override
-  String nothingNewBody(String time) =>
-      'לפי הבדיקה של ${_ltr(time)} אין עדכונים חדשים, ולכן לא ירד כלום. הכונן '
-      'והמחשב הזה מעודכנים.';
+  String nothingNewBody(String time, {required bool upToDate}) => [
+        'לפי הבדיקה של ${_ltr(time)} אין עדכונים חדשים, ולכן לא ירד כלום.',
+        if (upToDate) 'הכונן והמחשב הזה מעודכנים.',
+      ].join(' ');
   @override
   String nothingNewNote(String time) =>
       'אין חדש באתר אוצריא · נבדק ב-${_ltr(time)}';
@@ -1048,8 +1044,6 @@ class _Guide extends GuidanceStrings {
   @override
   String get attentionBody => 'בדף שלה מוסבר מה קרה ומה אפשר לעשות.';
   @override
-  String get attentionAppButton => 'לדף התוכנה';
-  @override
   String get attentionLibraryButton => 'לדף הספרייה';
   @override
   String get taskDownloadingTitle => 'מוריד את העדכונים לכונן';
@@ -1116,6 +1110,9 @@ class _Guide extends GuidanceStrings {
   String get otzariaOpenBody =>
       'כשתלחץ "עדכון", הכלי יבקש לסגור אותה. הספרים שפתוחים יחכו לך.';
   @override
+  String get otzariaOpenIdleBody =>
+      'אין כרגע מה להתקין, ואפשר להמשיך לעבוד בה. כשיהיה עדכון, הכלי יבקש לסגור אותה.';
+  @override
   String get autoInstallSkippedLead => 'לכן העדכון האוטומטי לא הותקן. ';
   @override
   String newPluginsTitle(int count) =>
@@ -1134,6 +1131,18 @@ class _Guide extends GuidanceStrings {
 
   @override
   String get toPluginsButton => 'לתוספים';
+  @override
+  String libraryMissingFilesBody(String names) =>
+      'חסר בכונן: $names. הורדה חוזרת לכונן תשלים את החסר, ושאר העדכון יותקן '
+      'כרגיל.';
+  @override
+  String get libraryCompanionsAbsentBody =>
+      'בכונן אין את התלמוד הבבלי, רשימת הספרים והמילון, ולכן הם לא יותקנו. '
+      'הורדה חוזרת לכונן תביא אותם.';
+  @override
+  String get semanticConsentBody =>
+      'חיפוש חכם נמצא בכונן. כדי להפעיל אותו צריך להסכים שאוצריא תשמור את מילות '
+      'החיפוש ואילו תוצאות עזרו לך.';
 
   @override
   String get tilesLabel => 'מה יש בכונן ובמחשב הזה';
@@ -1343,8 +1352,6 @@ class _AppScreen extends AppScreenStrings {
   @override
   String get channelPrerelease => 'ניסיונית';
 
-  @override
-  String get installingProgress => 'מתקין את אוצריא…';
   @override
   String get launchButton => 'פתיחת אוצריא';
 
@@ -3279,8 +3286,6 @@ class _AppDomain extends AppDomainStrings {
   @override
   String get setupContinuesElsewhere =>
       'אשף ההתקנה ממשיך לעדכן את אוצריא בחלון משלו — ממתינים לסיומו…';
-  @override
-  String get stopWaitingForSetup => 'הפסקת ההמתנה';
 
   @override
   String get noInstallableReleaseForPlatform =>
@@ -3357,7 +3362,7 @@ class _AppDomain extends AppDomainStrings {
   String installNotDetectedAnywhere(int timeoutSeconds) =>
       'ההתקנה הסתיימה, אבל אוצריא לא נמצאה במחשב תוך $timeoutSeconds שניות — '
       'לא ברשימת התוכנות המותקנות ולא במיקומים המוכרים. אם היא כן הותקנה, '
-      'בחר את תיקיית ההתקנה ידנית בדף התוכנה.';
+      'בחר את תיקיית ההתקנה ידנית בדף "אוצריא — מתקדם".';
   @override
   String launchFileMissing(String launchPath) =>
       'קובץ ההפעלה לא נמצא בנתיב: ${_ltr(launchPath)}';

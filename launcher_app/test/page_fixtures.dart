@@ -11,13 +11,12 @@ import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/screens/launcher/launcher_update_page.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
-import 'package:launcher_app/src/screens/otzaria_screen.dart';
+import 'package:launcher_app/src/screens/otzaria_advanced_page.dart';
 import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/self_update/launcher_release.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:library_manager/library_manager.dart';
-import 'package:otzaria_manager/otzaria_manager.dart';
 
 /// מצבי דפי התוכנה, הספרייה, הדיווחים ועדכון הכלי — לצילומי הסקירה. כל
 /// מצב בונה קונטרולרים אמיתיים ומציב בהם שדות, בלי דיסק ובלי רשת.
@@ -28,23 +27,15 @@ const _launchPath =
     r'C:\Users\David\AppData\Local\Programs\otzaria\otzaria.exe';
 const _dbPath = r'C:\Users\David\AppData\Roaming\otzaria\books\seforim.db';
 
-OtzariaScreen _otzaria(
+OtzariaAdvancedPage _otzaria(
   String dir,
   SettingsController s,
-  void Function(OtzariaModuleController c) setup, {
-  bool running = false,
-}) {
+  void Function(OtzariaModuleController c) setup,
+) {
   final c = OtzariaModuleController(dataDir: dir);
   setup(c);
   if (c.currentVersion != null) c.launchPath ??= _launchPath;
-  return OtzariaScreen(
-    otzaria: c,
-    settings: s,
-    otzariaIsRunning: running,
-    onCloseOtzaria: () async => true,
-    onUpdateHere: () {},
-    onReinstall: () {},
-  );
+  return OtzariaAdvancedPage(otzaria: c, settings: s, onReinstall: () {});
 }
 
 LibraryScreen _library(
@@ -74,77 +65,20 @@ LibraryScreen _library(
 }
 
 final Map<String, PageScenario> pageScenarios = {
-  'otzaria_update': (d, s) => _otzaria(d, s, (c) {
-        c
-          ..status = OtzariaModuleStatus.updateAvailable
-          ..currentVersion = '0.10.3'
-          ..latestVersion = '0.10.4'
-          ..lastDownloadedAt = DateTime(2026, 10, 18);
-      }),
-  'otzaria_uptodate': (d, s) => _otzaria(d, s, (c) {
+  'otzaria_advanced': (d, s) => _otzaria(d, s, (c) {
         c
           ..status = OtzariaModuleStatus.upToDate
           ..currentVersion = '0.10.4'
           ..latestVersion = '0.10.4'
           ..stableVersion = '0.10.4'
-          ..lastDownloadedAt = DateTime(2026, 10, 18)
-          ..onlineChannels = const OtzariaChannelReleases(
-            stable: OtzariaRelease(
-              tagName: '0.10.5',
-              name: '0.10.5',
-              isPrerelease: false,
-              isDraft: false,
-              publishedAt: null,
-              installerKind: OtzariaInstallerKind.windowsSetupExe,
-              installerAssetName: 'setup.exe',
-              installerDownloadUrl: 'https://example.invalid/setup.exe',
-              installerSizeBytes: 1,
-            ),
-          );
-      }),
-  'otzaria_newer': (d, s) => _otzaria(d, s, (c) {
-        c
-          ..status = OtzariaModuleStatus.installedIsNewer
-          ..currentVersion = '0.10.5'
-          ..latestVersion = '0.10.4';
-      }),
-  // מותקנת ניסיונית חדשה, והערוץ שנבחר יציב — ממתינים ליציבה חדשה.
-  'otzaria_awaits': (d, s) => _otzaria(d, s, (c) {
-        c
-          ..status = OtzariaModuleStatus.installedIsNewer
-          ..currentVersion = '0.10.5-beta'
-          ..latestVersion = '0.10.4'
-          ..stableVersion = '0.10.4'
           ..prereleaseVersion = '0.10.5-beta'
           ..hasChannelChoice = true
-          ..awaitsNewerInSelectedChannel = true
           ..lastDownloadedAt = DateTime(2026, 10, 18);
       }),
-  'otzaria_notinstalled': (d, s) => _otzaria(d, s, (c) {
+  'otzaria_advanced_notinstalled': (d, s) => _otzaria(d, s, (c) {
         c
           ..status = OtzariaModuleStatus.updateAvailable
           ..latestVersion = '0.10.4';
-      }),
-  'otzaria_notondrive': (d, s) => _otzaria(d, s, (c) {
-        c.status = OtzariaModuleStatus.needsDownload;
-      }),
-  'otzaria_running': (d, s) => _otzaria(
-        d,
-        s,
-        (c) {
-          c
-            ..status = OtzariaModuleStatus.updateAvailable
-            ..currentVersion = '0.10.3'
-            ..latestVersion = '0.10.4';
-        },
-        running: true,
-      ),
-  'otzaria_error': (d, s) => _otzaria(d, s, (c) {
-        c
-          ..status = OtzariaModuleStatus.error
-          ..currentVersion = '0.10.3'
-          ..errorMessage = 'לא הצלחנו לקרוא את התיקייה שבכונן\n'
-              'FileSystemException: Access is denied';
       }),
   'library_update': (d, s) => _library(d, (c) {
         c
@@ -313,8 +247,6 @@ final Map<String, PageScenario> pageScenarios = {
 
 /// מצבים שמצולמים גם עם "מתקדם" פתוח.
 const advancedScenarios = {
-  'otzaria_uptodate',
-  'otzaria_awaits',
   'library_update',
   'library_fullafterfail',
   'library_withapp',

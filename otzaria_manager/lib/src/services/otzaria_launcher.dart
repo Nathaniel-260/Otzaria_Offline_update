@@ -4,6 +4,8 @@ import 'package:otzaria_downloads/otzaria_downloads.dart' show WindowsElevation;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 
+import '../otzaria_user_error.dart';
+
 /// מפעיל את ההתקנה שהתגלתה — קובץ `.exe` בווינדוס, חבילת `.app` ב-macOS.
 /// נפרד מ-[OtzariaInstaller] כי "הפעלה" יכולה לקרות גם בלי שהתבצעה
 /// התקנה/עדכון בסשן הנוכחי (למשל בכל פתיחה של הלאנצ'ר, כשההתקנה כבר
@@ -30,7 +32,7 @@ class OtzariaLauncher {
         ? await Directory(launchPath).exists()
         : await File(launchPath).exists();
     if (!exists) {
-      throw StateError(
+      throw OtzariaUserError(
         AppL10n.strings.appDomain.launchFileMissing(launchPath),
       );
     }
@@ -48,7 +50,7 @@ class OtzariaLauncher {
         withUri == null ? [launchPath] : ['-a', launchPath, withUri],
       );
       if (result.exitCode != 0) {
-        throw StateError(
+        throw OtzariaUserError(
           AppL10n.strings.appDomain
               .launchFailed(result.exitCode, '${result.stderr}'),
         );

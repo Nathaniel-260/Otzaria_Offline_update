@@ -8,7 +8,7 @@ import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
-import 'package:launcher_app/src/screens/otzaria_screen.dart';
+import 'package:launcher_app/src/screens/otzaria_advanced_page.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/theme/theme_exports.dart';
@@ -146,16 +146,10 @@ void main() {
         busy: busy,
       );
 
-  OtzariaScreen otzariaScreen({
-    VoidCallback? onUpdateHere,
-    VoidCallback? onReinstall,
-  }) =>
-      OtzariaScreen(
+  OtzariaAdvancedPage otzariaScreen({VoidCallback? onReinstall}) =>
+      OtzariaAdvancedPage(
         otzaria: otzaria,
         settings: settings,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        onUpdateHere: onUpdateHere,
         onReinstall: onReinstall,
       );
 
@@ -232,25 +226,7 @@ void main() {
     });
   });
 
-  group('התקנת אוצריא מהדף — דרך מסך המשימה', () {
-    testWidgets('"עדכון ל-X" מוסר למשימה, בלי להתקין כאן', (tester) async {
-      otzaria.status = OtzariaModuleStatus.updateAvailable;
-      otzaria.currentVersion = '0.9.95';
-      otzaria.latestVersion = '0.9.96';
-      var tasks = 0;
-      await _pump(tester, otzariaScreen(onUpdateHere: () => tasks++));
-
-      expect(
-        find.text(stringsOf().pages.appUpdateButton('0.9.96')),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(ShellKeys.statusPrimary));
-      await tester.pumpAndSettle();
-      expect(tasks, 1);
-      expect(otzaria.installs, 0);
-      expect(find.byType(AppDialog), findsNothing);
-    });
-
+  group('התקנה מחדש מ"אוצריא — מתקדם" — דרך מסך המשימה', () {
     testWidgets('התקנה מחדש במתקדם — רק כשהגרסה שבכונן היא המותקנת', (
       tester,
     ) async {
@@ -260,7 +236,6 @@ void main() {
       otzaria.latestVersion = '0.9.96';
       var reinstalls = 0;
       await _pump(tester, otzariaScreen(onReinstall: () => reinstalls++));
-      await openAdvanced(tester);
       await tester.tap(find.widgetWithText(ActionButton, t.reinstallButton));
       await tester.pumpAndSettle();
       expect(reinstalls, 1);

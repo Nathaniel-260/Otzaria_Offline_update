@@ -16,6 +16,13 @@ abstract final class ShellKeys {
   static const heroChecking = ValueKey('home.hero.checking');
   static const heroItems = ValueKey('home.hero.items');
   static const heroTotal = ValueKey('home.hero.total');
+  static const heroWhatsNew = ValueKey('home.hero.whatsNew');
+  static const heroStopWaiting = ValueKey('home.hero.stopWaiting');
+  static const heroAppError = ValueKey('home.hero.appError');
+  static const heroAppErrorNote = ValueKey('home.hero.appErrorNote');
+  static const heroAppAdvanced = ValueKey('home.hero.appAdvanced');
+  static const semanticConsentWhatIsSent =
+      ValueKey('home.notice.semanticConsent.whatIsSent');
 
   static const readOnlyNotice = ValueKey('home.notice.readOnly');
   static const driveFullNotice = ValueKey('home.notice.driveFull');
@@ -24,6 +31,12 @@ abstract final class ShellKeys {
   static const otzariaOpenBanner = ValueKey('home.banner.otzariaOpen');
   static const elevationBanner = ValueKey('home.banner.elevation');
   static const newPluginsBanner = ValueKey('home.banner.newPlugins');
+  static const libraryMissingNotice = ValueKey('home.notice.libraryMissing');
+  static const libraryAbsentNotice = ValueKey('home.notice.libraryAbsent');
+  static const libraryNotFoundNotice = ValueKey('home.notice.libraryNotFound');
+  static const libraryElsewhereNotice =
+      ValueKey('home.notice.libraryElsewhere');
+  static const semanticConsentNotice = ValueKey('home.notice.semanticConsent');
 
   static const launcherLine = ValueKey('home.foot.launcher');
   static const launcherUpdateButton = ValueKey('home.foot.launcherUpdate');
@@ -42,6 +55,7 @@ abstract final class ShellKeys {
 
   static const statusPrimary = ValueKey('page.status.primary');
   static const pageAdvanced = ValueKey('page.advanced');
+  static const appAdvanced = ValueKey('otzaria.advanced');
   static const appChannel = ValueKey('otzaria.channel');
   static const appReinstall = ValueKey('otzaria.reinstall');
   static const appAwaitsNewer = ValueKey('otzaria.awaitsNewer');

@@ -1,3 +1,4 @@
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/launcher_update_controller.dart';
@@ -6,6 +7,7 @@ import '../../controllers/otzaria_module_controller.dart';
 import '../../controllers/plugins_module_controller.dart';
 import '../../flows/library_flows.dart';
 import '../../services/byte_size.dart';
+import '../../shell/shell_keys.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 import 'home_view_model.dart';
@@ -38,13 +40,33 @@ class HomeTaskProgress extends StatelessWidget {
           ),
         HomeTask.updatingLibrary => libraryApplyProgressRow(context, library),
         HomeTask.installingApp => ListenableBuilder(
-            listenable: otzaria.progress,
-            builder: (context, _) => InfoProgressRow(
-              stage: otzaria.installStage ?? context.strings.common.installing,
-            ),
+            listenable: Listenable.merge([otzaria, otzaria.progress]),
+            builder: (context, _) => _installRow(context),
           ),
         HomeTask.other => const SizedBox.shrink(),
       };
+
+  /// "הפסק להמתין" רק כשהאשף ממשיך בחלון משלו — אז ההמתנה לו היא שנעצרת.
+  Widget _installRow(BuildContext context) {
+    final stage = otzaria.installStage;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InfoProgressRow(stage: stage ?? context.strings.common.installing),
+        if (stage != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: AppTokens.spaceMD),
+            child: ActionButton.ghost(
+              key: ShellKeys.heroStopWaiting,
+              text: context.strings.task.stopWaiting,
+              icon: FluentIcons.dismiss_circle_24_regular,
+              size: ActionButtonSize.sm,
+              onPressed: otzaria.stopWaitingForSetup,
+            ),
+          ),
+      ],
+    );
+  }
 
   /// ההורדה עוברת בין התוכנה, הספרייה והתוספים — מד אחד למה שרץ עכשיו.
   Widget _downloadRow(BuildContext context) {

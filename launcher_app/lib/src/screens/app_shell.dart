@@ -13,7 +13,11 @@ import '../controllers/download_plan.dart';
 import '../controllers/launcher_update_flow.dart';
 import '../controllers/otzaria_module_controller.dart' show OtzariaModuleStatus;
 import '../controllers/plugins_module_controller.dart' show PluginsModuleStatus;
-import '../flows/library_flows.dart' show showLibraryChangesDialog;
+import '../flows/library_flows.dart'
+    show
+        capturePersonalVersion,
+        pickLibraryInstallDir,
+        showLibraryChangesDialog;
 import '../services/app_paths.dart';
 import '../services/dialog_queue.dart';
 import '../services/file_reveal.dart';
@@ -39,9 +43,10 @@ import 'help/help_page.dart';
 import 'home/home_page.dart';
 import 'home/home_progress.dart';
 import 'home/home_view_model.dart';
+import 'home/whats_new_dialog.dart';
 import 'launcher/launcher_update_page.dart';
 import 'library_screen.dart';
-import 'otzaria_screen.dart';
+import 'otzaria_advanced_page.dart';
 import 'plugins/plugins_screen.dart';
 import 'reports/reports_page.dart';
 import 'reports_upload_flow.dart';
@@ -389,7 +394,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
 
   void _updateHere() => unawaited(_session.updateHere(_hereItems));
 
-  /// מדף התוכנה או הספרייה — הרכיב הזה בלבד, באותו מסך משימה.
+  /// מ"אוצריא — מתקדם" או מדף הספרייה — הרכיב הזה בלבד, באותו מסך משימה.
   void _updateOnly(
     GuidanceItem item, {
     bool reinstallApp = false,
@@ -414,16 +419,21 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           ? () => unawaited(_session.restartElevated())
           : null;
 
-  /// "הצג התקדמות": הדף שבו רצה פעולה שמחוץ למסך משימה (התקנה אוטומטית,
-  /// כפתור בדף). הורדה תמיד מוצגת במסך המשימה, ולכן אין לה כפתור כזה.
+  /// "הצג התקדמות" של עדכון ספרייה שרץ מחוץ למסך משימה. התקנת התוכנה
+  /// מוצגת בגיבור עצמו, והורדה — תמיד במסך המשימה.
   void _showProgress() {
-    final section = switch (homeViewModelOf(_session).task) {
-      HomeTask.installingApp => ShellSection.otzaria,
-      HomeTask.updatingLibrary => ShellSection.library,
-      _ => null,
-    };
-    if (section != null) unawaited(_goTo(section));
+    if (homeViewModelOf(_session).task == HomeTask.updatingLibrary) {
+      unawaited(_goTo(ShellSection.library));
+    }
   }
+
+  void _showWhatsNew() => unawaited(
+        showHomeWhatsNewDialog(
+          context,
+          otzaria: _session.otzaria,
+          library: _session.library,
+        ),
+      );
 
   /// "איסוף לכונן": גילוי שאינו מעודכן נבנה מחדש מהספירה, בלי לאסוף.
   Future<void> _collectReports() async {
@@ -446,7 +456,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     onDownloadSemantic: () =>
         unawaited(_session.downloadAll(forceSemantic: true)),
     onRetryFailedDownloads: () => unawaited(_session.retryFailedDownloads()),
-    onLaunch: () => unawaited(_session.otzaria.launch()),
+    onLaunch: () => unawaited(_session.launchOtzaria()),
     onRecheck: () => unawaited(_session.checkNow()),
     onOpenSection: (section) => unawaited(_goTo(section)),
     onOpenSettings: () => unawaited(_goTo(ShellSection.settings)),
@@ -459,6 +469,14 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     onDismissElevation: _session.dismissElevation,
     onOpenLauncherUpdate: () => unawaited(_goTo(ShellSection.launcher)),
     onShowProgress: _showProgress,
+    onWhatsNew: _showWhatsNew,
+    onRecheckApp: () => unawaited(_session.otzaria.checkForUpdate()),
+    onCloseOtzaria: _session.closeOtzaria,
+    onPickLibraryFolder: () =>
+        unawaited(pickLibraryInstallDir(context, _session.library)),
+    onRegisterThisComputer: () =>
+        unawaited(capturePersonalVersion(context, _session.library)),
+    onGrantSemanticConsent: () => unawaited(_session.grantSemanticConsent()),
   );
 
   Widget _home() {
@@ -494,7 +512,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     final g = context.strings.guide;
     return switch (section) {
       ShellSection.home => context.strings.shell.breadcrumbHome,
-      ShellSection.otzaria => g.tileApp,
+      ShellSection.otzaria => context.strings.pages.appAdvancedPageTitle,
       ShellSection.library => g.tileLibrary,
       ShellSection.plugins => g.tilePlugins,
       ShellSection.customApps => g.tileCustomApps,
@@ -574,15 +592,12 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   Widget _subPage(ShellSection section) {
     final s = _session;
     return switch (section) {
-      ShellSection.otzaria => OtzariaScreen(
+      ShellSection.otzaria => OtzariaAdvancedPage(
           otzaria: s.otzaria,
           settings: widget.settings,
-          otzariaIsRunning: s.otzariaIsRunning,
-          onCloseOtzaria: s.closeOtzaria,
           onInstallAdopted: s.plugins.refreshInstalled,
           saferMode: s.saferMode,
           busy: s.longTaskRunning,
-          onUpdateHere: () => _updateOnly(GuidanceItem.app),
           onReinstall: () => _updateOnly(GuidanceItem.app, reinstallApp: true),
         ),
       ShellSection.customApps => CustomAppsScreen(
@@ -682,6 +697,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onOpenLauncherUpdate: () => unawaited(_goTo(ShellSection.launcher)),
           onEditFaq: () => unawaited(_editFaq()),
           onOpenLibrary: () => unawaited(_goTo(ShellSection.library)),
+          // `select` ולא מעל ההגדרות: הדף אינו נעול, ו"חזרה" ממנו מובילה לבית.
+          onOpenOtzariaAdvanced: () => unawaited(_goTo(ShellSection.otzaria)),
+          otzariaChannelChoice: s.otzaria.hasChannelChoice,
         ),
       ShellSection.help => HelpPage(
           faq: s.faq,
@@ -875,13 +893,14 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             onFinishWithoutWaiting: s.tasks.finishWithoutWaiting,
             onLaunch: () {
               _dismissTask();
-              unawaited(s.otzaria.launch());
+              unawaited(s.launchOtzaria());
             },
             onHome: _dismissTask,
             onRetry: () => unawaited(s.retryUpdateHere()),
+            // מצב התוכנה וההמשך שלה בבית — אין לה דף משלה.
             onOpenPage: (stage) => _leaveTaskTo(switch (stage) {
               GuidanceItem.library => ShellSection.library,
-              GuidanceItem.app => ShellSection.otzaria,
+              GuidanceItem.app => ShellSection.home,
               GuidanceItem.plugins => ShellSection.plugins,
             }),
             onReindex: library.hasPendingReindex

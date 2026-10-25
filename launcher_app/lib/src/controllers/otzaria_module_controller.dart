@@ -42,6 +42,7 @@ class OtzariaModuleController extends ChangeNotifier
     OtzariaLauncher launcher = const OtzariaLauncher(),
     OtzariaProcessCloser? processCloser,
     OtzariaTargetPlatform? platform,
+    @visibleForTesting OtzariaManager? manager,
   })  : _preferPrerelease = preferPrerelease,
         _pendingLaunchUri = pendingLaunchUri,
         _onLaunchUriDelivered = onLaunchUriDelivered,
@@ -49,14 +50,15 @@ class OtzariaModuleController extends ChangeNotifier
         _runningLocator = runningLocator,
         _processCloser =
             processCloser ?? OtzariaProcessCloser(locator: runningLocator),
-        _manager = OtzariaManager(
-          dataDir: dataDir,
-          stateDir: stateDir,
-          platform: platform,
-          preferPrerelease: preferPrerelease,
-          runningLocator: runningLocator,
-          launcher: launcher,
-        );
+        _manager = manager ??
+            OtzariaManager(
+              dataDir: dataDir,
+              stateDir: stateDir,
+              platform: platform,
+              preferPrerelease: preferPrerelease,
+              runningLocator: runningLocator,
+              launcher: launcher,
+            );
 
   final OtzariaManager _manager;
 
@@ -118,6 +120,13 @@ class OtzariaModuleController extends ChangeNotifier
 
   /// איך נגמרה ההתקנה האחרונה — בלי לפענח את [noticeMessage].
   OtzariaInstallResult? lastInstallResult;
+
+  /// מה נאמר כשההתקנה בוטלה או שהאשף עוד פתוח. נפרד מ-[noticeMessage], שגם
+  /// סירוב להפעיל בזמן עדכון ספרייה כותב אליו.
+  String? lastInstallNotice;
+
+  /// ההתקנה הסתיימה ואוצריא לא נמצאה — התיקון: "בחירת מיקום ידנית".
+  bool installNotDetected = false;
 
   /// הכשל האחרון היה "אין הרשאה" — ראו [Elevation] ואת התאום שלו
   /// ב-`LibraryModuleController`.
@@ -184,6 +193,23 @@ class OtzariaModuleController extends ChangeNotifier
   /// "מה התחדש" של הגרסה שיושבת במראה המקומית — מוצג אפילו בלי רשת, כי
   /// זה נשמר לצד שאר המטא-דאטה של ה-release.
   String? get latestReleaseNotes => _lastCheck?.latestRelease?.releaseNotes;
+
+  /// "מה חדש" של הגרסה שמותקנת כאן, כשהיא אחת משתי הגרסאות שבכונן.
+  String? get installedReleaseNotes {
+    final installed = currentVersion;
+    final check = _lastCheck;
+    if (installed == null || check == null) return null;
+    for (final release in [check.stableRelease, check.prereleaseRelease]) {
+      if (release == null) continue;
+      final tag = release.tagName;
+      if (OtzariaUpdateCheckResult.normalizeVersion(tag) ==
+              OtzariaUpdateCheckResult.normalizeVersion(installed) &&
+          OtzariaUpdateCheckResult.sameBuild(tag, installed)) {
+        return release.releaseNotes;
+      }
+    }
+    return null;
+  }
 
   /// `true` אם הבדיקה הקלה מצאה ברשת תג שונה מזה שכבר יושב **במראה
   /// המקומית**. ההשוואה היא מול המראה ולא מול מה שמותקן, כי השאלה שהכרטיס
@@ -437,6 +463,7 @@ class OtzariaModuleController extends ChangeNotifier
   Future<void> _checkForUpdate() async {
     status = OtzariaModuleStatus.checking;
     needsElevation = false;
+    installNotDetected = false;
     notifyListeners();
 
     try {
@@ -489,6 +516,8 @@ class OtzariaModuleController extends ChangeNotifier
     _installing = true;
     _stopSetupWait = false;
     lastInstallResult = null;
+    lastInstallNotice = null;
+    installNotDetected = false;
     _recheckAfterInstall = false;
     status = OtzariaModuleStatus.installing;
     needsElevation = false;
@@ -517,12 +546,12 @@ class OtzariaModuleController extends ChangeNotifier
       AppLogger.instance.info('התקנת אוצריא הסתיימה בהצלחה');
       recheck = useWizard;
     } on OtzariaInstallCancelled catch (e) {
-      noticeMessage = e.toString();
+      noticeMessage = lastInstallNotice = e.toString();
       lastInstallResult = OtzariaInstallResult.cancelled;
       AppLogger.instance.info('התקנת אוצריא בוטלה באשף');
       recheck = true;
     } on OtzariaWizardStillOpen catch (e) {
-      noticeMessage = e.toString();
+      noticeMessage = lastInstallNotice = e.toString();
       lastInstallResult = OtzariaInstallResult.wizardStillOpen;
       AppLogger.instance.info('אשף ההתקנה עדיין פתוח — ההתקנה לא זוהתה עדיין');
       recheck = true;
@@ -531,6 +560,7 @@ class OtzariaModuleController extends ChangeNotifier
       lastInstallResult = OtzariaInstallResult.failed;
       errorMessage = Elevation.describe(e);
       needsElevation = Elevation.isAccessDenied(e);
+      installNotDetected = e is OtzariaInstallNotDetected;
       _recheckAfterInstall = false;
       AppLogger.instance.error('התקנת אוצריא נכשלה', e, st);
     } finally {
@@ -546,8 +576,10 @@ class OtzariaModuleController extends ChangeNotifier
     notifyListeners();
   }
 
-  Future<void> launch() async {
-    if (_refuseWhileLibraryApplies()) return;
+  /// מחזירה את סיבת הכשל — `null` כשנפתחה, או כשסורבה בזמן עדכון ספרייה
+  /// (ואז הסיבה ב-[noticeMessage]).
+  Future<String?> launch() async {
+    if (_refuseWhileLibraryApplies()) return null;
     if (errorMessage != null && status != OtzariaModuleStatus.error) {
       errorMessage = null;
       notifyListeners();
@@ -560,10 +592,14 @@ class OtzariaModuleController extends ChangeNotifier
         isRunning = true;
         notifyListeners();
       }
+      return null;
     } catch (e, st) {
-      errorMessage = e.toString();
+      final message = e.toString();
+      // שגיאת בדיקה או התקנה שבגיבור נשארת; כשל ההפעלה נאמר בהודעה בלבד.
+      if (status != OtzariaModuleStatus.error) errorMessage = message;
       AppLogger.instance.error('OtzariaModuleController.launch() נכשל', e, st);
       notifyListeners();
+      return message;
     }
   }
 

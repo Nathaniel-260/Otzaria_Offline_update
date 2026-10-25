@@ -224,6 +224,14 @@ final Map<String, UpdateHereTask> updateScenarios = {
           '2.4 GB ופנויים 0.9 GB.',
     ),
   ),
+  'appFail': const UpdateHereTask(
+    phase: UpdateHereTaskPhase.failed,
+    stages: [GuidanceItem.app],
+    failure: UpdateFailure(
+      GuidanceItem.app,
+      message: 'לא הצלחנו להעתיק את קובץ ההתקנה מהכונן.',
+    ),
+  ),
   'instFailAdmin': const UpdateHereTask(
     phase: UpdateHereTaskPhase.failed,
     stages: [GuidanceItem.app],

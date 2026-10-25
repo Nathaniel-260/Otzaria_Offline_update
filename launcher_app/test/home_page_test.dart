@@ -2,6 +2,7 @@
 // הנכונים, וכל כפתור מפעיל את הפעולה שלו. בלי סשן ובלי קונטרולרים — מלבד
 // בדיקות המדים בסוף, שקוראות מ-progress של קונטרולרים אמיתיים.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
@@ -11,16 +12,21 @@ import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
+import 'package:launcher_app/src/flows/library_flows.dart'
+    show LibraryChangesCard;
 import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/screens/home/home_progress.dart';
 import 'package:launcher_app/src/screens/home/home_view_model.dart';
+import 'package:launcher_app/src/screens/home/whats_new_dialog.dart';
 import 'package:launcher_app/src/self_update/launcher_release.dart';
 import 'package:launcher_app/src/services/byte_size.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_navigator.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
+import 'package:library_manager/library_manager.dart' show LibraryChangesNote;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:path/path.dart' as p;
 import 'package:plugins_manager/plugins_manager.dart' show PluginsOnlineStatus;
 
 import 'home_fixtures.dart';
@@ -79,7 +85,10 @@ void main() {
       await pumpScreen(tester, HomePage(model: homeScenario('recheckNothing')));
       expect(inHero(find.text(g.recheckNothingTitle)), findsOneWidget);
       // השעה של הבדיקה שרצה, ובלי טענה על "מאז הבדיקה הקודמת".
-      expect(find.text(g.recheckNothingBody('23:14')), findsOneWidget);
+      expect(
+        find.text(g.recheckNothingBody('23:14', upToDate: true)),
+        findsOneWidget,
+      );
       expect(find.text(g.upToDateTitle), findsNothing);
     });
 
@@ -97,7 +106,34 @@ void main() {
         (tester) async {
       await pumpScreen(tester, HomePage(model: homeScenario('nothingNew')));
       expect(inHero(find.text(g.nothingNewTitle)), findsOneWidget);
-      expect(find.text(g.nothingNewBody('23:14')), findsOneWidget);
+      expect(
+        find.text(g.nothingNewBody('23:14', upToDate: true)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('חיפוש חכם שלא ירד — "אין חדש" בלי "הכונן מעודכן"',
+        (tester) async {
+      final m = homeScenario('nothingNew');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: m.guidance,
+            installedVersion: '0.10.4',
+            foundNothing: FoundNothing.earlierCheck,
+            onlineCheckedAt: m.onlineCheckedAt,
+            semanticOffer: true,
+          ),
+        ),
+      );
+      final body = g.nothingNewBody('23:14', upToDate: false);
+      expect(find.text(body), findsOneWidget);
+      expect(
+        find.text(g.nothingNewBody('23:14', upToDate: true)),
+        findsNothing,
+      );
+      expect(find.byKey(ShellKeys.heroSemanticOffer), findsOneWidget);
       expect(find.text(g.upToDateTitle), findsNothing);
       expect(find.text(g.recheckNothingTitle), findsNothing);
     });
@@ -560,7 +596,6 @@ void main() {
         await tester.tap(find.byKey(ShellKeys.tile(section)));
       }
       await tester.tap(find.text(g.toPluginsButton));
-      await tester.tap(find.text(g.whatsNewButton));
       expect(opened, [
         ShellSection.otzaria,
         ShellSection.library,
@@ -568,8 +603,9 @@ void main() {
         ShellSection.customApps,
         ShellSection.reports,
         ShellSection.plugins,
-        ShellSection.otzaria,
       ]);
+      // אין מה להראות — אין "מה חדש?".
+      expect(find.byKey(ShellKeys.heroWhatsNew), findsNothing);
     });
 
     testWidgets('הודעות במקום דיאלוגים: כל כפתור מפעיל את שלו', (tester) async {
@@ -1310,6 +1346,121 @@ void main() {
       expect(stateNotifications, 0);
     });
 
+    testWidgets('התקנת התוכנה: המד בגיבור, ו"הפסק להמתין" כשהאשף בחלון משלו',
+        (tester) async {
+      otzaria.status = OtzariaModuleStatus.installing;
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                otzariaStatus: AppStatusFact.installing,
+                installing: true,
+              ),
+            ),
+            task: HomeTask.installingApp,
+          ),
+          taskProgress: progress(HomeTask.installingApp),
+        ),
+      );
+      expect(inHero(find.text(g.taskInstallingAppTitle)), findsOneWidget);
+      expect(find.byType(InfoProgressRow), findsOneWidget);
+      // לא "הצג התקדמות" — ההתקדמות כבר כאן.
+      expect(find.byKey(ShellKeys.heroShowProgress), findsNothing);
+      expect(find.byKey(ShellKeys.heroStopWaiting), findsNothing);
+
+      otzaria.installStage = he.appDomain.setupContinuesElsewhere;
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      otzaria.notifyListeners();
+      await tester.pump();
+      expect(find.text(he.appDomain.setupContinuesElsewhere), findsOneWidget);
+      final stop = tester.widget<ActionButton>(
+        find.byKey(ShellKeys.heroStopWaiting),
+      );
+      expect(stop.text, he.task.stopWaiting);
+      expect(stop.onPressed, otzaria.stopWaitingForSetup);
+    });
+
+    testWidgets('"מה חדש?" — של הגרסה המותקנת כשאין עדכון, ושל הספרייה',
+        (tester) async {
+      await tester.runAsync(() async {
+        writeAppMirror(tempDir.path, '1.0.0');
+        await otzaria.checkForUpdate();
+      });
+      otzaria
+        ..currentVersion = '1.0.0'
+        ..status = OtzariaModuleStatus.upToDate;
+      library
+        ..changesNotes = const [
+          LibraryChangesNote(releaseTag: 'v31-1', path: 'none.md'),
+        ]
+        ..changesNotesVersion = 31;
+      final notes = whatsNewAppNotes(otzaria)!;
+      expect(notes.installed, isTrue);
+
+      await pumpScreen(
+        tester,
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showHomeWhatsNewDialog(
+              context,
+              otzaria: otzaria,
+              library: library,
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(he.pages.appWhatsNew('1.0.0')), findsOneWidget);
+      expect(find.text(he.pages.appInstalledNotesCaption), findsOneWidget);
+      expect(find.text('מה התחדש ב-1.0.0'), findsOneWidget);
+      expect(find.text(he.libraryScreen.changesTitle), findsOneWidget);
+      expect(find.byType(LibraryChangesCard), findsOneWidget);
+
+      await tester.tap(find.text(he.common.close));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppDialog), findsNothing);
+    });
+
+    testWidgets('"מה חדש?" כשיש עדכון — של הגרסה שבכונן, בלי כיתוב "מותקנת"',
+        (tester) async {
+      await tester.runAsync(() async {
+        writeAppMirror(tempDir.path, '1.1.0');
+        await otzaria.checkForUpdate();
+      });
+      otzaria
+        ..currentVersion = '1.0.0'
+        ..status = OtzariaModuleStatus.updateAvailable;
+      expect(whatsNewAppNotes(otzaria)?.installed, isFalse);
+
+      await pumpScreen(
+        tester,
+        Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showHomeWhatsNewDialog(
+              context,
+              otzaria: otzaria,
+              library: library,
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.text(he.pages.appWhatsNew('1.1.0')), findsOneWidget);
+      expect(find.text(he.pages.appInstalledNotesCaption), findsNothing);
+      expect(find.byType(LibraryChangesCard), findsNothing);
+    });
+
+    test('בלי הערות לשום דבר — אין "מה חדש?"', () {
+      expect(whatsNewAppNotes(otzaria), isNull);
+    });
+
     testWidgets('עדכון ספרייה: מד עם השלב והאזהרה לא לנתק', (tester) async {
       library.status = LibraryModuleStatus.updating;
       library.stageText = 'verify (2/3)';
@@ -1590,31 +1741,22 @@ void main() {
   });
 
   group('הגיבור — ליטוש', () {
-    testWidgets('"צריך בדיקה": הכפתור אומר לאיזה דף', (tester) async {
+    testWidgets('"צריך בדיקה" בספרייה: הכפתור פותח את הדף שלה', (tester) async {
       final opened = <ShellSection>[];
-      for (final (status, section, label) in [
-        (
-          const GuidanceFacts(libraryStatus: LibraryStatusFact.error),
-          ShellSection.library,
-          g.attentionLibraryButton,
-        ),
-        (
-          const GuidanceFacts(otzariaStatus: AppStatusFact.error),
-          ShellSection.otzaria,
-          g.attentionAppButton,
-        ),
-      ]) {
-        await pumpScreen(
-          tester,
-          HomePage(
-            model: HomeViewModel(guidance: deriveHomeGuidance(status)),
-            actions: HomeActions(onOpenSection: opened.add),
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(libraryStatus: LibraryStatusFact.error),
+            ),
           ),
-        );
-        expect(primary(tester).text, label);
-        await tester.tap(find.byKey(ShellKeys.heroPrimary));
-        expect(opened.last, section);
-      }
+          actions: HomeActions(onOpenSection: opened.add),
+        ),
+      );
+      expect(primary(tester).text, g.attentionLibraryButton);
+      await tester.tap(find.byKey(ShellKeys.heroPrimary));
+      expect(opened, [ShellSection.library]);
     });
 
     testWidgets('"בודק..." — מחוון פעילות, ו"פתיחת אוצריא" לא מחכה לו', (
@@ -1766,6 +1908,439 @@ void main() {
     });
   });
 
+  group('התוכנה והספרייה בבית', () {
+    HomeActions recording(List<String> calls) => HomeActions(
+          onWhatsNew: () => calls.add('whatsNew'),
+          onRecheckApp: () => calls.add('recheckApp'),
+          onRecheck: () => calls.add('checkNow'),
+          onCloseOtzaria: () async {
+            calls.add('close');
+            return true;
+          },
+          onPickLibraryFolder: () => calls.add('pick'),
+          onRegisterThisComputer: () => calls.add('register'),
+          onGrantSemanticConsent: () => calls.add('consent'),
+          onOpenSection: (section) => calls.add(section.name),
+          onOpenSettings: () => calls.add('settings'),
+        );
+
+    testWidgets('שגיאת התוכנה בגיבור, ו"בדוק שוב" בודק את התוכנה בלבד',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(model: homeScenario('appError'), actions: recording(calls)),
+      );
+      expect(inHero(find.text(g.attentionAppTitle)), findsOneWidget);
+      expect(find.byKey(ShellKeys.heroAppError), findsOneWidget);
+      expect(find.text('לא הצלחנו לקרוא את התיקייה שבכונן'), findsOneWidget);
+      expect(primary(tester).text, g.recheckButton);
+      await tester.tap(find.byKey(ShellKeys.heroPrimary));
+      // לא `checkNow`: הוא מריץ גם התקנה אוטומטית.
+      expect(calls, ['recheckApp']);
+    });
+
+    testWidgets('"בדוק שוב" של התוכנה מושבת כשמשימה רצה', (tester) async {
+      final m = homeScenario('appError');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: m.guidance,
+            appError: m.appError,
+            checkBlocked: true,
+          ),
+        ),
+      );
+      expect(primary(tester).onPressed, isNull);
+    });
+
+    testWidgets('"מה חדש?" בגיבור פותח חלון, גם כשאין עדכון', (tester) async {
+      for (final name in ['openIdle', 'libraryNotices']) {
+        final calls = <String>[];
+        await pumpScreen(
+          tester,
+          HomePage(model: homeScenario(name), actions: recording(calls)),
+        );
+        await tester.tap(find.byKey(ShellKeys.heroWhatsNew));
+        expect(calls, ['whatsNew'], reason: name);
+      }
+    });
+
+    testWidgets('אוצריא פתוחה ואין מה להתקין — הפס עם "סגירת אוצריא"',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(model: homeScenario('openIdle'), actions: recording(calls)),
+      );
+      final banner = find.byKey(ShellKeys.otzariaOpenBanner);
+      expect(banner, findsOneWidget);
+      expect(find.text(g.otzariaOpenIdleBody), findsOneWidget);
+      await tester.tap(
+        find.descendant(of: banner, matching: find.byType(ActionButton)),
+      );
+      await tester.pump();
+      expect(calls, ['close']);
+    });
+
+    testWidgets('אוצריא פתוחה ויש מה להתקין — בלי כפתור שמתחרה ב"עדכון"',
+        (tester) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('open')));
+      final banner = find.byKey(ShellKeys.otzariaOpenBanner);
+      expect(
+        find.descendant(of: banner, matching: find.byType(ActionButton)),
+        findsNothing,
+      );
+      expect(find.text(g.otzariaOpenIdleBody), findsNothing);
+    });
+
+    testWidgets('גרסה שממתינה בערוץ והאשף שלא ידוע — הערות שקטות בגיבור',
+        (tester) async {
+      final m = homeScenario('offline');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: m.guidance,
+            installedVersion: '0.10.3',
+            appAwaitsNewerStable: true,
+            appSetupNotice: 'setup-notice',
+          ),
+        ),
+      );
+      expect(inHero(find.text(g.updateHereTitle)), findsOneWidget);
+      expect(find.byKey(ShellKeys.appAwaitsNewer), findsOneWidget);
+      expect(
+        find.text(he.pages.appAwaitsNewer(stable: true)),
+        findsOneWidget,
+      );
+      expect(inHero(find.text('setup-notice')), findsOneWidget);
+    });
+
+    testWidgets('קבצים חסרים והסכמה לחיפוש חכם — הודעות מעל הגיבור',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('libraryNotices'),
+          actions: recording(calls),
+        ),
+      );
+      // אין כאן מה ללחוץ — הערה בגיבור, מתחת לפעולה, ולא הודעה מעליה.
+      final missing = inHero(find.byKey(ShellKeys.libraryMissingNotice));
+      expect(missing, findsOneWidget);
+      expect(
+        find.text(g.libraryMissingFilesBody('מילון החיפוש המקורב')),
+        findsOneWidget,
+      );
+      expect(
+        tester.getRect(missing).top,
+        greaterThan(tester.getRect(find.byKey(ShellKeys.heroPrimary)).bottom),
+      );
+      expect(find.text(g.semanticConsentBody), findsOneWidget);
+      // מתחת לגיבור: בחלון נמוך הפעולה הראשית נשארת בתחילת הדף.
+      expect(
+        tester.getRect(find.byKey(ShellKeys.semanticConsentNotice)).top,
+        greaterThan(tester.getRect(find.byKey(ShellKeys.hero)).bottom),
+      );
+      expect(find.byKey(ShellKeys.semanticConsentWhatIsSent), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(ShellKeys.semanticConsentNotice),
+          matching: find.text(he.pages.libSemanticGrant),
+        ),
+      );
+      expect(calls, ['consent']);
+    });
+
+    testWidgets('כונן בלי הנלווים — הודעה משלו', (tester) async {
+      final m = homeScenario('uptodate');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: m.guidance,
+            libraryCompanionsAbsent: true,
+          ),
+        ),
+      );
+      expect(inHero(find.byKey(ShellKeys.libraryAbsentNotice)), findsOneWidget);
+      expect(find.text(g.libraryCompanionsAbsentBody), findsOneWidget);
+    });
+
+    testWidgets('קבצים שלא ירדו כבר נאמרים ב"נסה שוב" — בלי הערה שנייה',
+        (tester) async {
+      final m = homeScenario('semanticOffer');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: m.guidance,
+            installedVersion: '0.10.4',
+            failedDownloads: 'תלמוד בבלי',
+            libraryMissingNames: 'תלמוד בבלי',
+          ),
+        ),
+      );
+      expect(find.byKey(ShellKeys.heroFailedDownloads), findsOneWidget);
+      expect(find.byKey(ShellKeys.libraryMissingNotice), findsNothing);
+    });
+
+    testWidgets('"צריך בדיקה" בלי "נסה שוב" — הקבצים החסרים עדיין נאמרים',
+        (tester) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(libraryStatus: LibraryStatusFact.error),
+            ),
+            installedVersion: '0.10.4',
+            failedDownloads: 'תלמוד בבלי',
+            libraryMissingNames: 'מילון',
+          ),
+        ),
+      );
+      expect(inHero(find.text(g.attentionLibraryTitle)), findsOneWidget);
+      expect(find.byKey(ShellKeys.heroFailedDownloads), findsNothing);
+      expect(
+          inHero(find.byKey(ShellKeys.libraryMissingNotice)), findsOneWidget);
+    });
+
+    testWidgets('שגיאת התוכנה כשהגיבור על משהו אחר — הערה עם "בדוק שוב"',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                otzariaStatus: AppStatusFact.error,
+                libraryStatus: LibraryStatusFact.updateAvailable,
+                online: false,
+              ),
+            ),
+            installedVersion: '0.10.3',
+            appError: 'broken\nstack',
+          ),
+          actions: recording(calls),
+        ),
+      );
+      expect(inHero(find.text(g.updateHereTitle)), findsOneWidget);
+      final note = find.byKey(ShellKeys.heroAppErrorNote);
+      expect(note, findsOneWidget);
+      expect(find.descendant(of: note, matching: find.text('broken')),
+          findsOneWidget);
+      await tester.tap(
+        find.descendant(of: note, matching: find.text(g.recheckButton)),
+      );
+      expect(calls, ['recheckApp']);
+    });
+
+    testWidgets('התקנה שלא נמצאה — קישור ל"אוצריא — מתקדם"', (tester) async {
+      final calls = <String>[];
+      final m = homeScenario('appError');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: m.guidance,
+            installedVersion: '0.10.4',
+            appError: m.appError,
+            appErrorPicksFolder: true,
+          ),
+          actions: recording(calls),
+        ),
+      );
+      await tester.tap(find.byKey(ShellKeys.heroAppAdvanced));
+      expect(calls, ['otzaria']);
+    });
+
+    testWidgets('הספרייה לא נמצאה: הגיבור עצמו מציע לבחור, בלי הודעה כפולה',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('libraryNotFound'),
+          actions: recording(calls),
+        ),
+      );
+      expect(inHero(find.text(he.pages.libNotFoundTitle)), findsOneWidget);
+      expect(find.text(he.pages.libNotFoundTitle), findsOneWidget);
+      expect(find.byKey(ShellKeys.libraryNotFoundNotice), findsNothing);
+      expect(primary(tester).text, he.pages.libPickFolderButton);
+      await tester.tap(find.byKey(ShellKeys.heroPrimary));
+      await tester.tap(find.byKey(ShellKeys.heroSecondary));
+      expect(calls, ['pick', 'library']);
+    });
+
+    testWidgets('הספרייה לא נמצאה כשהגיבור על משהו אחר — הודעה עם הפעולה',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                otzariaStatus: AppStatusFact.updateAvailable,
+                libraryStatus: LibraryStatusFact.needsManualPath,
+                online: false,
+              ),
+            ),
+            installedVersion: '0.10.3',
+            libraryNotFound: true,
+          ),
+          actions: recording(calls),
+        ),
+      );
+      expect(inHero(find.text(g.updateHereTitle)), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(ShellKeys.libraryNotFoundNotice),
+          matching: find.text(he.pages.libPickFolderButton),
+        ),
+      );
+      expect(calls, ['pick']);
+    });
+
+    testWidgets('הכונן הוכן למחשב אחר: "רישום גם של המחשב הזה" מהבית',
+        (tester) async {
+      final calls = <String>[];
+      final s = he.libraryScreen;
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('libraryElsewhere'),
+          actions: recording(calls),
+        ),
+      );
+      final notice = find.byKey(ShellKeys.libraryElsewhereNotice);
+      expect(notice, findsOneWidget);
+      expect(find.text(s.personalOtherMachineSubtitle('145')), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: notice,
+          matching: find.text(s.personalOtherMachineCaptureButton),
+        ),
+      );
+      await tester.tap(
+        find.descendant(
+          of: notice,
+          matching: find.text(s.personalOtherMachineSettingsButton),
+        ),
+      );
+      expect(calls, ['register', 'settings']);
+    });
+
+    testWidgets('מחשב אחר בכונן מוגן — הרישום מושבת, ונאמר למה',
+        (tester) async {
+      final s = he.libraryScreen;
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                readOnly: true,
+                otzariaStatus: AppStatusFact.updateAvailable,
+                libraryStatus: LibraryStatusFact.personalTargetElsewhere,
+              ),
+            ),
+            installedVersion: '0.10.3',
+            libraryElsewhereFrom: '',
+          ),
+        ),
+      );
+      final notice = find.byKey(ShellKeys.libraryElsewhereNotice);
+      final capture = tester.widget<ActionButton>(
+        find.descendant(
+          of: notice,
+          matching: find.widgetWithText(
+            ActionButton,
+            s.personalOtherMachineCaptureButton,
+          ),
+        ),
+      );
+      expect(capture.onPressed, isNull);
+      expect(
+        find.textContaining(he.pages.libPersonalReadOnly),
+        findsOneWidget,
+      );
+      // בלי גרסה רשומה — "לא ידוע", לא ריק.
+      expect(
+        find.textContaining(
+          s.personalOtherMachineSubtitle(he.common.unknownValue),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('מחשב אחר כשהגיבור "צריך בדיקה" עליו — הפעולה בגיבור בלבד',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                libraryStatus: LibraryStatusFact.personalTargetElsewhere,
+                online: false,
+              ),
+            ),
+            installedVersion: '0.10.4',
+            libraryElsewhereFrom: '145',
+          ),
+          actions: recording(calls),
+        ),
+      );
+      expect(find.byKey(ShellKeys.libraryElsewhereNotice), findsNothing);
+      expect(
+        inHero(find.text(he.libraryScreen.personalOtherMachineTitle)),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(ShellKeys.heroPrimary));
+      expect(calls, ['register']);
+    });
+
+    testWidgets('פעולות הספרייה מושבתות כשמשימה רצה', (tester) async {
+      final m = homeScenario('libraryNotices');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: m.guidance,
+            semanticConsent: true,
+            checkBlocked: true,
+          ),
+        ),
+      );
+      final grant = tester.widget<ActionButton>(
+        find.widgetWithText(ActionButton, he.pages.libSemanticGrant),
+      );
+      expect(grant.onPressed, isNull);
+    });
+
+    test('הודעות הספרייה בבית אינן אומרות "אינטרנט" (מחשב לא מחובר)', () {
+      for (final text in [
+        g.libraryMissingFilesBody('x'),
+        g.libraryCompanionsAbsentBody,
+        g.semanticConsentBody,
+        g.otzariaOpenIdleBody,
+        he.pages.libNotFoundBody,
+        he.libraryScreen.personalOtherMachineSubtitle('1'),
+        he.pages.libSemanticBody,
+      ]) {
+        expect(text, isNot(contains('אינטרנט')), reason: text);
+      }
+    });
+  });
+
   group('מסך הפתיחה — מה עוד יש בכונן', () {
     testWidgets('תוכנות נוספות ודיווחים — קישורים, והודעות הכונן והבית', (
       tester,
@@ -1825,4 +2400,30 @@ void main() {
       expect(find.byKey(ShellKeys.reportsIntroNotice), findsOneWidget);
     });
   });
+}
+
+/// מראה של התוכנה עם גרסה יציבה אחת [tag] והערות "מה התחדש ב-[tag]".
+void writeAppMirror(String dataDir, String tag) {
+  final mirror = p.join(dataDir, 'mirror', 'app');
+  final relative = 'installers/$tag/otzaria-$tag.exe';
+  final installer = File(p.join(mirror, p.joinAll(relative.split('/'))))
+    ..parent.createSync(recursive: true)
+    ..writeAsStringSync('installer for $tag');
+  File(p.join(mirror, 'latest-release.json')).writeAsStringSync(jsonEncode({
+    'schemaVersion': 2,
+    'syncedAt': '2026-08-01T00:00:00.000Z',
+    'stable': {
+      'tagName': tag,
+      'name': 'אוצריא $tag',
+      'isPrerelease': false,
+      'isDraft': false,
+      'publishedAt': '2026-08-01T00:00:00.000Z',
+      'installerKind': 'windowsSetupExe',
+      'installerAssetName': 'otzaria-$tag.exe',
+      'installerDownloadUrl': 'https://example.invalid/otzaria-$tag.exe',
+      'installerSizeBytes': installer.lengthSync(),
+      'releaseNotes': 'מה התחדש ב-$tag',
+      'installerPath': relative,
+    },
+  }));
 }

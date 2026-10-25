@@ -55,7 +55,7 @@ void main() {
       contains('\u20660.10.5-beta\u2069'),
     );
     expect(he.guide.drive('C:'), 'כונן \u2066C:\u2069');
-    expect(he.pages.appUpdateButton('0.10.5'), contains('\u20660.10.5\u2069'));
+    expect(he.pages.appWhatsNew('0.10.5'), contains('\u20660.10.5\u2069'));
   });
 
   test('כל תבנית עם גרסה, כונן או נתיב מבודדת אותם ב-_ltr', () {

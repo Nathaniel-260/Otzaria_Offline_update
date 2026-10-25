@@ -5,7 +5,6 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 import '../controllers/library_module_controller.dart';
 import '../flows/library_flows.dart';
 import '../services/byte_size.dart';
-import '../services/native_file_dialogs.dart';
 import '../services/timestamps.dart';
 import '../shell/shell_keys.dart';
 import '../theme/theme_exports.dart';
@@ -97,7 +96,7 @@ class LibraryScreen extends StatelessWidget {
         ],
         if (c.changesNotes.isNotEmpty) ...[
           SectionLabel(context.strings.libraryScreen.changesTitle),
-          _changesCard(context),
+          LibraryChangesCard(library: c),
         ],
         AdvancedSection(
           key: ShellKeys.pageAdvanced,
@@ -154,7 +153,7 @@ class LibraryScreen extends StatelessWidget {
               text: s.personalOtherMachineCaptureButton,
               onPressed: _isBusy || readOnly
                   ? null
-                  : () => _capturePersonalVersion(context),
+                  : () => capturePersonalVersion(context, library),
             ),
             ActionButton.ghost(
               text: s.personalOtherMachineSettingsButton,
@@ -343,11 +342,12 @@ class LibraryScreen extends StatelessWidget {
           key: ShellKeys.statusPrimary,
           text: t.libPickFolderButton,
           icon: FluentIcons.folder_open_24_regular,
-          onPressed: _isBusy ? null : () => _pickInstallDir(context),
+          onPressed:
+              _isBusy ? null : () => pickLibraryInstallDir(context, library),
         ),
         ActionButton.ghost(
           text: context.strings.libraryScreen.pickDbButton,
-          onPressed: _isBusy ? null : () => _pickDbFile(context),
+          onPressed: _isBusy ? null : () => pickLibraryDbFile(context, library),
         ),
       ],
       endActions: [RecheckButton(onPressed: _isBusy ? null : _recheck)],
@@ -457,29 +457,6 @@ class LibraryScreen extends StatelessWidget {
     );
   }
 
-  // ── מה חדש ────────────────────────────────────────────────────────────────
-
-  /// הרשימה עצמה יכולה למנות אלפי ספרים — היא נפתחת בחלון משלה.
-  Widget _changesCard(BuildContext context) {
-    final c = library;
-    final s = context.strings.libraryScreen;
-    return NewsCard(
-      items: [
-        c.changesNotesApplied
-            ? s.changesAppliedSubtitle('${c.changesNotesVersion}')
-            : s.changesPendingSubtitle('${c.changesNotesVersion}'),
-        if (c.changesNotesPartial)
-          s.changesPartial(c.changesNotes.length, c.changesNotesRange),
-      ],
-      footer: ActionButton.ghost(
-        text: s.changesButton,
-        icon: FluentIcons.document_text_24_regular,
-        size: ActionButtonSize.sm,
-        onPressed: () => showLibraryChangesDialog(context, c),
-      ),
-    );
-  }
-
   // ── מתקדם ─────────────────────────────────────────────────────────────────
 
   Widget _advanced(BuildContext context) {
@@ -507,12 +484,15 @@ class LibraryScreen extends StatelessWidget {
                 ActionButton.ghost(
                   text: s.pickInstallDirButton,
                   icon: FluentIcons.folder_open_24_regular,
-                  onPressed: _isBusy ? null : () => _pickInstallDir(context),
+                  onPressed: _isBusy
+                      ? null
+                      : () => pickLibraryInstallDir(context, library),
                 ),
               ActionButton.ghost(
                 text: s.pickDbButton,
                 icon: FluentIcons.document_24_regular,
-                onPressed: _isBusy ? null : () => _pickDbFile(context),
+                onPressed:
+                    _isBusy ? null : () => pickLibraryDbFile(context, library),
               ),
             ],
           ),
@@ -571,7 +551,7 @@ class LibraryScreen extends StatelessWidget {
               text: s.personalVersionButton,
               onPressed: _isBusy || readOnly
                   ? null
-                  : () => _capturePersonalVersion(context),
+                  : () => capturePersonalVersion(context, library),
             ),
           ),
         if (c.personalUpdateMode && c.personalDownloadNote != null)
@@ -614,65 +594,5 @@ class LibraryScreen extends StatelessWidget {
           ? s.mirrorHasVersion('${c.targetVersion}')
           : s.mirrorPresent,
     };
-  }
-
-  Future<void> _pickDbFile(BuildContext context) async {
-    final t = context.strings.libraryScreen;
-    final path = await NativeFileDialogs.pickFile(
-      dialogTitle: t.pickDbDialogTitle,
-      allowedExtensions: const ['db'],
-    );
-    if (path == null || !context.mounted) return;
-    if (!await _confirmLocationOutsideOtzaria(context, path)) return;
-    await library.setCustomDbPath(path);
-    UiSnack.showSuccess(t.dbPathUpdatedSnack);
-  }
-
-  /// התיקייה שאליה תותקן ספרייה חדשה, או שבה היא יושבת עכשיו.
-  Future<void> _pickInstallDir(BuildContext context) async {
-    final t = context.strings.libraryScreen;
-    final dir = await NativeFileDialogs.pickDirectory(
-      dialogTitle: t.pickInstallDirDialogTitle,
-    );
-    if (dir == null || !context.mounted) return;
-    if (!await _confirmLocationOutsideOtzaria(context, library.dbPathIn(dir))) {
-      return;
-    }
-    await library.setInstallDir(dir);
-    UiSnack.showSuccess(t.installDirUpdatedSnack);
-  }
-
-  /// מיקום שאוצריא אינה מחפשת בו מותר — אבל רק אחרי אזהרה מפורשת: היא לא
-  /// תראה שם ספרים עד שהמשתמש יצביע על התיקייה מתוך ההגדרות שלה.
-  Future<bool> _confirmLocationOutsideOtzaria(
-    BuildContext context,
-    String dbPath,
-  ) async {
-    if (await library.isDbPathKnownToOtzaria(dbPath)) return true;
-    if (!context.mounted) return false;
-    final t = context.strings.libraryScreen;
-    return showTwoActionsDialog(
-      context: context,
-      title: t.customLocationDialogTitle,
-      content: t.customLocationPrompt(dbPath),
-      confirmText: t.customLocationConfirm,
-    );
-  }
-
-  /// קוראת את גרסת המסד של המחשב הזה ורושמת אותה. snack ולא שדה מצב:
-  /// לחיצה שלא מצאה מסד היא מידע חד-פעמי, לא תקלה שנשארת בדף.
-  Future<void> _capturePersonalVersion(BuildContext context) async {
-    final t = context.strings.libraryScreen;
-    final captured = await library.capturePersonalVersion();
-    if (!context.mounted) return;
-    if (captured) {
-      UiSnack.showSuccess(
-        t.personalVersionCapturedSnack('${library.personalFromVersion}'),
-      );
-    } else {
-      UiSnack.showError(
-        library.personalCaptureError ?? t.personalVersionNotFoundSnack,
-      );
-    }
   }
 }

@@ -9,6 +9,7 @@ import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_tasks.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart' show OtzariaUserError;
 
 import 'task_fixtures.dart';
 import 'test_harness.dart';
@@ -223,7 +224,7 @@ void main() {
     expect(find.text(t.permissionAppBody), findsNothing);
   });
 
-  testWidgets('כשל הרשאות: גוף ידידותי, השגיאה בפרטים, בלי "לדף התוכנה"',
+  testWidgets('כשל הרשאות: גוף ידידותי, השגיאה בפרטים, בלי כפתור לדף',
       (tester) async {
     await show(tester, 'instFailAdmin');
     expect(find.text(t.permissionFailedTitle), findsOneWidget);
@@ -237,7 +238,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Access is denied'), findsNothing);
-    expect(find.text(t.toAppPage), findsNothing);
+    expect(find.byKey(ShellKeys.taskSecondary), findsNothing);
     final primary =
         tester.widget<ActionButton>(find.byKey(ShellKeys.taskPrimary));
     expect(primary.text, t.elevateButton);
@@ -271,6 +272,12 @@ void main() {
       expect(find.text(t.pluginsAfterInstall), findsOneWidget);
       expect(find.text(t.pluginsSent), findsNothing);
       expect(badge(tester).kind, ResultBadgeKind.calm);
+      // לתוכנה אין דף — הכפתור הוא "חזרה לבית", ופעם אחת בלבד.
+      expect(
+        tester.widget<ActionButton>(find.byKey(ShellKeys.taskPrimary)).text,
+        t.backHome,
+      );
+      expect(find.text(t.backHome), findsOneWidget);
       await tester.tap(find.byKey(ShellKeys.taskPrimary));
       expect(calls, ['page app']);
     });
@@ -290,6 +297,18 @@ void main() {
       await show(tester, 'wizardStillOpen');
       expect(find.text(t.wizardStillOpenTitle), findsOneWidget);
       expect(find.text(t.wizardClosedTitle), findsNothing);
+      expect(find.text(t.backHome), findsOneWidget);
+      await tester.tap(find.byKey(ShellKeys.taskPrimary));
+      expect(calls, ['page app']);
+    });
+
+    testWidgets('כשל בהתקנת התוכנה: "נסה שוב" ו"חזרה לבית", בלי דף תוכנה',
+        (tester) async {
+      await show(tester, 'appFail');
+      expect(find.text(t.appFailedTitle), findsOneWidget);
+      expect(find.byKey(ShellKeys.taskSecondary), findsNothing);
+      await tester.tap(find.text(t.backHome));
+      expect(calls, ['page app']);
     });
 
     testWidgets('מסירה מעורבת: רק מה שנשלח נקרא "נשלח"', (tester) async {
@@ -373,6 +392,15 @@ void main() {
         (body: null, details: 'Bad state: Access is denied (OS Error 5)'),
       );
       expect(splitFailureMessage(null), (body: null, details: null));
+      // כשל פנימי לפרטים; כשל של otzaria_manager — נוסח מתורגם, לגוף.
+      expect(
+        splitFailureMessage(StateError('No element').toString()),
+        (body: null, details: 'Bad state: No element'),
+      );
+      expect(
+        splitFailureMessage(OtzariaUserError('אוצריא לא נמצאה').toString()),
+        (body: 'אוצריא לא נמצאה', details: null),
+      );
     });
 
     test('כיוון הפרטים הטכניים לפי התו החזק הראשון', () {

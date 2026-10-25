@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
+import 'package:launcher_app/src/screens/home/home_view_model.dart'
+    show whatsNewAppNotes;
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
@@ -304,6 +306,59 @@ void main() {
     });
   });
 
+  group('"מה חדש" בבית', () {
+    void installed(String tag) {
+      final install = Directory(p.join(tempDir.path, 'Otzaria'))
+        ..createSync(recursive: true);
+      final exe = File(p.join(install.path, 'otzaria.exe'))
+        ..writeAsStringSync('exe');
+      File(p.join(tempDir.path, 'otzaria_install_state.json'))
+          .writeAsStringSync(jsonEncode(OtzariaInstallState(
+        installedTagName: tag,
+        installDir: install.path,
+        launchPath: exe.path,
+      ).toJson()));
+    }
+
+    test('אין עדכון — ההערות של הגרסה המותקנת, גם מהערוץ השני', () async {
+      writeAppMirror(stableTag: '1.0.0', prereleaseTag: '1.1.0-beta');
+      installed('1.1.0-beta');
+      final c = controllerFor();
+      await c.checkForUpdate();
+
+      expect(c.status, OtzariaModuleStatus.installedIsNewer);
+      expect(c.installedReleaseNotes, 'מה התחדש ב-1.1.0-beta');
+      final notes = whatsNewAppNotes(c)!;
+      expect(notes.installed, isTrue);
+      expect(notes.version, '1.1.0-beta');
+    });
+
+    test('יש עדכון בכונן — ההערות שלו, לא של המותקנת', () async {
+      writeAppMirror(stableTag: '1.1.0');
+      installed('1.0.0');
+      final c = controllerFor();
+      await c.checkForUpdate();
+
+      expect(c.status, OtzariaModuleStatus.updateAvailable);
+      expect(c.installedReleaseNotes, isNull);
+      final notes = whatsNewAppNotes(c)!;
+      expect(notes.installed, isFalse);
+      expect(notes.version, '1.1.0');
+      expect(notes.notes, 'מה התחדש ב-1.1.0');
+    });
+
+    test('גרסה מותקנת שאינה בכונן — אין הערות', () async {
+      writeAppMirror(stableTag: '1.0.0');
+      installed('0.9.0');
+      final c = controllerFor();
+      await c.checkForUpdate();
+      c.status = OtzariaModuleStatus.upToDate;
+
+      expect(c.installedReleaseNotes, isNull);
+      expect(whatsNewAppNotes(c), isNull);
+    });
+  });
+
   group('התקנה ואימוץ', () {
     test('install לפני בדיקה אינו עושה דבר ואינו זורק', () async {
       final c = controllerFor();
@@ -400,6 +455,28 @@ void main() {
       },
       testOn: 'mac-os',
     );
+
+    test('התקנה שהסתיימה ואוצריא לא נמצאה — הבית יציע בחירת תיקייה', () async {
+      writeAppMirror(stableTag: '1.0.0');
+      final c = OtzariaModuleController(
+        dataDir: tempDir.path,
+        runningLocator: const _NeverRunningLocator(),
+        manager: _NotDetectedManager(tempDir.path),
+      );
+      addTearDown(c.dispose);
+      await c.checkForUpdate();
+      expect(c.status, OtzariaModuleStatus.updateAvailable);
+
+      await c.install(useWizard: false);
+
+      expect(c.status, OtzariaModuleStatus.error);
+      expect(c.installNotDetected, isTrue);
+      expect(c.errorMessage, 'not detected');
+
+      // בדיקה חוזרת מוחקת את הסימן — שגיאה אחרת אינה מציעה את התיקייה.
+      await c.checkForUpdate();
+      expect(c.installNotDetected, isFalse);
+    });
 
     test('adoptInstallDir על תיקייה בלי אוצריא מחזיר false בלי לזרוק',
         () async {
@@ -557,10 +634,12 @@ void main() {
         if (!writeManagedInstall()) return;
         final t = controllerWith(launchFails: true);
 
-        await t.controller.launch();
+        final error = await t.controller.launch();
 
         expect(t.delivered, isEmpty);
         expect(t.controller.errorMessage, isNotNull);
+        expect(error, t.controller.errorMessage);
+        expect(error, 'הפעלה מדומה שנכשלה');
       },
       testOn: 'windows',
     );
@@ -840,7 +919,7 @@ class _RecordingLauncher extends OtzariaLauncher {
   @override
   Future<void> launch(String launchPath, {String? withUri}) async {
     uris.add(withUri);
-    if (fails) throw StateError('הפעלה מדומה שנכשלה');
+    if (fails) throw OtzariaUserError('הפעלה מדומה שנכשלה');
   }
 }
 
@@ -894,4 +973,19 @@ class _GatedLocator extends RunningOtzariaLocator {
     }
     return _probes[_handedOut++];
   }
+}
+
+/// מנהל שההתקנה שלו "הסתיימה" בלי שאוצריא נמצאה — בלי מתקין אמיתי.
+class _NotDetectedManager extends OtzariaManager {
+  _NotDetectedManager(String dataDir)
+      : super(dataDir: dataDir, runningLocator: const _NeverRunningLocator());
+
+  @override
+  Future<OtzariaInstallState> update(
+    OtzariaUpdateCheckResult check, {
+    bool useWizard = false,
+    void Function()? onSetupContinuesElsewhere,
+    bool Function()? isWaitCancelled,
+  }) async =>
+      throw OtzariaInstallNotDetected('not detected');
 }

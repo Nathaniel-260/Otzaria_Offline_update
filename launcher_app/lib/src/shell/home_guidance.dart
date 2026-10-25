@@ -213,6 +213,7 @@ class HomeGuidance {
     this.onlineProven = false,
     this.otherUpdates = const [],
     this.showOtzariaOpenBanner = false,
+    this.otzariaOpenBlocksUpdate = false,
     this.readOnly = false,
     this.driveFull = false,
   });
@@ -240,7 +241,12 @@ class HomeGuidance {
   /// ב-`upToDate`: מה שעוד מחכה, כדי שהגיבור לא יאמר "הכול מעודכן" לצד
   /// "עדכון זמין" בשורת המצב.
   final List<OtherUpdate> otherUpdates;
+
+  /// אוצריא פתוחה — נאמר בבית גם כשאין מה להתקין.
   final bool showOtzariaOpenBanner;
+
+  /// "עדכון כאן" יבקש לסגור אותה, ולכן בפס אין כפתור סגירה שמתחרה בו.
+  final bool otzariaOpenBlocksUpdate;
   final bool readOnly;
   final bool driveFull;
 
@@ -248,7 +254,8 @@ class HomeGuidance {
   String toString() => 'HomeGuidance($primary, $secondary, here: $hereItems, '
       'download: $downloadItems, attention: $attentionItem, '
       'unchecked: $uncheckedItems, proven: $onlineProven, '
-      'others: $otherUpdates, banner: $showOtzariaOpenBanner)';
+      'others: $otherUpdates, banner: $showOtzariaOpenBanner, '
+      'blocks: $otzariaOpenBlocksUpdate)';
 }
 
 /// סדר שלבי "עדכון כאן": התקנה ראשונה — תוכנה ואז ספרייה, בלי תוספים;
@@ -329,6 +336,9 @@ HomeGuidance deriveHomeGuidance(GuidanceFacts f) {
     List<OtherUpdate> others = const [],
   }) {
     final failed = primary == GuidancePrimary.checkFailed;
+    final open = f.otzariaRunning &&
+        f.otzariaInstalled &&
+        primary != GuidancePrimary.taskInProgress;
     return HomeGuidance(
       primary: primary,
       secondary: secondary,
@@ -344,8 +354,9 @@ HomeGuidance deriveHomeGuidance(GuidanceFacts f) {
           : const [],
       onlineProven: onlineProven,
       otherUpdates: others,
-      showOtzariaOpenBanner:
-          f.otzariaRunning && here.any((i) => i != GuidanceItem.plugins),
+      showOtzariaOpenBanner: open,
+      otzariaOpenBlocksUpdate:
+          open && here.any((i) => i != GuidanceItem.plugins),
       readOnly: f.readOnly,
       driveFull: f.driveFull,
     );

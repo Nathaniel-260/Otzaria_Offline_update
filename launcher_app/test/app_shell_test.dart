@@ -25,7 +25,7 @@ import 'package:launcher_app/src/screens/help/help_page.dart';
 import 'package:launcher_app/src/screens/home/home_page.dart';
 import 'package:launcher_app/src/screens/launcher/launcher_update_page.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
-import 'package:launcher_app/src/screens/otzaria_screen.dart';
+import 'package:launcher_app/src/screens/otzaria_advanced_page.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_detail_view.dart';
 import 'package:launcher_app/src/screens/plugins/plugins_screen.dart';
 import 'package:launcher_app/src/screens/reports_upload_section.dart';
@@ -218,7 +218,7 @@ void main() {
     // חנות התוספים היא היקרה מכולן (רשת כרטיסים עם תמונה לכל תוסף), וזו
     // בדיוק הסיבה שה-IndexedStack אינו בונה את כל ילדיו.
     expect(screen(PluginsScreen), findsNothing);
-    expect(screen(OtzariaScreen), findsNothing);
+    expect(screen(OtzariaAdvancedPage), findsNothing);
     expect(screen(LibraryScreen), findsNothing);
     expect(screen(SettingsScreen), findsNothing);
   });
@@ -346,6 +346,21 @@ void main() {
     expect(ticking(PluginsScreen), isFalse);
   });
 
+  testWidgets('"אוצריא — מתקדם": בחירת תיקייה מרעננת את התוספים', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    final s = sessionOf(tester);
+    await open(tester, ShellSection.otzaria);
+
+    final page =
+        tester.widget<OtzariaAdvancedPage>(screen(OtzariaAdvancedPage));
+    // תיקיית התוספים נגזרת מהתקנה שאומצה — אותה פונקציה של הקונטרולר.
+    expect(page.onInstallAdopted, s.plugins.refreshInstalled);
+    expect(page.otzaria, same(s.otzaria));
+    expect(page.saferMode, same(s.saferMode));
+  });
+
   testWidgets('כל חמשת המסכים נבנים אחרי ביקור בכולם', (tester) async {
     await pumpShell(tester);
 
@@ -360,7 +375,7 @@ void main() {
     }
 
     expect(screen(HomePage), findsOneWidget);
-    expect(screen(OtzariaScreen), findsOneWidget);
+    expect(screen(OtzariaAdvancedPage), findsOneWidget);
     expect(screen(LibraryScreen), findsOneWidget);
     expect(screen(PluginsScreen), findsOneWidget);
     expect(screen(SettingsScreen), findsOneWidget);
@@ -1117,6 +1132,101 @@ void main() {
         find.byKey(ShellKeys.taskElevation),
         Platform.isWindows ? findsOneWidget : findsNothing,
       );
+    });
+
+    testWidgets('מסך המשימה: התוכנה מובילה לבית, הספרייה והתוספים לדף שלהם',
+        (tester) async {
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      final nav = navigatorOf(tester);
+
+      // נפתח מדף הספרייה — "לבית" אינו רק סגירת השכבה שמעליו.
+      Future<void> finish(void Function() end) async {
+        await open(tester, ShellSection.plugins);
+        s.tasks.startUpdateHere(const [GuidanceItem.app]);
+        end();
+        await tester.pump();
+      }
+
+      await finish(() {
+        s.tasks
+          ..stageStopped(GuidanceItem.app, StageOutcome.stoppedWaiting)
+          ..updateDone();
+      });
+      expect(find.text(task.stoppedWaitingTitle), findsOneWidget);
+      await tester.tap(find.byKey(ShellKeys.taskPrimary));
+      await tester.pump();
+      expect(nav.stack, [const HomeRoute()]);
+
+      await finish(() {
+        s.tasks
+          ..stageStopped(GuidanceItem.app, StageOutcome.stillOpen)
+          ..updateCancelledByUser();
+      });
+      await tester.tap(find.byKey(ShellKeys.taskPrimary));
+      await tester.pump();
+      expect(nav.stack, [const HomeRoute()]);
+
+      await finish(
+        () => s.tasks.updateFailed(const UpdateFailure(GuidanceItem.app)),
+      );
+      expect(find.byKey(ShellKeys.taskSecondary), findsNothing);
+      await tester.tap(find.text(task.backHome));
+      await tester.pump();
+      expect(nav.stack, [const HomeRoute()]);
+
+      await finish(
+        () => s.tasks.updateFailed(const UpdateFailure(GuidanceItem.library)),
+      );
+      await tester.tap(find.byKey(ShellKeys.taskSecondary));
+      await tester.pump();
+      expect(nav.section, ShellSection.library);
+    });
+
+    // `checkNow` מריץ את `checkAll`, ושם גם התקנה אוטומטית בלי דיאלוג.
+    testWidgets('"בדוק שוב" בשגיאת התוכנה בודק את התוכנה בלבד', (tester) async {
+      await tester.runAsync(
+        () => settings.update(
+          const AppSettings(autoCheckUpdates: false, autoInstall: true),
+        ),
+      );
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      // הגיבור "בודק" כל עוד התוספים נטענים — כאן הם כבר נטענו.
+      // הבדיקה של העלייה קודם — אחרת "בדוק שוב" מצטרף אליה.
+      for (var i = 0; i < 100 && s.isCheckingNow; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump();
+      }
+      expect(s.isCheckingNow, isFalse);
+      final startupCheck = s.lastCheckedAt;
+      s.plugins.status = PluginsModuleStatus.ready;
+      s.otzaria
+        ..status = OtzariaModuleStatus.error
+        ..errorMessage = 'broken';
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      s.otzaria.notifyListeners();
+      await tester.pump();
+      expect(find.byKey(ShellKeys.heroAppError), findsOneWidget);
+
+      await tester.tap(find.byKey(ShellKeys.heroPrimary));
+      for (var i = 0;
+          i < 100 &&
+              (s.otzaria.status == OtzariaModuleStatus.error ||
+                  s.otzaria.status == OtzariaModuleStatus.checking);
+          i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump();
+      }
+      expect(s.otzaria.status, isNot(OtzariaModuleStatus.error));
+      // לא `checkNow`: הוא רושם "נבדק", ומריץ התקנה אוטומטית.
+      expect(s.lastCheckedAt, startupCheck);
+      expect(s.isCheckingNow, isFalse);
+      expect(s.otzaria.lastInstallResult, isNull);
     });
 
     testWidgets('השאלה על החיפוש החכם — "חזרה" סוגרת בלי להוריד',
@@ -2065,6 +2175,79 @@ void main() {
 
       expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
       expect(screen(SettingsScreen), findsOneWidget);
+    });
+
+    /// שני ערוצים בכונן — רק אז מוצגת בחירת הגרסה.
+    void offerChannels(AppSession s) {
+      s.otzaria
+        ..status = OtzariaModuleStatus.upToDate
+        ..currentVersion = '1.0.0'
+        ..latestVersion = '1.0.0'
+        ..stableVersion = '1.0.0'
+        ..prereleaseVersion = '1.1.0-beta'
+        ..hasChannelChoice = true;
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      s.otzaria.notifyListeners();
+    }
+
+    testWidgets('"אוצריא — מתקדם" אינו נעול, אבל שינוי הגרסה מבקש סיסמה', (
+      tester,
+    ) async {
+      await lockSettings(tester);
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      final nav = navigatorOf(tester);
+      offerChannels(s);
+      await tester.pump();
+
+      await open(tester, ShellSection.otzaria);
+      await tester.pump();
+      expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
+      expect(nav.stack, [
+        const HomeRoute(),
+        const SectionRoute(ShellSection.otzaria),
+      ]);
+      expect(find.byKey(ShellKeys.appAdvanced), findsOneWidget);
+      expect(find.text(stringsOf().pages.appAdvancedPageTitle), findsWidgets);
+
+      await tester.tap(find.text(stringsOf().appScreen.channelPrerelease));
+      await tester.pump();
+      expect(find.text(stringsOf().saferMode.verifyTitle), findsOneWidget);
+      await tester.tap(find.text(stringsOf().common.cancel));
+      await tester.pump();
+      expect(settings.settings.preferAppPrerelease, isFalse);
+      expect(s.saferMode.isLocked, isTrue);
+      expect(screen(SettingsScreen), findsNothing);
+    });
+
+    testWidgets('הקישור מההגדרות פותח את המתקדם מעל הבית, ו"חזרה" מובילה לבית',
+        (tester) async {
+      await lockSettings(tester);
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      final nav = navigatorOf(tester);
+
+      await open(tester, ShellSection.settings);
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), '1234');
+      await tester.tap(find.text(stringsOf().saferMode.enterButton));
+      await tester.pump();
+      expect(nav.section, ShellSection.settings);
+
+      final link = find.byKey(const ValueKey('settings.otzariaAdvanced'));
+      await tester.ensureVisible(link);
+      await tester.tap(link);
+      await tester.pump();
+      // לא "בית ← הגדרות ← מתקדם": "חזרה" הייתה נוחתת בהגדרות בלי שער.
+      expect(nav.stack, [
+        const HomeRoute(),
+        const SectionRoute(ShellSection.otzaria),
+      ]);
+
+      s.saferMode.lock();
+      await back(tester);
+      expect(nav.stack, [const HomeRoute()]);
+      expect(find.text(stringsOf().saferMode.verifyTitle), findsNothing);
     });
 
     testWidgets('העזרה אינה נעולה — רק העריכה שבה', (tester) async {

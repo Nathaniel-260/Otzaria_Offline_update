@@ -148,6 +148,22 @@ void main() {
       expect(asked, [ShellSection.library, ShellSection.plugins]);
     });
 
+    test('"אוצריא — מתקדם" אינו נעול, גם כשנכנסים אליו מההגדרות', () async {
+      final settings = gated.select(ShellSection.settings);
+      answer.complete(true);
+      expect(await settings, isTrue);
+
+      // הקישור שבהגדרות בוחר מקטע — "חזרה" מובילה לבית, לא להגדרות.
+      expect(await gated.select(ShellSection.otzaria), isTrue);
+      expect(gated.stack, [
+        const HomeRoute(),
+        const SectionRoute(ShellSection.otzaria),
+      ]);
+      expect(asked, [ShellSection.settings, ShellSection.otzaria]);
+      gated.back();
+      expect(gated.stack, [const HomeRoute()]);
+    });
+
     test('ההגדרות ממתינות לשער, ודחייה משאירה במקום', () async {
       final entered = gated.select(ShellSection.settings);
       expect(gated.section, ShellSection.home);
@@ -193,6 +209,7 @@ void main() {
     });
   });
 
+  // `SectionRoute` דורש מקטע: "otzaria" הוא עכשיו "אוצריא — מתקדם".
   test('לכל אריח בבית יש מקטע, והבית הוא הראשון', () {
     expect(ShellSection.values.first, ShellSection.home);
     expect(

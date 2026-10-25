@@ -327,20 +327,19 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
 
 **UI in `launcher_app` follows the design language of Otzaria's Download
 Assistant.** One fixed light theme (`AppThemeData.light()`: seed `#2C1B02`,
-`Segoe UI`, radius 8, no shadows); there is no dark mode and no colour choice,
-and the old `ui.themeMode`/`ui.seedColor` keys are dropped on the next save. The
+`Segoe UI`, radius 8, no shadows); there is no dark mode and no colour choice, and
+the old `ui.themeMode`/`ui.seedColor` keys are dropped on the next save. The
 `ColorScheme` roles plus the `AppPalette` theme extension carry every colour
 (hex-checked against the mockup in `test/theme_test.dart`),
-`AppTokens`/`AppTextStyles` every size. Window size and placement are the
-runner's job and navigation is in-body (both §5.9). Use the shared components
-(`ActionButton` with its sizes,
-`SettingsCard`/`SettingsActionTile`, `AppCard`/`RowsCard`/`AppRow`, `UiSnack`, the
-`show*Dialog` helpers, `AppSegmentedControl`, `StatusChip`, `IconTile`,
-`SectionLabel`, `AdvancedSection`, `OptionCard`, `FormCheckRow`, `ResultBadge`,
-`AppProgressBar`, `TaskFrame`/`StageRow`, `SubPageHeader`, `EmptyState`, `NoticeBanner`, `PathText`,
-`RtlIcon`, `RtlTextField`) instead of raw Material widgets, and keep alpha/hover
-overrides inside `lib/src/theme/`. The full rule table is in
-`launcher_app/README.md`.
+`AppTokens`/`AppTextStyles` every size. Window size and placement are the runner's
+job and navigation is in-body (both §5.9). Use the shared components (`ActionButton`
+with its sizes, `SettingsCard`/`SettingsActionTile`, `AppCard`/`RowsCard`/`AppRow`,
+`UiSnack`, the `show*Dialog` helpers, `AppSegmentedControl`, `StatusChip`,
+`IconTile`, `SectionLabel`, `AdvancedSection`, `OptionCard`, `FormCheckRow`,
+`ResultBadge`, `AppProgressBar`, `TaskFrame`/`StageRow`, `SubPageHeader`,
+`EmptyState`, `NoticeBanner`, `PathText`, `RtlIcon`, `RtlTextField`) instead of raw
+Material widgets, and keep alpha/hover overrides inside `lib/src/theme/`. The full
+rule table is in `launcher_app/README.md`.
 
 **All user-visible text lives in `otzaria_l10n`, never inline.** The launcher ships
 in Hebrew and English, defaulting to the system language
@@ -642,20 +641,20 @@ suppressed: a failed DB download is finished by downloading again.
 one kept the home offering a download that brought nothing, on every launch.
 `AppSettings.semanticDownload` (Settings, or "don't show again" under the question —
 hidden while safer mode is locked) → `semanticPreference`. In "ask" it is only
-`onlineSemanticOffer`, whose click passes `forceSemantic` (no question); the question
-comes only beside a real download. "Never" skips the peek, and a skipped peek is
-`semanticChecked = false` — unchecked, never "up to date".
+`onlineSemanticOffer`, whose click passes `forceSemantic` (no question); the
+question comes only beside a real download. "Never" skips the peek, and a skipped
+peek is `semanticChecked = false` — unchecked, never "up to date".
 
 **The download runs as a task screen, and its wording must match the undo.**
 `ShellTasks` (`shell/shell_tasks.dart`) is the host's UI side: the smart-search
-question (`confirmSemanticSearch` returns `null` for "back" — nothing is captured, saved or
-downloaded), progress, "cancelled", "drive is ready" and an in-window failure
-(`classifyDownloadFailure`: network/filter/Shabbat/no space are calm, the rest red;
-a rejected certificate is "filter", not "no internet" — retry alone will not help, and
-the no-space message is matched against every language's template). A
+question (`confirmSemanticSearch` returns `null` for "back" — nothing is captured,
+saved or downloaded), progress, "cancelled", "drive is ready" and an in-window
+failure (`classifyDownloadFailure`: network/filter/Shabbat/no space are calm, the
+rest red; a rejected certificate is "filter", not "no internet" — retry alone will
+not help, and the no-space message is matched against every language's template). A
 cancel keeps the components that finished, so the screen names them
-(`DownloadTask.kept`) or, when none did, says "the drive is as before".
-Ctrl+R/F5 and report offers also check `tasks.isRunning`; do **not** fold it into
+(`DownloadTask.kept`) or, when none did, says "the drive is as before". Ctrl+R/F5
+and report offers also check `tasks.isRunning`; do **not** fold it into
 `longTaskRunning` — the download's own `isBlocked` reads that and would stop itself.
 
 **Cancelling a download reverts only the component in progress.** "Cancel" (behind
@@ -1188,15 +1187,16 @@ stable, plus the latest pre-release *only when it is newer than that stable*
 (`OtzariaReleaseClient.fetchChannelReleases`). Both installers travel on the drive
 and the offline machine picks (`AppSettings.preferAppPrerelease` →
 `OtzariaManager.preferPrerelease`) with no network. Do **not** turn this back into a
-single-release download. Two consequences to preserve: a pre-release *older* than the
-newest stable is never mirrored (no real choice, wasted space — so `OtzariaScreen`
-shows the choice only when `hasChannelChoice`), and when the first page of 50
-releases holds no plain release at all, only the pre-release is downloaded: a stable
-already on the drive is **kept** (a stable cannot vanish by promotion, it only fell off
-the page), and with none the pre-release is offered **labelled** as such (replacing the
-old `NoStableReleaseException`). "Newer than the stable" is decided by list order
-online; a pre-release entry written by `sync` records the stable it was listed above
-(`newerThanStable`), and `load` trusts that instead of re-judging by publish date.
+single-release download. Two consequences to preserve: a pre-release *older* than
+the newest stable is never mirrored (no real choice, wasted space — so
+`OtzariaAdvancedPage` shows the choice only when `hasChannelChoice`), and when the
+first page of 50 releases holds no plain release at all, only the pre-release is
+downloaded: a stable already on the drive is **kept** (a stable cannot vanish by
+promotion, it only fell off the page), and with none the pre-release is offered
+**labelled** as such (replacing the old `NoStableReleaseException`). "Newer than the
+stable" is decided by list order online; a pre-release entry written by `sync`
+records the stable it was listed above (`newerThanStable`), and `load` trusts that
+instead of re-judging by publish date.
 
 **Version strings need normalizing before comparison.** An installed build reports
 `0.9.96` while the tag is `0.9.96+736`; `OtzariaUpdateCheckResult` strips a leading
@@ -1346,8 +1346,9 @@ decision belongs.
 **Cancelling the wizard is not a failure.** `OtzariaInstallCancelled` (Inno exit 2/5,
 plus 1223 = UAC refused) and `OtzariaWizardStillOpen` (the process returned before the
 install is on disk — routine when Inno elevates and hands off to an elevated child)
-surface as `OtzariaModuleController.noticeMessage` (and `lastInstallResult`): a plain
-snackbar on the app page, a calm "did not finish" task screen from "update here".
+surface as `OtzariaModuleController.lastInstallNotice` (and `lastInstallResult`):
+a quiet note in the home hero (`HomeViewModel.appSetupNotice`), a calm "did not
+finish" task screen from "update here".
 Never route them through `errorMessage`: painting the user's own choice red makes
 people think the program broke.
 
@@ -2094,37 +2095,36 @@ each built section is wrapped in `TickerMode(enabled: section == current)`; othe
 hidden section's spinner keeps requesting frames for the whole operation.
 
 **The safer-mode gate is the navigator's, for every route that puts Settings on the
-stack.** `ShellNavigator.canEnter` (`AppShell._canEnter`) asks the password before
-Settings, `CustomAppsManageRoute` and `FaqEditRoute` (help over Settings, so "back"
-lands there; it passes the Settings gate first). A gate inside `SettingsScreen` stayed
-open for good, because the built screen never leaves the `IndexedStack`. Help itself
-is open; only its edit mode asks. Settings are grouped (General, Other programs,
-Privacy and reports, a collapsed Advanced, About); the app channel lives only on the
-Otzaria page. Details: `launcher_app/README.md`.
+stack.** `ShellNavigator.canEnter` (`AppShell._canEnter`) asks before Settings,
+`CustomAppsManageRoute` and `FaqEditRoute` (help over Settings, so "back" lands
+there). A gate inside `SettingsScreen` stayed open for good: the built screen never
+leaves the `IndexedStack`. Help is open, but not its edit mode; so is "Otzaria —
+advanced" (`OtzariaAdvancedPage`: reinstall and install folder act on this machine),
+but not its channel change (`_setChannel`). Its tile and Settings link both `select`
+it, never stacking it on Settings. Details: `launcher_app/README.md`.
 
 **No dialog at startup except the crash prompt.** What used to pop up on launch is a
-row on the home page: the reports explainer, unmigrated legacy report queues, the
-skipped auto-install, new plugins, plugin updates, pending custom apps (marked seen only
-while their page is shown — `TickerMode`), a newer launcher ("עדכון זמין" at the start of the status bar, also for a
-version that is only on the drive), "restart
-as administrator" (dismissable once per run, also on the welcome screen), and reports
-waiting in Otzaria (a count on the reports tile; locked on a read-only drive). The crash
-prompt alone stays a `DialogQueue` dialog. Other dialogs answer a click the user just
-made: confirming the launcher install, cancelling a download or closing during a task
-(warnings), consents, reset, trust, passwords, the custom-app form and the report form.
-"Check now" sits at the end of the status bar pinned to the bottom of the home
-page (`AppSession.checkNow`: `checkAll`, then `checkOnline`; on a read-only
-drive `checkAll` only), after "checked at" — the last successful online check,
-on a connected machine only. The hero repeats nothing the status bar shows, and
-nothing the home shows on an offline machine says "internet" (maintainer
-decision): "not connected", "the connected computer". `checkAll` includes
-`_autoInstallIfEnabled`, so with auto-install on, "check now" can start an
-install without a dialog. The link, the hero's "check again" and the action
-share one block (`checkNowBlocked` = `longTaskRunning`), and the startup check
-counts as a running check (`isCheckingNow`). Ctrl+R/F5 stay local-only.
-Collecting reports has no dialog: the reports page shows the full disclosure
-(what is copied, unencrypted on the drive, who receives it) above "Collect to
-the drive", so the click is the consent.
+row on the home page: the reports explainer, legacy report queues, the skipped
+auto-install, new plugins and updates, pending custom apps (marked seen only while
+their page is shown — `TickerMode`), a newer launcher ("עדכון זמין" in the status
+bar, also when only on the drive), "restart as administrator" and reports in
+Otzaria. Only the crash prompt stays a `DialogQueue` dialog; other dialogs answer a
+click just made. Collecting reports has none: the disclosure sits above "Collect to
+the drive".
+
+**"Check now" is `checkAll` then `checkOnline`, and `checkAll` can install.** With
+auto-install on, `_autoInstallIfEnabled` starts an install without a dialog — so the
+hero's retry for an app error calls `otzaria.checkForUpdate` only. The status-bar
+link, the hero's "check again" and the action share one block (`checkNowBlocked` =
+`longTaskRunning`), the startup check counts as running (`isCheckingNow`), a
+read-only drive runs `checkAll` only, and Ctrl+R/F5 stay local-only
+(`AppSession.checkNow`).
+
+**Nothing the home shows on an offline machine says "internet".** Not connected is
+the normal case (§1), so it reads "not connected" / "the connected computer", and
+text shown on both machines is worded for both (maintainer decision). The hero
+repeats nothing the status bar shows; "checked at" there is the last successful
+online check, on a connected machine only.
 
 **Store images must pass `cacheWidth`.** Without it Flutter decodes at source
 resolution; a 1200×800 catalogue image is ~3.8MB of RAM, times every plugin. See

@@ -38,7 +38,7 @@ class UpdateHereActions {
   final VoidCallback onHome;
   final VoidCallback onRetry;
 
-  /// "לדף הספרייה" / "לדף התוכנה" במסך הכשל.
+  /// "לדף הספרייה" / "לדף התוספים" במסך הכשל. לתוכנה אין דף — הבית.
   final ValueChanged<GuidanceItem> onOpenPage;
 
   /// `null` — אין בקשת אינדוקס שממתינה.
@@ -504,16 +504,11 @@ class UpdateHereTaskView extends StatelessWidget {
           ? [
               ActionButton.recommended(
                 key: ShellKeys.taskPrimary,
-                text: t.toAppPage,
+                text: t.backHome,
                 size: ActionButtonSize.lg,
                 autofocus: true,
                 expand: true,
                 onPressed: () => actions.onOpenPage(GuidanceItem.app),
-              ),
-              ActionButton.ghost(
-                text: t.backHome,
-                expand: true,
-                onPressed: actions.onHome,
               ),
             ]
           : [
@@ -594,8 +589,8 @@ class UpdateHereTaskView extends StatelessWidget {
     final appOutcome = task.outcomes[GuidanceItem.app];
     final libraryDone =
         task.outcomes[GuidanceItem.library] == StageOutcome.done;
-    // לא ידוע אם ההתקנה הסתיימה — הבדיקה בדף התוכנה, לא "נסה שוב" שיפתח
-    // אשף נוסף מעל הפתוח.
+    // לא ידוע אם ההתקנה הסתיימה — הבדיקה בבית, לא "נסה שוב" שיפתח אשף נוסף
+    // מעל הפתוח.
     final unknown = wizard &&
         (appOutcome == StageOutcome.stoppedWaiting ||
             appOutcome == StageOutcome.stillOpen);
@@ -634,13 +629,13 @@ class UpdateHereTaskView extends StatelessWidget {
         if (unknown)
           ActionButton.recommended(
             key: ShellKeys.taskPrimary,
-            text: t.toAppPage,
+            text: t.backHome,
             size: ActionButtonSize.lg,
             autofocus: true,
             expand: true,
             onPressed: () => actions.onOpenPage(GuidanceItem.app),
           )
-        else
+        else ...[
           ActionButton.recommended(
             key: ShellKeys.taskPrimary,
             text: context.strings.common.retry,
@@ -650,11 +645,12 @@ class UpdateHereTaskView extends StatelessWidget {
             expand: true,
             onPressed: actions.onRetry,
           ),
-        ActionButton.ghost(
-          text: t.backHome,
-          expand: true,
-          onPressed: actions.onHome,
-        ),
+          ActionButton.ghost(
+            text: t.backHome,
+            expand: true,
+            onPressed: actions.onHome,
+          ),
+        ],
       ],
     );
   }
@@ -665,10 +661,12 @@ class UpdateHereTaskView extends StatelessWidget {
     final library = failure.stage == GuidanceItem.library;
     final elevate = actions.onRestartElevated;
     final message = splitFailureMessage(failure.message);
+    final app = failure.stage == GuidanceItem.app;
     final home = ActionButton.ghost(
       text: t.backHome,
       expand: true,
-      onPressed: actions.onHome,
+      onPressed:
+          app ? () => actions.onOpenPage(GuidanceItem.app) : actions.onHome,
     );
     if (elevate != null) {
       final raw = failure.message?.trim();
@@ -747,16 +745,13 @@ class UpdateHereTaskView extends StatelessWidget {
           expand: true,
           onPressed: actions.onRetry,
         ),
-        ActionButton.neutral(
-          key: ShellKeys.taskSecondary,
-          text: switch (failure.stage) {
-            GuidanceItem.library => t.toLibraryPage,
-            GuidanceItem.app => t.toAppPage,
-            GuidanceItem.plugins => t.toPluginsPage,
-          },
-          expand: true,
-          onPressed: () => actions.onOpenPage(failure.stage),
-        ),
+        if (!app)
+          ActionButton.neutral(
+            key: ShellKeys.taskSecondary,
+            text: library ? t.toLibraryPage : t.toPluginsPage,
+            expand: true,
+            onPressed: () => actions.onOpenPage(failure.stage),
+          ),
         home,
       ],
     );
