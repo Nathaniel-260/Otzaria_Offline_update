@@ -4,7 +4,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 
 import '../../controllers/download_plan.dart'
-    show LibrarySizeProbe, MirrorComponent;
+    show LibrarySizeProbe, MirrorComponent, SemanticSearchAnswer;
 import '../../services/byte_size.dart';
 import '../../shell/shell_keys.dart';
 import '../../shell/shell_tasks.dart';
@@ -60,7 +60,7 @@ class DownloadTaskActions {
   });
 
   /// התשובה לשאלת החיפוש החכם; `null` = חזרה.
-  final ValueChanged<bool?> onAnswer;
+  final ValueChanged<SemanticSearchAnswer?> onAnswer;
   final VoidCallback onCancel;
 
   /// "ביטול" ב"מתכונן להורדה" — הבדיקה ברשת יכולה להימשך.
@@ -82,6 +82,7 @@ class DownloadTaskView extends StatelessWidget {
     required this.actions,
     this.cancelling = false,
     this.done = const DownloadDoneInfo(),
+    this.canRemember = false,
     this.clock,
   });
 
@@ -92,12 +93,16 @@ class DownloadTaskView extends StatelessWidget {
   final bool cancelling;
   final DownloadDoneInfo done;
 
+  /// "אל תציג שוב" כותב להגדרות, ולכן אינו מוצג כשהן נעולות בסיסמה.
+  final bool canRemember;
+
   /// לבדיקות של מד המהירות.
   final DateTime Function()? clock;
 
   @override
   Widget build(BuildContext context) => switch (task.phase) {
-        DownloadTaskPhase.question => _SemanticQuestion(actions: actions),
+        DownloadTaskPhase.question =>
+          _SemanticQuestion(actions: actions, canRemember: canRemember),
         DownloadTaskPhase.preparing =>
           _Preparing(onCancel: actions.onCancelPreparing),
         DownloadTaskPhase.running => _DownloadProgress(
@@ -399,9 +404,10 @@ IconTile componentTile(
         : IconTile(icon: componentIcon(c), size: size, tone: tone);
 
 class _SemanticQuestion extends StatefulWidget {
-  const _SemanticQuestion({required this.actions});
+  const _SemanticQuestion({required this.actions, required this.canRemember});
 
   final DownloadTaskActions actions;
+  final bool canRemember;
 
   @override
   State<_SemanticQuestion> createState() => _SemanticQuestionState();
@@ -410,6 +416,7 @@ class _SemanticQuestion extends StatefulWidget {
 class _SemanticQuestionState extends State<_SemanticQuestion> {
   /// המומלץ מסומן מראש: בלי חיפוש חכם.
   bool _semantic = false;
+  bool _remember = false;
 
   @override
   Widget build(BuildContext context) {
@@ -423,7 +430,10 @@ class _SemanticQuestionState extends State<_SemanticQuestion> {
         key: ShellKeys.taskPrimary,
         text: t.startDownload,
         autofocus: true,
-        onPressed: () => widget.actions.onAnswer(_semantic),
+        onPressed: () => widget.actions.onAnswer((
+          download: _semantic,
+          remember: widget.canRemember && _remember,
+        )),
       ),
       child: Column(
         children: [
@@ -445,6 +455,16 @@ class _SemanticQuestionState extends State<_SemanticQuestion> {
             selected: _semantic,
             onSelected: () => setState(() => _semantic = true),
           ),
+          if (widget.canRemember) ...[
+            const SizedBox(height: 16),
+            FormCheckRow(
+              key: ShellKeys.taskSemanticRemember,
+              label: t.semanticRemember,
+              help: t.semanticRememberBody,
+              value: _remember,
+              onChanged: (v) => setState(() => _remember = v),
+            ),
+          ],
         ],
       ),
     );

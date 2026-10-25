@@ -60,6 +60,9 @@ class StaleOnlineChecks {
 
 enum MirrorComponent { app, library, plugins }
 
+/// התשובה לשאלת החיפוש החכם; [remember] — "אל תציג שוב" סומן.
+typedef SemanticSearchAnswer = ({bool download, bool remember});
+
 /// כמה הספרייה תוריד, לפי בדיקה שרצה לפני שהיא מתחילה לרדת.
 class LibrarySizeProbe {
   const LibrarySizeProbe.checking()

@@ -36,6 +36,91 @@ void main() {
   ActionButton primary(WidgetTester tester) =>
       tester.widget<ActionButton>(find.byKey(ShellKeys.heroPrimary));
 
+  group('חיפוש חכם, קבצים שלא ירדו ובדיקה מחודשת', () {
+    testWidgets('השורה המשנית מורידה, "נסה שוב" מנסה שוב — בלי "יש חדש"',
+        (tester) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('semanticOffer'),
+          actions: HomeActions(
+            onDownload: () => calls.add('download'),
+            onDownloadSemantic: () => calls.add('semantic'),
+            onRetryFailedDownloads: () => calls.add('retry'),
+          ),
+        ),
+      );
+      expect(inHero(find.text(g.upToDateTitle)), findsOneWidget);
+      expect(find.text(g.semanticOfferNote), findsOneWidget);
+      expect(
+        find.text(g.failedDownloadsNote('תלמוד בבלי')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.descendant(
+        of: find.byKey(ShellKeys.heroSemanticOffer),
+        matching: find.text(g.semanticOfferLink),
+      ));
+      await tester.tap(find.descendant(
+        of: find.byKey(ShellKeys.heroFailedDownloads),
+        matching: find.text(he.common.retry),
+      ));
+      expect(calls, ['semantic', 'retry']);
+    });
+
+    testWidgets('בלי הצעה — בלי שורה', (tester) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('uptodate')));
+      expect(find.byKey(ShellKeys.heroSemanticOffer), findsNothing);
+      expect(find.byKey(ShellKeys.heroFailedDownloads), findsNothing);
+    });
+
+    testWidgets('"בדקתי שוב — אין חדש" במקום "הכול מעודכן"', (tester) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('recheckNothing')));
+      expect(inHero(find.text(g.recheckNothingTitle)), findsOneWidget);
+      // השעה של הבדיקה שרצה, ובלי טענה על "מאז הבדיקה הקודמת".
+      expect(find.text(g.recheckNothingBody('23:14')), findsOneWidget);
+      expect(find.text(g.upToDateTitle), findsNothing);
+    });
+
+    test('latestOnlineCheck — רק בדיקות שהצליחו, המאוחרת מהן', () {
+      final early = DateTime(2026, 10, 25, 9);
+      final late = DateTime(2026, 10, 25, 11);
+      expect(latestOnlineCheck(const []), isNull);
+      expect(latestOnlineCheck([(late, 'offline'), (early, null)]), early);
+      expect(
+          latestOnlineCheck([(early, null), (null, null), (late, null)]), late);
+      expect(latestOnlineCheck([(late, 'offline')]), isNull);
+    });
+
+    testWidgets('בלי בדיקה חדשה — "אין חדש" לפי הבדיקה הקודמת ושעתה',
+        (tester) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('nothingNew')));
+      expect(inHero(find.text(g.nothingNewTitle)), findsOneWidget);
+      expect(find.text(g.nothingNewBody('23:14')), findsOneWidget);
+      expect(find.text(g.upToDateTitle), findsNothing);
+      expect(find.text(g.recheckNothingTitle), findsNothing);
+    });
+
+    for (final name in ['nothingNewAttention', 'nothingNewWelcome']) {
+      testWidgets('$name: "אין חדש" נאמר גם כאן', (tester) async {
+        await pumpScreen(tester, HomePage(model: homeScenario(name)));
+        expect(find.byKey(ShellKeys.heroFoundNothing), findsOneWidget);
+        expect(find.text(g.nothingNewNote('23:14')), findsOneWidget);
+      });
+    }
+
+    testWidgets('יש מה להתקין כאן — "בדקתי שוב" כהערה', (tester) async {
+      await pumpScreen(
+        tester,
+        HomePage(model: homeScenario('recheckNothingHere')),
+      );
+      expect(inHero(find.text(g.updateHereTitle)), findsOneWidget);
+      expect(find.text(g.recheckNothingNote('23:14')), findsOneWidget);
+      expect(find.byKey(ShellKeys.heroFailedDownloads), findsOneWidget);
+    });
+  });
+
   group('מצבי המוקאפ', () {
     final expectations = <String, ({String title, String? button})>{
       'offline': (title: g.updateHereTitle, button: g.updateHereButton),

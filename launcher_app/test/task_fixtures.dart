@@ -281,17 +281,26 @@ final Map<String, UpdateHereTask> updateScenarios = {
 };
 
 /// מסך משימה בודד מהמצבים שלמעלה, עם פעולות שנרשמות ב-[calls].
-Widget taskScenario(String name, {List<String>? calls}) {
+Widget taskScenario(
+  String name, {
+  List<String>? calls,
+  bool canRemember = true,
+}) {
   void call(String what) => calls?.add(what);
   final download = downloadScenarios[name];
   if (download != null) {
     return DownloadTaskView(
       task: download,
+      canRemember: canRemember,
       progress: ValueNotifier(0),
       snapshot: () => downloadProgressSnapshot,
       done: downloadDoneInfo,
       actions: DownloadTaskActions(
-        onAnswer: (v) => call('answer $v'),
+        onAnswer: (v) => call(
+          v == null
+              ? 'answer null'
+              : 'answer ${v.download} remember=${v.remember}',
+        ),
         onCancel: () => call('cancel'),
         onRetry: () => call('retry'),
         onHome: () => call('home'),

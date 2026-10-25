@@ -39,7 +39,7 @@ void main() {
       expect(cards.first.title, t.semanticNoTitle);
 
       await tester.tap(find.byKey(ShellKeys.taskPrimary));
-      expect(calls, ['answer false']);
+      expect(calls, ['answer false remember=false']);
     });
 
     testWidgets('בחירה ב"כן" עונה "כן", ו"חזרה" מבטלת בלי להוריד',
@@ -49,7 +49,31 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(ShellKeys.taskPrimary));
       await tester.tap(find.text(t.back));
-      expect(calls, ['answer true', 'answer null']);
+      expect(calls, ['answer true remember=false', 'answer null']);
+    });
+
+    testWidgets('"אל תציג שוב" נמסר עם התשובה; "חזרה" אינה זוכרת דבר',
+        (tester) async {
+      await show(tester, 'semantic');
+      expect(find.text(t.semanticRemember), findsOneWidget);
+      await tester.tap(find.text(t.semanticRemember));
+      await tester.pump();
+      await tester.tap(find.text(t.back));
+      await tester.tap(find.text(t.semanticYesTitle));
+      await tester.pump();
+      await tester.tap(find.byKey(ShellKeys.taskPrimary));
+      expect(calls, ['answer null', 'answer true remember=true']);
+    });
+
+    testWidgets('הגדרות נעולות בסיסמה — בלי "אל תציג שוב"', (tester) async {
+      await pumpScreen(
+        tester,
+        taskScenario('semantic', calls: calls, canRemember: false),
+        size: const Size(1000, 1400),
+      );
+      expect(find.byKey(ShellKeys.taskSemanticRemember), findsNothing);
+      await tester.tap(find.byKey(ShellKeys.taskPrimary));
+      expect(calls, ['answer false remember=false']);
     });
   });
 

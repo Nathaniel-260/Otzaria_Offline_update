@@ -573,6 +573,36 @@ void main() {
     expect(find.text(t.changesTitle), findsNothing);
   });
 
+  testWidgets('חיפוש חכם ב"לשאול" — שורה משלו, לא ערך ריק ב"זמין להורדה"',
+      (tester) async {
+    final t = stringsOf().pages;
+    library
+      ..status = LibraryModuleStatus.upToDate
+      ..onlineCheckedAt = DateTime.now()
+      ..onlineLatestVersion = 30
+      ..targetVersion = 30
+      ..onlineSemanticPending = true
+      ..semanticChecked = true;
+    Widget screen({required bool offer}) => LibraryScreen(
+          library: library,
+          otzariaIsRunning: false,
+          onCloseOtzaria: () async => true,
+          isDownloading: false,
+          onProcessStateChanged: () async => false,
+          onRequestReindex: () async {},
+          onGoToSettings: () {},
+          semanticOffer: offer,
+        );
+
+    await pumpScreen(tester, screen(offer: true));
+    expect(find.text(t.nothingNewOnline), findsOneWidget);
+    expect(find.text(t.libSemanticSection), findsWidgets);
+    expect(find.text(t.onlineAvailable), findsNWidgets(2));
+
+    await pumpScreen(tester, screen(offer: false));
+    expect(find.text(t.onlineAvailable), findsOneWidget);
+  });
+
   // המחשב המקוון בעדכון אישי: הסבר במקום ההודעה האדומה, ושתי הדרכים החוצה.
   testWidgets('מראה שנבנתה למחשב אחר מוסברת, בלי שורת שגיאה', (tester) async {
     final t = stringsOf().libraryScreen;
@@ -1202,6 +1232,42 @@ void main() {
       tester.element(find.text(en.settings.groupGeneral)),
     );
     expect(direction, TextDirection.ltr);
+  });
+
+  testWidgets('חיפוש חכם בהורדה: שלוש אפשרויות מתחת ליעדים, ונשמר',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      SettingsScreen(
+        controller: settings,
+        onOpenLog: () {},
+        launcherVersion: launcherVersion,
+      ),
+    );
+    final t = stringsOf().settings;
+    final row = find.byKey(const ValueKey('settings.semanticDownload'));
+    expect(row, findsOneWidget);
+    expect(
+      tester.getTopLeft(row).dy,
+      greaterThan(
+        tester
+            .getTopLeft(find.byKey(const ValueKey('settings.syncTargets')))
+            .dy,
+      ),
+    );
+    expect(
+      settings.settings.semanticDownload,
+      SemanticDownloadPreference.ask,
+    );
+    for (final (label, value) in [
+      (t.semanticDownloadAlways, SemanticDownloadPreference.always),
+      (t.semanticDownloadNever, SemanticDownloadPreference.never),
+      (t.semanticDownloadAsk, SemanticDownloadPreference.ask),
+    ]) {
+      await tester.tap(find.text(label));
+      await tester.pump();
+      expect(settings.settings.semanticDownload, value);
+    }
   });
 
   testWidgets('בחירת שפה נשמרת בהגדרות ומחליפה את המלל', (tester) async {

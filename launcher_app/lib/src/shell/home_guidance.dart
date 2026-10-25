@@ -42,6 +42,15 @@ enum GuidancePrimary {
   taskInProgress,
 }
 
+/// "הורדה" שלא מצאה מה להביא — מה הבית אומר במקום מסך משימה.
+enum FoundNothing {
+  /// בדיקה ברשת רצה ממש לפני ההחלטה.
+  rechecked,
+
+  /// הבדיקות היו טריות, וההחלטה נשענה עליהן.
+  earlierCheck,
+}
+
 enum GuidanceSecondary {
   none,
   updateHereToo,

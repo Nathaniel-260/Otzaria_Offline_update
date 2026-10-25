@@ -1,12 +1,15 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:launcher_app/src/controllers/download_plan.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/controllers/shell_module_ports.dart';
 import 'package:launcher_app/src/flows/update_here_flow.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
+import 'package:launcher_app/src/settings/app_settings.dart';
+import 'package:library_manager/library_manager.dart' show CompanionAsset;
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:plugins_manager/plugins_manager.dart';
@@ -95,6 +98,7 @@ void main() {
   test('the library proof ignores the smart-search answers', () {
     final port = LibraryModulePort(library);
     library
+      ..semanticPreference = SemanticDownloadPreference.always
       ..onlineCheckedAt = DateTime.now()
       ..onlineCheckError = null
       ..onlineCompanionsCheckError = null
@@ -108,6 +112,44 @@ void main() {
     library.onlineCompanionsCheckError = 'companions offline';
     expect(port.libraryOnlineProof.error, 'companions offline');
     expect(port.libraryOnlineProof.provenUpToDate, isFalse);
+  });
+
+  test('a companion that failed is hidden from the home, not proven', () {
+    final port = LibraryModulePort(library);
+    library
+      ..onlineCheckedAt = DateTime.now()
+      ..onlinePendingCompanions = {CompanionAsset.talmud}
+      ..failedCompanions = {CompanionAsset.talmud};
+
+    expect(library.hasOnlineUpdate, isFalse);
+    expect(port.libraryOnlineProof.provenUpToDate, isFalse);
+  });
+
+  test('"never" then "always" within the check age still downloads', () {
+    final port = LibraryModulePort(library);
+    library
+      ..semanticPreference = SemanticDownloadPreference.never
+      ..onlineCheckedAt = DateTime.now()
+      ..semanticChecked = false;
+    expect(port.libraryOnlineProof.provenUpToDate, isTrue);
+
+    library.semanticPreference = SemanticDownloadPreference.always;
+    expect(port.shouldOfferSemanticDownload, isTrue);
+
+    // גם אחרי שחזור התשובות (ביטול הורדה) ה"לא נבדק" נשמר — והספרייה רצה.
+    final answers = library.onlineAnswers;
+    library.semanticChecked = true;
+    library.restoreOnlineAnswers(answers);
+    expect(port.shouldOfferSemanticDownload, isTrue);
+    expect(
+      DownloadPlan.shouldSkipLibrary(
+        const AppSettings(semanticDownload: SemanticDownloadPreference.always),
+        includeSemanticSearch: port.shouldOfferSemanticDownload,
+        personalUpdateMode: false,
+        online: port.libraryOnlineProof,
+      ),
+      isFalse,
+    );
   });
 
   test('the library port reports failures and retries', () {

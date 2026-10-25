@@ -221,6 +221,11 @@ class _Task extends TaskStrings {
   String get semanticYesBody =>
       'The files take a few gigabytes, and the download will take longer. Using smart search in Otzaria requires consent to training-data collection; downloading does not change that consent.';
   @override
+  String get semanticRemember => "Don't show again";
+  @override
+  String get semanticRememberBody =>
+      'Your choice is saved in Settings, under "Smart search". You can change it there.';
+  @override
   String get back => 'Back';
   @override
   String get startDownload => 'Start download';
@@ -966,6 +971,32 @@ class _Guide extends GuidanceStrings {
       'The last library download did not finish. Downloading again continues '
       'from what already arrived.';
   @override
+  String get semanticOfferNote => 'Smart search is available to download';
+  @override
+  String get semanticOfferLink => 'Download';
+  @override
+  String get recheckNothingTitle =>
+      'Checked again — nothing new on the Otzaria site';
+  @override
+  String recheckNothingBody(String time) =>
+      'There are no new updates on the Otzaria site (checked at $time), so '
+      'nothing was downloaded. The drive and this computer are up to date.';
+  @override
+  String recheckNothingNote(String time) =>
+      'Checked again — nothing new on the Otzaria site · checked at $time';
+  @override
+  String get nothingNewTitle => 'Nothing new on the Otzaria site';
+  @override
+  String nothingNewBody(String time) =>
+      'The check at $time found no new updates, so nothing was downloaded. '
+      'The drive and this computer are up to date.';
+  @override
+  String nothingNewNote(String time) =>
+      'Nothing new on the Otzaria site · checked at $time';
+  @override
+  String failedDownloadsNote(String names) =>
+      'Did not reach the drive: $names.';
+  @override
   String get upToDateTitle => 'Everything is up to date on this computer';
   @override
   String upToDateBody(String? version, {required bool offline}) {
@@ -1494,6 +1525,17 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get syncLibraryLockedSubtitle =>
       'The library follows the registered computer.';
+  @override
+  String get semanticDownloadTitle => 'Smart search';
+  @override
+  String get semanticDownloadSubtitle =>
+      'The files take a few gigabytes. When there is a download:';
+  @override
+  String get semanticDownloadAsk => 'Ask every time';
+  @override
+  String get semanticDownloadAlways => 'Always download';
+  @override
+  String get semanticDownloadNever => "Don't download";
 
   @override
   String get personalModeTitle => 'Prepare an update for a specific computer';

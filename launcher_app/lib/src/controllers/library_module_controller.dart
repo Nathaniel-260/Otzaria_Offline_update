@@ -8,6 +8,7 @@ import 'package:seforim_library_updater/seforim_library_updater.dart';
 
 import '../services/app_logger.dart';
 import '../services/elevation.dart';
+import '../settings/app_settings.dart' show SemanticDownloadPreference;
 import 'dispose_guard.dart';
 import 'download_plan.dart' show LibrarySizeProbe;
 import 'online_check.dart';
@@ -44,6 +45,7 @@ typedef LibraryOnlineAnswers = ({
   String? companionsCheckError,
   bool semanticPending,
   String? semanticCheckError,
+  bool semanticChecked,
 });
 
 /// מה ההורדה האחרונה עשתה במצב "עדכון אישי".
@@ -93,6 +95,24 @@ class LibraryModuleController extends ChangeNotifier
   }
 
   bool get personalUpdateMode => _manager.personalUpdateMode;
+
+  SemanticDownloadPreference get semanticPreference => _semanticPreference;
+  SemanticDownloadPreference _semanticPreference =
+      SemanticDownloadPreference.ask;
+
+  set semanticPreference(SemanticDownloadPreference value) {
+    if (_semanticPreference == value) return;
+    _semanticPreference = value;
+    if (value == SemanticDownloadPreference.never) {
+      semanticDownloadFailed = false;
+    }
+    notifyListeners();
+  }
+
+  bool get _semanticCountsAsUpdate =>
+      _semanticPreference == SemanticDownloadPreference.always &&
+      onlineSemanticPending &&
+      !semanticDownloadFailed;
 
   final LibraryManager _manager;
   LibraryUpdateCheckResult? _lastCheck;
@@ -322,6 +342,45 @@ class LibraryModuleController extends ChangeNotifier
   bool onlineSemanticPending = false;
   String? onlineSemanticCheckError;
 
+  /// הבדיקה של החיפוש החכם רצה בפועל. בלעדיה — "לא נבדק", לעולם לא "מעודכן".
+  bool semanticChecked = false;
+
+  /// נלווים שנשארו חסרים אחרי הורדה של הספרייה שהסתיימה — לא מוצעים שוב עד
+  /// [forgetDownloadFailures]; אחרת הבית מציע אותם בכל פתיחה ונכשל שוב.
+  Set<CompanionAsset> failedCompanions = const {};
+  bool semanticDownloadFailed = false;
+
+  /// רק מה שעדיין חסר — בדיקה מאוחרת יותר יכולה לגלות שכבר ירד.
+  Set<CompanionAsset> get _stillFailed =>
+      failedCompanions.intersection(onlinePendingCompanions);
+
+  bool get hasDownloadFailures =>
+      _stillFailed.isNotEmpty ||
+      (semanticDownloadFailed && onlineSemanticPending);
+
+  String get failedDownloadNames => [
+        if (_stillFailed.isNotEmpty) _companionNames(_stillFailed),
+        if (semanticDownloadFailed && onlineSemanticPending)
+          AppL10n.strings.libraryDomain.companionSemanticName,
+      ].join(', ');
+
+  void forgetDownloadFailures() {
+    if (failedCompanions.isEmpty && !semanticDownloadFailed) return;
+    failedCompanions = const {};
+    semanticDownloadFailed = false;
+    notifyListeners();
+  }
+
+  Set<CompanionAsset> get _offeredCompanions =>
+      onlinePendingCompanions.difference(failedCompanions);
+
+  /// "לשאול כל פעם": חיפוש חכם שאפשר להוריד, כשורה משנית — לא כעדכון.
+  bool get onlineSemanticOffer =>
+      _semanticPreference == SemanticDownloadPreference.ask &&
+      onlineSemanticPending &&
+      semanticChecked &&
+      !semanticDownloadFailed;
+
   /// כשל בבדיקת הנלווים בלבד. אינו "אין רשת" למודול, אך שולל את ההוכחה שאין
   /// מה להוריד — ראו [onlineProofError].
   String? onlineCompanionsCheckError;
@@ -334,16 +393,17 @@ class LibraryModuleController extends ChangeNotifier
 
   /// לשאול על הורדת החיפוש החכם רק כשהבדיקה לא הוכיחה שהכונן כבר מחזיק אותו —
   /// אחרת "כן" מריץ את כל הורדת הספרייה בלי שום דבר חדש להביא.
-  bool get shouldOfferSemanticDownload => !provenUpToDateOnline(
+  bool get shouldOfferSemanticDownload =>
+      !semanticChecked ||
+      !provenUpToDateOnline(
         checkedAt: onlineCheckedAt,
         error: onlineCheckError ?? onlineSemanticCheckError,
         hasUpdate: onlineSemanticPending,
       );
 
   String get onlinePendingCompanionNames => [
-        if (onlinePendingCompanions.isNotEmpty)
-          _companionNames(onlinePendingCompanions),
-        if (onlineSemanticPending)
+        if (_offeredCompanions.isNotEmpty) _companionNames(_offeredCompanions),
+        if (_semanticCountsAsUpdate)
           AppL10n.strings.libraryDomain.companionSemanticName,
       ].join(', ');
 
@@ -355,6 +415,7 @@ class LibraryModuleController extends ChangeNotifier
         companionsCheckError: onlineCompanionsCheckError,
         semanticPending: onlineSemanticPending,
         semanticCheckError: onlineSemanticCheckError,
+        semanticChecked: semanticChecked,
       );
 
   void restoreOnlineAnswers(LibraryOnlineAnswers answers) {
@@ -365,15 +426,18 @@ class LibraryModuleController extends ChangeNotifier
     onlineCompanionsCheckError = answers.companionsCheckError;
     onlineSemanticPending = answers.semanticPending;
     onlineSemanticCheckError = answers.semanticCheckError;
+    semanticChecked = answers.semanticChecked;
     notifyListeners();
   }
 
-  bool get hasOnlineUpdate => hasOnlineLibraryUpdate || onlineSemanticPending;
+  bool get hasOnlineUpdate => hasOnlineLibraryUpdate || _semanticCountsAsUpdate;
 
   bool get hasOnlineLibraryUpdate =>
-      downloadNeedsRetry ||
-      _hasOnlineDbUpdate ||
-      onlinePendingCompanions.isNotEmpty;
+      downloadNeedsRetry || _hasOnlineDbUpdate || _offeredCompanions.isNotEmpty;
+
+  /// להוכחה שלפני ההורדה: נלווה שנכשל אינו מוצע בבית, אבל גם אינו "מעודכן".
+  bool get libraryDownloadPending =>
+      hasOnlineLibraryUpdate || onlinePendingCompanions.isNotEmpty;
 
   bool get _hasOnlineDbUpdate {
     final online = onlineLatestVersion;
@@ -421,13 +485,16 @@ class LibraryModuleController extends ChangeNotifier
     );
     onlineSemanticCheckError = null;
     onlineSemanticPending = false;
-    if (onlineCheckError == null) {
+    semanticChecked = false;
+    if (onlineCheckError == null &&
+        _semanticPreference != SemanticDownloadPreference.never) {
       try {
         onlineSemanticPending = await _manager.peekPendingSemanticSearch();
       } catch (e) {
         onlineSemanticCheckError = e.toString();
         AppLogger.instance.info('בדיקת החיפוש החכם ברשת לא הצליחה: $e');
       }
+      semanticChecked = true;
     }
     onlineCheckedAt = DateTime.now();
     notifyListeners();
@@ -500,7 +567,14 @@ class LibraryModuleController extends ChangeNotifier
       // עכשיו יש מול מה להשוות — מרעננים את מצב העדכון מהתיקייה החדשה.
       await checkForUpdate();
       // הנלווים יכולים להיכשל בנפרד; בודקים מה עדיין חסר אחרי ההורדה.
-      if (!(isCancelled?.call() ?? false)) await checkOnline();
+      if (!(isCancelled?.call() ?? false)) {
+        await checkOnline();
+        failedCompanions = {...onlinePendingCompanions};
+        if (includeSemanticSearch) {
+          semanticDownloadFailed = onlineSemanticPending;
+        }
+        notifyListeners();
+      }
       return;
     } catch (e, st) {
       // ביטול של המשתמש אינו תקלה, ולכן אינו נשאר על המסך כשגיאה. השלב

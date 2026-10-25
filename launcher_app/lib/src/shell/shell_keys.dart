@@ -9,6 +9,9 @@ abstract final class ShellKeys {
   static const heroPrimary = ValueKey('home.hero.primary');
   static const heroSecondary = ValueKey('home.hero.secondary');
   static const heroLaunch = ValueKey('home.hero.launch');
+  static const heroSemanticOffer = ValueKey('home.hero.semanticOffer');
+  static const heroFailedDownloads = ValueKey('home.hero.failedDownloads');
+  static const heroFoundNothing = ValueKey('home.hero.foundNothing');
   static const eyebrow = ValueKey('home.eyebrow');
   static const heroChecking = ValueKey('home.hero.checking');
 
@@ -63,6 +66,7 @@ abstract final class ShellKeys {
   static const taskPrimary = ValueKey('task.primary');
   static const taskSecondary = ValueKey('task.secondary');
   static const taskCancel = ValueKey('task.cancel');
+  static const taskSemanticRemember = ValueKey('task.semanticRemember');
   static const taskStopWaiting = ValueKey('task.stopWaiting');
   static const taskReindex = ValueKey('task.reindex');
   static const taskElevation = ValueKey('task.elevation');

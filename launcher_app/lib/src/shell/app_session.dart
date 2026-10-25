@@ -38,7 +38,7 @@ import '../settings/safer_mode.dart';
 import '../settings/settings_controller.dart';
 import '../widgets/ui_snack.dart';
 import 'download_failure.dart';
-import 'home_guidance.dart' show GuidanceItem;
+import 'home_guidance.dart' show FoundNothing, GuidanceItem;
 import 'session_prompts.dart';
 import 'shell_tasks.dart';
 
@@ -208,6 +208,18 @@ class AppSession extends ChangeNotifier {
   bool _reportsStopRequested = false;
 
   bool get isCheckingOnline => _isCheckingOnline;
+
+  /// "הורדה" שלא מצאה מה להביא — הבית אומר זאת במקום מסך משימה. נמחק בבדיקה,
+  /// בהורדה הבאה ובשינוי הגדרות.
+  FoundNothing? get foundNothing => _foundNothing;
+  FoundNothing? _foundNothing;
+  AppSettings? _appliedSettings;
+
+  /// "לשאול כל פעם" ויש חיפוש חכם להוריד — שורה משנית בבית ובדף הספרייה.
+  bool get onlineSemanticOffer =>
+      !readOnly &&
+      settings.settings.downloadsLibrary &&
+      _library.onlineSemanticOffer;
 
   /// בדיקה רצה — "בדוק עכשיו", הבדיקה שבעלייה, או בדיקה ברשת.
   bool get isCheckingNow => _checkingNow || _isCheckingOnline;
@@ -558,8 +570,14 @@ class AppSession extends ChangeNotifier {
 
   /// הצבת ערך idempotent — ה-setter מתעלם מאותו ערך, ולכן אין בדיקה חוזרת.
   void _applySettings(AppSettings s) {
+    // נקרא בכל שינוי בסשן; רק הגדרות חדשות מבטלות את "אין חדש".
+    if (_appliedSettings != null && !identical(s, _appliedSettings)) {
+      _foundNothing = null;
+    }
+    _appliedSettings = s;
     _otzaria.preferPrerelease = s.preferAppPrerelease;
     _library.personalUpdateMode = s.personalUpdateMode;
+    _library.semanticPreference = s.semanticDownload;
   }
 
   /// בדיקת תהליך טרייה מיד לפני פעולה שאוצריא הפתוחה חוסמת. `force`: אינה
@@ -644,7 +662,10 @@ class AppSession extends ChangeNotifier {
 
   Future<void> checkOnline() async {
     if (readOnly || _isCheckingOnline) return;
-    _update(() => _isCheckingOnline = true);
+    _update(() {
+      _isCheckingOnline = true;
+      _foundNothing = null;
+    });
     await _launcherFlow.checkMirror();
     if (!isActive) return;
     await Future.wait([
@@ -768,9 +789,9 @@ class AppSession extends ChangeNotifier {
     return true;
   }
 
-  /// המסך עובר ל"מתכונן" מיד — גם מ"נסה שוב" במסך שהסתיים, וגם כשניקוי
-  /// קודם עוד רץ. זרימה שחזרה בלי להתחיל סוגרת אותו.
-  Future<void> downloadAll() async {
+  /// "מתכונן" נפתח מיד, גם מ"נסה שוב"; זרימה שחזרה בלי להתחיל סוגרת אותו.
+  /// [forceSemantic] — ראו [MirrorDownloadFlow.downloadAll].
+  Future<void> downloadAll({bool forceSemantic = false}) async {
     if (_blockedByReadOnly() || tasks.isRunning) return;
     if (!settings.settings.hasSyncSelection) {
       prompts.notifyNoSyncSelection();
@@ -781,13 +802,19 @@ class AppSession extends ChangeNotifier {
       return;
     }
     final request = ++_downloadRequest;
+    if (_foundNothing != null) _update(() => _foundNothing = null);
     tasks.prepareDownload();
-    await _downloads.downloadAll();
+    await _downloads.downloadAll(forceSemantic: forceSemantic);
     // בקשה שבוטלה לא סוגרת את המסך של בקשה חדשה שנפתחה אחריה.
     if (isActive && request == _downloadRequest) tasks.abandonDownload();
   }
 
   int _downloadRequest = 0;
+
+  /// "נסה שוב" בהערה על קבצים שלא ירדו. הספרייה רצה בשבילם ממילא (ההוכחה
+  /// סופרת אותם), וההורדה מחשבת מחדש מה נכשל.
+  Future<void> retryFailedDownloads() =>
+      downloadAll(forceSemantic: _library.semanticDownloadFailed);
 
   /// "ביטול" ב"מתכונן להורדה": המסך נסגר, והזרימה עוצרת אחרי הבדיקה ברשת.
   void abandonPreparingDownload() {
@@ -819,7 +846,7 @@ class AppSession extends ChangeNotifier {
 
   void stopWaitingForSetup() => _updateHere.stopWaiting();
 
-  Future<void> _refreshStaleOnlineChecks(AppSettings s) async {
+  Future<bool> _refreshStaleOnlineChecks(AppSettings s) async {
     final stale = StaleOnlineChecks.of(
       s,
       app: OnlineCheckStamp(
@@ -839,7 +866,7 @@ class AppSession extends ChangeNotifier {
         error: _plugins.storeAppCheckError,
       ),
     );
-    if (!stale.any) return;
+    if (!stale.any) return false;
     final ownsCheckingFlag = !_isCheckingOnline;
     if (ownsCheckingFlag) _update(() => _isCheckingOnline = true);
     try {
@@ -853,6 +880,7 @@ class AppSession extends ChangeNotifier {
         _update(() => _isCheckingOnline = false);
       }
     }
+    return true;
   }
 
   Future<DownloadRollback> _captureDownloadRollback() =>
@@ -922,6 +950,7 @@ class AppSession extends ChangeNotifier {
     await _asCheck(() async {
       await checkAll();
       if (!isActive || readOnly) return;
+      _library.forgetDownloadFailures();
       await checkOnline();
     });
   }
@@ -969,11 +998,24 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   AppSettings get settings => _session.settings.settings;
 
   @override
-  Future<void> refreshStaleOnlineChecks(AppSettings s) =>
+  Future<bool> refreshStaleOnlineChecks(AppSettings s) =>
       _session._refreshStaleOnlineChecks(s);
 
   @override
-  Future<bool?> confirmSemanticSearch() => _session.tasks.askBeforeDownload();
+  Future<SemanticSearchAnswer?> confirmSemanticSearch() async {
+    final answer = await _session.tasks.askBeforeDownload();
+    if (answer != null && answer.remember && _session.isActive) {
+      final settings = _session.settings;
+      unawaited(settings.update(
+        settings.settings.copyWith(
+          semanticDownload: answer.download
+              ? SemanticDownloadPreference.always
+              : SemanticDownloadPreference.never,
+        ),
+      ));
+    }
+    return answer;
+  }
 
   @override
   Future<DownloadRollback> captureRollback() =>
@@ -1019,6 +1061,11 @@ class _SessionDownloadHost implements MirrorDownloadHost {
 
   @override
   void downloadEnded() {}
+
+  @override
+  void downloadFoundNothing({required bool rechecked}) =>
+      _session._update(() => _session._foundNothing =
+          rechecked ? FoundNothing.rechecked : FoundNothing.earlierCheck);
 
   @override
   void downloadCrashed(

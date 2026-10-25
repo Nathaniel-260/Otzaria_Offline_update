@@ -220,6 +220,11 @@ class _Task extends TaskStrings {
   String get semanticYesBody =>
       'הקבצים תופסים כמה ג׳יגה־בייט, וההורדה תהיה ארוכה יותר. כדי להשתמש בחיפוש החכם באוצריא צריך להסכים לאיסוף נתוני אימון; ההורדה עצמה אינה משנה את ההסכמה.';
   @override
+  String get semanticRemember => 'אל תציג שוב';
+  @override
+  String get semanticRememberBody =>
+      'הבחירה תישמר בהגדרות, תחת "חיפוש חכם". אפשר לשנות אותה שם.';
+  @override
   String get back => 'חזרה';
   @override
   String get startDownload => 'התחלת ההורדה';
@@ -934,6 +939,30 @@ class _Guide extends GuidanceStrings {
   String get libraryRetryNote =>
       'ההורדה הקודמת של הספרייה לא הושלמה. הורדה חוזרת תמשיך ממה שכבר ירד.';
   @override
+  String get semanticOfferNote => 'חיפוש חכם זמין להורדה';
+  @override
+  String get semanticOfferLink => 'הורדה';
+  @override
+  String get recheckNothingTitle => 'בדקתי שוב — אין חדש באתר אוצריא';
+  @override
+  String recheckNothingBody(String time) =>
+      'באתר אוצריא אין עדכונים חדשים (נבדק ב-${_ltr(time)}), ולכן לא ירד כלום. '
+      'הכונן והמחשב הזה מעודכנים.';
+  @override
+  String recheckNothingNote(String time) =>
+      'בדקתי שוב — אין חדש באתר אוצריא · נבדק ב-${_ltr(time)}';
+  @override
+  String get nothingNewTitle => 'אין חדש באתר אוצריא';
+  @override
+  String nothingNewBody(String time) =>
+      'לפי הבדיקה של ${_ltr(time)} אין עדכונים חדשים, ולכן לא ירד כלום. הכונן '
+      'והמחשב הזה מעודכנים.';
+  @override
+  String nothingNewNote(String time) =>
+      'אין חדש באתר אוצריא · נבדק ב-${_ltr(time)}';
+  @override
+  String failedDownloadsNote(String names) => 'לא ירד לכונן: $names.';
+  @override
   String get upToDateTitle => 'הכול מעודכן במחשב הזה';
   @override
   String upToDateBody(String? version, {required bool offline}) {
@@ -1442,6 +1471,17 @@ class _Settings extends SettingsScreenStrings {
   String get syncTargetPlugins => 'תוספים';
   @override
   String get syncLibraryLockedSubtitle => 'הספרייה נקבעת לפי המחשב שנרשם.';
+  @override
+  String get semanticDownloadTitle => 'חיפוש חכם';
+  @override
+  String get semanticDownloadSubtitle =>
+      'הקבצים תופסים כמה ג׳יגה־בייט. כשיש הורדה:';
+  @override
+  String get semanticDownloadAsk => 'לשאול כל פעם';
+  @override
+  String get semanticDownloadAlways => 'תמיד להוריד';
+  @override
+  String get semanticDownloadNever => 'לא להוריד';
 
   @override
   String get personalModeTitle => 'הכנת עדכון למחשב מסוים';

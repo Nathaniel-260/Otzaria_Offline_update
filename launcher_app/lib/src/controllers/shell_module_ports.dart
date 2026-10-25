@@ -103,7 +103,7 @@ class LibraryModulePort
   OnlineProof get libraryOnlineProof => OnlineProof(
         checkedAt: _library.onlineCheckedAt,
         error: _library.onlineLibraryProofError,
-        hasUpdate: _library.hasOnlineLibraryUpdate,
+        hasUpdate: _library.libraryDownloadPending,
       );
 
   @override

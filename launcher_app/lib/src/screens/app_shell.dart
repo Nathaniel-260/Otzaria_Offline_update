@@ -443,6 +443,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     onInstallHere: _updateHere,
     onUpdateHere: _updateHere,
     onDownload: () => unawaited(_session.downloadAll()),
+    onDownloadSemantic: () =>
+        unawaited(_session.downloadAll(forceSemantic: true)),
+    onRetryFailedDownloads: () => unawaited(_session.retryFailedDownloads()),
     onLaunch: () => unawaited(_session.otzaria.launch()),
     onRecheck: () => unawaited(_session.checkNow()),
     onOpenSection: (section) => unawaited(_goTo(section)),
@@ -601,6 +604,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onRequestReindex: s.requestLibraryReindex,
           onGoToSettings: () => unawaited(_goTo(ShellSection.settings)),
           onGrantSemanticConsent: s.grantSemanticConsent,
+          semanticOffer: s.onlineSemanticOffer,
           busy: s.longTaskRunning,
           readOnly: widget.readOnly,
           appInstalled: s.otzaria.currentVersion != null,
@@ -832,6 +836,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           progress: _downloadProgress,
           snapshot: _downloadSnapshot,
           cancelling: s.isCancellingDownload,
+          canRemember: !s.saferMode.isLocked,
           done: DownloadDoneInfo(
             appVersion: s.otzaria.latestVersion == null
                 ? null

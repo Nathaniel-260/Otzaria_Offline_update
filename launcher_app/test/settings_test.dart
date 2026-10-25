@@ -81,6 +81,7 @@ void main() {
         'library',
         'plugins',
         'personalMode',
+        'semantic',
         'ui',
         'language',
         'textScale',
@@ -168,11 +169,43 @@ void main() {
       expect(restored.saferModeActive, isTrue);
 
       final json = restored.toJson();
-      expect(json['schemaVersion'], 13);
+      expect(json['schemaVersion'], 14);
       expect(
         (json['ui'] as Map<String, dynamic>).keys,
         unorderedEquals(['language', 'textScale']),
       );
+    });
+
+    // סכימה 14: העדפת החיפוש החכם בהורדה.
+    test('קובץ מסכימה 13 בלי sync.semantic — "לשאול כל פעם"', () {
+      final restored = AppSettings.fromJson({
+        'schemaVersion': 13,
+        'sync': {'app': true, 'library': true, 'plugins': false},
+      });
+      expect(restored.semanticDownload, SemanticDownloadPreference.ask);
+      expect(restored.syncPlugins, isFalse);
+      expect(
+        (restored.toJson()['sync'] as Map<String, dynamic>)['semantic'],
+        'ask',
+      );
+    });
+
+    test('sync.semantic נשמר ונקרא; ערך לא מוכר חוזר ל"לשאול"', () {
+      for (final value in SemanticDownloadPreference.values) {
+        final json = const AppSettings().copyWith(semanticDownload: value);
+        expect(
+          AppSettings.fromJson(json.toJson()).semanticDownload,
+          value,
+        );
+      }
+      for (final bad in ['sometimes', 1, true, null]) {
+        expect(
+          AppSettings.fromJson({
+            'sync': {'semantic': bad},
+          }).semanticDownload,
+          SemanticDownloadPreference.ask,
+        );
+      }
     });
 
     test('JSON ריק → בדיוק ברירות המחדל', () {

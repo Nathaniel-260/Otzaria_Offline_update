@@ -13,6 +13,8 @@ final _proven =
     OnlineProof(checkedAt: _checkedAt, error: null, hasUpdate: false);
 final _hasNew =
     OnlineProof(checkedAt: _checkedAt, error: null, hasUpdate: true);
+const SemanticSearchAnswer _yes = (download: true, remember: false);
+const SemanticSearchAnswer _no = (download: false, remember: false);
 
 class _FakeApp implements AppMirrorModule, AutoInstallApp {
   _FakeApp(this.log);
@@ -162,23 +164,26 @@ class _FakeDownloadHost implements MirrorDownloadHost {
   AppSettings settings = const AppSettings();
 
   Future<void> Function(AppSettings s)? onRefresh;
-  Future<bool?> Function()? onConfirmSemantic;
+  Future<SemanticSearchAnswer?> Function()? onConfirmSemantic;
   Completer<void>? sweepGate;
   int sweeps = 0;
   List<MirrorComponent>? failed;
   List<MirrorComponent>? skipped;
 
+  bool refreshed = true;
+
   @override
-  Future<void> refreshStaleOnlineChecks(AppSettings s) async {
+  Future<bool> refreshStaleOnlineChecks(AppSettings s) async {
     log.add('refresh');
     await onRefresh?.call(s);
+    return refreshed;
   }
 
   @override
-  Future<bool?> confirmSemanticSearch() async {
+  Future<SemanticSearchAnswer?> confirmSemanticSearch() async {
     log.add('ask semantic');
     final answer = onConfirmSemantic;
-    return answer == null ? false : await answer();
+    return answer == null ? _no : await answer();
   }
 
   @override
@@ -219,6 +224,10 @@ class _FakeDownloadHost implements MirrorDownloadHost {
 
   @override
   void downloadEnded() => log.add('ended');
+
+  @override
+  void downloadFoundNothing({required bool rechecked}) =>
+      log.add(rechecked ? 'found nothing' : 'found nothing unchecked');
 
   Object? crashed;
 
@@ -454,7 +463,7 @@ void main() {
     test('a declined smart search still skips an up-to-date library', () async {
       library.shouldOfferSemanticDownload = true;
       library.libraryOnlineProof = _proven;
-      host.onConfirmSemantic = () async => false;
+      host.onConfirmSemantic = () async => _no;
 
       await flow.downloadAll();
 
@@ -466,7 +475,7 @@ void main() {
     test('an accepted smart search runs the library with it', () async {
       library.shouldOfferSemanticDownload = true;
       library.libraryOnlineProof = _proven;
-      host.onConfirmSemantic = () async => true;
+      host.onConfirmSemantic = () async => _yes;
 
       await flow.downloadAll();
 
@@ -532,7 +541,7 @@ void main() {
       await flow.downloadAll();
       host.settings = const AppSettings();
       library.shouldOfferSemanticDownload = true;
-      host.onConfirmSemantic = () async => true;
+      host.onConfirmSemantic = () async => _yes;
       await flow.downloadAll();
 
       expect(componentsRun().where((c) => c == 'library'), hasLength(2));
@@ -575,7 +584,7 @@ void main() {
       library.shouldOfferSemanticDownload = true;
       host.onConfirmSemantic = () async {
         host.isBlocked = true;
-        return true;
+        return _yes;
       };
 
       await flow.downloadAll();
@@ -727,6 +736,108 @@ void main() {
       await flow.cancelAndWait();
       expect(flow.isCancelling, isFalse);
       expect(log, isEmpty);
+    });
+
+    group('smart search preference', () {
+      setUp(() {
+        app.onlineProof = _proven;
+        library.libraryOnlineProof = _proven;
+        plugins.catalogOnlineProof = _proven;
+        plugins.storeAppOnlineProof = _proven;
+        library.shouldOfferSemanticDownload = true;
+      });
+
+      AppSettings mode(SemanticDownloadPreference p) =>
+          AppSettings(semanticDownload: p);
+
+      test('"never": no question, no smart search, even unchecked', () async {
+        host.settings = mode(SemanticDownloadPreference.never);
+        app.onlineProof = _hasNew;
+        await flow.downloadAll(forceSemantic: true);
+        expect(log, isNot(contains('ask semantic')));
+        expect(componentsRun(), ['app']);
+      });
+
+      test('"always": downloads it without asking, only when not proven',
+          () async {
+        host.settings = mode(SemanticDownloadPreference.always);
+        await flow.downloadAll();
+        expect(log, isNot(contains('ask semantic')));
+        expect(componentsRun(), ['library']);
+        expect(library.includedSemanticSearch, isTrue);
+
+        log.clear();
+        library.shouldOfferSemanticDownload = false;
+        await flow.downloadAll();
+        expect(componentsRun(), isEmpty);
+        expect(log, contains('found nothing'));
+      });
+
+      test('"ask" + force: downloads it without asking', () async {
+        await flow.downloadAll(forceSemantic: true);
+        expect(log, isNot(contains('ask semantic')));
+        expect(library.includedSemanticSearch, isTrue);
+      });
+
+      test('"ask" without force: asks only next to a real download', () async {
+        await flow.downloadAll();
+        expect(log, isNot(contains('ask semantic')));
+        expect(log, contains('found nothing'));
+
+        log.clear();
+        app.onlineProof = _hasNew;
+        host.onConfirmSemantic = () async => _yes;
+        await flow.downloadAll();
+        expect(log.where((e) => e == 'ask semantic'), hasLength(1));
+        expect(componentsRun(), ['app', 'library']);
+        expect(library.includedSemanticSearch, isTrue);
+      });
+
+      test('the decision follows the refresh: nothing left means no run',
+          () async {
+        host.onRefresh =
+            (_) async => library.shouldOfferSemanticDownload = false;
+        await flow.downloadAll(forceSemantic: true);
+        expect(componentsRun(), isEmpty);
+        expect(log, ['refresh', 'found nothing']);
+        expect(flow.isDownloading, isFalse);
+        expect(host.sweeps, 0);
+      });
+
+      test('re-entry after "cancel" keeps the force flag', () async {
+        final refreshGate = Completer<void>();
+        host.onRefresh = (_) => refreshGate.future;
+        final abandoned = flow.downloadAll();
+        flow.abandonPreparing();
+
+        final again = flow.downloadAll(forceSemantic: true);
+        host.onRefresh = null;
+        refreshGate.complete();
+        await abandoned;
+        await again;
+        expect(log, isNot(contains('ask semantic')));
+        expect(library.includedSemanticSearch, isTrue);
+      });
+    });
+
+    test('a refresh that finds nothing new opens no task and reports it',
+        () async {
+      host.onRefresh = (_) async {
+        app.onlineProof = _proven;
+        library.libraryOnlineProof = _proven;
+        plugins.catalogOnlineProof = _proven;
+        plugins.storeAppOnlineProof = _proven;
+      };
+      await flow.downloadAll();
+      expect(log, ['refresh', 'found nothing']);
+      expect(host.skipped, isNull);
+      expect(flow.isPreparing, isFalse);
+
+      // בלי רענון ברשת אין "בדקתי שוב".
+      log.clear();
+      host.refreshed = false;
+      await flow.downloadAll();
+      expect(log, ['refresh', 'found nothing unchecked']);
     });
 
     test('a failed component is reported and the mirror is not swept',

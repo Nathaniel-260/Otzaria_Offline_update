@@ -49,6 +49,10 @@ class HomeViewModel {
     this.syncLibrary = true,
     this.syncPlugins = true,
     this.libraryDownloadFailed = false,
+    this.semanticOffer = false,
+    this.failedDownloads,
+    this.foundNothing,
+    this.onlineCheckedAt,
     this.appTile = TileStatus.upToDate,
     this.libraryTile = TileStatus.upToDate,
     this.pluginsTile = TileStatus.upToDate,
@@ -111,6 +115,18 @@ class HomeViewModel {
   final bool syncLibrary;
   final bool syncPlugins;
   final bool libraryDownloadFailed;
+
+  /// `AppSession.onlineSemanticOffer` — שורה משנית, לא חלק מ"יש חדש".
+  final bool semanticOffer;
+
+  /// שמות הקבצים שלא ירדו בהורדה האחרונה; `null` כשאין.
+  final String? failedDownloads;
+
+  /// `AppSession.foundNothing`.
+  final FoundNothing? foundNothing;
+
+  /// הבדיקה האחרונה ברשת שהצליחה — לשעה ב-[FoundNothing.earlierCheck].
+  final DateTime? onlineCheckedAt;
   final TileStatus appTile;
   final TileStatus libraryTile;
   final TileStatus pluginsTile;
@@ -199,10 +215,9 @@ HomeViewModel homeViewModelOf(AppSession s) {
         library.companionsOnly ? library.pendingCompanionNames : null,
     onlineLibraryVersion:
         library.hasOnlineLibraryUpdate ? library.onlineUpdateVersion : null,
-    onlineCompanionNames: library.onlinePendingCompanions.isNotEmpty ||
-            library.onlineSemanticPending
-        ? library.onlinePendingCompanionNames
-        : null,
+    onlineCompanionNames: library.onlinePendingCompanionNames.isEmpty
+        ? null
+        : library.onlinePendingCompanionNames,
     pluginUpdatesOnDrive: facts.pluginUpdatesOnDrive,
     onlinePluginChanges: plugins.hasCatalogOnlineUpdate ? pluginChanges : 0,
     onlinePluginCatalogChanged:
@@ -212,6 +227,21 @@ HomeViewModel homeViewModelOf(AppSession s) {
     syncLibrary: settings.downloadsLibrary,
     syncPlugins: settings.syncPlugins,
     libraryDownloadFailed: library.downloadNeedsRetry && !s.isDownloading,
+    semanticOffer: s.onlineSemanticOffer,
+    failedDownloads:
+        library.hasDownloadFailures && settings.downloadsLibrary && !s.readOnly
+            ? library.failedDownloadNames
+            : null,
+    foundNothing: s.foundNothing,
+    onlineCheckedAt: latestOnlineCheck([
+      if (settings.syncApp) (otzaria.onlineCheckedAt, otzaria.onlineCheckError),
+      if (settings.downloadsLibrary)
+        (library.onlineCheckedAt, library.onlineProofError),
+      if (settings.syncPlugins) ...[
+        (plugins.onlineCheckedAt, plugins.onlineCheckError),
+        (plugins.storeAppCheckedAt, plugins.storeAppCheckError),
+      ],
+    ]),
     appTile: tile(GuidanceItem.app),
     libraryTile: tile(GuidanceItem.library),
     pluginsTile: tile(GuidanceItem.plugins),
@@ -249,6 +279,16 @@ HomeViewModel homeViewModelOf(AppSession s) {
     checkedAt: s.lastCheckedAt,
     driveName: driveNameOf(s.dataDir),
   );
+}
+
+/// המאוחרת מבין הבדיקות ברשת שהצליחו (של הרכיבים שנבחרו); `null` כשאין כזו.
+DateTime? latestOnlineCheck(List<(DateTime?, Object?)> checks) {
+  DateTime? latest;
+  for (final (at, error) in checks) {
+    if (at == null || error != null) continue;
+    if (latest == null || at.isAfter(latest)) latest = at;
+  }
+  return latest;
 }
 
 /// תוספים שההורדה תביא: חדשים, מעודכנים, וכאלה שהקובץ שלהם חסר בכונן. תוסף

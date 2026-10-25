@@ -42,10 +42,12 @@ abstract interface class MirrorDownloadHost {
   bool get isBlocked;
   bool get launcherDownloading;
   AppSettings get settings;
-  Future<void> refreshStaleOnlineChecks(AppSettings s);
 
-  /// `null` = חזרה מהשאלה: ההורדה לא מתחילה.
-  Future<bool?> confirmSemanticSearch();
+  /// `true` כשבדיקה אחת לפחות רצה עכשיו ברשת.
+  Future<bool> refreshStaleOnlineChecks(AppSettings s);
+
+  /// `null` = חזרה מהשאלה: ההורדה לא מתחילה, ושום דבר לא נשמר.
+  Future<SemanticSearchAnswer?> confirmSemanticSearch();
   Future<DownloadRollback> captureRollback();
   Future<void> sweepMirror();
   void stateChanged();
@@ -57,6 +59,9 @@ abstract interface class MirrorDownloadHost {
     List<MirrorComponent> kept = const [],
   });
   void downloadEnded();
+
+  /// אין מה להביא — לא נפתח מסך "לא ירד דבר". [rechecked]: הבדיקה רעננה עכשיו.
+  void downloadFoundNothing({required bool rechecked});
 
   /// חריג שלא נתפס בזרימה — המסך עובר לכשל, ולא נשאר תקוע ב"מתכונן".
   /// [abandoned]: הזרימה בוטלה, והמסך שפתוח עכשיו שייך לבקשה אחרת.
@@ -108,7 +113,8 @@ class MirrorDownloadFlow {
   bool get isPreparing => _isPreparing;
   Future<void>? get pendingSweep => _sweep;
 
-  Future<void> downloadAll() async {
+  /// [forceSemantic]: השורה "חיפוש חכם זמין" — מורידה בלי לשאול, במצב "לשאול".
+  Future<void> downloadAll({bool forceSemantic = false}) async {
     if (_isPreparing) {
       // "ביטול" ואז "הורדה" לפני שהזרימה שבוטלה חזרה: מחכים לה ומתחילים מחדש.
       final abandoned = _run;
@@ -122,7 +128,7 @@ class MirrorDownloadFlow {
     }
     _isPreparing = true;
     _abandonRequested = false;
-    final run = _run = _downloadAll();
+    final run = _run = _downloadAll(forceSemantic: forceSemantic);
     try {
       await run;
     } catch (error, stackTrace) {
@@ -155,7 +161,7 @@ class MirrorDownloadFlow {
     }
   }
 
-  Future<void> _downloadAll() async {
+  Future<void> _downloadAll({required bool forceSemantic}) async {
     if (_sweep case final sweep?) {
       await sweep;
       if (!host.isActive || _abandonRequested) return;
@@ -163,7 +169,7 @@ class MirrorDownloadFlow {
     final s = host.settings;
     if (!s.hasSyncSelection || host.isBlocked) return;
 
-    await host.refreshStaleOnlineChecks(s);
+    final rechecked = await host.refreshStaleOnlineChecks(s);
     if (!host.isActive || _abandonRequested) return;
 
     final skipApp = DownloadPlan.shouldSkipApp(
@@ -171,38 +177,51 @@ class MirrorDownloadFlow {
       hasStaleFullPackage: app.hasStaleFullPackage,
       online: app.onlineProof,
     );
+    DownloadPlan planWith({required bool semantic}) => DownloadPlan(
+          skipApp: skipApp,
+          includeSemanticSearch: semantic,
+          skipLibrary: DownloadPlan.shouldSkipLibrary(
+            s,
+            includeSemanticSearch: semantic,
+            personalUpdateMode: library.personalUpdateMode,
+            online: library.libraryOnlineProof,
+          ),
+          skipPlugins: DownloadPlan.shouldSkipPlugins(
+            s,
+            catalog: plugins.catalogOnlineProof,
+          ),
+          skipStoreApp: DownloadPlan.shouldSkipStoreApp(
+            s,
+            storeApp: plugins.storeAppOnlineProof,
+          ),
+        );
+    final offer = s.downloadsLibrary && library.shouldOfferSemanticDownload;
     var includeSemanticSearch = false;
-    if (s.downloadsLibrary && library.shouldOfferSemanticDownload) {
-      final answer = await host.confirmSemanticSearch();
-      if (answer == null) return;
-      includeSemanticSearch = answer;
+    switch (s.semanticDownload) {
+      case SemanticDownloadPreference.never:
+        break;
+      case SemanticDownloadPreference.always:
+        includeSemanticSearch = offer;
+      case SemanticDownloadPreference.ask when forceSemantic:
+        includeSemanticSearch = offer;
+      case SemanticDownloadPreference.ask:
+        // שואלים רק כשיש הורדה אמיתית; בלעדיה "כן" היה מריץ ספרייה בשביל כלום.
+        if (offer && _componentsOf(planWith(semantic: false), s).isNotEmpty) {
+          final answer = await host.confirmSemanticSearch();
+          if (answer == null) return;
+          includeSemanticSearch = answer.download;
+        }
     }
     if (!host.isActive || host.isBlocked || _abandonRequested) return;
-    final plan = DownloadPlan(
-      skipApp: skipApp,
-      includeSemanticSearch: includeSemanticSearch,
-      skipLibrary: DownloadPlan.shouldSkipLibrary(
-        s,
-        includeSemanticSearch: includeSemanticSearch,
-        personalUpdateMode: library.personalUpdateMode,
-        online: library.libraryOnlineProof,
-      ),
-      skipPlugins: DownloadPlan.shouldSkipPlugins(
-        s,
-        catalog: plugins.catalogOnlineProof,
-      ),
-      skipStoreApp: DownloadPlan.shouldSkipStoreApp(
-        s,
-        storeApp: plugins.storeAppOnlineProof,
-      ),
-    );
+    final plan = planWith(semantic: includeSemanticSearch);
+    final components = _componentsOf(plan, s);
+    if (components.isEmpty) {
+      host.downloadFoundNothing(rechecked: rechecked);
+      return;
+    }
 
     _plan = plan;
-    _components = [
-      if (plan.runsApp(s)) MirrorComponent.app,
-      if (plan.runsLibrary(s)) MirrorComponent.library,
-      if (plan.runsPlugins(s) || plan.runsStoreApp(s)) MirrorComponent.plugins,
-    ];
+    _components = components;
     _current = null;
     _isDownloading = true;
     _cancelRequested = false;
@@ -298,6 +317,15 @@ class MirrorDownloadFlow {
       }
     }
   }
+
+  static List<MirrorComponent> _componentsOf(
+          DownloadPlan plan, AppSettings s) =>
+      [
+        if (plan.runsApp(s)) MirrorComponent.app,
+        if (plan.runsLibrary(s)) MirrorComponent.library,
+        if (plan.runsPlugins(s) || plan.runsStoreApp(s))
+          MirrorComponent.plugins,
+      ];
 
   Future<void> _sweepMirror() async {
     try {

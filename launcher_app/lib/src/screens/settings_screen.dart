@@ -168,6 +168,7 @@ class SettingsScreen extends StatelessWidget {
           onChanged: (v) => _confirmAutoInstall(context, enabled: v),
         ),
         _syncTargetsRow(context),
+        _semanticDownloadRow(context),
       ],
     );
   }
@@ -312,6 +313,45 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () => unawaited(_toggleSyncTarget(target)),
                 ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _semanticDownloadRow(BuildContext context) {
+    final t = context.strings.settings;
+    return AppRow(
+      key: const ValueKey('settings.semanticDownload'),
+      alignTop: true,
+      leading: const IconTile(
+        icon: FluentIcons.sparkle_24_regular,
+        size: _tile,
+        tone: _quiet,
+      ),
+      title: t.semanticDownloadTitle,
+      subtitle: t.semanticDownloadSubtitle,
+      below: Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: AppSegmentedControl<SemanticDownloadPreference>(
+            options: [
+              SegmentOption(
+                value: SemanticDownloadPreference.ask,
+                label: t.semanticDownloadAsk,
+              ),
+              SegmentOption(
+                value: SemanticDownloadPreference.always,
+                label: t.semanticDownloadAlways,
+              ),
+              SegmentOption(
+                value: SemanticDownloadPreference.never,
+                label: t.semanticDownloadNever,
+              ),
+            ],
+            currentValue: _s.semanticDownload,
+            onChanged: (v) => unawaited(_set(_s.copyWith(semanticDownload: v))),
+          ),
         ),
       ),
     );

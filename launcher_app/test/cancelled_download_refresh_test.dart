@@ -10,6 +10,7 @@ import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
 import 'package:launcher_app/src/controllers/shell_module_ports.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
+import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -362,19 +363,23 @@ void main() {
       () async {
     final checkedBefore = DateTime.now().subtract(const Duration(minutes: 1));
     library
+      ..semanticPreference = SemanticDownloadPreference.always
       ..onlineSemanticPending = true
+      ..semanticChecked = true
       ..onlineCheckedAt = checkedBefore;
     startDownload();
 
     library
       ..downloadStatus = MirrorDownloadStatus.done
       ..onlineSemanticPending = false
+      ..semanticChecked = false
       ..onlineCheckedAt = DateTime.now();
     expect(library.hasOnlineUpdate, isFalse);
 
     await refresh(MirrorComponent.library);
 
     expect(library.onlineSemanticPending, isTrue);
+    expect(library.semanticChecked, isTrue);
     expect(library.shouldOfferSemanticDownload, isTrue);
     expect(
       cardOffersDownload(

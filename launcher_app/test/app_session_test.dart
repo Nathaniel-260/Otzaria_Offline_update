@@ -5,6 +5,7 @@ import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
 import 'package:launcher_app/src/controllers/app_reports_controller.dart';
+import 'package:launcher_app/src/controllers/download_plan.dart';
 import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/launcher_update_flow.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
@@ -21,6 +22,7 @@ import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/shell/home_guidance_session.dart';
 import 'package:launcher_app/src/shell/session_prompts.dart';
 import 'package:launcher_app/src/shell/shell_tasks.dart';
+import 'package:library_manager/library_manager.dart' show CompanionAsset;
 import 'package:otzaria_manager/otzaria_manager.dart';
 
 import 'test_support.dart';
@@ -438,6 +440,214 @@ void main() {
       s.tasks.updateDone();
       expect(await s.confirmClose(), isTrue);
       expect(prompts.calls, ['confirmClose']);
+    });
+  });
+
+  group('הורדה: חיפוש חכם, בדיקה מחודשת וקבצים שנכשלו', () {
+    setUp(() => HttpOverrides.global = NoNetworkHttpOverrides());
+    tearDown(() => HttpOverrides.global = null);
+
+    /// כל בדיקה ברשת רצה זה עתה ולא מצאה דבר — אין רענון לפני ההורדה.
+    void allProven(AppSession s) {
+      final now = DateTime.now();
+      s.otzaria.onlineCheckedAt = now;
+      s.library
+        ..onlineCheckedAt = now
+        ..semanticChecked = true;
+      s.plugins
+        ..onlineCheckedAt = now
+        ..storeAppCheckedAt = now;
+    }
+
+    Future<DownloadTask> question(AppSession s) async {
+      for (var i = 0; i < 200; i++) {
+        final task = s.tasks.current;
+        if (task is DownloadTask && task.phase == DownloadTaskPhase.question) {
+          return task;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      fail('השאלה לא נפתחה');
+    }
+
+    test('אין מה להוריד — אין מסך משימה, והבית אומר זאת', () async {
+      final s = session()..start();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      allProven(s);
+      await s.downloadAll();
+      expect(s.tasks.hasTask, isFalse);
+      expect(s.isDownloading, isFalse);
+      // הבדיקות היו טריות: "אין חדש" לפי הבדיקה הקודמת, לא "בדקתי שוב".
+      expect(s.foundNothing, FoundNothing.earlierCheck);
+      final model = homeViewModelOf(s);
+      expect(model.foundNothing, FoundNothing.earlierCheck);
+      expect(model.onlineCheckedAt, isNotNull);
+
+      // שעה לכל רכיב: הספרייה החדשה ביותר, אבל בדיקת הנלווים שלה נכשלה.
+      final base = DateTime.now();
+      final appAt = base.add(const Duration(minutes: 1));
+      final libraryAt = base.add(const Duration(minutes: 2));
+      s.otzaria.onlineCheckedAt = appAt;
+      s.library
+        ..onlineCheckedAt = libraryAt
+        ..onlineCompanionsCheckError = 'companions';
+      s.plugins
+        ..onlineCheckedAt = base
+        ..storeAppCheckedAt = base;
+      expect(homeViewModelOf(s).onlineCheckedAt, appAt);
+
+      // רכיב שלא נבחר אינו נספר, גם כשהבדיקה שלו מאוחרת יותר.
+      await settings.update(settings.settings.copyWith(syncPlugins: false));
+      s.plugins.onlineCheckedAt = base.add(const Duration(minutes: 5));
+      expect(homeViewModelOf(s).onlineCheckedAt, appAt);
+
+      // "לא להוריד": החיפוש החכם לא נבדק — וזה אינו כשל של הספרייה.
+      s.library.onlineCompanionsCheckError = null;
+      await settings.update(settings.settings.copyWith(
+        semanticDownload: SemanticDownloadPreference.never,
+      ));
+      s.library.semanticChecked = false;
+      expect(s.library.onlineSemanticCheckError, isNull);
+      expect(homeViewModelOf(s).onlineCheckedAt, libraryAt);
+
+      await settings.update(settings.settings.copyWith(
+        syncPlugins: true,
+        semanticDownload: SemanticDownloadPreference.ask,
+      ));
+      allProven(s);
+      await s.downloadAll();
+      expect(s.foundNothing, FoundNothing.earlierCheck);
+
+      // ההורדה הבאה מוחקת אותו מיד, עוד לפני שהיא מחליטה.
+      final next = s.downloadAll();
+      expect(s.foundNothing, isNull);
+      await next;
+      expect(s.foundNothing, FoundNothing.earlierCheck);
+
+      // שינוי בקונטרולר (לא בהגדרות) אינו מוחק אותו.
+      s.library
+        ..failedCompanions = {CompanionAsset.talmud}
+        ..forgetDownloadFailures();
+      expect(s.foundNothing, FoundNothing.earlierCheck);
+
+      await settings.update(settings.settings.copyWith(textScale: 1.15));
+      expect(s.foundNothing, isNull);
+
+      await s.downloadAll();
+      expect(s.foundNothing, isNotNull);
+      await s.checkOnline();
+      expect(s.foundNothing, isNull);
+    });
+
+    test('"אל תציג שוב" עם "כן" שומר "תמיד להוריד"', () async {
+      await settings.update(settings.settings.copyWith(
+        personalUpdateMode: true,
+      ));
+      final s = session()..start();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      allProven(s);
+      s.library.semanticChecked = false;
+
+      final run = s.downloadAll();
+      await question(s);
+      s.otzaria.status = OtzariaModuleStatus.installing;
+      s.tasks.answer((download: true, remember: true));
+      await run;
+      expect(
+        settings.settings.semanticDownload,
+        SemanticDownloadPreference.always,
+      );
+      expect(s.library.semanticPreference, SemanticDownloadPreference.always);
+    });
+
+    test('"נסה שוב" על חיפוש חכם שנכשל מוריד אותו בלי לשאול', () async {
+      final s = session();
+      allProven(s);
+      s.library
+        ..onlineSemanticPending = true
+        ..semanticDownloadFailed = true;
+      expect(s.library.semanticPreference, SemanticDownloadPreference.ask);
+      // בלי force: אין הורדה אמיתית, ולכן גם אין שאלה.
+      await s.downloadAll();
+      expect(s.foundNothing, isNotNull);
+
+      await s.retryFailedDownloads();
+      expect(s.foundNothing, isNull);
+      final task = s.tasks.current;
+      expect(task, isA<DownloadTask>());
+      expect((task! as DownloadTask).components, [MirrorComponent.library]);
+      expect(s.library.downloadStatus, isNot(MirrorDownloadStatus.idle));
+    });
+
+    test('"אל תציג שוב" עם "לא" שומר "לא להוריד"; "חזרה" לא שומרת', () async {
+      await settings.update(settings.settings.copyWith(
+        personalUpdateMode: true,
+      ));
+      final s = session()..start();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      allProven(s);
+      s.library.semanticChecked = false;
+
+      final back = s.downloadAll();
+      await question(s);
+      s.tasks.answer(null);
+      await back;
+      expect(
+        settings.settings.semanticDownload,
+        SemanticDownloadPreference.ask,
+      );
+
+      final run = s.downloadAll();
+      await question(s);
+      // נחסם אחרי התשובה, כדי שלא תרוץ הורדה אמיתית.
+      s.otzaria.status = OtzariaModuleStatus.installing;
+      s.tasks.answer((download: false, remember: true));
+      await run;
+      expect(
+        settings.settings.semanticDownload,
+        SemanticDownloadPreference.never,
+      );
+      expect(s.library.semanticPreference, SemanticDownloadPreference.never);
+    });
+
+    test('השורה המשנית רק ב"לשאול", כשהספרייה נבחרת להורדה', () async {
+      final s = session()..start();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      s.library
+        ..onlineSemanticPending = true
+        ..semanticChecked = true;
+      expect(s.onlineSemanticOffer, isTrue);
+      expect(homeViewModelOf(s).semanticOffer, isTrue);
+      expect(s.library.hasOnlineUpdate, isFalse);
+
+      await settings.update(settings.settings.copyWith(syncLibrary: false));
+      expect(s.onlineSemanticOffer, isFalse);
+
+      await settings.update(settings.settings.copyWith(
+        syncLibrary: true,
+        semanticDownload: SemanticDownloadPreference.always,
+      ));
+      expect(s.onlineSemanticOffer, isFalse);
+      expect(s.library.hasOnlineUpdate, isTrue);
+    });
+
+    test('קובץ שנכשל — הערה בבית עד שנשכח', () async {
+      final s = session();
+      allProven(s);
+      s.library
+        ..onlinePendingCompanions = {CompanionAsset.talmud}
+        ..failedCompanions = {CompanionAsset.talmud};
+      expect(homeViewModelOf(s).failedDownloads, isNotNull);
+      expect(s.library.hasOnlineUpdate, isFalse);
+
+      // בדיקה מאוחרת יותר מצאה שהוא כבר בכונן — אין עוד מה לומר.
+      s.library.onlinePendingCompanions = const {};
+      expect(homeViewModelOf(s).failedDownloads, isNull);
+
+      s.library.onlinePendingCompanions = {CompanionAsset.talmud};
+      s.library.forgetDownloadFailures();
+      expect(homeViewModelOf(s).failedDownloads, isNull);
+      expect(s.library.hasOnlineUpdate, isTrue);
     });
   });
 

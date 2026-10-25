@@ -43,6 +43,9 @@ HomeViewModel _model(
   bool offersElevation = false,
   LauncherLine? launcher,
   bool canLaunch = true,
+  bool semanticOffer = false,
+  String? failedDownloads,
+  FoundNothing? foundNothing,
 }) {
   final guidance = deriveHomeGuidance(f);
   TileStatus tile(GuidanceItem item) =>
@@ -67,6 +70,10 @@ HomeViewModel _model(
     syncApp: f.syncApp,
     syncLibrary: f.syncLibrary,
     syncPlugins: f.syncPlugins,
+    semanticOffer: semanticOffer,
+    failedDownloads: failedDownloads,
+    foundNothing: foundNothing,
+    onlineCheckedAt: f.online == true ? _checkedAt : null,
     appTile: tile(GuidanceItem.app),
     libraryTile: tile(GuidanceItem.library),
     pluginsTile: tile(GuidanceItem.plugins),
@@ -237,6 +244,51 @@ HomeViewModel homeScenario(String name) => switch (name) {
           customApps: 2,
           customAppsPending: 2,
           reportsToSend: 3,
+        ),
+      // "לשאול כל פעם": חיפוש חכם לבדו — שורה משנית, ונלווה שלא ירד.
+      'semanticOffer' => _model(
+          const GuidanceFacts(online: true),
+          installed: '0.10.4',
+          semanticOffer: true,
+          failedDownloads: 'תלמוד בבלי',
+        ),
+      // "הורדה" על בדיקה ישנה, והבדיקה המחודשת לא מצאה דבר.
+      'recheckNothing' => _model(
+          const GuidanceFacts(online: true),
+          installed: '0.10.4',
+          foundNothing: FoundNothing.rechecked,
+        ),
+      // אותו דבר כשהבדיקות היו טריות — לפי הבדיקה הקודמת, עם השעה שלה.
+      'nothingNew' => _model(
+          const GuidanceFacts(online: true),
+          installed: '0.10.4',
+          foundNothing: FoundNothing.earlierCheck,
+        ),
+      'nothingNewAttention' => _model(
+          const GuidanceFacts(
+            libraryStatus: LibraryStatusFact.error,
+            online: true,
+          ),
+          foundNothing: FoundNothing.earlierCheck,
+        ),
+      'nothingNewWelcome' => _model(
+          const GuidanceFacts(
+            otzariaInstalled: false,
+            otzariaStatus: AppStatusFact.needsDownload,
+            libraryStatus: LibraryStatusFact.needsDownload,
+            online: true,
+          ),
+          installed: null,
+          drive: null,
+          foundNothing: FoundNothing.earlierCheck,
+        ),
+      'recheckNothingHere' => _model(
+          const GuidanceFacts(
+            otzariaStatus: AppStatusFact.updateAvailable,
+            online: true,
+          ),
+          foundNothing: FoundNothing.rechecked,
+          failedDownloads: 'תלמוד בבלי',
         ),
       _ => throw ArgumentError.value(name, 'name'),
     };

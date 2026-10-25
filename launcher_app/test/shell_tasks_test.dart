@@ -27,8 +27,8 @@ void main() {
       expect(downloadPhase(), DownloadTaskPhase.preparing);
       final answer = tasks.askBeforeDownload();
       expect(downloadPhase(), DownloadTaskPhase.question);
-      tasks.answer(true);
-      expect(await answer, isTrue);
+      tasks.answer((download: true, remember: true));
+      expect(await answer, (download: true, remember: true));
       expect(downloadPhase(), DownloadTaskPhase.preparing);
 
       tasks.downloadRunning(
@@ -88,11 +88,11 @@ void main() {
       expect(tasks.hasTask, isFalse);
 
       // תשובה מאוחרת אינה עושה דבר, ושאלה חדשה נפתחת כרגיל.
-      tasks.answer(true);
+      tasks.answer((download: true, remember: false));
       expect(tasks.hasTask, isFalse);
       final again = tasks.askBeforeDownload();
-      tasks.answer(true);
-      expect(await again, isTrue);
+      tasks.answer((download: true, remember: false));
+      expect((await again)?.download, isTrue);
       expect(downloadPhase(), DownloadTaskPhase.preparing);
     });
 

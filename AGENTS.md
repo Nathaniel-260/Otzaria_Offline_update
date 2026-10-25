@@ -336,8 +336,8 @@ runner's job and navigation is in-body (both §5.9). Use the shared components
 (`ActionButton` with its sizes,
 `SettingsCard`/`SettingsActionTile`, `AppCard`/`RowsCard`/`AppRow`, `UiSnack`, the
 `show*Dialog` helpers, `AppSegmentedControl`, `StatusChip`, `IconTile`,
-`SectionLabel`, `AdvancedSection`, `OptionCard`, `ResultBadge`, `AppProgressBar`,
-`TaskFrame`/`StageRow`, `SubPageHeader`, `EmptyState`, `NoticeBanner`, `PathText`,
+`SectionLabel`, `AdvancedSection`, `OptionCard`, `FormCheckRow`, `ResultBadge`,
+`AppProgressBar`, `TaskFrame`/`StageRow`, `SubPageHeader`, `EmptyState`, `NoticeBanner`, `PathText`,
 `RtlIcon`, `RtlTextField`) instead of raw Material widgets, and keep alpha/hover
 overrides inside `lib/src/theme/`. The full rule table is in
 `launcher_app/README.md`.
@@ -590,6 +590,13 @@ The library is never skipped in personal-update mode, where the target comes fro
 the recorded DB version. The skip is named on the "drive is ready" task screen; a
 silent one produced the "why did it not download the plugins" confusion.
 
+**A download that finds nothing to run opens no result screen — and is never
+silent.** A stale "new online" used to end in a task screen saying "nothing was
+downloaded". The flow calls `downloadFoundNothing`, and `AppSession.foundNothing`
+makes the home say so in every primary: "checked again" when a check just ran,
+otherwise "nothing new" — each with the time of the latest successful check of a
+selected component. Cleared by a check, the next download or a settings change.
+
 **Filtered networks get their own messages and NetFree's CA.** A filter answers
 418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
 handshake dump. `otzaria_downloads` maps them to `NetworkBlockedException` /
@@ -607,9 +614,24 @@ never got it, and `companions=[]` on the offline machine hid it (issue #33).
 `CompanionAssetsMirror.peekPending` → `LibraryModuleController.onlinePendingCompanions`
 feeds `hasOnlineUpdate`; its failure blocks the skip via `onlineProofError`.
 
+**A companion that failed is hidden from the home, never proven.** Still pending
+after a finished library download, it kept the home offering a download that failed
+again each time. `failedCompanions` leaves it out of `hasOnlineUpdate` until "check
+now" (in memory: once per launch), but `libraryDownloadPending` keeps it in the skip
+proof, so any real download retries it. `downloadNeedsRetry` is deliberately not
+suppressed: a failed DB download is finished by downloading again.
+
+**Smart search alone is not an update unless the user chose "always".** A declined
+one kept the home offering a download that brought nothing, on every launch.
+`AppSettings.semanticDownload` (Settings, or "don't show again" under the question —
+hidden while safer mode is locked) → `semanticPreference`. In "ask" it is only
+`onlineSemanticOffer`, whose click passes `forceSemantic` (no question); the question
+comes only beside a real download. "Never" skips the peek, and a skipped peek is
+`semanticChecked = false` — unchecked, never "up to date".
+
 **The download runs as a task screen, and its wording must match the undo.**
 `ShellTasks` (`shell/shell_tasks.dart`) is the host's UI side: the smart-search
-question (`confirmSemanticSearch` returns `null` for "back" — nothing is captured or
+question (`confirmSemanticSearch` returns `null` for "back" — nothing is captured, saved or
 downloaded), progress, "cancelled", "drive is ready" and an in-window failure
 (`classifyDownloadFailure`: network/filter/Shabbat/no space are calm, the rest red;
 a rejected certificate is "filter", not "no internet" — retry alone will not help, and

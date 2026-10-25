@@ -28,6 +28,7 @@ class LibraryScreen extends StatelessWidget {
     this.onGrantSemanticConsent,
     this.onUpdateHere,
     this.onInstallFull,
+    this.semanticOffer = false,
     this.busy = false,
     this.readOnly = false,
     this.appInstalled = true,
@@ -57,6 +58,9 @@ class LibraryScreen extends StatelessWidget {
 
   /// הספרייה המלאה שבכונן, במקום עדכון שנכשל — באותו מסך משימה.
   final VoidCallback? onInstallFull;
+
+  /// `AppSession.onlineSemanticOffer` — שורה משלו, לא חלק מ"זמין להורדה".
+  final bool semanticOffer;
 
   /// משימה ארוכה רצה במקום אחר.
   final bool busy;
@@ -270,12 +274,15 @@ class LibraryScreen extends StatelessWidget {
             label: t.onlineAvailable,
             value: switch (c.onlineUpdateVersion) {
               final online? => t.libVersion(online),
-              null
-                  when c.onlinePendingCompanions.isNotEmpty ||
-                      c.onlineSemanticPending =>
+              null when c.onlinePendingCompanionNames.isNotEmpty =>
                 c.onlinePendingCompanionNames,
               null => t.nothingNewOnline,
             },
+          ),
+        if (semanticOffer)
+          StatusValue(
+            label: t.libSemanticSection,
+            value: t.onlineAvailable,
           ),
       ],
       extra: [

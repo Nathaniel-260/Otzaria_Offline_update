@@ -20,6 +20,8 @@ class HomeActions {
     this.onInstallHere = _noop,
     this.onUpdateHere = _noop,
     this.onDownload = _noop,
+    this.onDownloadSemantic = _noop,
+    this.onRetryFailedDownloads = _noop,
     this.onLaunch = _noop,
     this.onRecheck = _noop,
     this.onOpenSection = _noopSection,
@@ -37,6 +39,12 @@ class HomeActions {
   final VoidCallback onInstallHere;
   final VoidCallback onUpdateHere;
   final VoidCallback onDownload;
+
+  /// "חיפוש חכם זמין להורדה" — מוריד בלי לשאול.
+  final VoidCallback onDownloadSemantic;
+
+  /// "נסה שוב" בהערה על קבצים שלא ירדו.
+  final VoidCallback onRetryFailedDownloads;
   final VoidCallback onLaunch;
   final VoidCallback onRecheck;
   final ValueChanged<ShellSection> onOpenSection;
@@ -90,7 +98,19 @@ class HomePage extends StatelessWidget {
             offline: model.readOnly || model.online == false,
             narrow: narrow,
             busy: model.isCheckingOnline,
-            notices: [..._driveNotices(context), ..._notices(context)],
+            notices: [
+              ..._driveNotices(context),
+              ..._notices(context),
+              if (foundNothingText(context, model) case final text?)
+                NoticeBanner(
+                  key: ShellKeys.heroFoundNothing,
+                  leading: const IconTile(
+                    icon: FluentIcons.checkmark_24_regular,
+                    tone: IconTileTone.quiet,
+                  ),
+                  title: text,
+                ),
+            ],
             links: _welcomeLinks(context),
             onDownload: actions.onDownload,
             onHelp: actions.onHelp,
@@ -286,6 +306,19 @@ class HomePage extends StatelessWidget {
   }
 }
 
+/// "הורדה" שלא מצאה מה להביא, כהערה — ראו `AppSession.foundNothing`.
+String? foundNothingText(BuildContext context, HomeViewModel m) {
+  final g = context.strings.guide;
+  return switch ((m.foundNothing, m.onlineCheckedAt)) {
+    (null, _) => null,
+    (FoundNothing.rechecked, final at?) =>
+      g.recheckNothingNote(formatClock(at)),
+    (FoundNothing.rechecked, null) => g.recheckNothingTitle,
+    (FoundNothing.earlierCheck, final at?) => g.nothingNewNote(formatClock(at)),
+    (FoundNothing.earlierCheck, null) => g.nothingNewTitle,
+  };
+}
+
 Widget _logo(double size) => Image.asset(
       'assets/images/otzaria_logo.png',
       width: size,
@@ -299,8 +332,9 @@ typedef _Pill = ({IconData icon, String text});
 
 /// הערה קטנה בגיבור (`.hero-note`), עם קישור אופציונלי בסופה.
 class _Note {
-  const _Note(this.icon, this.text, {this.link, this.onLink});
+  const _Note(this.icon, this.text, {this.link, this.onLink, this.key});
 
+  final Key? key;
   final IconData icon;
   final String text;
   final String? link;
@@ -431,7 +465,7 @@ class _Hero extends StatelessWidget {
         ],
         for (final note in spec.notes) ...[
           const SizedBox(height: 14),
-          _HeroNote(note),
+          _HeroNote(note, key: note.key),
         ],
       ],
     );
@@ -520,6 +554,35 @@ class _Hero extends StatelessWidget {
       ),
     ];
 
+    final blocked = busy || m.checkBlocked;
+    _Note failedNote({required bool retry}) => _Note(
+          key: ShellKeys.heroFailedDownloads,
+          FluentIcons.warning_16_regular,
+          g.failedDownloadsNote(m.failedDownloads!),
+          link: retry ? context.strings.common.retry : null,
+          onLink: retry && !blocked ? actions.onRetryFailedDownloads : null,
+        );
+    // הערות של בית שאין בו הורדה: חיפוש חכם שלא נחשב עדכון, וקבצים שנכשלו.
+    final downloadNotes = [
+      if (m.semanticOffer)
+        _Note(
+          key: ShellKeys.heroSemanticOffer,
+          FluentIcons.sparkle_16_regular,
+          g.semanticOfferNote,
+          link: g.semanticOfferLink,
+          onLink: blocked ? null : actions.onDownloadSemantic,
+        ),
+      if (m.failedDownloads != null) failedNote(retry: true),
+    ];
+    final recheckNote = [
+      if (foundNothingText(context, m) case final text?)
+        _Note(
+          key: ShellKeys.heroFoundNothing,
+          FluentIcons.checkmark_16_regular,
+          text,
+        ),
+    ];
+
     switch (_g.primary) {
       case GuidancePrimary.checking || GuidancePrimary.welcome:
         return (
@@ -527,7 +590,7 @@ class _Hero extends StatelessWidget {
           body: g.checkingBody,
           pills: const [],
           actions: const [],
-          notes: const [],
+          notes: recheckNote,
         );
       case GuidancePrimary.installHere:
         return (
@@ -535,7 +598,7 @@ class _Hero extends StatelessWidget {
           body: g.installHereBody,
           pills: _herePills(context),
           actions: [primary(g.installHereButton, actions.onInstallHere)],
-          notes: const [],
+          notes: [...recheckNote, ...downloadNotes],
         );
       case GuidancePrimary.updateHere:
         return (
@@ -549,7 +612,7 @@ class _Hero extends StatelessWidget {
             }),
             ...launchToo,
           ],
-          notes: const [],
+          notes: [...recheckNote, ...downloadNotes],
         );
       case GuidancePrimary.downloadToDrive:
         final hereToo = _g.secondary == GuidanceSecondary.updateHereToo;
@@ -579,6 +642,9 @@ class _Hero extends StatelessWidget {
           notes: [
             if (m.libraryDownloadFailed)
               _Note(FluentIcons.info_16_regular, g.libraryRetryNote),
+            // הכפתור הראשי כבר מנסה אותם שוב.
+            if (m.failedDownloads != null) failedNote(retry: false),
+            ...recheckNote,
             ..._syncOffNotes(context),
             if (hereToo)
               _Note(
@@ -620,23 +686,35 @@ class _Hero extends StatelessWidget {
           pills: const [],
           actions: quietActions,
           notes: [
+            ...recheckNote,
             if (m.online != true)
               _Note(FluentIcons.usb_stick_20_regular, g.newerNote),
             ..._quietNotes(context, offline: false),
+            ...downloadNotes,
           ],
         );
       case GuidancePrimary.upToDate:
         return (
-          title: g.upToDateTitle,
-          body: g.upToDateBody(
-            m.installedVersion == null
-                ? null
-                : displayVersion(m.installedVersion!),
-            offline: m.online == false,
-          ),
+          title: switch (m.foundNothing) {
+            FoundNothing.rechecked => g.recheckNothingTitle,
+            FoundNothing.earlierCheck => g.nothingNewTitle,
+            null => g.upToDateTitle,
+          },
+          body: switch ((m.foundNothing, m.onlineCheckedAt)) {
+            (FoundNothing.rechecked, final at?) =>
+              g.recheckNothingBody(formatClock(at)),
+            (FoundNothing.earlierCheck, final at?) =>
+              g.nothingNewBody(formatClock(at)),
+            _ => g.upToDateBody(
+                m.installedVersion == null
+                    ? null
+                    : displayVersion(m.installedVersion!),
+                offline: m.online == false,
+              ),
+          },
           pills: const [],
           actions: quietActions,
-          notes: _quietNotes(context, offline: true),
+          notes: [..._quietNotes(context, offline: true), ...downloadNotes],
         );
       case GuidancePrimary.attention:
         final library = _g.attentionItem == GuidanceItem.library;
@@ -652,7 +730,7 @@ class _Hero extends StatelessWidget {
               ),
             ),
           ],
-          notes: const [],
+          notes: recheckNote,
         );
       case GuidancePrimary.taskInProgress:
         Widget showProgress() => ActionButton.recommended(
@@ -928,7 +1006,7 @@ class _PillChip extends StatelessWidget {
 }
 
 class _HeroNote extends StatelessWidget {
-  const _HeroNote(this.note);
+  const _HeroNote(this.note, {super.key});
 
   final _Note note;
 

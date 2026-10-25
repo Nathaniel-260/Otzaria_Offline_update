@@ -13,6 +13,7 @@ export 'copy_path_button.dart';
 export 'custom_switch.dart';
 export 'empty_state.dart';
 export 'focus_ring.dart';
+export 'form_check_row.dart';
 export 'icon_tile.dart';
 export 'info_rows.dart';
 export 'library_changes_view.dart';

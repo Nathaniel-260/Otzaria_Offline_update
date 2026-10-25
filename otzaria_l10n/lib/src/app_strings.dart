@@ -157,6 +157,10 @@ abstract class TaskStrings {
   String get semanticNoSize;
   String get semanticYesTitle;
   String get semanticYesBody;
+
+  /// תיבת הסימון שבתחתית השאלה — מעבירה את הבחירה להגדרות.
+  String get semanticRemember;
+  String get semanticRememberBody;
   String get back;
   String get startDownload;
   String get preparingTitle;
@@ -513,6 +517,23 @@ abstract class GuidanceStrings {
   String get changeInSettingsLink;
   String get chooseInSettingsLink;
   String get libraryRetryNote;
+
+  /// "לשאול כל פעם" בהגדרות: חיפוש חכם לבדו הוא שורה שקטה, לא "יש חדש".
+  String get semanticOfferNote;
+  String get semanticOfferLink;
+
+  /// "הורדה" שהבדיקה המחודשת שלפניה לא מצאה בה דבר — במקום מסך "לא ירד דבר".
+  String get recheckNothingTitle;
+  String recheckNothingBody(String time);
+  String recheckNothingNote(String time);
+
+  /// אותו מצב בלי בדיקה חדשה: לפי הבדיקה הקודמת, ובשעה שלה.
+  String get nothingNewTitle;
+  String nothingNewBody(String time);
+  String nothingNewNote(String time);
+
+  /// קבצים שנכשלו בהורדה האחרונה — לא מוצעים שוב עד "נסה שוב" או בדיקה ידנית.
+  String failedDownloadsNote(String names);
   String get upToDateTitle;
   String upToDateBody(String? version, {required bool offline});
   String get launchButton;
@@ -794,6 +815,13 @@ abstract class SettingsScreenStrings {
 
   /// נוסף לשורה, וגם הסבר צף לשבב, כשעדכון למחשב מסוים נועל את "הספרייה".
   String get syncLibraryLockedSubtitle;
+
+  /// חיפוש חכם בהורדה: לשאול / תמיד / לא.
+  String get semanticDownloadTitle;
+  String get semanticDownloadSubtitle;
+  String get semanticDownloadAsk;
+  String get semanticDownloadAlways;
+  String get semanticDownloadNever;
 
   // ── עדכון למחשב מסוים ──
   /// רק קובצי העדכון מהגרסה המותקנת — הכונן אינו משמש עוד למחשבים אחרים.

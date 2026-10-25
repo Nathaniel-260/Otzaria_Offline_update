@@ -1307,9 +1307,40 @@ void main() {
       expect(body, contains('_session.markPluginsVisited()'));
     });
 
+    // רענון אמיתי שאינו מוצא דבר דורש רשת; הזרימה נבדקת ב-shell_flows_test.
+    test('רענון שרץ נמסר כ"בדקתי שוב", ובלעדיו — "לפי הבדיקה הקודמת"', () {
+      final refresh = bodyOf(
+        'Future<bool> _refreshStaleOnlineChecks(AppSettings s)',
+        'Future<DownloadRollback> _captureDownloadRollback()',
+      );
+      expect(refresh, contains('if (!stale.any) return false;'));
+      expect(refresh, contains('return true;'));
+      final host = bodyOf(
+        'class _SessionDownloadHost implements MirrorDownloadHost',
+        'class _SessionLauncherHost',
+      );
+      expect(
+        host,
+        contains(
+          'rechecked ? FoundNothing.rechecked : FoundNothing.earlierCheck',
+        ),
+      );
+    });
+
+    test('"בדוק עכשיו" מחזיר להצעה קבצים שנכשלו, לפני הבדיקה ברשת', () {
+      final body = bodyOf(
+        'Future<void> checkNow()',
+        'Future<void> _asCheck(',
+      );
+      expect(
+        body.indexOf('_library.forgetDownloadFailures()'),
+        allOf(isNonNegative, lessThan(body.indexOf('await checkOnline()'))),
+      );
+    });
+
     test('הבדיקה המקוונת שלפני ההורדה מרעננת רק את מה שהתיישן', () {
       final body = bodyOf(
-        'Future<void> _refreshStaleOnlineChecks(AppSettings s)',
+        'Future<bool> _refreshStaleOnlineChecks(AppSettings s)',
         'Future<DownloadRollback> _captureDownloadRollback()',
       );
       expect(body, contains('StaleOnlineChecks.of('));
@@ -1920,6 +1951,26 @@ void main() {
       expect(find.text(stringsOf().saferMode.verifyTitle), findsOneWidget);
       // המסך עצמו כלל לא נבנה — גם לא מוסתר מאחורי הדיאלוג.
       expect(screen(SettingsScreen), findsNothing);
+    });
+
+    testWidgets('שאלת החיפוש החכם — "אל תציג שוב" מוסתר כשההגדרות נעולות', (
+      tester,
+    ) async {
+      await lockSettings(tester);
+      await pumpShell(tester);
+      final s = sessionOf(tester);
+      final answer = s.tasks.askBeforeDownload();
+      await tester.pump();
+      expect(find.text(stringsOf().task.semanticTitle), findsOneWidget);
+      expect(find.byKey(ShellKeys.taskSemanticRemember), findsNothing);
+
+      s.saferMode.unlock();
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      s.tasks.notifyListeners();
+      await tester.pump();
+      expect(find.byKey(ShellKeys.taskSemanticRemember), findsOneWidget);
+      s.tasks.answer(null);
+      expect(await answer, isNull);
     });
 
     testWidgets('"הורדה" בלי בחירה — הודעה בלבד, בלי מעבר ובלי בקשת סיסמה', (

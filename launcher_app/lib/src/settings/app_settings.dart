@@ -33,6 +33,27 @@ enum AppLanguagePreference {
   }
 }
 
+/// האם ההורדה לכונן מביאה גם את החיפוש החכם (כמה ג׳יגה־בייט). [ask] — השאלה
+/// שלפני ההורדה; [always]/[never] נבחרים בהגדרות או ב"אל תציג שוב" שבשאלה.
+enum SemanticDownloadPreference {
+  ask('ask'),
+  always('always'),
+  never('never');
+
+  const SemanticDownloadPreference(this.code);
+
+  /// הערך שנשמר תחת `sync.semantic`.
+  final String code;
+
+  /// ערך לא מוכר — וגם קובץ מלפני השדה — חוזר לשאלה.
+  static SemanticDownloadPreference fromCode(Object? code) {
+    for (final preference in values) {
+      if (preference.code == code) return preference;
+    }
+    return SemanticDownloadPreference.ask;
+  }
+}
+
 /// שפת מערכת ההפעלה, מצומצמת לשפות שהלאנצ'ר מדבר.
 ///
 /// `PlatformDispatcher` ולא `Platform.localeName` — הראשון הוא שפת *הממשק*
@@ -55,7 +76,7 @@ AppLanguage systemLanguage() {
 class AppSettings {
   /// הגרסה נכתבת ואינה נבדקת בקריאה: מפתח חסר מקבל ברירת מחדל, ומפתח לא
   /// מוכר נמחק בשמירה הבאה.
-  static const int schemaVersion = 13;
+  static const int schemaVersion = 14;
 
   /// בדיקת עדכונים בפתיחה — גם מקומית (התיקייה שלצד התוכנה) וגם קלה מול
   /// GitHub כשיש רשת: מטא-דאטה בלבד, בלי הורדה, וכשל (אין רשת) נבלע בשקט.
@@ -72,6 +93,8 @@ class AppSettings {
   /// בלי המסד המלא (~1.5GB). ברירת המחדל `false` — התוכנה היא כלי הפצה, וכונן
   /// בלי המסד המלא אינו יכול לשרת מחשב שאין בו אוצריא בכלל.
   final bool personalUpdateMode;
+
+  final SemanticDownloadPreference semanticDownload;
 
   // ── התקנה אוטומטית מהתיקייה המקומית ─────────────────────────────────────
   /// התוכנה והספרייה יחד — התקנה ראשונה לעולם אינה אוטומטית.
@@ -116,6 +139,7 @@ class AppSettings {
     this.syncLibrary = true,
     this.syncPlugins = true,
     this.personalUpdateMode = false,
+    this.semanticDownload = SemanticDownloadPreference.ask,
     this.autoInstall = false,
     this.preferAppPrerelease = false,
     this.languagePreference = AppLanguagePreference.system,
@@ -153,6 +177,7 @@ class AppSettings {
     bool? syncLibrary,
     bool? syncPlugins,
     bool? personalUpdateMode,
+    SemanticDownloadPreference? semanticDownload,
     bool? autoInstall,
     bool? preferAppPrerelease,
     AppLanguagePreference? languagePreference,
@@ -168,6 +193,7 @@ class AppSettings {
       syncLibrary: syncLibrary ?? this.syncLibrary,
       syncPlugins: syncPlugins ?? this.syncPlugins,
       personalUpdateMode: personalUpdateMode ?? this.personalUpdateMode,
+      semanticDownload: semanticDownload ?? this.semanticDownload,
       autoInstall: autoInstall ?? this.autoInstall,
       preferAppPrerelease: preferAppPrerelease ?? this.preferAppPrerelease,
       languagePreference: languagePreference ?? this.languagePreference,
@@ -193,6 +219,7 @@ class AppSettings {
           'library': syncLibrary,
           'plugins': syncPlugins,
           'personalMode': personalUpdateMode,
+          'semantic': semanticDownload.code,
         },
         'ui': {
           'language': languagePreference.code,
@@ -264,6 +291,7 @@ class AppSettings {
       syncPlugins: flag(sync, 'plugins', defaults.syncPlugins),
       personalUpdateMode:
           flag(sync, 'personalMode', defaults.personalUpdateMode),
+      semanticDownload: SemanticDownloadPreference.fromCode(sync['semantic']),
       autoInstall: merged(
         'install',
         'installApp',

@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../controllers/download_plan.dart' show MirrorComponent;
+import '../controllers/download_plan.dart'
+    show MirrorComponent, SemanticSearchAnswer;
 import 'home_guidance.dart' show GuidanceItem;
 
 enum DownloadTaskPhase { preparing, question, running, cancelled, done, failed }
@@ -250,7 +251,7 @@ final class UpdateHereTask extends ShellTask {
 /// כי הוא באג בזרימה ולא מצב שהמשתמש יכול להגיע אליו.
 class ShellTasks extends ChangeNotifier {
   ShellTask? _current;
-  Completer<bool?>? _question;
+  Completer<SemanticSearchAnswer?>? _question;
   Completer<bool>? _decision;
   Completer<void>? _finishNow;
   int _lastUpdateId = 0;
@@ -290,13 +291,13 @@ class ShellTasks extends ChangeNotifier {
 
   /// השאלה שלפני ההורדה ("להוריד גם חיפוש חכם?"). `null` = חזרה, כלומר
   /// ביטול לפני שההורדה התחילה.
-  Future<bool?> askBeforeDownload() {
+  Future<SemanticSearchAnswer?> askBeforeDownload() {
     if (_current == null) prepareDownload();
     _moveDownload(DownloadTaskPhase.question);
-    return (_question = Completer<bool?>()).future;
+    return (_question = Completer<SemanticSearchAnswer?>()).future;
   }
 
-  void answer(bool? value) {
+  void answer(SemanticSearchAnswer? value) {
     final question = _question;
     if (question == null || question.isCompleted) return;
     _question = null;
