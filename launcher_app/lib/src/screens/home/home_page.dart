@@ -48,7 +48,7 @@ class HomeActions {
   final VoidCallback onRestartElevated;
   final VoidCallback onDismissElevation;
 
-  /// "פרטים ועדכון" בשורת הכלי — דף "עדכון הכלי הזה".
+  /// "עדכון זמין" בשורת המצב — דף "עדכון הכלי הזה".
   final VoidCallback onOpenLauncherUpdate;
 
   /// "הצג התקדמות" בגיבור של התקנה שרצה מחוץ למסך משימה — הדף שבו היא רצה.
@@ -98,7 +98,7 @@ class HomePage extends StatelessWidget {
           );
         }
         const padding = LayoutConstraints.pagePadding;
-        return Center(
+        final list = Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth:
@@ -124,14 +124,19 @@ class HomePage extends StatelessWidget {
                 ] else
                   SectionLabel(context.strings.guide.tilesLabel),
                 _Tiles(model: model, onOpen: actions.onOpenSection),
-                _Foot(
-                  model: model,
-                  actions: actions,
-                  launcherProgress: launcherProgress,
-                ),
               ],
             ),
           ),
+        );
+        return Column(
+          children: [
+            Expanded(child: list),
+            _StatusBar(
+              model: model,
+              actions: actions,
+              launcherProgress: launcherProgress,
+            ),
+          ],
         );
       },
     );
@@ -167,7 +172,7 @@ class HomePage extends StatelessWidget {
         NoticeBanner(
           key: ShellKeys.otzariaOpenBanner,
           kind: NoticeKind.banner,
-          leading: IconTile(child: _logo(24)),
+          leading: const IconTile(child: OtzariaLogo()),
           title: g.otzariaOpenTitle,
           body: model.autoInstallSkipped
               ? '${g.autoInstallSkippedLead}${g.otzariaOpenBody}'
@@ -436,28 +441,14 @@ class _Hero extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final g = context.strings.guide;
     final style = AppTextStyles.small.copyWith(color: cs.onSurfaceVariant);
-    final online = model.online;
     final installed = model.installedVersion;
     return Wrap(
       key: ShellKeys.eyebrow,
       spacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Icon(
-          online == true
-              ? FluentIcons.globe_desktop_20_regular
-              : FluentIcons.desktop_16_regular,
-          size: 16,
-          color: cs.primary,
-        ),
-        Text(
-          switch (online) {
-            true => g.eyebrowOnline,
-            false => g.eyebrowOffline,
-            null => g.eyebrowThisComputer,
-          },
-          style: style,
-        ),
+        Icon(FluentIcons.desktop_16_regular, size: 16, color: cs.primary),
+        Text(g.eyebrowThisComputer, style: style),
         Text('·', style: style.copyWith(color: cs.outline)),
         Text(
           installed == null
@@ -484,13 +475,19 @@ class _Hero extends StatelessWidget {
     final g = context.strings.guide;
     final m = model;
 
-    Widget primary(String text, VoidCallback? onPressed, {IconData? icon}) =>
+    Widget primary(
+      String text,
+      VoidCallback? onPressed, {
+      IconData? icon,
+      bool spinning = false,
+    }) =>
         ActionButton.recommended(
           key: ShellKeys.heroPrimary,
           text: text,
           icon: icon,
           size: ActionButtonSize.lg,
           autofocus: true,
+          spinning: spinning,
           onPressed: onPressed,
         );
     Widget secondary(String text, VoidCallback? onPressed, {IconData? icon}) =>
@@ -503,6 +500,17 @@ class _Hero extends StatelessWidget {
         );
 
     final busy = m.isCheckingOnline;
+    // כשהגיבור מציע עדכון — אוצריא המותקנת עדיין נפתחת מכאן.
+    final launchToo = [
+      if (m.installedVersion != null &&
+          m.canLaunch &&
+          !_g.showOtzariaOpenBanner)
+        ActionButton.ghost(
+          key: ShellKeys.heroLaunch,
+          text: g.launchButton,
+          onPressed: actions.onLaunch,
+        ),
+    ];
     final quietActions = [
       primary(g.launchButton, m.canLaunch ? actions.onLaunch : null),
       secondary(
@@ -539,6 +547,7 @@ class _Hero extends StatelessWidget {
             secondary(g.whatsNewButton, () {
               actions.onOpenSection(_whatsNewSection());
             }),
+            ...launchToo,
           ],
           notes: const [],
         );
@@ -549,10 +558,14 @@ class _Hero extends StatelessWidget {
           body: g.downloadBody,
           pills: _downloadPills(context),
           actions: [
+            // בזמן הבדיקה ברשת: מחוון בכפתור, כדי שלא ייראה כבוי בלי סיבה.
             primary(
               g.downloadButton,
               busy ? null : actions.onDownload,
-              icon: FluentIcons.arrow_download_24_regular,
+              icon: busy
+                  ? FluentIcons.arrow_sync_24_regular
+                  : FluentIcons.arrow_download_24_regular,
+              spinning: busy,
             ),
             if (hereToo)
               secondary(
@@ -561,6 +574,7 @@ class _Hero extends StatelessWidget {
                     ? actions.onInstallHere
                     : actions.onUpdateHere,
               ),
+            ...launchToo,
           ],
           notes: [
             if (m.libraryDownloadFailed)
@@ -955,6 +969,7 @@ typedef _TileSpec = ({
   StatusKind kind,
   String label,
   IconData? chipIcon,
+  List<String> facts,
 });
 
 class _Tiles extends StatelessWidget {
@@ -992,11 +1007,64 @@ class _Tiles extends StatelessWidget {
     );
   }
 
+  /// לא נבדק או בבדיקה — הגרסאות עוד לא ידועות, ושורות העובדות היו מטעות.
+  static bool _factsKnown(TileStatus s) =>
+      s != TileStatus.unknown && s != TileStatus.checking;
+
+  List<String> _appFacts(BuildContext context) {
+    final m = model;
+    if (!_factsKnown(m.appTile)) return const [];
+    final g = context.strings.guide;
+    final t = context.strings.pages;
+    String version(String v, String? other) =>
+        g.tileFactVersion(displayVersion(v, other: other));
+    return [
+      g.tileFactHere(
+        m.installedVersion == null
+            ? t.libNotInstalled
+            : version(m.installedVersion!, m.driveAppVersion),
+      ),
+      g.tileFactDrive(
+        m.driveAppVersion == null
+            ? t.nothingYet
+            : version(m.driveAppVersion!, m.installedVersion),
+      ),
+      if (m.onlineAppVersion != null)
+        g.tileFactOnline(version(m.onlineAppVersion!, m.driveAppVersion)),
+    ];
+  }
+
+  List<String> _libraryFacts(BuildContext context) {
+    final m = model;
+    if (!_factsKnown(m.libraryTile)) return const [];
+    final g = context.strings.guide;
+    final t = context.strings.pages;
+    final online = m.onlineLibraryVersion != null
+        ? t.libVersion(m.onlineLibraryVersion!)
+        : m.onlineCompanionNames;
+    return [
+      g.tileFactHere(
+        m.libraryHereVersion != null
+            ? t.libVersion(m.libraryHereVersion!)
+            : m.libraryFreshInstall
+                ? t.libNotInstalled
+                : context.strings.common.unknownValue,
+      ),
+      g.tileFactDrive(
+        m.driveLibraryVersion != null
+            ? t.libVersion(m.driveLibraryVersion!)
+            : t.nothingYet,
+      ),
+      if (online != null) g.tileFactOnline(online),
+    ];
+  }
+
   List<_TileSpec> _specs(BuildContext context) {
     final g = context.strings.guide;
     final common = context.strings.common;
     final m = model;
 
+    // אותו אוצר מילים לתוכנה ולספרייה: השבב הוא הפעולה, העובדות בשורות.
     (StatusKind, String, IconData?) shared(TileStatus status) =>
         switch (status) {
           TileStatus.unknown => (
@@ -1005,11 +1073,17 @@ class _Tiles extends StatelessWidget {
               null
             ),
           TileStatus.checking => (StatusKind.working, g.chipChecking, null),
+          TileStatus.working => (StatusKind.working, g.chipUpdating, null),
           TileStatus.attention => (StatusKind.error, g.chipAttention, null),
           TileStatus.installHere => (
               StatusKind.needsAction,
               g.chipReadyToInstall,
               FluentIcons.arrow_download_16_regular,
+            ),
+          TileStatus.updateHere => (
+              StatusKind.updateAvailable,
+              context.strings.pages.chipUpdateOnDrive,
+              null,
             ),
           TileStatus.nothingOnDrive => (
               StatusKind.needsAction,
@@ -1021,52 +1095,18 @@ class _Tiles extends StatelessWidget {
               g.chipNewOnline,
               FluentIcons.arrow_download_16_regular,
             ),
-          _ => (StatusKind.ok, common.upToDate, null),
-        };
-    final installed = m.installedVersion == null
-        ? null
-        : displayVersion(m.installedVersion!, other: m.driveAppVersion);
-
-    final app = switch (m.appTile) {
-      TileStatus.working => (StatusKind.working, g.chipInstalling, null),
-      TileStatus.upToDate => (
-          StatusKind.ok,
-          installed == null ? common.upToDate : g.chipAppUpToDate(installed),
-          null,
-        ),
-      TileStatus.newerHere => (StatusKind.ok, g.chipNewerHere, null),
-      TileStatus.updateHere => (
-          StatusKind.updateAvailable,
-          g.chipAppUpdate(
-            displayVersion(
-              m.driveAppVersion ?? '',
-              other: m.installedVersion,
+          TileStatus.newerHere => (StatusKind.ok, g.chipNewerHere, null),
+          TileStatus.needsConsent => (
+              StatusKind.needsAction,
+              context.strings.libraryDomain.semanticConsentRequired,
+              FluentIcons.sparkle_16_regular,
             ),
-          ),
-          null,
-        ),
-      TileStatus.nothingOnDrive when installed != null => (
-          StatusKind.ok,
-          g.chipAppInstalled(installed),
-          null,
-        ),
-      final other => shared(other),
-    };
-    final library = switch (m.libraryTile) {
-      TileStatus.working => (StatusKind.working, g.chipUpdating, null),
-      TileStatus.upToDate => (StatusKind.ok, g.chipLibraryUpToDate, null),
-      TileStatus.updateHere => (
-          StatusKind.updateAvailable,
-          g.chipLibraryUpdate,
-          null,
-        ),
-      TileStatus.needsConsent => (
-          StatusKind.needsAction,
-          context.strings.libraryDomain.semanticConsentRequired,
-          FluentIcons.sparkle_16_regular,
-        ),
-      final other => shared(other),
-    };
+          TileStatus.upToDate => (StatusKind.ok, g.chipLibraryUpToDate, null),
+        };
+    final app = m.appTile == TileStatus.working
+        ? (StatusKind.working, g.chipInstalling, null)
+        : shared(m.appTile);
+    final library = shared(m.libraryTile);
     final plugins = switch (m.pluginsTile) {
       TileStatus.checking => (StatusKind.working, g.chipChecking, null),
       TileStatus.onlineAvailable => shared(TileStatus.onlineAvailable),
@@ -1092,8 +1132,9 @@ class _Tiles extends StatelessWidget {
       ShellSection section,
       Widget icon,
       String name,
-      (StatusKind, String, IconData?) chip,
-    ) =>
+      (StatusKind, String, IconData?) chip, {
+      List<String> facts = const [],
+    }) =>
         (
           section: section,
           icon: icon,
@@ -1101,15 +1142,23 @@ class _Tiles extends StatelessWidget {
           kind: chip.$1,
           label: chip.$2,
           chipIcon: chip.$3,
+          facts: facts,
         );
 
     return [
-      spec(ShellSection.otzaria, IconTile(child: _logo(26)), g.tileApp, app),
+      spec(
+        ShellSection.otzaria,
+        IconTile(child: _logo(26)),
+        g.tileApp,
+        app,
+        facts: _appFacts(context),
+      ),
       spec(
         ShellSection.library,
         const IconTile(icon: FluentIcons.library_24_regular),
         g.tileLibrary,
         library,
+        facts: _libraryFacts(context),
       ),
       spec(
         ShellSection.plugins,
@@ -1197,13 +1246,21 @@ class _Tile extends StatelessWidget {
                       label: spec.label,
                       icon: spec.chipIcon,
                     ),
+                    if (spec.facts.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      for (final fact in spec.facts)
+                        Text(
+                          fact,
+                          style: AppTextStyles.meta.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),
               Icon(
-                context.isRtl
-                    ? FluentIcons.chevron_left_20_filled
-                    : FluentIcons.chevron_right_20_filled,
+                FluentIcons.chevron_right_20_filled,
                 size: 20,
                 color: cs.outline,
               ),
@@ -1215,10 +1272,11 @@ class _Tile extends StatelessWidget {
   }
 }
 
-// ── שורת התחתית ───────────────────────────────────────────────────────────────
+// ── שורת המצב ─────────────────────────────────────────────────────────────────
 
-class _Foot extends StatelessWidget {
-  const _Foot({
+/// שורת המצב שבתחתית החלון: עדכון הכלי בהתחלה; חיבור, כונן ו"נבדק ב-" בקצה.
+class _StatusBar extends StatelessWidget {
+  const _StatusBar({
     required this.model,
     required this.actions,
     this.launcherProgress,
@@ -1235,11 +1293,43 @@ class _Foot extends StatelessWidget {
     final style = AppTextStyles.meta.copyWith(color: cs.onSurfaceVariant);
     final checkedAt = model.checkedAt;
     final drive = model.driveName;
+    final online = model.online;
 
     final canCheck = !model.readOnly &&
         !model.checkBlocked &&
         model.guidance.primary != GuidancePrimary.taskInProgress;
+
+    Widget item(IconData icon, String text, {Key? key}) => Row(
+          key: key,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: cs.primary),
+            const SizedBox(width: 6),
+            Text(text, style: style),
+          ],
+        );
+
     final meta = <Widget>[
+      if (online != null && !model.readOnly)
+        item(
+          online
+              ? FluentIcons.globe_desktop_20_regular
+              : FluentIcons.desktop_16_regular,
+          online ? g.eyebrowOnline : g.eyebrowOffline,
+          key: ShellKeys.connectionLine,
+        ),
+      if (drive != null)
+        item(
+          FluentIcons.usb_stick_20_regular,
+          [
+            g.drive(drive),
+            if (model.driveFull)
+              g.driveFullSuffix
+            else if (model.readOnly)
+              g.driveReadOnlySuffix,
+          ].join(' · '),
+          key: ShellKeys.driveLine,
+        ),
       if (checkedAt != null || canCheck)
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -1277,111 +1367,81 @@ class _Foot extends StatelessWidget {
               ),
           ],
         ),
-      if (drive != null)
-        Row(
-          key: ShellKeys.driveLine,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(FluentIcons.usb_stick_20_regular, size: 16, color: cs.primary),
-            const SizedBox(width: 6),
-            Text(
-              [
-                g.drive(drive),
-                if (model.driveFull)
-                  g.driveFullSuffix
-                else if (model.readOnly)
-                  g.driveReadOnlySuffix,
-              ].join(' · '),
-              style: style,
-            ),
-          ],
-        ),
     ];
 
     final launcher = model.launcher;
-    return Padding(
-      padding: const EdgeInsets.only(top: 20),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // כמו `.selfupd` (flex:1, min-width:260): המשבצת תמיד תופסת את
-          // ההתחלה, כך שהמטא נשאר בקצה גם כשאין שורת כלי.
-          if (constraints.maxWidth >= _wideFoot) {
-            return Row(
-              children: [
-                Expanded(
-                  child: launcher == null
-                      ? const SizedBox.shrink()
-                      : Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: _launcher(context, launcher, style),
-                        ),
-                ),
-                for (final item in meta) ...[
-                  const SizedBox(width: 16),
-                  item,
-                ],
-              ],
-            );
-          }
-          return Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (launcher != null) _launcher(context, launcher, style),
-              ...meta,
-            ],
-          );
-        },
+    return Container(
+      key: ShellKeys.statusBar,
+      constraints: const BoxConstraints(minHeight: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppSurfaces.topBarBackground(context),
+        border:
+            Border(top: BorderSide(color: AppSurfaces.shellDivider(context))),
+      ),
+      child: Row(
+        children: [
+          if (launcher != null) ...[
+            _launcher(context, launcher, style),
+            const SizedBox(width: 16),
+          ],
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Wrap(
+                spacing: 20,
+                runSpacing: 4,
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: meta,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  /// מתחת לזה שורת הכלי והמטא לא נכנסים יחד בשורה אחת.
-  static const double _wideFoot = 640;
-
+  /// כמו "עדכון זמין" שבאוצריא: כפתור בולט, גם כשהגרסה החדשה רק בכונן.
   Widget _launcher(BuildContext context, LauncherLine line, TextStyle style) {
     final cs = Theme.of(context).colorScheme;
     final g = context.strings.guide;
     final busy = model.guidance.primary == GuidancePrimary.taskInProgress;
     final version = line.version == null ? '' : displayVersion(line.version!);
-    final (IconData icon, String text) = switch (line.kind) {
-      LauncherLineKind.online => (
-          FluentIcons.sparkle_16_regular,
-          g.launcherOnline(version),
-        ),
-      LauncherLineKind.ready || LauncherLineKind.readyManual => (
-          FluentIcons.sparkle_16_regular,
-          g.launcherOnDrive(version),
-        ),
-      LauncherLineKind.downloading => (
-          FluentIcons.arrow_download_16_regular,
-          g.launcherDownloading,
-        ),
-      LauncherLineKind.error => (
-          FluentIcons.warning_16_regular,
-          line.error ?? '',
-        ),
-    };
-    final link = line.kind == LauncherLineKind.downloading
-        ? null
-        : g.launcherDetailsLink;
-    final onLink = busy ? null : actions.onOpenLauncherUpdate;
-    return ConstrainedBox(
-      key: ShellKeys.launcherLine,
-      constraints: const BoxConstraints(minWidth: 260),
-      child: Wrap(
-        spacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
+    if (line.kind == LauncherLineKind.downloading) {
+      return Row(
+        key: ShellKeys.launcherLine,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: cs.primary),
-          Text(text, style: style),
-          if (line.kind == LauncherLineKind.downloading &&
-              launcherProgress != null)
+          Icon(FluentIcons.arrow_download_16_regular,
+              size: 16, color: cs.primary),
+          const SizedBox(width: 6),
+          Text(g.launcherDownloading, style: style),
+          if (launcherProgress != null) ...[
+            const SizedBox(width: 8),
             launcherProgress!,
-          if (link != null)
-            TextLink(text: link, onTap: onLink, style: AppTextStyles.meta),
+          ],
         ],
+      );
+    }
+    final tooltip = busy
+        ? context.strings.pages.pageBusyNote
+        : switch (line.kind) {
+            LauncherLineKind.online => g.launcherOnline(version),
+            LauncherLineKind.error => line.error ?? '',
+            _ => g.launcherOnDrive(version),
+          };
+    return Tooltip(
+      key: ShellKeys.launcherLine,
+      message: tooltip,
+      child: ActionButton.neutral(
+        key: ShellKeys.launcherUpdateButton,
+        text: g.updateAvailableButton,
+        icon: line.kind == LauncherLineKind.error
+            ? FluentIcons.warning_24_regular
+            : FluentIcons.arrow_download_24_regular,
+        size: ActionButtonSize.sm,
+        onPressed: busy ? null : actions.onOpenLauncherUpdate,
       ),
     );
   }

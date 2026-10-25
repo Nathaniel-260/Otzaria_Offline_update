@@ -67,7 +67,6 @@ class _LightboxState extends State<_Lightbox> {
   Widget build(BuildContext context) {
     final hasMany = widget.paths.length > 1;
     final t = context.strings.plugins;
-    final isRtl = context.isRtl;
     final cs = Theme.of(context).colorScheme;
 
     return Focus(
@@ -111,17 +110,13 @@ class _LightboxState extends State<_Lightbox> {
               // "הקודם" בצד שממנו באים — ימין בעברית, כמו החץ → במקלדת.
               _NavButton(
                 alignment: AlignmentDirectional.centerStart,
-                icon: isRtl
-                    ? FluentIcons.chevron_right_24_regular
-                    : FluentIcons.chevron_left_24_regular,
+                icon: FluentIcons.chevron_left_24_regular,
                 tooltip: t.screenshotPrevious,
                 onPressed: () => _step(-1),
               ),
               _NavButton(
                 alignment: AlignmentDirectional.centerEnd,
-                icon: isRtl
-                    ? FluentIcons.chevron_left_24_regular
-                    : FluentIcons.chevron_right_24_regular,
+                icon: FluentIcons.chevron_right_24_regular,
                 tooltip: t.screenshotNext,
                 onPressed: () => _step(1),
               ),

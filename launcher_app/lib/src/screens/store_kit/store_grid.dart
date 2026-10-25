@@ -10,8 +10,7 @@ const double kStoreTwoColumnWidth = 772;
 /// מחוץ לרשת (בלי גובה קבוע): מהרוחב הזה הכרטיס מוצג כשורה.
 const double kStoreRowCardWidth = 480;
 
-/// גובה הכרטיס בשתי הצורות: חלק קבוע (ריפוד, סמל, כפתור) וחלק שגדל עם
-/// הטקסט. הגובה **קבוע** — התיאור תמיד בשתי שורות שמורות — כדי שהרשת לא
+/// גובה הכרטיס קבוע (התיאור תמיד בשתי שורות שמורות), כדי שהרשת לא
 /// תצטרך למדוד אף כרטיס.
 double storeRowCardExtent(double textScale) => 32 + 100 * textScale;
 
@@ -20,10 +19,8 @@ double storeRowCardExtent(double textScale) => 32 + 100 * textScale;
 double storeTileCardExtent(double textScale) =>
     math.max(112 + 104 * textScale, 52 + 146 * textScale);
 
-/// פריסת רשת הכרטיסים: עמודה אחת של שורות, או שתיים של כרטיסים.
-///
-/// ⚠️ החישוב ב-delegate ולא ב-`SliverLayoutBuilder`: ה-scrollOffset הוא חלק
-/// מ-`SliverConstraints`, ושם הרשת הייתה נבנית מחדש בכל פריים של גלילה.
+/// החישוב ב-delegate ולא ב-`SliverLayoutBuilder`: שם הרשת הייתה נבנית
+/// מחדש בכל פריים של גלילה.
 class StoreGridDelegate extends SliverGridDelegate {
   const StoreGridDelegate({required this.textScale});
 

@@ -6,9 +6,8 @@ import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 import 'plugin_visuals.dart';
 
-/// "דירוג המשתמשים" בדף התוסף: הממוצע, הכוכבים, מספר המדרגים והפילוח.
-///
-/// **תצוגה בלבד.** הדירוג נעשה באתר ודורש חשבון; הכונן רק נושא את המספרים.
+/// "דירוג המשתמשים" בדף התוסף — תצוגה בלבד: הדירוג נעשה באתר, והכונן
+/// רק נושא את המספרים.
 class PluginRatingSummary extends StatelessWidget {
   const PluginRatingSummary({super.key, required this.plugin, this.asOf});
 

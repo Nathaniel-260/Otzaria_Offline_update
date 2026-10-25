@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/theme/theme_exports.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import 'test_harness.dart';
 
@@ -574,6 +575,39 @@ void main() {
       );
       expect(paint().foregroundPainter, isNull);
     });
+  });
+
+  testWidgets('חזרה מצביעה ימינה בעברית, והפירור מתקדם שמאלה', (tester) async {
+    for (final (language, back, crumb) in [
+      (AppLanguage.hebrew, AxisDirection.right, AxisDirection.left),
+      (AppLanguage.english, AxisDirection.left, AxisDirection.right),
+    ]) {
+      await tester.pumpWidget(
+        wrap(
+          Material(
+            child: SubPageHeader(
+              onBack: () {},
+              onHome: () {},
+              trail: const [(label: 'דף', onTap: null)],
+            ),
+          ),
+          language: language,
+        ),
+      );
+      final backIcon = find.descendant(
+        of: find.byType(RtlIcon),
+        matching: find.byType(Icon),
+      );
+      expect(drawnArrow(tester, backIcon), back, reason: '$language');
+      expect(
+        drawnArrow(
+          tester,
+          find.byIcon(FluentIcons.chevron_right_16_regular),
+        ),
+        crumb,
+        reason: '$language',
+      );
+    }
   });
 
   testWidgets('פירור: בריחוף primary וקו תחתון', (tester) async {

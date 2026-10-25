@@ -190,7 +190,7 @@ final Map<String, UpdateHereTask> updateScenarios = {
       GuidanceItem.app: StageOutcome.done,
       GuidanceItem.library: StageOutcome.done,
     },
-    libraryNote: 'אוצריא עוד לא מכוונת לספרייה החדשה — בחרו אותה בהגדרות '
+    libraryNote: 'אוצריא עוד לא מכוונת לספרייה החדשה — בחר אותה בהגדרות '
         'אוצריא.',
   ),
   'firstStopped': const UpdateHereTask(

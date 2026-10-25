@@ -13,11 +13,8 @@ import 'custom_app_detail_view.dart';
 import 'custom_app_install_action.dart';
 import 'custom_app_store_card.dart';
 
-/// "תוכנות נוספות" — אותה ערכה של חנות התוספים: שבבי קטגוריות, רשת כרטיסים
-/// ודף לכל תוכנה.
-///
-/// האריח בבית מופיע **רק כשיש תוכנות**. כאן רק מה שעושים עם התוכנות עצמן —
-/// הורדה, התקנה והפעלה; ההוספה והניהול בהגדרות (`CustomAppsManagePage`).
+/// "תוכנות נוספות" בערכת החנות. כאן רק הורדה, התקנה והפעלה; ההוספה
+/// והניהול בהגדרות (`CustomAppsManagePage`).
 class CustomAppsScreen extends StatefulWidget {
   const CustomAppsScreen({
     super.key,

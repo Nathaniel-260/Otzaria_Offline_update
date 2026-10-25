@@ -43,9 +43,7 @@ class WelcomeView extends StatelessWidget {
     final g = context.strings.guide;
     final small = AppTextStyles.small.copyWith(color: cs.onSurfaceVariant);
     final arrow = Icon(
-      context.isRtl
-          ? FluentIcons.chevron_left_20_filled
-          : FluentIcons.chevron_right_20_filled,
+      FluentIcons.chevron_right_20_filled,
       size: 20,
       color: cs.outline,
     );
@@ -113,7 +111,10 @@ class WelcomeView extends StatelessWidget {
               child: ActionButton.recommended(
                 key: ShellKeys.welcomePrimary,
                 text: g.welcomeDownloadButton,
-                icon: FluentIcons.arrow_download_24_regular,
+                icon: busy
+                    ? FluentIcons.arrow_sync_24_regular
+                    : FluentIcons.arrow_download_24_regular,
+                spinning: busy,
                 size: ActionButtonSize.lg,
                 autofocus: true,
                 onPressed: busy ? null : onDownload,

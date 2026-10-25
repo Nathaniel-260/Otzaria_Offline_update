@@ -7,6 +7,7 @@ import 'package:plugins_manager/plugins_manager.dart';
 import '../../controllers/plugins_module_controller.dart';
 import '../../services/native_file_dialogs.dart';
 import '../../services/timestamps.dart';
+import '../../shell/shell_keys.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 import '../store_kit/store_kit.dart';
@@ -16,10 +17,8 @@ import 'plugin_store_card.dart';
 import 'plugin_visuals.dart';
 import 'store_app_export_flow.dart';
 
-/// חנות התוספים — בסגנון החנות שבאתר: חיפוש, בורר מותקנים, קטגוריות, פס
-/// עדכונים, רשת כרטיסים ודף פרטים מלא.
-///
-/// הכול נטען מהכונן; "רענון" הוא הפעולה היחידה שפונה לאתר, תמיד בלחיצה.
+/// חנות התוספים בסגנון האתר. הכול נטען מהכונן; "רענון" הוא הפעולה
+/// היחידה שפונה לאתר, ותמיד בלחיצה.
 class PluginsScreen extends StatefulWidget {
   const PluginsScreen({
     super.key,
@@ -271,7 +270,8 @@ class _PluginsScreenState extends State<PluginsScreen> {
               ? t.storeSubtitle
               : '${t.storeSubtitle} ${t.asOfDate(formatStoreLocalDate(lastSync))}',
           actions: [
-            if (_canSync)
+            // בחנות ריקה "רענון" הוא הפעולה הראשית של המצב הריק.
+            if (_canSync && !empty)
               ActionButton.ghost(
                 text: t.refreshButton,
                 icon: FluentIcons.arrow_sync_20_regular,
@@ -311,12 +311,20 @@ class _PluginsScreenState extends State<PluginsScreen> {
                   icon: FluentIcons.arrow_sync_20_regular,
                   onPressed: busy ? null : () => unawaited(_sync()),
                 )
-              else if (widget.onOpenHelp case final help?)
+              else ...[
                 ActionButton.neutral(
-                  text: t.howItWorksButton,
-                  icon: FluentIcons.question_circle_20_regular,
-                  onPressed: help,
+                  key: ShellKeys.storeEmptyReload,
+                  text: t.reloadButton,
+                  icon: FluentIcons.arrow_clockwise_20_regular,
+                  onPressed: busy ? null : _c.load,
                 ),
+                if (widget.onOpenHelp case final help?)
+                  ActionButton.ghost(
+                    text: t.howItWorksButton,
+                    icon: FluentIcons.question_circle_20_regular,
+                    onPressed: help,
+                  ),
+              ],
             ],
           ),
         )

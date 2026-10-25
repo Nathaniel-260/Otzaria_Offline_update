@@ -242,12 +242,16 @@ class StoreInfoEntry {
     required this.label,
     required this.value,
     this.ltr = false,
+    this.mono = false,
     this.trailing,
   });
 
   final String label;
   final String value;
+
+  /// [ltr] — גרסה; [mono] — כתובת או נתיב, בתיבת `PathText`.
   final bool ltr;
+  final bool mono;
 
   /// כפתורים קטנים אחרי הערך (העתקה, פתיחה).
   final List<Widget>? trailing;
@@ -280,11 +284,13 @@ class StoreInfoRows extends StatelessWidget {
                   Expanded(
                     child: Align(
                       alignment: AlignmentDirectional.centerEnd,
-                      child: entry.ltr
+                      child: entry.mono
                           ? PathText(entry.value)
                           : Text(
                               entry.value,
                               textAlign: TextAlign.end,
+                              textDirection:
+                                  entry.ltr ? TextDirection.ltr : null,
                               style: AppTextStyles.rowTitle.copyWith(
                                 color: cs.onSurface,
                               ),

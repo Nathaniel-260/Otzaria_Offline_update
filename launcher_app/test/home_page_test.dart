@@ -337,7 +337,27 @@ void main() {
       await tapIn('online', ShellKeys.heroSecondary);
       await tapIn('uptodate', ShellKeys.heroPrimary);
       await tapIn('uptodate', ShellKeys.heroSecondary);
-      expect(calls, ['update', 'download', 'update', 'launch', 'recheck']);
+      await tapIn('online', ShellKeys.heroLaunch);
+      await tapIn('offline', ShellKeys.heroLaunch);
+      expect(calls, [
+        'update',
+        'download',
+        'update',
+        'launch',
+        'recheck',
+        'launch',
+        'launch',
+      ]);
+    });
+
+    testWidgets('גיבור של עדכון — "פתח את אוצריא" רק כשאפשר להפעיל', (
+      tester,
+    ) async {
+      // אוצריא פתוחה (open) או מצב רגוע, שבו ההפעלה היא הכפתור הראשי.
+      for (final name in ['open', 'uptodate', 'newer']) {
+        await pumpScreen(tester, HomePage(model: homeScenario(name)));
+        expect(find.byKey(ShellKeys.heroLaunch), findsNothing, reason: name);
+      }
     });
 
     testWidgets('התקנה ראשונה במחשב ריק כשבכונן יש תוכנה', (tester) async {
@@ -384,6 +404,8 @@ void main() {
         ),
       );
       expect(primary(tester).onPressed, isNull);
+      // מושבת עם סיבה: המחוון מסתובב, כמו "בדוק עכשיו".
+      expect(primary(tester).spinning, isTrue);
     });
 
     testWidgets('אריח פותח את המקטע שלו; פס התוספים החדשים פותח את החנות', (
@@ -710,9 +732,9 @@ void main() {
           actions: HomeActions(onOpenLauncherUpdate: () => opened++),
         ),
       );
-      expect(find.text(g.launcherOnline('3.3.0')), findsOneWidget);
+      expect(find.byTooltip(g.launcherOnline('3.3.0')), findsOneWidget);
       expect(find.text(he.launcherUpdate.installButton), findsNothing);
-      await tester.tap(find.text(g.launcherDetailsLink));
+      await tester.tap(find.byKey(ShellKeys.launcherUpdateButton));
       expect(opened, 1);
     });
 
@@ -728,10 +750,10 @@ void main() {
           actions: HomeActions(onOpenLauncherUpdate: () => opened++),
         ),
       );
-      expect(find.text(g.launcherOnDrive('3.3.0')), findsOneWidget);
+      expect(find.byTooltip(g.launcherOnDrive('3.3.0')), findsOneWidget);
       // ההתקנה עצמה בדף הכלי, לא בשורה שבבית.
       expect(find.text(he.launcherUpdate.installButton), findsNothing);
-      await tester.tap(find.text(g.launcherDetailsLink));
+      await tester.tap(find.byKey(ShellKeys.launcherUpdateButton));
       expect(opened, 1);
 
       await pumpScreen(
@@ -740,10 +762,8 @@ void main() {
       );
       expect(
         tester
-            .widget<TextLink>(
-              find.widgetWithText(TextLink, g.launcherDetailsLink),
-            )
-            .onTap,
+            .widget<ActionButton>(find.byKey(ShellKeys.launcherUpdateButton))
+            .onPressed,
         isNull,
       );
     });
@@ -761,9 +781,9 @@ void main() {
           actions: HomeActions(onOpenLauncherUpdate: () => opened++),
         ),
       );
-      expect(find.text(g.launcherOnDrive('3.3.0')), findsOneWidget);
+      expect(find.byTooltip(g.launcherOnDrive('3.3.0')), findsOneWidget);
       expect(find.text(he.launcherUpdate.installButton), findsNothing);
-      await tester.tap(find.text(g.launcherDetailsLink));
+      await tester.tap(find.byKey(ShellKeys.launcherUpdateButton));
       expect(opened, 1);
     });
 
@@ -873,22 +893,69 @@ void main() {
       expect(find.byKey(ShellKeys.checkNow), findsNothing);
       expect(
         tester
-            .widget<TextLink>(
-              find.widgetWithText(TextLink, g.launcherDetailsLink),
-            )
-            .onTap,
+            .widget<ActionButton>(find.byKey(ShellKeys.launcherUpdateButton))
+            .onPressed,
         isNull,
       );
+      // מושבת עם הסבר בריחוף.
+      expect(find.byTooltip(he.pages.pageBusyNote), findsOneWidget);
     });
 
-    testWidgets('בלי שורת כלי, המטא נשאר בקצה הסוף (כמו `.selfupd` ריק)', (
+    testWidgets('שורת המצב צמודה לתחתית החלון, והמטא בקצה הסוף', (
       tester,
     ) async {
       await pumpScreen(tester, HomePage(model: withLauncher(null)));
-      final hero = tester.getRect(find.byKey(ShellKeys.hero));
-      final drive = tester.getRect(find.byKey(ShellKeys.driveLine));
+      final bar = tester.getRect(find.byKey(ShellKeys.statusBar));
+      final screen = tester.getRect(find.byType(HomePage));
+      expect(bar.bottom, screen.bottom);
+      expect(bar.width, screen.width);
+      for (final key in [ShellKeys.driveLine, ShellKeys.checkedAt]) {
+        expect(
+          find.descendant(
+            of: find.byKey(ShellKeys.statusBar),
+            matching: find.byKey(key),
+          ),
+          findsOneWidget,
+        );
+      }
       // RTL: סוף השורה הוא השמאל.
-      expect(drive.left, closeTo(hero.left, 1));
+      final checkNow = tester.getRect(find.byKey(ShellKeys.checkNow));
+      expect(checkNow.left, closeTo(bar.left + 16, 1));
+    });
+
+    testWidgets('"עדכון זמין" בתחילת שורת המצב — מימין בעברית', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: withLauncher(
+            const LauncherLine(LauncherLineKind.ready, version: '3.3.0'),
+          ),
+        ),
+      );
+      final bar = tester.getRect(find.byKey(ShellKeys.statusBar));
+      final button = find.byKey(ShellKeys.launcherUpdateButton);
+      expect(find.text(g.updateAvailableButton), findsOneWidget);
+      expect(tester.getRect(button).right, closeTo(bar.right - 16, 1));
+      expect(
+        find.descendant(
+          of: button,
+          matching: find.byIcon(FluentIcons.arrow_download_24_regular),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('מצב החיבור בשורת המצב', (tester) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('offline')));
+      expect(
+        find.descendant(
+          of: find.byKey(ShellKeys.connectionLine),
+          matching: find.text(g.eyebrowOffline),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('גרסת הכלי מוצגת בלי v', (tester) async {
@@ -900,7 +967,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text(g.launcherOnline('3.3.0')), findsOneWidget);
+      expect(find.byTooltip(g.launcherOnline('3.3.0')), findsOneWidget);
     });
   });
 
@@ -1203,7 +1270,11 @@ void main() {
           ),
         ),
       );
-      expect(find.text(g.chipAppUpdate('0.9.98+801')), findsOneWidget);
+      expect(find.text(he.pages.chipUpdateOnDrive), findsOneWidget);
+      expect(
+        find.text(g.tileFactDrive(g.tileFactVersion('0.9.98+801'))),
+        findsOneWidget,
+      );
       expect(find.text(g.eyebrowOtzaria('0.9.98+799')), findsOneWidget);
     });
   });
@@ -1217,7 +1288,7 @@ void main() {
           ),
         );
 
-    testWidgets('מה שההורדה תביא — "חדש באינטרנט" עם סמל הורדה', (
+    testWidgets('מה שההורדה תביא — "יש עדכון להוריד לכונן" עם סמל הורדה', (
       tester,
     ) async {
       await pumpScreen(tester, HomePage(model: homeScenario('downloadOnly')));
@@ -1238,7 +1309,10 @@ void main() {
     testWidgets('בלי רשת: האריח מתאר את הכונן כרגיל', (tester) async {
       await pumpScreen(tester, HomePage(model: homeScenario('offline')));
       expect(find.text(g.chipNewOnline), findsNothing);
-      expect(chipOf(tester, ShellSection.library).label, g.chipLibraryUpdate);
+      expect(
+        chipOf(tester, ShellSection.library).label,
+        he.pages.chipUpdateOnDrive,
+      );
     });
 
     testWidgets('שבב "מעודכן" — וי פשוט, לא וי בעיגול', (tester) async {
@@ -1254,10 +1328,69 @@ void main() {
       expect(icon.size, 14);
     });
 
-    testWidgets('החיצים באריחים מלאים, כמו במוקאפ', (tester) async {
-      await pumpScreen(tester, HomePage(model: homeScenario('uptodate')));
-      expect(find.byIcon(FluentIcons.chevron_left_20_filled), findsWidgets);
-      expect(find.byIcon(FluentIcons.chevron_left_20_regular), findsNothing);
+    testWidgets('החיצים באריחים מלאים, ומצביעים פנימה: שמאלה בעברית', (
+      tester,
+    ) async {
+      for (final (language, direction) in [
+        (AppLanguage.hebrew, AxisDirection.left),
+        (AppLanguage.english, AxisDirection.right),
+      ]) {
+        await pumpScreen(
+          tester,
+          HomePage(model: homeScenario('uptodate')),
+          language: language,
+        );
+        final chevron = find.descendant(
+          of: find.byKey(ShellKeys.tile(ShellSection.otzaria)),
+          matching: find.byIcon(FluentIcons.chevron_right_20_filled),
+        );
+        expect(chevron, findsOneWidget);
+        expect(drawnArrow(tester, chevron), direction, reason: '$language');
+      }
+    });
+
+    testWidgets('התוכנה והספרייה: אותו שבב לאותו מצב, והעובדות בשורות', (
+      tester,
+    ) async {
+      const facts = GuidanceFacts(
+        online: false,
+        otzariaStatus: AppStatusFact.needsDownload,
+        libraryStatus: LibraryStatusFact.needsDownload,
+      );
+      final guidance = deriveHomeGuidance(facts);
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: guidance,
+            online: false,
+            installedVersion: '0.10.3',
+            libraryHereVersion: 146,
+            appTile: deriveTileStatus(GuidanceItem.app, facts),
+            libraryTile: deriveTileStatus(GuidanceItem.library, facts),
+          ),
+        ),
+      );
+      final app = chipOf(tester, ShellSection.otzaria);
+      final library = chipOf(tester, ShellSection.library);
+      expect(app.label, g.chipNotOnDrive);
+      expect((app.label, app.kind), (library.label, library.kind));
+      expect(
+        find.text(g.tileFactHere(g.tileFactVersion('0.10.3'))),
+        findsOneWidget,
+      );
+      expect(
+          find.text(g.tileFactHere(he.pages.libVersion(146))), findsOneWidget);
+      expect(find.text(g.tileFactDrive(he.pages.nothingYet)), findsNWidgets(2));
+      expect(find.textContaining(g.tileFactOnline('')), findsNothing);
+    });
+
+    testWidgets('מחובר: האריח אומר גם מה זמין להורדה', (tester) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('online')));
+      expect(
+        find.text(g.tileFactOnline(he.pages.libVersion(147))),
+        findsOneWidget,
+      );
     });
   });
 

@@ -31,9 +31,13 @@ void main() {
       expect(await answer, isTrue);
       expect(downloadPhase(), DownloadTaskPhase.preparing);
 
-      tasks.downloadRunning(const [MirrorComponent.library]);
+      tasks.downloadRunning(
+        const [MirrorComponent.library],
+        expectedBytes: const {MirrorComponent.library: 42},
+      );
       expect(downloadPhase(), DownloadTaskPhase.running);
       expect(download().components, [MirrorComponent.library]);
+      expect(download().expectedBytes, {MirrorComponent.library: 42});
 
       tasks.downloadDone(skipped: const [MirrorComponent.plugins]);
       expect(downloadPhase(), DownloadTaskPhase.done);
@@ -98,6 +102,14 @@ void main() {
       expect(downloadPhase(), DownloadTaskPhase.cancelled);
       expect(download().revertFailed, isTrue);
       expect(tasks.isRunning, isFalse);
+    });
+
+    test('ביטול בזמן ריצה זוכר מה נשאר בכונן', () {
+      tasks.downloadRunning(
+          const [MirrorComponent.app, MirrorComponent.library]);
+      tasks.downloadCancelled(kept: const [MirrorComponent.app]);
+      expect(download().kept, [MirrorComponent.app]);
+      expect(download().revertFailed, isFalse);
     });
 
     test('הזרימה חזרה בלי להתחיל — המסך נסגר; משימה רצה נשארת', () {

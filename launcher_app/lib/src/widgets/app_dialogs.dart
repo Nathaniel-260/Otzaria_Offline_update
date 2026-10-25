@@ -1,10 +1,5 @@
-// דיאלוגים גנריים M3 — פורט מאוצריא (`otzaria/lib/widgets/dialogs/`).
-// אין להשתמש ב-showDialog עם AlertDialog מותאם ישירות; רק דרך העוזרים כאן.
-//
-// כללי הסגנון (המוקאפ): רוחב 336, ו-440 לדו-שיח עם שדות; ריפוד 24.
-//  • singleAction — כפתור אישור אחד (recommended)
-//  • twoActions   — ביטול (ghost) + אישור (recommended)
-//  • warning      — הבטוח (recommended, ממוקד) + הפעולה (warning) בקצה
+// כל דו-שיח עובר כאן (לא AlertDialog ישיר): רוחב 336, 440 עם שדות, ריפוד 24.
+// warning — הביטול הוא הכפתור המומלץ, והפעולה יושבת בקצה.
 
 import 'package:flutter/material.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -12,7 +7,7 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 import '../theme/theme_exports.dart';
 import 'action_buttons.dart';
 
-enum _DialogVariant { singleAction, twoActions, warning }
+enum _DialogVariant { singleAction, twoActions, warning, custom }
 
 class AppDialog extends StatelessWidget {
   final String title;
@@ -27,6 +22,7 @@ class AppDialog extends StatelessWidget {
   /// `null` = 336 לדו-שיח טקסט, 440 כשיש [customContent].
   final double? width;
   final _DialogVariant _variant;
+  final List<Widget> _customActions;
 
   AppDialog.singleAction({
     super.key,
@@ -37,6 +33,22 @@ class AppDialog extends StatelessWidget {
     this.width,
   })  : _variant = _DialogVariant.singleAction,
         confirmText = confirmText ?? AppL10n.strings.common.confirm,
+        cancelText = '',
+        subtitle = null,
+        _customActions = const [];
+
+  /// טופס עם פעולות משלו (שליחה עם מחוון, למשל) — אותה מסגרת ואותה טיפוגרפיה.
+  /// [customContent] גולל בעצמו: `Flexible` + `SingleChildScrollView`.
+  const AppDialog.custom({
+    super.key,
+    required this.title,
+    required Widget this.customContent,
+    required List<Widget> actions,
+    this.width,
+  })  : _variant = _DialogVariant.custom,
+        _customActions = actions,
+        content = null,
+        confirmText = '',
         cancelText = '',
         subtitle = null;
 
@@ -51,7 +63,8 @@ class AppDialog extends StatelessWidget {
     this.width,
   })  : _variant = _DialogVariant.twoActions,
         cancelText = cancelText ?? AppL10n.strings.common.cancel,
-        confirmText = confirmText ?? AppL10n.strings.common.confirm;
+        confirmText = confirmText ?? AppL10n.strings.common.confirm,
+        _customActions = const [];
 
   AppDialog.warning({
     super.key,
@@ -64,7 +77,8 @@ class AppDialog extends StatelessWidget {
     this.width,
   })  : _variant = _DialogVariant.warning,
         cancelText = cancelText ?? AppL10n.strings.common.cancel,
-        confirmText = confirmText ?? AppL10n.strings.common.continueAction;
+        confirmText = confirmText ?? AppL10n.strings.common.continueAction,
+        _customActions = const [];
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +143,7 @@ class AppDialog extends StatelessWidget {
     final defaultAction = customContent == null;
 
     return switch (_variant) {
+      _DialogVariant.custom => _customActions,
       _DialogVariant.singleAction => [
           ActionButton.recommended(
             text: confirmText,

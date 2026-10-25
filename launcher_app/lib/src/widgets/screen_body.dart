@@ -3,19 +3,20 @@ import 'package:flutter/material.dart';
 import '../theme/theme_exports.dart';
 import 'sub_page_header.dart';
 
-/// גוף דף (`.page`): כותרת 20/600 עם הסבר אופציונלי (`.pagehead`) ורשימת
-/// כרטיסים, ברוחב תוכן של עד 720 וממורכז, עם ריפוד 28/24/40. דף שכרטיס
-/// המצב שלו נושא את השם — בלי [title].
+/// גוף דף (`.page`): כותרת והסבר, ורשימת כרטיסים עד 720 ממורכזת. דף
+/// שכרטיס המצב שלו נושא את השם — בלי [title].
 class ScreenBody extends StatelessWidget {
   final String? title;
   final String? description;
   final List<Widget> children;
+  final ScrollController? controller;
 
   const ScreenBody({
     super.key,
     this.title,
     this.description,
     required this.children,
+    this.controller,
   });
 
   @override
@@ -30,6 +31,7 @@ class ScreenBody extends StatelessWidget {
           maxWidth: LayoutConstraints.panelContentMaxWidth + padding.horizontal,
         ),
         child: ListView(
+          controller: controller,
           padding: padding,
           children: [
             if (header != null) header,

@@ -58,10 +58,8 @@ class SubPageHeader extends StatelessWidget {
     for (final (i, crumb) in trail.indexed) {
       crumbs.add(
         Icon(
-          // הפירור מתקדם בכיוון הקריאה.
-          context.isRtl
-              ? FluentIcons.chevron_left_16_regular
-              : FluentIcons.chevron_right_16_regular,
+          // הפירור מתקדם בכיוון הקריאה; Icon מהפך את ה-chevron ב-RTL.
+          FluentIcons.chevron_right_16_regular,
           size: 14,
           color: cs.outline,
         ),
@@ -92,7 +90,8 @@ class SubPageHeader extends StatelessWidget {
               message: s.backTooltip,
               child: IconButton(
                 onPressed: onBack,
-                icon: RtlIcon(context.backArrowIcon, size: 20),
+                icon:
+                    const RtlIcon(FluentIcons.arrow_left_24_regular, size: 20),
                 color: cs.onSurfaceVariant,
                 style: IconButton.styleFrom(
                   fixedSize: const Size(40, 40),

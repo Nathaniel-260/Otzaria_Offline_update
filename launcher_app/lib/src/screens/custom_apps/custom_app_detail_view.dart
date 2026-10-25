@@ -124,6 +124,19 @@ class CustomAppDetailView extends StatelessWidget {
         ),
         StoreDetailColumns(
           start: [
+            if (screenshots.isNotEmpty) ...[
+              StoreSectionTitle(t.screenshotsPanelTitle),
+              StoreScreenshots(paths: screenshots),
+            ],
+            if (_descriptor.longDescription case final text?) ...[
+              StoreSectionTitle(t.aboutPanelTitle),
+              Text(
+                text,
+                style: AppTextStyles.dialogBody.copyWith(color: cs.onSurface),
+              ),
+            ],
+          ],
+          end: [
             StoreSectionTitle(t.infoPanelTitle),
             StoreInfoRows(entries: _info(context)),
             if (_descriptor.categorySlugs.isNotEmpty) ...[
@@ -139,19 +152,6 @@ class CustomAppDetailView extends StatelessWidget {
                       onTap: () => onCategorySelected(slug),
                     ),
                 ],
-              ),
-            ],
-          ],
-          end: [
-            if (screenshots.isNotEmpty) ...[
-              StoreSectionTitle(t.screenshotsPanelTitle),
-              StoreScreenshots(paths: screenshots),
-            ],
-            if (_descriptor.longDescription case final text?) ...[
-              StoreSectionTitle(t.aboutPanelTitle),
-              Text(
-                text,
-                style: AppTextStyles.dialogBody.copyWith(color: cs.onSurface),
               ),
             ],
           ],
@@ -215,7 +215,7 @@ class CustomAppDetailView extends StatelessWidget {
           final source? => source.webUrl,
           null => t.infoSourceFile,
         },
-        ltr: _descriptor.github != null,
+        mono: _descriptor.github != null,
       ),
       if (stored != null) ...[
         StoreInfoEntry(

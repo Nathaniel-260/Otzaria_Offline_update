@@ -17,6 +17,7 @@ import 'package:launcher_app/src/self_update/launcher_release.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:library_manager/library_manager.dart';
+import 'package:otzaria_manager/otzaria_manager.dart';
 
 /// מצבי דפי התוכנה, הספרייה, הדיווחים ועדכון הכלי — לצילומי הסקירה. כל
 /// מצב בונה קונטרולרים אמיתיים ומציב בהם שדות, בלי דיסק ובלי רשת.
@@ -85,7 +86,21 @@ final Map<String, PageScenario> pageScenarios = {
           ..status = OtzariaModuleStatus.upToDate
           ..currentVersion = '0.10.4'
           ..latestVersion = '0.10.4'
-          ..lastDownloadedAt = DateTime(2026, 10, 18);
+          ..stableVersion = '0.10.4'
+          ..lastDownloadedAt = DateTime(2026, 10, 18)
+          ..onlineChannels = const OtzariaChannelReleases(
+            stable: OtzariaRelease(
+              tagName: '0.10.5',
+              name: '0.10.5',
+              isPrerelease: false,
+              isDraft: false,
+              publishedAt: null,
+              installerKind: OtzariaInstallerKind.windowsSetupExe,
+              installerAssetName: 'setup.exe',
+              installerDownloadUrl: 'https://example.invalid/setup.exe',
+              installerSizeBytes: 1,
+            ),
+          );
       }),
   'otzaria_newer': (d, s) => _otzaria(d, s, (c) {
         c
@@ -149,6 +164,8 @@ final Map<String, PageScenario> pageScenarios = {
           ..status = LibraryModuleStatus.upToDate
           ..localVersion = 31
           ..targetVersion = 31
+          ..onlineLatestVersion = 32
+          ..onlineCheckedAt = DateTime(2026, 10, 25)
           ..semanticPending = true
           ..semanticConsentGranted = true
           ..mirroredCompanions = {CompanionAsset.talmud};

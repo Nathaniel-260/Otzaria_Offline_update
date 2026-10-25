@@ -12,9 +12,8 @@ import '../../theme/theme_exports.dart';
 import '../../widgets/screen_body.dart';
 import '../../widgets/widgets_exports.dart';
 
-/// דף "עדכון הכלי הזה" — מהשורה שבתחתית הבית: הגרסה הפתוחה מול החדשה, מה
-/// חדש בה, ופעולה אחת לפי המצב (הורדה, התקנה, החלפה ידנית, הפעלה כמנהל).
-/// יומן השינויים המלא נפתח מכאן — שורת "אודות" בהגדרות מובילה לדף הזה.
+/// "עדכון הכלי הזה": הגרסה הפתוחה מול החדשה, מה חדש ופעולה אחת לפי המצב.
+/// גם "אודות" בהגדרות מוביל לכאן.
 class LauncherUpdatePage extends StatelessWidget {
   const LauncherUpdatePage({
     super.key,
@@ -25,6 +24,8 @@ class LauncherUpdatePage extends StatelessWidget {
     this.onRestartElevated,
     this.readOnly = false,
     this.busy = false,
+    this.onCheck,
+    this.checking = false,
   });
 
   final LauncherUpdateController controller;
@@ -42,6 +43,10 @@ class LauncherUpdatePage extends StatelessWidget {
 
   /// משימה ארוכה רצה — ההתקנה סוגרת את הכלי, ולכן היא ממתינה לסופה.
   final bool busy;
+
+  /// "בדוק עכשיו" של הבית — כשעוד לא נבדק. `null` — חסום בזמן משימה.
+  final VoidCallback? onCheck;
+  final bool checking;
 
   @override
   Widget build(BuildContext context) {
@@ -136,6 +141,14 @@ class LauncherUpdatePage extends StatelessWidget {
         text:
             error == null ? t.selfDownloadButton : context.strings.common.retry,
         onPressed: busy || readOnly ? null : onDownload,
+      );
+    } else if (c.status == LauncherUpdateStatus.idle) {
+      primary = ActionButton.neutral(
+        key: ShellKeys.statusPrimary,
+        text: g.checkNowLink,
+        icon: FluentIcons.arrow_sync_24_regular,
+        spinning: checking,
+        onPressed: checking ? null : onCheck,
       );
     } else {
       primary = null;

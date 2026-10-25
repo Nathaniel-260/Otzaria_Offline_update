@@ -69,6 +69,7 @@ class _FakeLibrary implements LibraryMirrorModule, AutoInstallLibrary {
   bool hasUpdateAvailable = true;
 
   bool? includedSemanticSearch;
+  Future<void> Function()? onDownload;
   Future<void> Function()? onUpdate;
   Future<void> Function()? onRecheck;
 
@@ -79,7 +80,16 @@ class _FakeLibrary implements LibraryMirrorModule, AutoInstallLibrary {
   }) async {
     includedSemanticSearch = includeSemanticSearch;
     log.add('library');
+    await onDownload?.call();
   }
+
+  var probes = 0;
+
+  @override
+  void startDownloadSizeProbe() => probes++;
+
+  @override
+  void clearDownloadSizeProbe() {}
 
   @override
   Future<void> update() async {
@@ -122,9 +132,11 @@ class _FakeRollback implements DownloadRollback {
 
   final List<String> log;
   Completer<void>? gate;
+  MirrorComponent? reverted;
 
   @override
-  Future<void> rollback() async {
+  Future<void> rollback(MirrorComponent? inProgress) async {
+    reverted = inProgress;
     log.add('rollback');
     await gate?.future;
     if (error case final error?) throw error;
@@ -194,9 +206,16 @@ class _FakeDownloadHost implements MirrorDownloadHost {
   @override
   void downloadSnapshotFailed(Object error) => log.add('snapshot failed');
 
+  List<MirrorComponent>? kept;
+
   @override
-  void downloadCancelled({Object? revertError}) =>
-      log.add(revertError == null ? 'cancelled' : 'cancelled revert failed');
+  void downloadCancelled({
+    Object? revertError,
+    List<MirrorComponent> kept = const [],
+  }) {
+    this.kept = kept;
+    log.add(revertError == null ? 'cancelled' : 'cancelled revert failed');
+  }
 
   @override
   void downloadEnded() => log.add('ended');
@@ -499,6 +518,27 @@ void main() {
       expect(componentsRun(), isNot(contains('library')));
     });
 
+    test('the library size is probed while the app downloads', () async {
+      app.onDownload = () async => expect(library.probes, 1);
+      await flow.downloadAll();
+      expect(library.probes, 1);
+    });
+
+    test('no size probe without the library, first, or with smart search',
+        () async {
+      host.settings = const AppSettings(syncLibrary: false);
+      await flow.downloadAll();
+      host.settings = const AppSettings(syncApp: false);
+      await flow.downloadAll();
+      host.settings = const AppSettings();
+      library.shouldOfferSemanticDownload = true;
+      host.onConfirmSemantic = () async => true;
+      await flow.downloadAll();
+
+      expect(componentsRun().where((c) => c == 'library'), hasLength(2));
+      expect(library.probes, 0);
+    });
+
     test('personal update mode never skips the library', () async {
       library.libraryOnlineProof = _proven;
       library.personalUpdateMode = true;
@@ -570,6 +610,38 @@ void main() {
       expect(host.sweeps, 0);
       expect(flow.pendingSweep, isNull);
       expect(log, isNot(contains('finished')));
+    });
+
+    test('cancel during the first component reverts it and keeps nothing',
+        () async {
+      app.onDownload = () async => flow.requestCancel();
+
+      await flow.downloadAll();
+
+      expect(host.rollback.reverted, MirrorComponent.app);
+      expect(host.kept, isEmpty);
+    });
+
+    test('cancel during the second component keeps the first', () async {
+      library.onDownload = () async => flow.requestCancel();
+
+      await flow.downloadAll();
+
+      expect(componentsRun(), ['app', 'library']);
+      expect(host.rollback.reverted, MirrorComponent.library);
+      expect(host.kept, [MirrorComponent.app]);
+      expect(log.last, 'cancelled');
+    });
+
+    test('a component that failed before the cancel is not reported as kept',
+        () async {
+      app.onDownload = () async => app.downloadFailed = true;
+      library.onDownload = () async => flow.requestCancel();
+
+      await flow.downloadAll();
+
+      expect(host.rollback.reverted, MirrorComponent.library);
+      expect(host.kept, isEmpty);
     });
 
     test('a failed snapshot downloads nothing and is reported', () async {

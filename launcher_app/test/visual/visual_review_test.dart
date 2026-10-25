@@ -1,5 +1,5 @@
-// צילומי סקירה (לא goldens): רק ב-Windows עם OTZ_VISUAL=1; השלב ב-OTZ_VISUAL_PHASE.
-// פלט: build/visual_review/<phase>/<state>.png, ו-<state>_narrow.png ב-760x560.
+// צילומי סקירה: רק ב-Windows עם OTZ_VISUAL=1; השלב ב-OTZ_VISUAL_PHASE, אנגלית ב-OTZ_VISUAL_LANG=en.
+// פלט: build/visual_review/<phase>[_en]/<state>.png, ו-<state>_narrow.png ב-760x560.
 
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -39,7 +39,10 @@ import 'visual_fonts.dart';
 
 final _enabled =
     Platform.isWindows && Platform.environment['OTZ_VISUAL'] == '1';
+final _english = Platform.environment['OTZ_VISUAL_LANG'] == 'en';
 final _phase = Platform.environment['OTZ_VISUAL_PHASE'] ?? 'phase0';
+final _outPhase = _english ? '${_phase}_en' : _phase;
+final _language = _english ? AppLanguage.english : AppLanguage.hebrew;
 
 const _sizes = {'': Size(1000, 720), '_narrow': Size(760, 560)};
 
@@ -62,7 +65,7 @@ final List<VisualState> _phase0States = [
   (name: 'plugins', open: (t) => _tapTile(t, ShellSection.plugins)),
   (
     name: 'settings',
-    open: (t) => _tapTooltip(t, stringsOf().shell.settingsTooltip),
+    open: (t) => _tapTooltip(t, stringsOf(_language).shell.settingsTooltip),
   ),
 ];
 
@@ -73,7 +76,10 @@ Future<void> _tapTooltip(WidgetTester tester, String tooltip) async {
 
 final List<VisualState> _phase1States = [
   ..._phase0States,
-  (name: 'help', open: (t) => _tapTooltip(t, stringsOf().shell.helpTooltip)),
+  (
+    name: 'help',
+    open: (t) => _tapTooltip(t, stringsOf(_language).shell.helpTooltip)
+  ),
 ];
 
 Future<void> _tab(WidgetTester tester, int times) async {
@@ -89,11 +95,11 @@ final List<VisualState> _phase1bStates = [
   (
     name: 'dialog_hover_close',
     open: (t) async {
-      await _tapTooltip(t, stringsOf().shell.helpTooltip);
+      await _tapTooltip(t, stringsOf(_language).shell.helpTooltip);
       final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
       await mouse.addPointer(
         location: t.getCenter(
-          find.bySemanticsLabel(stringsOf().shell.windowClose),
+          find.bySemanticsLabel(stringsOf(_language).shell.windowClose),
         ),
       );
       await t.pump();
@@ -110,13 +116,22 @@ final List<VisualState> _phase2aStates = [
   (name: 'shell_plugins', open: (t) => _tapTile(t, ShellSection.plugins)),
   (
     name: 'shell_settings',
-    open: (t) => _tapTooltip(t, stringsOf().shell.settingsTooltip),
+    open: (t) => _tapTooltip(t, stringsOf(_language).shell.settingsTooltip),
   ),
 ];
 
 /// שלב 5: ההגדרות (מקופל ופתוח), דו-שיחי הנעילה והשאלות הנפוצות.
 Future<void> _openSettings(WidgetTester tester) =>
-    _tapTooltip(tester, stringsOf().shell.settingsTooltip);
+    _tapTooltip(tester, stringsOf(_language).shell.settingsTooltip);
+
+/// בלי דיווחים האריח אינו מוצג — ולכן דרך הנווט.
+Future<void> _openReports(WidgetTester tester) async {
+  final shell = tester.state(find.byType(AppShell)) as dynamic;
+  (shell.navigator as ShellNavigator)
+      .push(const SectionRoute(ShellSection.reports))
+      .ignore();
+  await tester.pump(const Duration(milliseconds: 300));
+}
 
 Future<void> _tapVisible(WidgetTester tester, Finder target) async {
   // רשימה עצלה: מה שמתחת לחלון עוד לא נבנה, ולכן גוללים עד שהוא נמצא.
@@ -133,17 +148,19 @@ Future<void> _tapVisible(WidgetTester tester, Finder target) async {
 
 Future<void> _openSettingsAdvanced(WidgetTester tester) async {
   await _openSettings(tester);
-  await _tapVisible(tester, find.text(stringsOf().pages.advancedTitle));
+  await _tapVisible(
+      tester, find.text(stringsOf(_language).pages.advancedTitle));
 }
 
 /// סיסמה 1234 נקבעת דרך הדו-שיח — והנעילה פעילה אחריה.
 Future<void> _setPassword(WidgetTester tester) async {
   await _openSettingsAdvanced(tester);
-  await _tapVisible(tester, find.text(stringsOf().saferMode.setPasswordButton));
+  await _tapVisible(
+      tester, find.text(stringsOf(_language).saferMode.setPasswordButton));
   final fields = find.byType(TextField);
   await tester.enterText(fields.at(0), '1234');
   await tester.enterText(fields.at(1), '1234');
-  await tester.tap(find.text(stringsOf().saferMode.setConfirm));
+  await tester.tap(find.text(stringsOf(_language).saferMode.setConfirm));
   await tester.runAsync(
     () => Future<void>.delayed(const Duration(milliseconds: 300)),
   );
@@ -175,7 +192,8 @@ final List<VisualState> _phase5States = [
     name: 'dlg_auto_install',
     open: (t) async {
       await _openSettings(t);
-      await _tapVisible(t, find.text(stringsOf().settings.autoInstallTitle));
+      await _tapVisible(
+          t, find.text(stringsOf(_language).settings.autoInstallTitle));
     },
   ),
   (
@@ -184,7 +202,7 @@ final List<VisualState> _phase5States = [
       await _openSettingsAdvanced(t);
       await _tapVisible(
         t,
-        find.text(stringsOf().saferMode.setPasswordButton),
+        find.text(stringsOf(_language).saferMode.setPasswordButton),
       );
     },
   ),
@@ -199,14 +217,15 @@ final List<VisualState> _phase5States = [
     name: 'dlg_pw_enter',
     open: (t) async {
       await _setPassword(t);
-      await _tapVisible(t, find.text(stringsOf().saferMode.lockTitle));
+      await _tapVisible(t, find.text(stringsOf(_language).saferMode.lockTitle));
     },
   ),
   (
     name: 'dlg_pw_change',
     open: (t) async {
       await _setPassword(t);
-      await _tapVisible(t, find.text(stringsOf().saferMode.changeButton));
+      await _tapVisible(
+          t, find.text(stringsOf(_language).saferMode.changeButton));
     },
   ),
   (
@@ -214,14 +233,15 @@ final List<VisualState> _phase5States = [
     open: (t) async {
       await _setPassword(t);
       // המחיקה מושבתת כשהנעילה פעילה — מכבים אותה קודם.
-      await _tapVisible(t, find.text(stringsOf().saferMode.lockTitle));
+      await _tapVisible(t, find.text(stringsOf(_language).saferMode.lockTitle));
       await t.enterText(find.byType(TextField), '1234');
-      await t.tap(find.text(stringsOf().common.confirm));
+      await t.tap(find.text(stringsOf(_language).common.confirm));
       await t.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 300)),
       );
       await t.pump(const Duration(milliseconds: 400));
-      await _tapVisible(t, find.text(stringsOf().saferMode.clearButton));
+      await _tapVisible(
+          t, find.text(stringsOf(_language).saferMode.clearButton));
     },
   ),
   (
@@ -231,25 +251,28 @@ final List<VisualState> _phase5States = [
       await _tapVisible(t, find.byKey(const ValueKey('settings.reset')));
     },
   ),
-  (name: 'help', open: (t) => _tapTooltip(t, stringsOf().shell.helpTooltip)),
+  (
+    name: 'help',
+    open: (t) => _tapTooltip(t, stringsOf(_language).shell.helpTooltip)
+  ),
   (
     name: 'help_open',
     open: (t) async {
-      await _tapTooltip(t, stringsOf().shell.helpTooltip);
-      await _tapVisible(t, find.text(stringsOf().faq.qOfflineFlow));
+      await _tapTooltip(t, stringsOf(_language).shell.helpTooltip);
+      await _tapVisible(t, find.text(stringsOf(_language).faq.qOfflineFlow));
     },
   ),
   (
     name: 'help_edit',
     open: (t) async {
-      await _tapTooltip(t, stringsOf().shell.helpTooltip);
+      await _tapTooltip(t, stringsOf(_language).shell.helpTooltip);
       await _tapVisible(t, find.byKey(const ValueKey('faq.edit')));
     },
   ),
   (
     name: 'help_edit_bottom',
     open: (t) async {
-      await _tapTooltip(t, stringsOf().shell.helpTooltip);
+      await _tapTooltip(t, stringsOf(_language).shell.helpTooltip);
       await _tapVisible(t, find.byKey(const ValueKey('faq.edit')));
       await _scrollDown(t);
     },
@@ -264,28 +287,32 @@ final List<VisualState> _phase5bStates = [
     name: 'settings_privacy',
     open: (t) async {
       await _openSettings(t);
-      await _tapVisible(t, find.text(stringsOf().settings.groupPrivacy));
+      await _tapVisible(
+          t, find.text(stringsOf(_language).settings.groupPrivacy));
     },
   ),
   (
     name: 'dlg_personal',
     open: (t) async {
       await _openSettingsAdvanced(t);
-      await _tapVisible(t, find.text(stringsOf().settings.personalModeTitle));
+      await _tapVisible(
+          t, find.text(stringsOf(_language).settings.personalModeTitle));
     },
   ),
   (
     name: 'dlg_pw_change_error',
     open: (t) async {
       await _setPassword(t);
-      await _tapVisible(t, find.text(stringsOf().saferMode.changeButton));
+      await _tapVisible(
+          t, find.text(stringsOf(_language).saferMode.changeButton));
       final fields = find.byType(TextField);
       await t.enterText(fields.at(0), '9999');
       await t.enterText(fields.at(1), '5678');
       await t.enterText(fields.at(2), '5678');
       await t.tap(
         find
-            .widgetWithText(ActionButton, stringsOf().saferMode.changeButton)
+            .widgetWithText(
+                ActionButton, stringsOf(_language).saferMode.changeButton)
             .last,
       );
       await t.pump(const Duration(milliseconds: 400));
@@ -295,7 +322,19 @@ final List<VisualState> _phase5bStates = [
     name: 'help_edit_from_settings',
     open: (t) async {
       await _openSettingsAdvanced(t);
-      await _tapVisible(t, find.text(stringsOf().settings.faqEditTitle));
+      await _tapVisible(
+          t, find.text(stringsOf(_language).settings.faqEditTitle));
+    },
+  ),
+  (
+    name: 'reports_page',
+    open: _openReports,
+  ),
+  (
+    name: 'dlg_app_report',
+    open: (t) async {
+      await _openReports(t);
+      await _tapVisible(t, find.byKey(ShellKeys.reportsProblem));
     },
   ),
 ];
@@ -387,9 +426,11 @@ void main() {
     // עברית במפורש: "כמו במחשב" במכונת הבדיקה היא אנגלית, וההגדרות מציבות
     // אותה ב-`AppL10n` בכל שמירה — וכך "Cancel" נכנס לדו-שיחים בצילום.
     await settings.update(
-      const AppSettings(
+      AppSettings(
         autoCheckUpdates: false,
-        languagePreference: AppLanguagePreference.hebrew,
+        languagePreference: _english
+            ? AppLanguagePreference.english
+            : AppLanguagePreference.hebrew,
       ),
     );
   });
@@ -445,7 +486,7 @@ void main() {
             : null;
         try {
           useViewSize(tester, size);
-          AppL10n.use(AppLanguage.hebrew);
+          AppL10n.use(_language);
           await tester.pumpWidget(
             RepaintBoundary(
               key: boundary,
@@ -460,6 +501,7 @@ void main() {
                   showWindowButtons: _showWindowButtons,
                   appReports: reports,
                 ),
+                language: _language,
               ),
             ),
           );
@@ -468,8 +510,8 @@ void main() {
           await settle(tester);
           await capture(
             tester,
-            p.join(
-                'build', 'visual_review', _phase, '${state.name}$suffix.png'),
+            p.join('build', 'visual_review', _outPhase,
+                '${state.name}$suffix.png'),
           );
           await tester.pumpWidget(const SizedBox.shrink());
         } finally {
@@ -491,7 +533,7 @@ void main() {
         WidgetsApp.debugAllowBannerOverride = false;
         try {
           useViewSize(tester, size);
-          AppL10n.use(AppLanguage.hebrew);
+          AppL10n.use(_language);
           await tester.pumpWidget(
             RepaintBoundary(
               key: boundary,
@@ -511,6 +553,7 @@ void main() {
                     ],
                   ),
                 ),
+                language: _language,
               ),
             ),
           );
@@ -520,7 +563,7 @@ void main() {
             p.join(
               'build',
               'visual_review',
-              _phase,
+              _outPhase,
               'home_$scenario$suffix.png',
             ),
           );
@@ -541,7 +584,7 @@ void main() {
         try {
           useViewSize(tester, size);
           // `formatBytes` קורא את השפה הגלובלית — בלי זה היחידות באנגלית.
-          AppL10n.use(AppLanguage.hebrew);
+          AppL10n.use(_language);
           await tester.pumpWidget(
             RepaintBoundary(
               key: boundary,
@@ -559,6 +602,7 @@ void main() {
                     ],
                   ),
                 ),
+                language: _language,
               ),
             ),
           );
@@ -568,7 +612,7 @@ void main() {
             p.join(
               'build',
               'visual_review',
-              _phase,
+              _outPhase,
               'task_$scenario$suffix.png',
             ),
           );
@@ -617,13 +661,14 @@ void main() {
                     ],
                   ),
                 ),
+                language: _language,
               ),
             ),
           );
           await settle(tester);
           await capture(
             tester,
-            p.join('build', 'visual_review', _phase, '$name$suffix.png'),
+            p.join('build', 'visual_review', _outPhase, '$name$suffix.png'),
           );
           await tester.pumpWidget(const SizedBox.shrink());
         } finally {
@@ -649,12 +694,12 @@ void main() {
           try {
             useViewSize(tester, size);
             // מלל התחום (otzaria_l10n) נקרא מהשפה הגלובלית, לא מה-context.
-            AppL10n.use(AppLanguage.hebrew);
+            AppL10n.use(_language);
             final crumb = switch (name.split('_').first) {
-              'otzaria' => stringsOf().guide.tileApp,
-              'library' => stringsOf().guide.tileLibrary,
-              'reports' => stringsOf().pages.repCrumb,
-              _ => stringsOf().pages.selfCrumb,
+              'otzaria' => stringsOf(_language).guide.tileApp,
+              'library' => stringsOf(_language).guide.tileLibrary,
+              'reports' => stringsOf(_language).pages.repCrumb,
+              _ => stringsOf(_language).pages.selfCrumb,
             };
             await tester.pumpWidget(
               RepaintBoundary(
@@ -682,6 +727,7 @@ void main() {
                       ],
                     ),
                   ),
+                  language: _language,
                 ),
               ),
             );
@@ -692,7 +738,8 @@ void main() {
                 const Offset(0, -2000),
               );
               await settle(tester);
-              await tester.tap(find.text(stringsOf().pages.advancedTitle));
+              await tester
+                  .tap(find.text(stringsOf(_language).pages.advancedTitle));
               await settle(tester);
               await tester.drag(
                 find.byType(ListView).first,
@@ -702,7 +749,7 @@ void main() {
             }
             await capture(
               tester,
-              p.join('build', 'visual_review', _phase, 'page_$file.png'),
+              p.join('build', 'visual_review', _outPhase, 'page_$file.png'),
             );
             await tester.pumpWidget(const SizedBox.shrink());
           } finally {
@@ -722,10 +769,10 @@ void main() {
         final fixture = StoreFixture(tempDir.path);
         try {
           useViewSize(tester, size);
-          AppL10n.use(AppLanguage.hebrew);
+          AppL10n.use(_language);
           await tester.runAsync(fixture.paint);
           final screen = scenario.build(fixture);
-          final s = stringsOf();
+          final s = stringsOf(_language);
           final section = name.startsWith('plugin') || name == 'lightbox'
               ? s.guide.tilePlugins
               : name.startsWith('manage') || name == 'addapp'
@@ -780,6 +827,7 @@ void main() {
                     ],
                   ),
                 ),
+                language: _language,
               ),
             ),
           );
@@ -790,7 +838,8 @@ void main() {
           }
           await capture(
             tester,
-            p.join('build', 'visual_review', _phase, 'store_$name$suffix.png'),
+            p.join(
+                'build', 'visual_review', _outPhase, 'store_$name$suffix.png'),
           );
           await tester.pumpWidget(const SizedBox.shrink());
         } finally {
@@ -810,7 +859,8 @@ void main() {
     try {
       useViewSize(tester, const Size(1000, 720));
       await tester.pumpWidget(
-        RepaintBoundary(key: boundary, child: wrap(const _Gallery())),
+        RepaintBoundary(
+            key: boundary, child: wrap(const _Gallery(), language: _language)),
       );
       await settle(tester);
       // מיקוד מהמקלדת על השדה השני — הטבעת שלו והמסגרת ב-primary.
@@ -819,7 +869,7 @@ void main() {
       await tester.pump();
       await capture(
         tester,
-        p.join('build', 'visual_review', _phase, 'gallery.png'),
+        p.join('build', 'visual_review', _outPhase, 'gallery.png'),
       );
       await tester.pumpWidget(const SizedBox.shrink());
     } finally {

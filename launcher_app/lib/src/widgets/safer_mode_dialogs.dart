@@ -7,10 +7,8 @@ import '../theme/theme_exports.dart';
 import 'action_buttons.dart';
 import 'rtl_text_field.dart';
 
-/// מבקש את סיסמת מצב הסייפר. מחזיר `true` רק כשהוזנה הסיסמה הנכונה.
-///
-/// [hint] אומר *למה* מבקשים אותה עכשיו — כניסה להגדרות, עריכת השאלות,
-/// הפעלת הנעילה או כיבויה. [confirmText] — ברירת המחדל "אישור".
+/// סיסמת מצב הסייפר; `true` רק בסיסמה הנכונה. [hint] אומר למה מבקשים
+/// אותה עכשיו.
 Future<bool> showSaferModePasswordDialog(
   BuildContext context, {
   required String storedPassword,

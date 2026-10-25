@@ -850,6 +850,21 @@ void main() {
       expect(nav.stack, [const HomeRoute()]);
     });
 
+    testWidgets('Esc בשדה טקסט יוצא מהשדה במקום לחזור לבית', (tester) async {
+      final focus = FocusNode();
+      addTearDown(focus.dispose);
+      await tester.pumpWidget(
+        wrap(Material(child: TextField(focusNode: focus))),
+      );
+      expect(leaveTextField(), isFalse);
+      focus.requestFocus();
+      await tester.pump();
+      expect(leaveTextField(), isTrue);
+      await tester.pump();
+      expect(focus.hasFocus, isFalse);
+      expect(leaveTextField(), isFalse);
+    });
+
     testWidgets('Esc אינו יוצא משכבת משימה', (tester) async {
       await pumpShell(tester);
       final nav = navigatorOf(tester);
@@ -981,7 +996,9 @@ void main() {
     await pumpShell(tester);
 
     final dynamic state = tester.state(find.byType(AppShell));
-    final dirs = List<String>.from(state.session.downloadMirrorDirs as List);
+    final byComponent =
+        state.session.downloadMirrorDirs as Map<MirrorComponent, List<String>>;
+    final dirs = byComponent[MirrorComponent.plugins]!;
     final mirrorRoot = p.join(tempDir.path, 'mirror');
     final pluginDirs = PluginsManager.mirrorDirsIn(mirrorRoot);
 
@@ -1141,8 +1158,8 @@ void main() {
       // "מתכונן" נפתח רק ב-downloadAll — ניקוי שהסתיים אחרי "ביטול" לא פותח אותו שוב.
       expect(host, isNot(contains('prepareDownload')));
       expect(host, contains('_session.tasks.askBeforeDownload()'));
-      expect(host,
-          contains('_session.tasks.downloadRunning(flow.activeComponents)'));
+      expect(host, contains('_session.tasks.downloadRunning('));
+      expect(host, contains('flow.activeComponents,'));
       expect(host, contains('_session.tasks.downloadCancelled('));
       expect(host, contains('s.tasks.downloadDone(skipped: skipped)'));
       expect(host, contains('classifyDownloadFailure('));
@@ -2139,7 +2156,7 @@ void main() {
     test('גוף השומר נמצא', () => expect(start, greaterThan(-1)));
 
     test('שואל רק בזמן פעולה ארוכה', () {
-      expect(body, contains('!longTaskRunning) return true'));
+      expect(body, contains('!(longTaskRunning || updatingHere)) return true'));
       expect(body, contains('prompts.confirmClose('));
       expect(
         _methodBody(

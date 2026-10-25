@@ -34,6 +34,9 @@ class AppTokens {
   static const double dialogWidth = 336;
   static const double dialogFormWidth = 440;
 
+  /// טופס הדיווח — סוג, שדות ותמונות בשורה.
+  static const double dialogWideWidth = 560;
+
   // ── Typography Scale ——————————————————————
   static const double fontSM = 12;
   static const double fontMD = 14;

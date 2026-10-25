@@ -272,7 +272,7 @@ void main() {
         GuidancePrimary.upToDate,
       ),
       _case(
-        'אוצריא לא מותקנת אבל בכונן יש אותה — לא "ברוכים הבאים"',
+        'אוצריא לא מותקנת אבל בכונן יש אותה — לא "ברוך הבא"',
         const GuidanceFacts(
           online: true,
           otzariaInstalled: false,
@@ -424,6 +424,62 @@ void main() {
   });
 
   group('deriveTileStatus', () {
+    // התוכנה והספרייה מדברות מאותה נקודת מבט: מה בכונן מול המחשב ומול הרשת.
+    test('התוכנה והספרייה מקבלות אותו מצב לאותן עובדות', () {
+      final cases = <(AppStatusFact, LibraryStatusFact, bool, TileStatus)>[
+        (
+          AppStatusFact.needsDownload,
+          LibraryStatusFact.needsDownload,
+          false,
+          TileStatus.nothingOnDrive,
+        ),
+        (
+          AppStatusFact.needsDownload,
+          LibraryStatusFact.needsDownload,
+          true,
+          TileStatus.onlineAvailable,
+        ),
+        (
+          AppStatusFact.updateAvailable,
+          LibraryStatusFact.updateAvailable,
+          false,
+          TileStatus.updateHere,
+        ),
+        (
+          AppStatusFact.upToDate,
+          LibraryStatusFact.upToDate,
+          true,
+          TileStatus.onlineAvailable,
+        ),
+        (
+          AppStatusFact.upToDate,
+          LibraryStatusFact.upToDate,
+          false,
+          TileStatus.upToDate,
+        ),
+      ];
+      for (final (app, library, online, expected) in cases) {
+        final f = GuidanceFacts(
+          otzariaStatus: app,
+          libraryStatus: library,
+          online: online,
+          onlineApp: online,
+          onlineLibrary: online,
+        );
+        final download = deriveHomeGuidance(f).downloadItems;
+        expect(
+          deriveTileStatus(_app, f, download: download),
+          expected,
+          reason: '$app online=$online',
+        );
+        expect(
+          deriveTileStatus(_library, f, download: download),
+          expected,
+          reason: '$library online=$online',
+        );
+      }
+    });
+
     test('תוכנה', () {
       TileStatus app(AppStatusFact s, {bool installed = true}) =>
           deriveTileStatus(
@@ -510,7 +566,8 @@ void main() {
       );
     });
 
-    test('רכיב שההורדה מביאה — "חדש באינטרנט", גם כשהוא חסר בכונן', () {
+    test('רכיב שההורדה מביאה — "יש עדכון להוריד לכונן", גם כשהוא חסר בכונן',
+        () {
       TileStatus tile(GuidanceItem item, GuidanceFacts f) =>
           deriveTileStatus(item, f, download: [item]);
       expect(
@@ -535,7 +592,7 @@ void main() {
       );
     });
 
-    test('פעולה רצה, בדיקה, תקלה והסכמה גוברות על "חדש באינטרנט"', () {
+    test('פעולה רצה, בדיקה, תקלה והסכמה גוברות על "יש עדכון להוריד לכונן"', () {
       TileStatus app(AppStatusFact s) => deriveTileStatus(
             _app,
             GuidanceFacts(otzariaStatus: s),

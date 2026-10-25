@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 
-import '../../controllers/download_plan.dart' show MirrorComponent;
+import '../../controllers/download_plan.dart'
+    show LibrarySizeProbe, MirrorComponent;
 import '../../services/byte_size.dart';
 import '../../shell/shell_keys.dart';
 import '../../shell/shell_tasks.dart';
@@ -20,12 +21,14 @@ class DownloadSnapshot {
     this.fraction,
     this.received,
     this.total,
+    this.libraryProbe,
   });
 
   final MirrorComponent? current;
   final double? fraction;
   final int? received;
   final int? total;
+  final LibrarySizeProbe? libraryProbe;
 }
 
 /// אחרי ההורדה: מה אפשר לעשות במחשב הזה.
@@ -99,6 +102,7 @@ class DownloadTaskView extends StatelessWidget {
           _Preparing(onCancel: actions.onCancelPreparing),
         DownloadTaskPhase.running => _DownloadProgress(
             components: task.components,
+            expectedBytes: task.expectedBytes,
             progress: progress,
             snapshot: snapshot,
             cancelling: cancelling,
@@ -118,7 +122,13 @@ class DownloadTaskView extends StatelessWidget {
         icon: FluentIcons.arrow_reset_24_regular,
       ),
       title: t.cancelledTitle,
-      body: task.revertFailed ? t.cancelledRevertFailedBody : t.cancelledBody,
+      body: task.revertFailed
+          ? t.cancelledRevertFailedBody
+          : task.kept.isEmpty
+              ? t.cancelledBody
+              : t.cancelledKeptBody(context.strings.plugins.joinNames([
+                  for (final c in task.kept) componentStepName(context, c),
+                ])),
       actions: [
         ActionButton.recommended(
           key: ShellKeys.taskPrimary,
@@ -156,7 +166,7 @@ class DownloadTaskView extends StatelessWidget {
       onPressed: actions.onRetry,
     );
     final home = ActionButton.ghost(
-      text: t.backToHomePage,
+      text: t.backHome,
       expand: true,
       onPressed: actions.onHome,
     );
@@ -193,7 +203,7 @@ class DownloadTaskView extends StatelessWidget {
           actions: [
             ActionButton.recommended(
               key: ShellKeys.taskPrimary,
-              text: t.backToHomePage,
+              text: t.backHome,
               size: ActionButtonSize.lg,
               autofocus: true,
               expand: true,
@@ -262,7 +272,7 @@ class DownloadTaskView extends StatelessWidget {
             onPressed: actions.onHere,
           ),
           ActionButton.ghost(
-            text: t.backToHomePage,
+            text: t.backHome,
             expand: true,
             onPressed: actions.onHome,
           ),
@@ -477,10 +487,12 @@ class _DownloadProgress extends StatefulWidget {
     required this.snapshot,
     required this.cancelling,
     required this.onCancel,
+    this.expectedBytes = const {},
     this.clock,
   });
 
   final List<MirrorComponent> components;
+  final Map<MirrorComponent, int> expectedBytes;
   final Listenable progress;
   final DownloadSnapshot Function() snapshot;
   final bool cancelling;
@@ -590,6 +602,27 @@ class _DownloadProgressState extends State<_DownloadProgress> {
     final shown = current ?? components.firstOrNull;
     final sizeOfCurrent =
         total != null && total > 0 ? formatBytes(total) : null;
+    final expected = {
+      ...widget.expectedBytes,
+      if (s.libraryProbe?.bytes case final bytes?)
+        MirrorComponent.library: bytes,
+    };
+    String? approx(MirrorComponent c) => switch (expected[c]) {
+          final size? => t.approxSize(formatBytes(size)),
+          null => null,
+        };
+    // הגודל האמיתי של הספרייה גובר על הבדיקה המוקדמת.
+    final sizes = [
+      for (final c in components)
+        c == MirrorComponent.library
+            ? _sizes[c] ?? expected[c]
+            : expected[c] ?? _sizes[c],
+    ];
+    final totalLine = sizes.isEmpty || sizes.contains(null)
+        ? ' '
+        : t.downloadTotal(
+            formatBytes(sizes.fold<int>(0, (sum, size) => sum + size!)),
+          );
     final String speedLine;
     if (received == null) {
       // רכיב שלא מדווח בייטים — אין מהירות לחשב.
@@ -609,7 +642,13 @@ class _DownloadProgressState extends State<_DownloadProgress> {
     return Column(
       children: [
         TaskHeading(title: t.downloadingTitle, body: t.downloadingBody),
-        SizedBox(height: narrow ? 16 : 24),
+        const SizedBox(height: 8),
+        Text(
+          totalLine,
+          key: const ValueKey('task.download.total'),
+          style: AppTextStyles.small.copyWith(color: cs.onSurfaceVariant),
+        ),
+        SizedBox(height: narrow ? 8 : 16),
         Text(
           overall == null ? '…' : '${(overall * 100).floor()}%',
           key: const ValueKey('task.download.percent'),
@@ -676,11 +715,18 @@ class _DownloadProgressState extends State<_DownloadProgress> {
                         ? [
                             if (fraction != null)
                               '${(fraction * 100).floor()}%',
-                            if (sizeOfCurrent != null) sizeOfCurrent,
+                            if (sizeOfCurrent ?? approx(c) case final size?)
+                              size,
                           ].join(' · ')
                         : [
                             t.stageWaiting,
-                            if (_sizes[c] case final size?) formatBytes(size),
+                            if (_sizes[c] case final size?)
+                              formatBytes(size)
+                            else if (approx(c) case final size?)
+                              size
+                            else if (c == MirrorComponent.library &&
+                                (s.libraryProbe?.checking ?? false))
+                              t.sizeChecking,
                           ].join(' · '),
               ),
           ],

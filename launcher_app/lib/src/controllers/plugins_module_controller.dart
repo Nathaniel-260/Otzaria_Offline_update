@@ -140,9 +140,8 @@ class PluginsModuleController extends ChangeNotifier
   /// קטגוריות החנות כפי שנאצרו באתר, בסדר שלו. ריק במראה ישנה.
   List<PluginStoreCategory> categories = const [];
 
-  /// `manifestId -> גרסה מותקנת`. setter ולא שדה: התוצרים הממוזנים למטה
-  /// ([filtered], [updatablePlugins]…) נגזרים ממנו, והצבה ישירה
-  /// הייתה משאירה אותם על התשובה הקודמת.
+  /// `manifestId -> גרסה מותקנת`. setter ולא שדה: הוא מאפס את מה שנגזר
+  /// ממנו ([filtered], [updatablePlugins]…).
   Map<String, String> get installed => _installed;
   set installed(Map<String, String> value) {
     _installed = value;

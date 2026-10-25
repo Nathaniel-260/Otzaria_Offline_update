@@ -86,10 +86,8 @@ abstract interface class UpdateHereHost {
   ShellTasks get tasks;
 }
 
-/// "עדכון אוצריא במחשב הזה" כמסך משימה. **עדכון**: הספרייה, התוכנה ואז
-/// מסירת התוספים — כמו `AutoInstallFlow`. **התקנה ראשונה**: התוכנה ואז
-/// הספרייה, ולעולם בלי תוספים. אוצריא נסגרת רק אחרי "סגירה והמשך" — חוץ
-/// מאחרי האשף בהתקנה ראשונה, שפתח אותה בעצמו.
+/// "עדכון כאן": הספרייה, התוכנה ואז התוספים; בהתקנה ראשונה התוכנה ואז הספרייה.
+/// אוצריא נסגרת רק אחרי "סגירה והמשך", חוץ מאחרי אשף שפתח אותה בעצמו.
 class UpdateHereFlow {
   UpdateHereFlow({
     required this.app,
@@ -162,6 +160,11 @@ class UpdateHereFlow {
       pluginNames: stages.contains(GuidanceItem.plugins)
           ? plugins.deliverableUpdates
           : const [],
+      request: (
+        items: List.unmodifiable(items),
+        reinstallApp: reinstallApp,
+        fullLibrary: fullLibrary,
+      ),
     );
     try {
       await _run(
@@ -177,6 +180,20 @@ class UpdateHereFlow {
       _failIfRunning(id, error);
     }
     return true;
+  }
+
+  /// "נסה שוב" אחרי כשל או ביטול — אותה בקשה, לא מה שמוצג עכשיו בבית.
+  Future<bool> retry() async {
+    final request = switch (_tasks.current) {
+      UpdateHereTask(:final request?, isFinished: true) => request,
+      _ => null,
+    };
+    if (request == null) return false;
+    return run(
+      request.items,
+      reinstallApp: request.reinstallApp,
+      fullLibrary: request.fullLibrary,
+    );
   }
 
   Future<void> _run(

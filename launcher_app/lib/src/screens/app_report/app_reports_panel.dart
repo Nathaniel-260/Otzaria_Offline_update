@@ -13,15 +13,15 @@ import '../../theme/theme_exports.dart';
 import '../../widgets/widgets_exports.dart';
 import 'app_report_result_snack.dart';
 
-/// הדיווחים של הכלי על עצמו, בדף הדיווחים: התור וההיסטוריה — פורט של
-/// לשונית "התוכנה" ב-`ReportsManagementDialog` של אוצריא, בלי סקריפט
-/// השליחה, "סמן כנשלח" ועריכת דיווח שמור.
+/// הדיווחים של הכלי על עצמו: התור וההיסטוריה — פורט של לשונית "התוכנה"
+/// ב-`ReportsManagementDialog` של אוצריא, בלי סקריפט השליחה ובלי עריכה.
 class AppReportsPanel extends StatefulWidget {
   const AppReportsPanel({
     super.key,
     required this.reports,
     this.openUrl = FileReveal.openGithubUrl,
     this.connection,
+    this.checkConnectionButton,
   });
 
   final AppReportsController reports;
@@ -29,6 +29,9 @@ class AppReportsPanel extends StatefulWidget {
 
   /// שליחה רק כשידוע שיש חיבור — כמו בכרטיס הראשי של הדף.
   final bool? connection;
+
+  /// "בדוק חיבור" של הדף, כשהחיבור עוד לא נבדק.
+  final Widget? checkConnectionButton;
 
   @override
   State<AppReportsPanel> createState() => _AppReportsPanelState();
@@ -232,7 +235,7 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
     if (pending == null) {
       return const Padding(
         padding: EdgeInsets.all(AppTokens.spaceMD),
-        child: Center(child: CircularProgressIndicator()),
+        child: AppProgressBar(thin: true),
       );
     }
     // שתי רשימות ריקות — שורה אחת, ולא שני כרטיסים ריקים.
@@ -242,7 +245,7 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
         mainAxisSize: MainAxisSize.min,
         children: [
           SectionLabel(pages.repOwnTitle),
-          _emptyCard(context, pages.repOwnEmpty),
+          SectionEmptyNote(pages.repOwnEmpty),
         ],
       );
     }
@@ -257,6 +260,8 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
             trailing: Wrap(
               spacing: 4,
               children: [
+                if (!canSend && widget.checkConnectionButton != null)
+                  widget.checkConnectionButton!,
                 if (canSend)
                   ActionButton.ghost(
                     key: const ValueKey('app-reports-flush'),
@@ -336,11 +341,11 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
               key: const ValueKey('app-reports-clear-sent'),
               text: t.clearSentButton,
               size: ActionButtonSize.sm,
-              onPressed: _clearSent,
+              onPressed: _sent.isEmpty ? null : _clearSent,
             ),
           ),
           if (_sent.isEmpty)
-            _emptyCard(context, pages.repOwnEmpty)
+            SectionEmptyNote(pages.repOwnEmpty)
           else
             RowsCard(
               children: [
@@ -389,14 +394,4 @@ class _AppReportsPanelState extends State<AppReportsPanel> {
       ],
     );
   }
-
-  Widget _emptyCard(BuildContext context, String text) => AppCard(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          text,
-          style: AppTextStyles.small.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
 }

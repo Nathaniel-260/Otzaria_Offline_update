@@ -110,6 +110,167 @@ void main() {
       expect(calls, ['cancel']);
     });
 
+    testWidgets('שורות ממתינות מראות גודל צפוי, וסך הכול רק כשהכול ידוע',
+        (tester) async {
+      const mb = 1024 * 1024;
+      final progress = ValueNotifier(0);
+      var snapshot = const DownloadSnapshot(
+        current: MirrorComponent.app,
+        received: 10 * mb,
+        total: 120 * mb,
+        fraction: 10 / 120,
+      );
+      await pumpScreen(
+        tester,
+        DownloadTaskView(
+          task: const DownloadTask(
+            phase: DownloadTaskPhase.running,
+            components: [
+              MirrorComponent.app,
+              MirrorComponent.library,
+              MirrorComponent.plugins,
+            ],
+            expectedBytes: {
+              MirrorComponent.app: 240 * mb,
+              MirrorComponent.plugins: 5 * mb,
+            },
+          ),
+          progress: progress,
+          snapshot: () => snapshot,
+          actions: DownloadTaskActions(
+            onAnswer: (_) {},
+            onCancel: () {},
+            onRetry: () {},
+            onHome: () {},
+            onHere: () {},
+          ),
+        ),
+      );
+      List<String?> details() => [
+            for (final row
+                in tester.widgetList<StageRow>(find.byType(StageRow)))
+              row.detail,
+          ];
+
+      expect(details(), [
+        '8% · ${formatBytes(120 * mb)}',
+        t.stageWaiting,
+        '${t.stageWaiting} · ${t.approxSize(formatBytes(5 * mb))}',
+      ]);
+      // לספרייה אין גודל צפוי — סך הכול היה ממציא מספר.
+      expect(line(tester, 'task.download.total'), ' ');
+
+      snapshot = const DownloadSnapshot(
+        current: MirrorComponent.library,
+        received: 0,
+        total: 1024 * mb,
+        fraction: 0,
+      );
+      progress.value++;
+      await tester.pump();
+      expect(
+        line(tester, 'task.download.total'),
+        t.downloadTotal(formatBytes((240 + 1024 + 5) * mb)),
+      );
+    });
+
+    testWidgets('הספרייה: "בודק", אחר כך הגודל המדויק, והגודל האמיתי גובר',
+        (tester) async {
+      const mb = 1024 * 1024;
+      final progress = ValueNotifier(0);
+      DownloadSnapshot app(LibrarySizeProbe? probe) => DownloadSnapshot(
+            current: MirrorComponent.app,
+            received: 10 * mb,
+            total: 240 * mb,
+            fraction: 10 / 240,
+            libraryProbe: probe,
+          );
+      var snapshot = app(const LibrarySizeProbe.checking());
+      await pumpScreen(
+        tester,
+        DownloadTaskView(
+          task: const DownloadTask(
+            phase: DownloadTaskPhase.running,
+            components: [MirrorComponent.app, MirrorComponent.library],
+            expectedBytes: {MirrorComponent.app: 240 * mb},
+          ),
+          progress: progress,
+          snapshot: () => snapshot,
+          actions: DownloadTaskActions(
+            onAnswer: (_) {},
+            onCancel: () {},
+            onRetry: () {},
+            onHome: () {},
+            onHere: () {},
+          ),
+        ),
+      );
+      String? libraryRow() =>
+          tester.widgetList<StageRow>(find.byType(StageRow)).last.detail;
+      Future<void> next(DownloadSnapshot value) async {
+        snapshot = value;
+        progress.value++;
+        await tester.pump();
+      }
+
+      expect(libraryRow(), '${t.stageWaiting} · ${t.sizeChecking}');
+      expect(line(tester, 'task.download.total'), ' ');
+
+      await next(app(const LibrarySizeProbe.known(12 * mb)));
+      expect(
+        libraryRow(),
+        '${t.stageWaiting} · ${t.approxSize(formatBytes(12 * mb))}',
+      );
+      expect(
+        line(tester, 'task.download.total'),
+        t.downloadTotal(formatBytes((240 + 12) * mb)),
+      );
+
+      await next(const DownloadSnapshot(
+        current: MirrorComponent.library,
+        received: 0,
+        total: 15 * mb,
+        fraction: 0,
+        libraryProbe: LibrarySizeProbe.known(12 * mb),
+      ));
+      expect(libraryRow(), '0% · ${formatBytes(15 * mb)}');
+      expect(
+        line(tester, 'task.download.total'),
+        t.downloadTotal(formatBytes((240 + 15) * mb)),
+      );
+    });
+
+    testWidgets('בדיקה שנכשלה משאירה "ממתין" בלי מספר ובלי סך הכול',
+        (tester) async {
+      await pumpScreen(
+        tester,
+        DownloadTaskView(
+          task: const DownloadTask(
+            phase: DownloadTaskPhase.running,
+            components: [MirrorComponent.app, MirrorComponent.library],
+            expectedBytes: {MirrorComponent.app: 1024},
+          ),
+          progress: ValueNotifier(0),
+          snapshot: () => const DownloadSnapshot(
+            current: MirrorComponent.app,
+            libraryProbe: LibrarySizeProbe.failed(),
+          ),
+          actions: DownloadTaskActions(
+            onAnswer: (_) {},
+            onCancel: () {},
+            onRetry: () {},
+            onHome: () {},
+            onHere: () {},
+          ),
+        ),
+      );
+      expect(
+        tester.widgetList<StageRow>(find.byType(StageRow)).last.detail,
+        t.stageWaiting,
+      );
+      expect(line(tester, 'task.download.total'), ' ');
+    });
+
     testWidgets('האחוז לא יורד כשהרכיב מפסיק לדווח חלק, ובלי בייטים אין מהירות',
         (tester) async {
       final progress = ValueNotifier(0);
@@ -331,6 +492,33 @@ void main() {
     expect(calls, ['retry', 'home']);
   });
 
+  testWidgets('בוטלה אחרי שרכיב ירד עד הסוף — אומר מה נשאר בכונן',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      DownloadTaskView(
+        task: const DownloadTask(
+          phase: DownloadTaskPhase.cancelled,
+          kept: [MirrorComponent.app, MirrorComponent.library],
+        ),
+        progress: ValueNotifier(0),
+        snapshot: () => const DownloadSnapshot(),
+        actions: DownloadTaskActions(
+          onAnswer: (_) {},
+          onCancel: () {},
+          onRetry: () {},
+          onHome: () {},
+          onHere: () {},
+        ),
+      ),
+    );
+    expect(
+      find.text(t.cancelledKeptBody('${t.stepApp} ו${t.stepLibrary}')),
+      findsOneWidget,
+    );
+    expect(find.text(t.cancelledBody), findsNothing);
+  });
+
   testWidgets('בוטלה ושחזור הכונן נכשל — נאמר בכנות', (tester) async {
     await pumpScreen(
       tester,
@@ -371,7 +559,7 @@ void main() {
       );
       expect(step.strong, stringsOf().shell.appTitle);
       await tester.tap(find.text(t.updateHereToo));
-      await tester.tap(find.text(t.backToHomePage));
+      await tester.tap(find.text(t.backHome));
       expect(calls, ['here', 'home']);
     });
 

@@ -11,13 +11,8 @@ enum _Variant { recommended, neutral, outlined, ghost, warning }
 /// גובה הכפתור: 32 / 40 / 44, כמו `.btn.sm` / `.btn` / `.btn.lg` במוקאפ.
 enum ActionButtonSize { sm, md, lg }
 
-/// כפתור פעולה גנרי בסגנון M3. השתמש בבנאים הממוינים:
-/// - [ActionButton.recommended] — FilledButton לפעולה מומלצת
-/// - [ActionButton.neutral] — FilledButton.tonal לפעולה ניטרלית
-/// - [ActionButton.outlined] — OutlinedButton: מסגרת בלבד. אין לו מקבילה
-///   במוקאפ — לא במסכים חדשים.
-/// - [ActionButton.ghost] — TextButton שקוף וניטרלי
-/// - [ActionButton.warning] — TextButton עם טקסט cs.error לפעולות הרסניות
+/// כפתור פעולה: recommended (מלא), neutral (tonal), ghost (שקוף), warning
+/// (הרסני). outlined אינו במוקאפ — לא במסכים חדשים.
 class ActionButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;

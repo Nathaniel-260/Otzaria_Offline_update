@@ -52,12 +52,12 @@ void main() {
     expect(find.text(t.closeHint(plugins: true)), findsOneWidget);
     final primary =
         tester.widget<ActionButton>(find.byKey(ShellKeys.taskPrimary));
-    expect(primary.text, t.closeAndContinue);
+    expect(primary.text, t.closeOtzariaAndContinue);
     await tester.tap(find.byKey(ShellKeys.taskPrimary));
     expect(calls, ['respond true']);
   });
 
-  testWidgets('שלב הספרייה: התקדמות מה-progress, "אל תנתקו את הכונן"',
+  testWidgets('שלב הספרייה: התקדמות מה-progress, "אל תנתק את הכונן"',
       (tester) async {
     final progress = ValueNotifier(0);
     var fraction = 0.1;
@@ -253,8 +253,8 @@ void main() {
     await show(tester, 'firstClose');
     expect(find.text(t.closeAfterWizardBody), findsOneWidget);
     expect(find.text(t.libraryWaitingClose), findsOneWidget);
-    await tester.tap(find.text(t.closeAfterWizardButton));
-    await tester.tap(find.text(t.notNow));
+    await tester.tap(find.text(t.closeOtzariaAndContinue));
+    await tester.tap(find.text(stringsOf().common.cancel));
     expect(calls, ['respond true', 'respond false']);
   });
 
@@ -315,7 +315,7 @@ void main() {
       await show(tester, 'libraryNote');
       expect(find.text(t.installedTitle), findsOneWidget);
       expect(badge(tester).kind, ResultBadgeKind.ok);
-      expect(find.textContaining('בחרו אותה בהגדרות'), findsOneWidget);
+      expect(find.textContaining('בחר אותה בהגדרות'), findsOneWidget);
       expect(find.text(t.libraryFailedTitle), findsNothing);
       // הגוף לא מבטיח "מוכנות ללימוד" כשההערה אומרת שאוצריא לא תמצא אותה.
       final body = t.doneHereBody(

@@ -309,7 +309,7 @@ class PluginDetailView extends StatelessWidget {
         StoreInfoEntry(
           label: t.infoSource,
           value: homepage,
-          ltr: true,
+          mono: true,
           trailing: [
             AppIconButton(
               icon: FluentIcons.copy_20_regular,

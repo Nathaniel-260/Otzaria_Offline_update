@@ -36,8 +36,17 @@ void main() {
     dataDir = await Directory.systemTemp.createTemp('otzaria-manager-test-');
   });
 
+  // סורק או אינדקס של Windows מחזיק לרגע קובץ בתיקייה (errno 32) — ניסיון חוזר.
   tearDown(() async {
-    if (await dataDir.exists()) await dataDir.delete(recursive: true);
+    for (var attempt = 1;; attempt++) {
+      try {
+        if (await dataDir.exists()) await dataDir.delete(recursive: true);
+        return;
+      } on FileSystemException {
+        if (attempt == 5) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 200 * attempt));
+      }
+    }
   });
 
   String mirrorDir() => p.join(dataDir.path, 'mirror', 'app');

@@ -405,6 +405,40 @@ void main() {
       expect(prompts.calls, ['confirmClose', 'confirmClose']);
       expect(prompts.closeDownloading, [false, false]);
     });
+
+    test('"נסה שוב" כשאין עוד מה להתקין — חוזרים לבית, לא כפתור מת', () async {
+      final s = session();
+      s.tasks.startUpdateHere(
+        const [GuidanceItem.library],
+        request: (
+          items: const [GuidanceItem.library],
+          reinstallApp: false,
+          fullLibrary: true,
+        ),
+      );
+      s.tasks.updateFailed(const UpdateFailure(GuidanceItem.library));
+      await s.retryUpdateHere();
+      expect(s.tasks.hasTask, isFalse);
+    });
+
+    test('שומר הסגירה שואל גם בשלבי "עדכון כאן" שאינם משימה ארוכה', () async {
+      final s = session();
+      s.tasks.startUpdateHere(const [GuidanceItem.plugins]);
+      expect(s.longTaskRunning, isFalse);
+      prompts.closeAnswer = false;
+      expect(await s.confirmClose(), isFalse);
+      expect(prompts.calls, ['confirmClose']);
+
+      // שאלת "לסגור את אוצריא?" — עוד לא רץ דבר, ולכן אין אזהרה.
+      unawaited(s.tasks.askToCloseOtzaria());
+      expect(await s.confirmClose(), isTrue);
+      expect(prompts.calls, ['confirmClose']);
+      s.tasks.respond(true);
+
+      s.tasks.updateDone();
+      expect(await s.confirmClose(), isTrue);
+      expect(prompts.calls, ['confirmClose']);
+    });
   });
 
   group('ההכוונה רואה כל משימה ארוכה', () {

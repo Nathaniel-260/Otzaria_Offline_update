@@ -1952,6 +1952,12 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.text(t.storeAppDoneTitle), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is CopyPathButton && w.path == tempDir.path,
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('שם בכרטיס: עד שתי שורות בכרטיס, ובשורה — אחת עם השם המלא בריחוף',

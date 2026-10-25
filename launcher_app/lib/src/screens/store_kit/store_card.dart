@@ -5,11 +5,8 @@ import '../../widgets/widgets_exports.dart';
 import 'store_grid.dart';
 import 'store_visuals.dart';
 
-/// כרטיס פריט בחנות (`.pcard`) — תוסף או תוכנה נוספת. כל הכרטיס לחיץ אל
-/// הפרטים, ובריחוף הרקע cardSelected והשם ב-primary.
-///
-/// רחב (עמודה אחת) — שורה: סמל, טקסט, ועמודת פעולה בצד. צר (שתי עמודות) —
-/// כרטיס: סמל ושם, תיאור, ופעולה בתחתית. הגובה קבוע ונקבע ברשת.
+/// כרטיס בחנות (`.pcard`), לחיץ כולו. רחב — שורה; צר — כרטיס. הגובה
+/// קבוע ונקבע ברשת.
 class StoreItemCard extends StatefulWidget {
   const StoreItemCard({
     super.key,

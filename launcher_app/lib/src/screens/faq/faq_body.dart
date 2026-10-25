@@ -15,11 +15,8 @@ import 'faq_question_form.dart';
 /// על כונן נייד.
 const Duration _contactSaveDelay = Duration(milliseconds: 500);
 
-/// השאלות הנפוצות — תוכן דף העזרה (`HelpPage`): כותרת, קבוצות, ואיש הקשר.
-/// תשובה אחת פתוחה בכל רגע — רשימה שכולה פתוחה אי אפשר לסרוק.
-///
-/// "עריכה" מחליף למצב עריכה: הסתרת שאלות, שאלות משלי ואיש הקשר. במצב
-/// סייפר הכניסה לעריכה נשאלת סיסמה.
+/// השאלות הנפוצות (`HelpPage`). תשובה אחת פתוחה בכל רגע; "עריכה" נכנסת
+/// להסתרה, שאלות משלי ואיש הקשר, ובמצב סייפר דורשת סיסמה.
 class FaqBody extends StatefulWidget {
   const FaqBody({
     super.key,
@@ -273,7 +270,7 @@ class _FaqBodyState extends State<FaqBody> {
       ],
       SectionLabel(t.myQuestionsTitle),
       if (_custom.extras.isEmpty)
-        _FaqItem.note(t.noExtrasYet)
+        SectionEmptyNote(t.noExtrasYet)
       else
         for (var i = 0; i < _custom.extras.length; i++)
           _FaqItem(
@@ -325,22 +322,14 @@ class _FaqBodyState extends State<FaqBody> {
 /// במצב עריכה בלי חץ ובלי תשובה, ועם כלים בקצה.
 class _FaqItem extends StatelessWidget {
   const _FaqItem({
-    required FaqEntry this.entry,
+    required this.entry,
     this.isOpen = false,
     this.onTap,
     this.hidden = false,
     this.actions,
-  }) : note = null;
+  });
 
-  const _FaqItem.note(String this.note)
-      : entry = null,
-        isOpen = false,
-        onTap = null,
-        hidden = false,
-        actions = null;
-
-  final FaqEntry? entry;
-  final String? note;
+  final FaqEntry entry;
   final bool isOpen;
   final VoidCallback? onTap;
   final bool hidden;
@@ -361,12 +350,10 @@ class _FaqItem extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
-                  entry?.question ?? note!,
+                  entry.question,
                   style: AppTextStyles.body.copyWith(
                     fontWeight: isOpen ? FontWeight.w600 : FontWeight.w400,
-                    color: hidden || note != null
-                        ? cs.onSurfaceVariant
-                        : cs.onSurface,
+                    color: hidden ? cs.onSurfaceVariant : cs.onSurface,
                   ),
                 ),
                 if (hidden)
@@ -433,7 +420,7 @@ class _FaqItem extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Text(
-                  entry!.answer,
+                  entry.answer,
                   style: AppTextStyles.body.copyWith(
                     color: cs.onSurfaceVariant,
                     height: 1.6,

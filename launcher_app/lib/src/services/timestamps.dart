@@ -2,11 +2,8 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import 'hebrew_date.dart';
 
-/// חותמות זמן ותאריכים לתצוגה.
-///
-/// חותמות של **המסגרת** ("סונכרן ב…", "נבדק לאחרונה ב…") מספריות בלוח הלועזי:
-/// כך קל להשוות בין שתי הרצות. תאריכי **החנויות** ([formatStoreDate]) — בלוח
-/// העברי בעברית, כמו באתר.
+/// חותמות של המסגרת בלוח הלועזי, כדי להשוות הרצות; תאריכי החנויות
+/// ([formatStoreDate]) בלוח העברי בעברית, כמו באתר.
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -16,10 +13,8 @@ String formatClock(DateTime value) {
   return '${_two(local.hour)}:${_two(local.minute)}';
 }
 
-/// תאריך ושעה מלאים.
-///
-/// סדר התאריך נגזר משפת הממשק: `dd.mm.yyyy` בעברית, ו-ISO (`yyyy-mm-dd`)
-/// באנגלית — שם `dd.mm.yyyy` נקרא כתאריך אמריקאי שהפכו בו את היום והחודש.
+/// תאריך ושעה: `dd.mm.yyyy` בעברית, ISO באנגלית — שם `dd.mm.yyyy`
+/// נקרא כתאריך אמריקאי הפוך.
 String formatTimestamp(DateTime value) {
   final local = value.toLocal();
   final time = '${formatClock(local)}:${_two(local.second)}';
@@ -38,11 +33,8 @@ String formatDate(DateTime value) {
   return '${_two(local.day)}.${_two(local.month)}.${local.year}';
 }
 
-/// תאריך בחנות התוספים ובתוכנות הנוספות — הפורמט האחד לשתיהן. בעברית תאריך
-/// עברי כמו באתר ("ט' חשוון ה'תשפ"ז"), באנגלית "October 18, 2026".
-///
-/// לרגע מהקטלוג: נקרא ב-UTC, כמו בחנות שבאתר — כך אותו תוסף מקבל אותו
-/// תאריך בשניהם. לרגע שנרשם במחשב הזה — [formatStoreLocalDate].
+/// תאריך בחנויות. רגע מהקטלוג נקרא ב-UTC, כמו באתר; רגע שנרשם במחשב
+/// הזה — [formatStoreLocalDate].
 String formatStoreDate(DateTime value) => _storeDay(value.toUtc());
 
 /// [formatStoreDate] לרגע שנרשם במחשב הזה (סנכרון, הוספה): היום בלוח המקומי.

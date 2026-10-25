@@ -1,6 +1,7 @@
 // עוזרי בדיקה משותפים למסכי הלאנצ'ר. יושבים בקובץ נפרד (ולא ב-`*_test.dart`)
 // כדי שכמה קובצי בדיקה יוכלו לחלוק אותם בלי לגרור זה את הבדיקות של זה.
 
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -59,4 +60,31 @@ Future<void> pumpScreen(
   AppL10n.use(language);
   addTearDown(() => AppL10n.use(AppLanguage.hebrew));
   await tester.pumpWidget(wrap(screen, language: language));
+}
+
+/// לאן החץ שב-[icon] (Finder של `Icon`) מצביע על המסך: הגליף, ואחריו ההיפוך
+/// ש-`Icon` עצמו עושה ב-RTL לאייקון עם `matchTextDirection`.
+AxisDirection drawnArrow(WidgetTester tester, Finder icon) {
+  final data = tester.widget<Icon>(icon).icon!;
+  final left = {
+    FluentIcons.chevron_left_16_regular,
+    FluentIcons.chevron_left_20_regular,
+    FluentIcons.chevron_left_20_filled,
+    FluentIcons.chevron_left_24_regular,
+    FluentIcons.arrow_left_24_regular,
+  };
+  final right = {
+    FluentIcons.chevron_right_16_regular,
+    FluentIcons.chevron_right_20_regular,
+    FluentIcons.chevron_right_20_filled,
+    FluentIcons.chevron_right_24_regular,
+    FluentIcons.arrow_right_24_regular,
+  };
+  expect(left.contains(data) || right.contains(data), isTrue,
+      reason: 'לא חץ מוכר: $data');
+  final mirrored = data.matchTextDirection &&
+      Directionality.of(tester.element(icon)) == TextDirection.rtl;
+  return left.contains(data) != mirrored
+      ? AxisDirection.left
+      : AxisDirection.right;
 }

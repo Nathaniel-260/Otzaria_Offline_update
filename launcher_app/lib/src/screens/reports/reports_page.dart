@@ -31,6 +31,8 @@ class ReportsPage extends StatelessWidget {
     this.legacyNotice = false,
     this.onDismissLegacy,
     this.appReports,
+    this.onCheckConnection,
+    this.checkingConnection = false,
   });
 
   final ErrorReportsController? errorReports;
@@ -61,6 +63,10 @@ class ReportsPage extends StatelessWidget {
   /// הדיווחים של הכלי על עצמו — `null` בבדיקות.
   final AppReportsController? appReports;
 
+  /// "בדוק חיבור" כש-[connection] עוד `null` — בלעדיו אין דרך לשלוח מכאן.
+  final VoidCallback? onCheckConnection;
+  final bool checkingConnection;
+
   @override
   Widget build(BuildContext context) {
     final t = context.strings.pages;
@@ -80,7 +86,11 @@ class ReportsPage extends StatelessWidget {
           builder: (context, _) => _statusCard(context),
         ),
         if (reports != null)
-          AppReportsPanel(reports: reports, connection: connection),
+          AppReportsPanel(
+            reports: reports,
+            connection: connection,
+            checkConnectionButton: _checkConnectionButton(context),
+          ),
         if (reports != null) ...[
           SectionLabel(t.repProblemSection),
           RowsCard(
@@ -98,6 +108,18 @@ class ReportsPage extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget? _checkConnectionButton(BuildContext context) {
+    if (connection != null || onCheckConnection == null) return null;
+    return ActionButton.ghost(
+      key: ShellKeys.reportsCheckConnection,
+      text: context.strings.pages.repCheckConnectionButton,
+      icon: FluentIcons.globe_24_regular,
+      size: ActionButtonSize.sm,
+      isLoading: checkingConnection,
+      onPressed: checkingConnection ? null : onCheckConnection,
     );
   }
 
@@ -217,6 +239,7 @@ class ReportsPage extends StatelessWidget {
         ? Text(key: ShellKeys.pageBusyNote, t.pageBusyNote, style: sub)
         : null;
 
+    final checkButton = _checkConnectionButton(context);
     if (collecting > 0) {
       final canSend = waiting > 0 && connection == true;
       return StatusCard(
@@ -255,6 +278,7 @@ class ReportsPage extends StatelessWidget {
             onPressed: busy ? null : onCollect,
           ),
           // מה שכבר בכונן נשלח גם בלי לאסוף קודם.
+          if (waiting > 0 && !canSend && checkButton != null) checkButton,
           if (canSend)
             ActionButton.neutral(
               key: ShellKeys.reportsSend,
@@ -292,15 +316,16 @@ class ReportsPage extends StatelessWidget {
         title: t.repStoredTitle(waiting),
         subtitle: connection == null ? t.repUncheckedBody : t.repStoredBody,
         actions: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(FluentIcons.info_16_regular,
-                  size: 16, color: cs.onSurfaceVariant),
-              const SizedBox(width: 6),
-              Text(t.repOnlyOnline, style: sub),
-            ],
-          ),
+          checkButton ??
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(FluentIcons.info_16_regular,
+                      size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Text(t.repOnlyOnline, style: sub),
+                ],
+              ),
         ],
       );
     }

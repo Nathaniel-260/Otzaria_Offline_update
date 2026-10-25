@@ -491,7 +491,7 @@ void main() {
       await openForm(tester);
 
       expect(find.text('הקובץ הוא התוכנה עצמה'), findsOneWidget);
-      expect(find.textContaining('תישאלו לאן להעתיק'), findsOneWidget);
+      expect(find.textContaining('תישאל לאן להעתיק'), findsOneWidget);
     });
 
     testWidgets('בחירת ארכיון המקור של Audacity נדחית ואפשר לבחור מתקין',
@@ -632,7 +632,7 @@ void main() {
       }
       expect(
         installerKindLabelOf(CustomInstallerKind.zipPortable, t),
-        'ארכיון',
+        'קובץ דחוס (ZIP)',
       );
     });
 

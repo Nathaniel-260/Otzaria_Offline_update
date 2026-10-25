@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../theme/theme_exports.dart';
 
-/// [notice] — כרטיס הודעה (`.notice`), [warning] — אותו על רקע אזהרה,
-/// [banner] — פס tonal בבית ובחנות (`.banner`).
-/// [inCard] — הודעה בתוך כרטיס: רקע של קטע-משנה, כדי שלא תיבלע בכרטיס.
+/// notice — כרטיס; warning — על רקע אזהרה; banner — פס tonal;
+/// inCard — רקע של קטע-משנה, כדי שלא תיבלע בכרטיס.
 enum NoticeKind { notice, warning, banner, inCard }
 
 /// הודעה קבועה בדף: אריח (או לוגו), כותרת, פירוט ופעולות בקצה.
@@ -30,6 +29,16 @@ class NoticeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => _build(
+        context,
+        // צר: הפעולות יורדות מתחת לפירוט, ולא דוחסות אותו לעמודה צרה.
+        stacked: actions.isNotEmpty && constraints.maxWidth < 560,
+      ),
+    );
+  }
+
+  Widget _build(BuildContext context, {required bool stacked}) {
     final cs = Theme.of(context).colorScheme;
     final banner = kind == NoticeKind.banner;
     final background = switch (kind) {
@@ -38,6 +47,7 @@ class NoticeBanner extends StatelessWidget {
       NoticeKind.banner => AppSurfaces.banner(context),
       NoticeKind.inCard => AppSurfaces.panelSection(context),
     };
+    final buttons = Wrap(spacing: 8, runSpacing: 8, children: actions);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: banner
@@ -49,7 +59,7 @@ class NoticeBanner extends StatelessWidget {
       ),
       child: Row(
         // הודעה עם כפתור: הכפתור באמצע הגובה, לא צמוד לשורה הראשונה.
-        crossAxisAlignment: banner || actions.isNotEmpty
+        crossAxisAlignment: !stacked && (banner || actions.isNotEmpty)
             ? CrossAxisAlignment.center
             : CrossAxisAlignment.start,
         children: [
@@ -74,12 +84,13 @@ class NoticeBanner extends StatelessWidget {
                   ),
                 ],
                 if (below != null) ...[const SizedBox(height: 6), below!],
+                if (stacked) ...[const SizedBox(height: 10), buttons],
               ],
             ),
           ),
-          if (actions.isNotEmpty) ...[
+          if (actions.isNotEmpty && !stacked) ...[
             const SizedBox(width: 14),
-            Wrap(spacing: 8, runSpacing: 8, children: actions),
+            buttons,
           ],
         ],
       ),

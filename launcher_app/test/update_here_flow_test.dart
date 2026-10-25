@@ -540,6 +540,60 @@ void main() {
     });
   });
 
+  group('"נסה שוב" — אותה בקשה', () {
+    test('הספרייה המלאה נכשלה — שוב הספרייה המלאה בלבד', () async {
+      library
+        ..canApplyFull = true
+        ..succeeds = false;
+      app.hasUpdateAvailable = true;
+      await flow.run(const [GuidanceItem.library], fullLibrary: true);
+      expect(task()!.phase, UpdateHereTaskPhase.failed);
+
+      library.succeeds = true;
+      expect(await flow.retry(), isTrue);
+      expect(log, ['library-full', 'library-full']);
+      expect(library.applies, 0);
+      expect(app.installs, 0);
+      expect(task()!.phase, UpdateHereTaskPhase.done);
+    });
+
+    test('התקנה מחדש נכשלה — שוב התקנה מחדש, ולא "אין מה להתקין"', () async {
+      app
+        ..hasUpdateAvailable = false
+        ..canReinstall = true
+        ..outcome = AppInstallOutcome.failed;
+      await flow.run(const [GuidanceItem.app], reinstallApp: true);
+      expect(task()!.phase, UpdateHereTaskPhase.failed);
+
+      app.outcome = AppInstallOutcome.installed;
+      expect(await flow.retry(), isTrue);
+      expect(app.installs, 2);
+      expect(library.applies, 0);
+      expect(task()!.phase, UpdateHereTaskPhase.done);
+    });
+
+    test('אחרי ביטול באשף — התקנה מחדש שוב; בזמן ריצה — כלום', () async {
+      app
+        ..hasUpdateAvailable = false
+        ..canReinstall = true
+        ..outcome = AppInstallOutcome.cancelled;
+      await flow.run(const [GuidanceItem.app], reinstallApp: true);
+      expect(task()!.phase, UpdateHereTaskPhase.cancelledByUser);
+
+      app
+        ..outcome = AppInstallOutcome.installed
+        ..gate = Completer<void>();
+      final retry = flow.retry();
+      await settle();
+      expect(task()!.isFinished, isFalse);
+      expect(await flow.retry(), isFalse);
+      app.gate!.complete();
+      expect(await retry, isTrue);
+      expect(app.installs, 2);
+      expect(task()!.phase, UpdateHereTaskPhase.done);
+    });
+  });
+
   group('תיקוני QA של 2b', () {
     test('ספרייה שהוחלה עם הערה — סיום עם ההערה, לא כשל', () async {
       library.noteAfterApply = 'צריך לכוון את אוצריא לספרייה';

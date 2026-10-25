@@ -93,9 +93,11 @@ final class DownloadTask extends ShellTask {
   const DownloadTask({
     required this.phase,
     this.components = const [],
+    this.expectedBytes = const {},
     this.skipped = const [],
     this.failure,
     this.revertFailed = false,
+    this.kept = const [],
   });
 
   final DownloadTaskPhase phase;
@@ -103,12 +105,18 @@ final class DownloadTask extends ShellTask {
   /// מה ירד בהורדה הזו, לפי הסדר.
   final List<MirrorComponent> components;
 
+  /// הגודל הצפוי לכל רכיב לפי הבדיקה ברשת; רכיב שגודלו לא ידוע חסר.
+  final Map<MirrorComponent, int> expectedBytes;
+
   /// מה דולג כי באתר אין בו חדש.
   final List<MirrorComponent> skipped;
   final DownloadFailure? failure;
 
   /// הביטול לא הצליח להחזיר את הכונן במלואו.
   final bool revertFailed;
+
+  /// בביטול: רכיבים שירדו עד הסוף ונשארו בכונן.
+  final List<MirrorComponent> kept;
 
   @override
   bool get isFinished => switch (phase) {
@@ -122,23 +130,35 @@ final class DownloadTask extends ShellTask {
   DownloadTask _copy({
     DownloadTaskPhase? phase,
     List<MirrorComponent>? components,
+    Map<MirrorComponent, int>? expectedBytes,
     List<MirrorComponent>? skipped,
     DownloadFailure? failure,
     bool? revertFailed,
+    List<MirrorComponent>? kept,
   }) =>
       DownloadTask(
         phase: phase ?? this.phase,
         components: components ?? this.components,
+        expectedBytes: expectedBytes ?? this.expectedBytes,
         skipped: skipped ?? this.skipped,
         failure: failure ?? this.failure,
         revertFailed: revertFailed ?? this.revertFailed,
+        kept: kept ?? this.kept,
       );
 }
+
+/// מה שהתבקש ב"עדכון כאן" — "נסה שוב" מריץ בדיוק אותו דבר.
+typedef UpdateHereRequest = ({
+  List<GuidanceItem> items,
+  bool reinstallApp,
+  bool fullLibrary,
+});
 
 final class UpdateHereTask extends ShellTask {
   const UpdateHereTask({
     required this.phase,
     required this.stages,
+    this.request,
     this.id = 0,
     this.stageIndex = 0,
     this.firstInstall = false,
@@ -157,6 +177,7 @@ final class UpdateHereTask extends ShellTask {
   /// מזהה ההרצה — מסירה שנמשכת אחרי הסיום לא תכתוב על הרצה חדשה.
   final int id;
   final UpdateHereTaskPhase phase;
+  final UpdateHereRequest? request;
 
   /// סדר ההתקנה — ראו `UpdateHereFlow.stagesFor`.
   final List<GuidanceItem> stages;
@@ -208,6 +229,7 @@ final class UpdateHereTask extends ShellTask {
       UpdateHereTask(
         id: id,
         phase: phase ?? this.phase,
+        request: request,
         stages: stages,
         stageIndex: stageIndex ?? this.stageIndex,
         firstInstall: firstInstall,
@@ -255,9 +277,8 @@ class ShellTasks extends ChangeNotifier {
 
   // ── הורדה לכונן ──
 
-  /// ההורדה מתכוננת (בדיקה ברשת של מה שהתיישן). מחליף משימה שהסתיימה —
-  /// "נסה שוב" ו"הורדה מחדש" מתחילים מכאן בלי לחזור לבית בדרך. כבר מתכונן
-  /// — אין שינוי.
+  /// ההורדה מתכוננת. מחליף משימה שהסתיימה, כך ש"נסה שוב" אינו חוזר לבית
+  /// בדרך; כבר מתכונן — אין שינוי.
   void prepareDownload() {
     final task = _current;
     if (task is DownloadTask && task.phase == DownloadTaskPhase.preparing) {
@@ -288,11 +309,18 @@ class ShellTasks extends ChangeNotifier {
   }
 
   /// ההורדה התחילה בפועל — [components] הם מה שירד, לפי הסדר.
-  void downloadRunning(List<MirrorComponent> components) {
+  void downloadRunning(
+    List<MirrorComponent> components, {
+    Map<MirrorComponent, int> expectedBytes = const {},
+  }) {
     if (_current == null) prepareDownload();
     final task = _current;
     if (task is DownloadTask && task.phase == DownloadTaskPhase.running) return;
-    _moveDownload(DownloadTaskPhase.running, components: components);
+    _moveDownload(
+      DownloadTaskPhase.running,
+      components: components,
+      expectedBytes: expectedBytes,
+    );
   }
 
   /// הזרימה חזרה בלי להתחיל (חסימה, בלי בחירה) — המסך נסגר בשקט.
@@ -304,12 +332,17 @@ class ShellTasks extends ChangeNotifier {
   }
 
   /// ביטול לפני שההורדה התחילה הוא תשובה ריקה לשאלה, לא מצב "בוטל".
-  void downloadCancelled({bool revertFailed = false}) => _question != null
-      ? answer(null)
-      : _moveDownload(
-          DownloadTaskPhase.cancelled,
-          revertFailed: revertFailed,
-        );
+  void downloadCancelled({
+    bool revertFailed = false,
+    List<MirrorComponent> kept = const [],
+  }) =>
+      _question != null
+          ? answer(null)
+          : _moveDownload(
+              DownloadTaskPhase.cancelled,
+              revertFailed: revertFailed,
+              kept: kept,
+            );
 
   void downloadFailed(DownloadFailure failure) =>
       _moveDownload(DownloadTaskPhase.failed, failure: failure);
@@ -328,6 +361,7 @@ class ShellTasks extends ChangeNotifier {
     ({int low, int high})? libraryMinutes,
     String? account,
     List<String> pluginNames = const [],
+    UpdateHereRequest? request,
   }) {
     _requireIdle();
     if (stages.isEmpty) throw ArgumentError.value(stages, 'stages');
@@ -336,6 +370,7 @@ class ShellTasks extends ChangeNotifier {
     _set(UpdateHereTask(
       id: id,
       phase: UpdateHereTaskPhase.running,
+      request: request,
       stages: List.unmodifiable(stages),
       firstInstall: firstInstall,
       appVersion: appVersion,
@@ -478,9 +513,11 @@ class ShellTasks extends ChangeNotifier {
   void _moveDownload(
     DownloadTaskPhase to, {
     List<MirrorComponent>? components,
+    Map<MirrorComponent, int>? expectedBytes,
     List<MirrorComponent>? skipped,
     DownloadFailure? failure,
     bool? revertFailed,
+    List<MirrorComponent>? kept,
   }) {
     final task = _current;
     if (task is! DownloadTask ||
@@ -490,9 +527,11 @@ class ShellTasks extends ChangeNotifier {
     _set(task._copy(
       phase: to,
       components: components,
+      expectedBytes: expectedBytes,
       skipped: skipped,
       failure: failure,
       revertFailed: revertFailed,
+      kept: kept,
     ));
   }
 

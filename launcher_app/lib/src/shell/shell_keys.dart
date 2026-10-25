@@ -8,6 +8,7 @@ abstract final class ShellKeys {
   static const hero = ValueKey('home.hero');
   static const heroPrimary = ValueKey('home.hero.primary');
   static const heroSecondary = ValueKey('home.hero.secondary');
+  static const heroLaunch = ValueKey('home.hero.launch');
   static const eyebrow = ValueKey('home.eyebrow');
   static const heroChecking = ValueKey('home.hero.checking');
 
@@ -20,6 +21,9 @@ abstract final class ShellKeys {
   static const newPluginsBanner = ValueKey('home.banner.newPlugins');
 
   static const launcherLine = ValueKey('home.foot.launcher');
+  static const launcherUpdateButton = ValueKey('home.foot.launcherUpdate');
+  static const statusBar = ValueKey('home.statusBar');
+  static const connectionLine = ValueKey('home.foot.connection');
   static const checkedAt = ValueKey('home.foot.checkedAt');
   static const checkNow = ValueKey('home.foot.checkNow');
   static const driveLine = ValueKey('home.foot.drive');
@@ -47,6 +51,8 @@ abstract final class ShellKeys {
       ValueKey('library.consent.whatIsSent');
   static const libraryInstallNote = ValueKey('library.installNote');
   static const reportsSend = ValueKey('reports.send');
+  static const reportsCheckConnection = ValueKey('reports.checkConnection');
+  static const storeEmptyReload = ValueKey('store.empty.reload');
   static const reportsStop = ValueKey('reports.stop');
   static const reportsProblem = ValueKey('reports.problem');
   static const reportsLegacy = ValueKey('reports.legacy');

@@ -13,9 +13,8 @@ import '../widgets/screen_body.dart';
 import '../widgets/widgets_exports.dart';
 import 'home/home_view_model.dart' show displayVersion;
 
-/// דף "תוכנת אוצריא": כרטיס מצב עם פעולה אחת לפי המצב, מה חדש בגרסה שבכונן,
-/// ומתקדם — ערוץ, התקנה מחדש, מיקום ההתקנה והתיקייה שבכונן. ההתקנה עצמה
-/// רצה במסך המשימה ("עדכון כאן", התוכנה בלבד). אין התקנה של גרסה ישנה יותר.
+/// דף "תוכנת אוצריא": כרטיס מצב, מה חדש ומתקדם. ההתקנה רצה במסך המשימה,
+/// ואין התקנה של גרסה ישנה יותר.
 class OtzariaScreen extends StatelessWidget {
   const OtzariaScreen({
     super.key,
@@ -91,7 +90,7 @@ class OtzariaScreen extends StatelessWidget {
     final g = context.strings.guide;
     return NoticeBanner(
       kind: NoticeKind.banner,
-      leading: const IconTile(icon: FluentIcons.warning_24_regular),
+      leading: const IconTile(child: OtzariaLogo()),
       title: g.otzariaOpenTitle,
       body: g.otzariaOpenBody,
       actions: [CloseOtzariaButton(onClose: onCloseOtzaria)],
@@ -113,12 +112,22 @@ class OtzariaScreen extends StatelessWidget {
           c.installStage ?? g.chipInstalling,
         ),
       OtzariaModuleStatus.error => (StatusKind.error, g.chipAttention),
-      _ when !_installed => (StatusKind.needsAction, t.appChipNotInstalled),
+      OtzariaModuleStatus.updateAvailable when !_installed => (
+          StatusKind.needsAction,
+          g.chipReadyToInstall,
+        ),
       OtzariaModuleStatus.updateAvailable => (
           StatusKind.updateAvailable,
           t.chipUpdateOnDrive,
         ),
       OtzariaModuleStatus.installedIsNewer => (StatusKind.ok, g.chipNewerHere),
+      // כמו האריח בבית: מה שההורדה תביא הוא "יש עדכון להוריד לכונן".
+      OtzariaModuleStatus.needsDownload ||
+      OtzariaModuleStatus.upToDate when c.hasOnlineUpdate =>
+        (
+          StatusKind.updateAvailable,
+          g.chipNewOnline,
+        ),
       OtzariaModuleStatus.needsDownload => (
           StatusKind.needsAction,
           g.chipNotOnDrive,
@@ -176,7 +185,7 @@ class OtzariaScreen extends StatelessWidget {
         StatusValue(
           label: t.onThisComputer,
           value: installed == null
-              ? context.strings.common.emptyValue
+              ? t.libNotInstalled
               : displayVersion(installed, other: drive),
           ltr: installed != null,
         ),
@@ -188,6 +197,16 @@ class OtzariaScreen extends StatelessWidget {
               ? t.downloadedOn(formatDate(downloadedAt))
               : null,
         ),
+        // רק אחרי בדיקה ברשת שהצליחה; בלעדיה אין מה לומר על הרשת.
+        if (c.onlineChannels != null)
+          StatusValue(
+            label: t.onlineAvailable,
+            value: switch (c.onlineUpdateVersion) {
+              final online? => displayVersion(online, other: drive),
+              null => t.nothingNewOnline,
+            },
+            ltr: c.onlineUpdateVersion != null,
+          ),
       ],
       extra: [
         if (_installing) _installingProgress(context),
@@ -308,7 +327,9 @@ class OtzariaScreen extends StatelessWidget {
             icon: FluentIcons.folder_open_24_regular,
             onPressed: _isBusy ? null : () => _pickInstallDir(context),
           ),
-          below: launchPath == null ? null : PathText(p.dirname(launchPath)),
+          below: launchPath == null
+              ? null
+              : PathText(p.dirname(launchPath), copyable: true),
         ),
         AppRow(
           title: t.appSourceTitle,

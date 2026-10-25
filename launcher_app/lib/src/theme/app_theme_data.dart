@@ -182,9 +182,7 @@ class AppThemeData {
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  //  Button Themes — hover 8%, pressed 12%, טבעת מיקוד מהמקלדת
-  // ══════════════════════════════════════════════════════════════════════════
+  // ── Button Themes — hover 8%, pressed 12%, טבעת מיקוד מהמקלדת ──
 
   static IconButtonThemeData _iconButtonTheme(ColorScheme cs) =>
       IconButtonThemeData(

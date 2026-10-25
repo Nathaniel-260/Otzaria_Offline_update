@@ -1,6 +1,5 @@
-// UiSnack — הודעות למשתמש: טוסט inverseSurface ממורכז בתחתית (`.toast`),
-// בלי תור הודעות ובלי פעולות.
-// אין להשתמש ב-ScaffoldMessenger/SnackBar ישירות.
+// UiSnack — טוסט ממורכז בתחתית, בלי תור ובלי פעולות. אין להשתמש
+// ב-ScaffoldMessenger/SnackBar ישירות.
 
 import 'dart:async';
 

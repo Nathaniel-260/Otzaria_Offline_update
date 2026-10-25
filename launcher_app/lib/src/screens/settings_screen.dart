@@ -7,7 +7,6 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 import '../controllers/app_reports_controller.dart';
 import '../controllers/custom_apps_controller.dart';
 import '../controllers/launcher_update_controller.dart';
-import '../services/app_paths.dart';
 import '../settings/app_settings.dart';
 import '../settings/safer_mode.dart';
 import '../settings/settings_controller.dart';
@@ -20,15 +19,8 @@ import 'custom_apps/custom_apps_settings_card.dart';
 import 'home/home_view_model.dart' show launcherLineOf, LauncherLineKind;
 import 'store_kit/store_visuals.dart' show StoreFilterChip;
 
-/// מסך ההגדרות: כללי, תוכנות נוספות, פרטיות ודיווחים, מתקדם (מקופל) ואודות.
-///
-/// **אין כאן הגדרות רשת בכוונה.** הזמן הקצוב לכל פנייה נקבע בלקוחות עצמם
-/// (ראו `OtzariaReleaseClient`) — כשל הורדה נפתר בניסיון חוזר ולא בהארכתו.
-///
-/// **אין כאן נתיבים בכוונה.** תיקיית הנתונים צמודה לקובץ ההרצה (ראו
-/// [AppPaths]) — שינוי נתיב היה שובר את הרעיון של כונן נייד.
-///
-/// **אין כאן ערוץ גרסאות** — הוא בדף התוכנה › מתקדם בלבד.
+/// אין כאן בכוונה הגדרות רשת (הזמן הקצוב בלקוחות), נתיבים (צמודים לקובץ
+/// ההרצה, כדי שהכונן יישאר נייד) או ערוץ גרסאות (בדף התוכנה).
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({
     super.key,

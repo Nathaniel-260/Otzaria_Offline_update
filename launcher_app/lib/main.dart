@@ -214,10 +214,8 @@ void main() {
   );
 }
 
-/// מסתיר את מסגרת החלון של המערכת — מכאן והלאה שורת הכותרת היא [AppTitleBar]
-/// שבתוך האפליקציה, בצבע הרקע. רץ לפני `runApp` כדי שהחלון ייצבע פעם אחת
-/// בגודלו הסופי: שינוי המסגרת מאתחל את אזור-הלקוח ומבטל פריים שכבר צויר.
-/// הגודל והמיקום ההתחלתיים נקבעים ב-runner (`main.cpp`) ולא כאן — ראו שם.
+/// מסגרת המערכת מוסתרת לפני `runApp`: שינוי המסגרת מבטל פריים שכבר צויר.
+/// הגודל והמיקום ההתחלתיים נקבעים ב-runner (`main.cpp`).
 Future<void> _prepareWindow() async {
   if (!(Platform.isWindows || Platform.isLinux || Platform.isMacOS)) return;
   // כשל כאן הוא קוסמטי בלבד (נשארת מסגרת המערכת), אבל בלי ה-catch הוא היה
@@ -301,11 +299,8 @@ class PayloadMismatchApp extends StatelessWidget {
       );
 }
 
-/// הקונפיגורציה המשותפת לכל ה-MaterialApp — שפה, כיווניות וערכת הנושא
-/// הבהירה, שאינה תלויה בהגדרות.
-///
-/// ה-`locale` הוא שקובע גם את כיוון הכתיבה: עברית → RTL, אנגלית → LTR, דרך
-/// `GlobalWidgetsLocalizations`. אין כאן נגיעה ישירה ב-[Directionality].
+/// הקונפיגורציה של כל MaterialApp. ה-`locale` קובע גם את הכיוון (RTL/LTR)
+/// דרך `GlobalWidgetsLocalizations` — בלי [Directionality] ישיר.
 Widget _materialApp({
   required Widget home,
   required AppLanguage language,

@@ -1,6 +1,5 @@
-// Barrel re-export — כל רכיבי הממשק המשותפים.
-// ראה launcher_app/README.md לכללי השימוש (איזה כפתור/דיאלוג/שורה מתי).
-// כולל `context.strings` — כל מסך שמייבא רכיבים ממילא צריך גם מלל.
+// כל רכיבי הממשק המשותפים, וגם `context.strings` — ראו launcher_app/README.md
+// לכללי השימוש.
 export '../l10n/app_strings_scope.dart';
 export 'action_buttons.dart';
 export 'advanced_section.dart';
@@ -20,6 +19,7 @@ export 'library_changes_view.dart';
 export 'news_card.dart';
 export 'notice_banner.dart';
 export 'option_card.dart';
+export 'otzaria_logo.dart';
 export 'path_text.dart';
 export 'recheck_button.dart';
 export 'result_badge.dart';

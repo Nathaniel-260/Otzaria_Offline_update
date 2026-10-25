@@ -287,7 +287,7 @@ dart analyze                       # all pure-Dart packages, including otzaria_d
   `set_launcher_version.sh`) adds the `* **0.N**` heading above them, and the
   Release workflow's `guard` job fails when there is nothing unheaded to stamp.
   That file is what "מה חדש" shows, on the "update this tool" page (reached from
-  the home page's bottom line and from Settings → About).
+  the home page's status bar and from Settings → About).
   **Bug fixes alone require neither a changelog entry nor a question about one.**
   For other changes, ask the maintainer whether they warrant a changelog entry
   before editing that file, and follow their answer. Before release, document the
@@ -366,12 +366,26 @@ Hebrew is the source, English a free translation of it.
 - Direction comes from the locale alone (`GlobalWidgetsLocalizations`); never set
   `Directionality` by hand. Exactly one exception, pinned by an allowlist in
   `launcher_app/test/widgets_test.dart`: `UiSnack` (lives in an `Overlay`, reads
-  `AppL10n.language.isRtl`). A second is a bug, not a precedent. For back/forward arrows use
-  `context.backArrowIcon` / `context.forwardArrowIcon`: `RtlIcon` mirrors arrows
-  under RTL, so those helpers hand it the *opposite* glyph and the result is
-  identical in both languages. On a `Text`, pass `textDirection: TextDirection.ltr`
+  `AppL10n.language.isRtl`). A second is a bug, not a precedent. **Give arrows and chevrons their LTR glyph
+  and nothing else** (back = `arrow_left`, forward = `chevron_right`): Fluent
+  marks them `matchTextDirection`, so `Icon` already mirrors them under RTL; an
+  `isRtl ?` swap or an `RtlIcon` map entry flips them back, which pointed every
+  tile chevron the wrong way (`drawnArrow` in `test/test_harness.dart` pins it). On a `Text`, pass `textDirection: TextDirection.ltr`
   only for inherently LTR content (paths, emails, versions, hashes, URLs); never
   pass `TextDirection.rtl` — the locale already sets it.
+- **A version, drive, path, file name, tag or URL inside a Hebrew template goes
+  through `_ltr()`** in `strings_he.dart` (LRI…PDI). Unisolated, "0.10.5-beta" renders
+  as "beta-0.10.5" and "C:" as ":C". `otzaria_l10n/test/ltr_isolation_test.dart`
+  scans every template whose parameter is named that way. Sizes keep their own rule
+  below.
+- **A string that tells the user to press something quotes its exact label.**
+  `otzaria_l10n/test/button_quotes_test.dart` checks every Hebrew quote against the
+  labels in `strings_he.dart`; a label outside this tool (Windows, Otzaria's own
+  settings, a website) goes on its `_external` list. Button labels are action nouns
+  ("שליחה", "פתיחת התיקייה", "פתיחת אוצריא"), except "נסה שוב" and "בדוק שוב".
+- **Hebrew addresses the user in masculine singular, as Otzaria does** ("לחץ", "בחר",
+  "שלך"); impersonal forms ("יש ל…", "אפשר ל…") are fine. The search index is
+  "אינדקס החיפוש", Otzaria's own term.
 - **Counts go through `plural(count, one:, two:, many:)`**, never `'$n דקות'`: the
   singular is spelled out ("תוסף אחד") and so is the Hebrew dual ("שתי דקות"). Such a
   field is listed in `_spelledOne` / `_spelledTwoInHebrew` in
@@ -600,17 +614,19 @@ downloaded), progress, "cancelled", "drive is ready" and an in-window failure
 (`classifyDownloadFailure`: network/filter/Shabbat/no space are calm, the rest red;
 a rejected certificate is "filter", not "no internet" — retry alone will not help, and
 the no-space message is matched against every language's template). A
-cancel reverts the drive, so the screen says "the drive is as before", never "what
-was downloaded is kept" — that is true only after a *failure*, which keeps parts.
+cancel keeps the components that finished, so the screen names them
+(`DownloadTask.kept`) or, when none did, says "the drive is as before".
 Ctrl+R/F5 and report offers also check `tasks.isRunning`; do **not** fold it into
 `longTaskRunning` — the download's own `isBlocked` reads that and would stop itself.
 
-**Cancelling a download deletes what *that* download brought.** "Cancel" (behind the
-warning dialog) appears only while a download runs, and
+**Cancelling a download reverts only the component in progress.** "Cancel" (behind
+the warning dialog) appears only while a download runs, and
 `MirrorDownloadFlow.requestCancel` rides the `isCancelled` callback every layer
-already takes, so it lands mid-asset.
-`MirrorDownloadUndo` snapshots `mirror/library`, `mirror/companions`, `mirror/app`
-and `mirror/plugins` before the first byte; on cancel it deletes created files,
+already takes, so it lands mid-asset. Components that finished stay, and so do the
+online answers measured against them (`refreshAfterCancelledDownload(reverted:)`).
+`MirrorDownloadUndo` snapshots every root of `AppSession.downloadMirrorDirs`
+(per component) before the first byte; on cancel it reverts the in-progress
+component's roots (`revert(roots:)`): it deletes created files,
 restores any rewritten `.json` manifest (a new `releases.json` over deleted assets
 is a mirror pointing at nothing) and the `.resume`/`.segments` download state by
 content, and truncates a resumed partial asset (and its `.seg-N` ranges) back to
@@ -1167,6 +1183,12 @@ the hero) installs both when `otzaria.currentVersion == null &&
 library.isFreshInstall` — never plugins. An update keeps `AutoInstallFlow`'s order:
 library, app, then plugin delivery (`PluginsModuleController.deliverUpdates`, which
 only *sends* — the screen says "sent to Otzaria, approve there").
+
+- **"Try again" reruns the request that failed, not what home shows now.** The task
+  keeps its `UpdateHereRequest` (items, `reinstallApp`, `fullLibrary`) and
+  `AppSession.retryUpdateHere` → `UpdateHereFlow.retry` runs exactly that. Wiring the
+  button to home's `hereItems` turned a failed full-library or reinstall run into a
+  partial update, or into a button that did nothing.
 
 - **App first, never the library first.** Where the DB goes follows what the wizard
   chose: a portable install keeps it beside the exe, an ordinary one under
@@ -1914,7 +1936,9 @@ exe into `mirror/launcher/`, copies it over the stub (two renames, rollback on f
   `AppLifecycleListener.onExitRequested` that macOS Cmd+Q / Dock > Quit reach
   (a refusal there returns `AppExitResponse.cancel`): a download is
   cancelled and `MirrorDownloadUndo` reverts it before the process exits; an install
-  can only be warned about. A guard that throws still closes — X must never go inert.
+  can only be warned about. A running "update here" stage asks too, plugin
+  delivery included (not `longTaskRunning`); its questions do not, nothing runs yet.
+  A guard that throws still closes — X must never go inert.
 - **The mirror is checked on every writable start, also with `autoCheckUpdates` off**,
   and again before each `checkOnline` (`LauncherUpdateFlow.checkMirror`). It is a disk
   read, and on the offline machine it is the only way to see a launcher the online
@@ -2022,7 +2046,8 @@ help is a body section hosting the FAQ (`HelpPage` → `FaqBody`), not a dialog.
 The stack is `ShellNavigator`'s (`SectionRoute`, `PluginDetailRoute`,
 `CustomAppDetailRoute`, `CustomAppsManageRoute`, `FaqEditRoute`, `TaskRoute`);
 back button, breadcrumb and Esc pop it, so a detail page's single back leads to
-its list. `IndexedStack` builds every child, so the
+its list. Esc inside a text field only leaves the field (`leaveTextField`). Kept
+sections keep their scroll; help resets to the top on each visit. `IndexedStack` builds every child, so the
 plugin store — a card grid with one `Image.file` per plugin — was built and decoded at
 launch, before the user opened it. Sections are created on first visit
 (`ShellNavigator.isBuilt`) and kept after. `IndexedStack` does not disable tickers, so
@@ -2041,14 +2066,15 @@ Otzaria page. Details: `launcher_app/README.md`.
 **No dialog at startup except the crash prompt.** What used to pop up on launch is a
 row on the home page: the reports explainer, unmigrated legacy report queues, the
 skipped auto-install, new plugins, plugin updates, pending custom apps (marked seen only
-while their page is shown — `TickerMode`), a newer launcher (the bottom line), "restart
+while their page is shown — `TickerMode`), a newer launcher ("עדכון זמין" at the start of the status bar, also for a
+version that is only on the drive), "restart
 as administrator" (dismissable once per run, also on the welcome screen), and reports
 waiting in Otzaria (a count on the reports tile; locked on a read-only drive). The crash
 prompt alone stays a `DialogQueue` dialog. Other dialogs answer a click the user just
 made: confirming the launcher install, cancelling a download or closing during a task
 (warnings), consents, reset, trust, passwords, the custom-app form and the report form.
 "Check now" sits next to "checked at" in the
-bottom line (`AppSession.checkNow`: `checkAll`, then `checkOnline`; on a read-only drive
+status bar pinned to the bottom of the home page (`AppSession.checkNow`: `checkAll`, then `checkOnline`; on a read-only drive
 `checkAll` only). `checkAll` includes `_autoInstallIfEnabled`, so with auto-install on,
 "check now" can start an install without a dialog. The link, the hero's "check again" and
 the action share one block (`checkNowBlocked` = `longTaskRunning`), and the startup check

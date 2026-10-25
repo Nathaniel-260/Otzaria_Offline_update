@@ -29,7 +29,7 @@ HomeViewModel _model(
   String? installed = '0.10.3',
   String? drive = '0.10.4',
   String? onlineApp,
-  String? onlineLibrary,
+  int? onlineLibrary,
   int onlinePlugins = 0,
   int pluginUpdates = 0,
   int customApps = 0,
@@ -53,7 +53,13 @@ HomeViewModel _model(
     installedVersion: installed,
     driveAppVersion: drive,
     onlineAppVersion: onlineApp,
-    driveLibraryVersion: '146',
+    libraryHereVersion: installed == null
+        ? null
+        : f.libraryStatus == LibraryStatusFact.updateAvailable
+            ? 145
+            : 146,
+    libraryFreshInstall: installed == null,
+    driveLibraryVersion: 146,
     onlineLibraryVersion: onlineLibrary,
     pluginUpdatesOnDrive: pluginUpdates,
     onlinePluginChanges: onlinePlugins,
@@ -114,7 +120,7 @@ HomeViewModel homeScenario(String name) => switch (name) {
           ),
           // גרסה גולמית כמו שהאתר מחזיר — המסך מציג "0.10.5".
           onlineApp: 'v0.10.5+812',
-          onlineLibrary: '147',
+          onlineLibrary: 147,
           onlinePlugins: 3,
           onlineStoreApp: true,
           pluginUpdates: 3,
@@ -208,7 +214,7 @@ HomeViewModel homeScenario(String name) => switch (name) {
           ),
           installed: '0.10.4',
           onlineApp: '0.10.5',
-          onlineLibrary: '147',
+          onlineLibrary: 147,
           onlinePlugins: 5,
           customApps: 2,
           reportsToSend: 3,

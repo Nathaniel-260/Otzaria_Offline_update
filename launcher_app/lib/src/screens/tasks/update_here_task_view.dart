@@ -119,7 +119,7 @@ class UpdateHereTaskView extends StatelessWidget {
       ),
       end: ActionButton.recommended(
         key: ShellKeys.taskPrimary,
-        text: t.closeAndContinue,
+        text: t.closeOtzariaAndContinue,
         autofocus: true,
         onPressed: () => actions.onRespond(true),
       ),
@@ -162,14 +162,14 @@ class UpdateHereTaskView extends StatelessWidget {
     return TaskFrame(
       start: closing
           ? ActionButton.ghost(
-              text: t.notNow,
+              text: context.strings.common.cancel,
               onPressed: () => actions.onRespond(false),
             )
           : null,
       end: closing
           ? ActionButton.recommended(
               key: ShellKeys.taskPrimary,
-              text: t.closeAfterWizardButton,
+              text: t.closeOtzariaAndContinue,
               autofocus: true,
               onPressed: () => actions.onRespond(true),
             )
@@ -511,7 +511,7 @@ class UpdateHereTaskView extends StatelessWidget {
                 onPressed: () => actions.onOpenPage(GuidanceItem.app),
               ),
               ActionButton.ghost(
-                text: t.backToHomePage,
+                text: t.backHome,
                 expand: true,
                 onPressed: actions.onHome,
               ),
@@ -526,7 +526,7 @@ class UpdateHereTaskView extends StatelessWidget {
                 onPressed: actions.onLaunch,
               ),
               ActionButton.ghost(
-                text: t.backToHomePage,
+                text: t.backHome,
                 expand: true,
                 onPressed: actions.onHome,
               ),

@@ -30,6 +30,7 @@ import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as path;
 import 'package:plugins_manager/plugins_manager.dart';
 
@@ -214,10 +215,65 @@ void main() {
     otzaria.status = OtzariaModuleStatus.needsDownload;
     await pumpScreen(tester, otzariaPage(onUpdateHere: () {}));
 
-    expect(find.text(p.appChipNotInstalled), findsOneWidget);
+    expect(find.text(p.libNotInstalled), findsOneWidget);
+    expect(find.text(stringsOf().guide.chipNotOnDrive), findsOneWidget);
     expect(find.byKey(ShellKeys.statusPrimary), findsNothing);
     expect(find.text(p.appInstallButton), findsNothing);
     expect(find.text(p.appNeedsDownloadNote), findsOneWidget);
+  });
+
+  testWidgets('מעודכנת, וברשת יש חדש — "יש עדכון להוריד לכונן" כמו האריח בבית',
+      (
+    tester,
+  ) async {
+    otzaria
+      ..currentVersion = '0.9.95'
+      ..status = OtzariaModuleStatus.upToDate
+      ..onlineChannels = const OtzariaChannelReleases(
+        stable: OtzariaRelease(
+          tagName: '0.9.96+736',
+          name: 'אוצריא 0.9.96',
+          isPrerelease: false,
+          isDraft: false,
+          publishedAt: null,
+          installerKind: OtzariaInstallerKind.windowsSetupExe,
+          installerAssetName: 'setup.exe',
+          installerDownloadUrl: 'https://example.invalid/setup.exe',
+          installerSizeBytes: 1,
+        ),
+      );
+    expect(otzaria.hasOnlineUpdate, isTrue);
+    await pumpScreen(tester, otzariaPage(onUpdateHere: () {}));
+    expect(find.text(stringsOf().guide.chipNewOnline), findsOneWidget);
+    expect(find.text(stringsOf().pages.chipUpToDate), findsNothing);
+    // הדף אומר גם מה זמין להורדה, לא רק מה במחשב ובכונן.
+    expect(find.text(stringsOf().pages.onlineAvailable), findsOneWidget);
+    expect(find.text('0.9.96'), findsOneWidget);
+  });
+
+  testWidgets('בלי בדיקה ברשת אין שורת "זמין להורדה"', (tester) async {
+    otzaria
+      ..currentVersion = '0.9.95'
+      ..status = OtzariaModuleStatus.upToDate;
+    await pumpScreen(tester, otzariaPage());
+    expect(find.text(stringsOf().pages.onlineAvailable), findsNothing);
+  });
+
+  testWidgets('הספרייה: מה זמין להורדה אחרי בדיקה ברשת', (tester) async {
+    final p = stringsOf().pages;
+    library
+      ..status = LibraryModuleStatus.upToDate
+      ..localVersion = 30
+      ..targetVersion = 30
+      ..onlineLatestVersion = 31
+      ..onlineCheckedAt = DateTime(2026, 10, 25);
+    await pumpScreen(tester, libraryPage());
+    expect(find.text(p.onlineAvailable), findsOneWidget);
+    expect(find.text(p.libVersion(31)), findsOneWidget);
+
+    library.onlineLatestVersion = 30;
+    await pumpScreen(tester, libraryPage());
+    expect(find.text(p.nothingNewOnline), findsOneWidget);
   });
 
   testWidgets('לא מותקנת ויש בכונן — "התקנת אוצריא" מוסר למשימה', (
@@ -257,7 +313,8 @@ void main() {
     await openAdvanced(tester);
 
     expect(find.text(stringsOf().pages.appChannelTitle), findsOneWidget);
-    expect(find.textContaining('0.9.90 (יציבה)'), findsOneWidget);
+    // הגרסה מבודדת LTR, כדי ש-beta לא תתהפך בעברית.
+    expect(find.textContaining('0.9.90\u2069 (יציבה)'), findsOneWidget);
 
     await tester.tap(find.text(stringsOf().appScreen.channelPrerelease));
     await tester.pumpAndSettle();
@@ -682,8 +739,9 @@ void main() {
     final t = stringsOf().plugins;
     expect(find.text(t.emptyTitle), findsOneWidget);
     expect(find.text(t.emptyBodyOnline), findsOneWidget);
-    // הרענון בראש הדף ובמצב הריק.
-    expect(find.text(t.refreshButton), findsNWidgets(2));
+    // "רענון" אחד — הפעולה של המצב הריק, לא גם בראש הדף.
+    expect(find.text(t.refreshButton), findsOneWidget);
+    expect(find.byKey(ShellKeys.storeEmptyReload), findsNothing);
     // מראה ריקה — לא מציגים חיפוש וסינון על כלום.
     expect(find.text(t.searchHint), findsNothing);
     expect(find.text(t.filterInstalled), findsNothing);
@@ -700,6 +758,8 @@ void main() {
     final t = stringsOf().plugins;
     expect(find.text(t.refreshButton), findsNothing);
     expect(find.text(t.emptyBodyOffline), findsOneWidget);
+    // בלי אינטרנט עדיין אפשר לטעון מחדש את מה שבכונן.
+    expect(find.byKey(ShellKeys.storeEmptyReload), findsOneWidget);
   });
 
   testWidgets('מסך החנות מציג כרטיס תוסף מהקטלוג המקומי', (tester) async {
@@ -1977,7 +2037,7 @@ void main() {
     final p = stringsOf().pages;
     library
       ..status = LibraryModuleStatus.upToDate
-      ..dbPath = r'C:\otzariaooks\seforim.db'
+      ..dbPath = r'C:\otzaria\books\seforim.db'
       ..personalUpdateMode = true
       ..pendingReindex = const ExternalUpdateNoticeData(
         route: ExternalUpdateNotice.routeDelta,
@@ -2007,7 +2067,21 @@ void main() {
     ]) {
       expect(find.byKey(key), findsOneWidget, reason: '$key');
     }
-    expect(find.text(r'C:\otzariaooks\seforim.db'), findsOneWidget);
+    expect(find.text(r'C:\otzaria\books\seforim.db'), findsOneWidget);
+    // נתיב ארוך מקוצר לשורה — הנתיב המלא בריחוף, ואפשר להעתיק אותו.
+    expect(
+      find.byTooltip(
+        '\u2066C:\\otzaria\\books\\seforim.db\u2069',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(ShellKeys.libraryLocation),
+        matching: find.byTooltip(stringsOf().common.copyPathButton),
+      ),
+      findsOneWidget,
+    );
     expect(find.text(stringsOf().libraryScreen.personalVersionTitle),
         findsOneWidget);
     // "עדכון למחשב מסוים" מופעל בהגדרות — השורה מובילה לשם.

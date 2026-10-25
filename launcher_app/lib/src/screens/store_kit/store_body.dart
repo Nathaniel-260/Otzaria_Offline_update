@@ -5,12 +5,8 @@ import 'package:flutter/material.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/sub_page_header.dart';
 
-/// גוף מסך החנות (`.page.wide`): עד 960 ממורכז, ריפוד 28/24/40, וראש דף
-/// המשנה בראש הגליל.
-///
-/// **התוכן נמסר כ-slivers בלבד**, ושום דבר בתוכו אינו גליל בפני עצמו: רשת
-/// הכרטיסים היא `SliverGrid` שבונה רק את מה שקרוב לחלון. רשימה קבועה של
-/// ילדים, או גליל מקונן, הייתה בונה את כולם מיד — עם כל פענוחי התמונות.
+/// גוף החנות: התוכן slivers בלבד, בלי גליל מקונן — כך `SliverGrid` בונה
+/// רק את הכרטיסים שליד החלון ולא מפענח את כל התמונות מיד.
 class StoreBody extends StatelessWidget {
   const StoreBody({super.key, required this.slivers, this.maxWidth});
 

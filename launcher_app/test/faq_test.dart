@@ -239,6 +239,21 @@ void main() {
       expect(find.text(t.aOfflineFlow), findsNothing);
     });
 
+    testWidgets('כל כניסה לדף העזרה מתחילה מלמעלה', (tester) async {
+      useViewSize(tester, const Size(900, 500));
+      await pumpBody(tester);
+      final scrollable = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      scrollable.position.jumpTo(300);
+      await tester.pump();
+      expect(scrollable.position.pixels, 300);
+
+      await pumpBody(tester, active: false);
+      await pumpBody(tester);
+      expect(scrollable.position.pixels, 0);
+    });
+
     testWidgets('כל השאלות מוצגות באנגלית גם כן', (tester) async {
       await pumpScreen(
         tester,

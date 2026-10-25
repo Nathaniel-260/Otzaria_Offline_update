@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/theme_exports.dart';
 import 'focus_ring.dart';
 
-/// כרטיס תוכן שטוח: surface, רדיוס 8, בלי מסגרת ובלי צל (`.card`).
-///
-/// - [AppCard] — ילד יחיד; [onTap] הופך אותו ללחיץ (ריחוף 8%, לחיצה 12%).
-/// - [AppCard.section] — שורות עם רצועה של 2 בצבע הדף ביניהן ו-4 בקצוות
-///   (`.rows`).
+/// כרטיס שטוח (`.card`). [AppCard.section] — שורות עם רצועה בצבע הדף
+/// ביניהן (`.rows`).
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,

@@ -35,6 +35,8 @@ class HomeViewModel {
     this.driveAppVersion,
     this.appAwaitsNewerStable,
     this.onlineAppVersion,
+    this.libraryHereVersion,
+    this.libraryFreshInstall = false,
     this.driveLibraryVersion,
     this.driveCompanionNames,
     this.onlineLibraryVersion,
@@ -85,11 +87,15 @@ class HomeViewModel {
   /// לערוץ היציב. `null` כשזה לא המצב.
   final bool? appAwaitsNewerStable;
   final String? onlineAppVersion;
-  final String? driveLibraryVersion;
+
+  /// `null` — לא מותקנת ([libraryFreshInstall]) או לא ידועה.
+  final int? libraryHereVersion;
+  final bool libraryFreshInstall;
+  final int? driveLibraryVersion;
 
   /// בכונן יש רק קבצים נלווים לספרייה, בלי גרסת מסד חדשה.
   final String? driveCompanionNames;
-  final String? onlineLibraryVersion;
+  final int? onlineLibraryVersion;
   final String? onlineCompanionNames;
   final int pluginUpdatesOnDrive;
 
@@ -186,15 +192,13 @@ HomeViewModel homeViewModelOf(AppSession s) {
         otzaria.awaitsNewerInSelectedChannel ? !otzaria.preferPrerelease : null,
     onlineAppVersion:
         otzaria.hasOnlineUpdate ? otzaria.onlineUpdateVersion : null,
-    driveLibraryVersion: library.companionsOnly || library.targetVersion == null
-        ? null
-        : '${library.targetVersion}',
+    libraryHereVersion: library.localVersion,
+    libraryFreshInstall: library.isFreshInstall,
+    driveLibraryVersion: library.targetVersion,
     driveCompanionNames:
         library.companionsOnly ? library.pendingCompanionNames : null,
     onlineLibraryVersion:
-        library.hasOnlineLibraryUpdate && library.onlineUpdateVersion != null
-            ? '${library.onlineUpdateVersion}'
-            : null,
+        library.hasOnlineLibraryUpdate ? library.onlineUpdateVersion : null,
     onlineCompanionNames: library.onlinePendingCompanions.isNotEmpty ||
             library.onlineSemanticPending
         ? library.onlinePendingCompanionNames

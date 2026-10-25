@@ -298,6 +298,25 @@ class AppSession extends ChangeNotifier {
   /// מה יורד עכשיו — למסך ההתקדמות.
   MirrorComponent? get currentDownload => _downloads.currentComponent;
 
+  /// מה שכל רכיב צפוי להוריד לפי הבדיקה ברשת; רכיב שגודלו לא ידוע חסר.
+  Map<MirrorComponent, int> get expectedDownloadBytes {
+    final plan = _downloads.activePlan;
+    if (plan == null) return const {};
+    final s = settings.settings;
+    final app = _otzaria.onlineDownloadBytes;
+    final plugins = [
+      if (plan.runsPlugins(s)) _plugins.onlineStatus?.pendingBytes,
+      if (plan.runsStoreApp(s)) _plugins.storeAppOnline?.sizeBytes,
+    ];
+    final pluginBytes = plugins.contains(null)
+        ? 0
+        : plugins.fold<int>(0, (sum, bytes) => sum + bytes!);
+    return {
+      if (app != null && plan.runsApp(s)) MirrorComponent.app: app,
+      if (pluginBytes > 0) MirrorComponent.plugins: pluginBytes,
+    };
+  }
+
   /// העבודה שבעלייה. נפרד מהבנאי כדי שבדיקות יוכלו לבנות סשן בלי להריץ אותה.
   void start() {
     final s = settings.settings;
@@ -710,13 +729,15 @@ class AppSession extends ChangeNotifier {
   }
 
   @visibleForTesting
-  List<String> get downloadMirrorDirs => [
-        _library.mirrorDir,
-        _library.companionsMirrorDir,
-        _library.semanticMirrorDir,
-        _otzaria.mirrorDir,
-        ..._plugins.mirrorDirs,
-      ];
+  Map<MirrorComponent, List<String>> get downloadMirrorDirs => {
+        MirrorComponent.app: [_otzaria.mirrorDir],
+        MirrorComponent.library: [
+          _library.mirrorDir,
+          _library.companionsMirrorDir,
+          _library.semanticMirrorDir,
+        ],
+        MirrorComponent.plugins: _plugins.mirrorDirs,
+      };
 
   Future<void> cancelDownload() async {
     if (!_downloads.isDownloading || _downloads.isCancelling || !isActive) {
@@ -732,7 +753,12 @@ class AppSession extends ChangeNotifier {
   Future<bool> confirmClose() async {
     // הסגירה מסתיימת ב-`exit`, ושום dispose לא ירוץ אחריה.
     await _faq.flush().timeout(const Duration(seconds: 1), onTimeout: () {});
-    if (!isActive || !longTaskRunning) return true;
+    // גם במסירת התוספים, שאינה longTask; בשאלות (סגירת אוצריא, משתמש אחר) עוד לא רץ דבר.
+    final updatingHere = switch (tasks.current) {
+      UpdateHereTask(phase: UpdateHereTaskPhase.running) => true,
+      _ => false,
+    };
+    if (!isActive || !(longTaskRunning || updatingHere)) return true;
     final approved = await prompts.confirmClose(
       downloading: _downloads.isDownloading,
     );
@@ -769,9 +795,8 @@ class AppSession extends ChangeNotifier {
     tasks.abandonDownload();
   }
 
-  /// "עדכון אוצריא במחשב הזה" / "התקנת אוצריא" — מסך המשימה.
-  /// מדף התוכנה: [reinstallApp] — התקנה מחדש של אותה גרסה. מדף הספרייה:
-  /// [fullLibrary] — הספרייה המלאה שבכונן במקום עדכון שנכשל.
+  /// "עדכון כאן". מדף התוכנה [reinstallApp] — אותה גרסה שוב; מדף הספרייה
+  /// [fullLibrary] — הספרייה המלאה במקום עדכון שנכשל.
   Future<void> updateHere(
     List<GuidanceItem> items, {
     bool reinstallApp = false,
@@ -783,6 +808,13 @@ class AppSession extends ChangeNotifier {
       reinstallApp: reinstallApp,
       fullLibrary: fullLibrary,
     );
+  }
+
+  Future<void> retryUpdateHere() async {
+    if (tasks.isRunning || exitPending || !isActive) return;
+    if (await _updateHere.retry() || !isActive) return;
+    tasks.dismiss();
+    UiSnack.show(AppL10n.strings.task.retryNothingSnack);
   }
 
   void stopWaitingForSetup() => _updateHere.stopWaiting();
@@ -954,7 +986,10 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   void stateChanged() {
     final flow = _session._downloads;
     if (flow.isDownloading) {
-      _session.tasks.downloadRunning(flow.activeComponents);
+      _session.tasks.downloadRunning(
+        flow.activeComponents,
+        expectedBytes: _session.expectedDownloadBytes,
+      );
     }
     _session._rebuild();
   }
@@ -968,12 +1003,18 @@ class _SessionDownloadHost implements MirrorDownloadHost {
   }
 
   @override
-  void downloadCancelled({Object? revertError}) {
+  void downloadCancelled({
+    Object? revertError,
+    List<MirrorComponent> kept = const [],
+  }) {
     if (revertError != null) {
       AppLogger.instance
           .info('revert after cancelled download failed: $revertError');
     }
-    _session.tasks.downloadCancelled(revertFailed: revertError != null);
+    _session.tasks.downloadCancelled(
+      revertFailed: revertError != null,
+      kept: kept,
+    );
   }
 
   @override

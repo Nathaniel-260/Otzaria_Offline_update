@@ -163,11 +163,11 @@ class _CustomAppsManagePageState extends State<CustomAppsManagePage> {
                     ),
           ),
         ),
-        RowsCard(
-          children: [
-            if (categories.isEmpty)
-              AppRow(title: t.noCategoriesTitle, subtitle: t.noCategoriesHint)
-            else
+        if (categories.isEmpty)
+          SectionEmptyNote(t.noCategoriesTitle, hint: t.noCategoriesHint)
+        else
+          RowsCard(
+            children: [
               for (final category in categories)
                 AppRow(
                   leading: const IconTile(
@@ -211,8 +211,8 @@ class _CustomAppsManagePageState extends State<CustomAppsManagePage> {
                     ],
                   ),
                 ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }

@@ -71,9 +71,8 @@ DownloadFailure classifyDownloadFailure({
   );
 }
 
-/// מזהה את הודעת "אין מספיק מקום" של מנוע הספרייה לפי התבנית המתורגמת
-/// עצמה, כך ששינוי בנוסח אינו שובר את הזיהוי. המנוע זורק טקסט בלבד, ולכן
-/// נבדקות התבניות של כל השפות — החלפת שפה אחרי הכשל לא תפספס אותו.
+/// "אין מספיק מקום" לפי התבנית המתורגמת עצמה, בכל השפות — המנוע זורק
+/// טקסט בלבד, והשפה יכולה להתחלף אחרי הכשל.
 ({String needed, String free})? parseNotEnoughSpace(String error) {
   for (final language in AppLanguage.values) {
     final space = _parseNotEnoughSpace(

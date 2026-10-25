@@ -121,8 +121,6 @@ abstract class ShellStrings {
 abstract class HomeStrings {
   const HomeStrings();
 
-  String get otzariaRunningTitle;
-
   String get otzariaOpenSnack;
 
   /// אזהרה לפני עדכון הספרייה ולאורכו — התוכנה והעדכונים יושבים על הכונן
@@ -185,13 +183,23 @@ abstract class TaskStrings {
   String bytesLine(String name, String done, String total);
   String stageDone(String? size);
   String get stageWaiting;
+
+  /// גודל צפוי לפי הבדיקה ברשת — [size] כבר מעוצב.
+  String approxSize(String size);
+  String downloadTotal(String size);
+
+  /// ליד "ממתין", בזמן שבודקים כמה הספרייה תוריד.
+  String get sizeChecking;
   String get cancelling;
   String get cancelledTitle;
   String get cancelledBody;
+
+  /// [names] — הרכיבים שירדו עד הסוף, מחוברים לרשימה.
+  String cancelledKeptBody(String names);
   String get cancelledRevertFailedBody;
   String get downloadAgain;
   String get backHome;
-  String get backToHomePage;
+  String get retryNothingSnack;
   String get doneTitle;
   String get doneBody;
 
@@ -239,10 +247,8 @@ abstract class TaskStrings {
   String get closeTitle;
   String get closeBody;
   String closeHint({required bool plugins});
-  String get closeAndContinue;
   String get closeAfterWizardBody;
-  String get closeAfterWizardButton;
-  String get notNow;
+  String get closeOtzariaAndContinue;
   String stepOf(int index, int count);
   String get installingApp;
   String get updatingApp;
@@ -346,6 +352,10 @@ abstract class PageStrings {
   String get onThisComputer;
   String get onTheDrive;
   String get nothingYet;
+
+  /// מה ברשת ועוד לא בכונן — רק כשהבדיקה ברשת הצליחה.
+  String get onlineAvailable;
+  String get nothingNewOnline;
   String downloadedOn(String date);
   String get chipUpdateOnDrive;
   String get chipUpToDate;
@@ -415,6 +425,7 @@ abstract class PageStrings {
   String get repStoredBody;
   String get repUncheckedBody;
   String get repOnlyOnline;
+  String get repCheckConnectionButton;
   String repAlsoStored(int count);
   String get repNothingTitle;
   String get repSendButton;
@@ -556,9 +567,6 @@ abstract class GuidanceStrings {
   String get tilePlugins;
   String get tileCustomApps;
   String get tileReports;
-  String chipAppUpToDate(String version);
-  String chipAppUpdate(String version);
-  String chipAppInstalled(String version);
   String get chipReadyToInstall;
   String get chipNewerHere;
   String get chipNotOnDrive;
@@ -567,7 +575,6 @@ abstract class GuidanceStrings {
   String get chipUpdating;
   String get chipAttention;
   String get chipLibraryUpToDate;
-  String get chipLibraryUpdate;
   String chipPluginUpdates(int count);
   String chipPluginsInstalled(int count);
   String chipPluginsOnDrive(int count);
@@ -582,15 +589,23 @@ abstract class GuidanceStrings {
   /// רכיב שההורדה לכונן תביא — כמו "מה ייכלל" בגיבור.
   String get chipNewOnline;
 
+  /// שורות העובדות שבאריחי התוכנה והספרייה.
+  String tileFactHere(String value);
+  String tileFactDrive(String value);
+  String tileFactOnline(String value);
+  String tileFactVersion(String version);
+
+  /// הכפתור שבשורת המצב כשיש גרסה חדשה של הכלי עצמו.
+  String get updateAvailableButton;
+
   // ── שורת התחתית ──
   String launcherOnline(String version);
   String launcherOnDrive(String version);
-  String get launcherDetailsLink;
   String get launcherDownloading;
   String checkedAt(String time);
   String get recheckHint;
   String get checkNowLink;
-  String drive(String name);
+  String drive(String letter);
   String get driveReadOnlySuffix;
   String get driveFullSuffix;
 
@@ -781,8 +796,7 @@ abstract class SettingsScreenStrings {
   String get syncLibraryLockedSubtitle;
 
   // ── עדכון למחשב מסוים ──
-  /// מוריד רק את קובצי העדכון מהגרסה שכבר מותקנת ומעלה, בלי המסד המלא —
-  /// ולכן הכונן אינו משמש עוד להפצה למחשבים אחרים.
+  /// רק קובצי העדכון מהגרסה המותקנת — הכונן אינו משמש עוד למחשבים אחרים.
   String get personalModeTitle;
   String get personalModeSubtitle;
 
@@ -957,8 +971,7 @@ abstract class PluginsStrings {
   String get screenshotNext;
 
   // ── תוכנת החנות העצמאית ─────────────────────────────────────────────────
-  // שורה ב"מתקדם" שמעתיקה את חנות התוספים כתוכנת ווינדוס עצמאית,
-  // ואיתה כל התוספים שבמראה. הניסוח מקביל לזה שבאתר (Otzaria_Website#171).
+  // החנות כתוכנת ווינדוס עצמאית, עם התוספים שבכונן (Otzaria_Website#171).
   String get storeAppButton;
   String get storeAppDialogTitle;
   String get storeAppDialogBody;
@@ -1180,13 +1193,11 @@ abstract class FaqStrings {
   String get aNoExpenses;
 
   // ── איש הקשר ────────────────────────────────────────────────────────────
-  /// כותרת המקטע של איש הקשר. בקריאה הוא מוצג **רק** כשמולאו שם או טלפון —
-  /// "אפשר לפנות אלינו" בלי לומר למי אינו עוזר לאיש.
+  /// מוצג רק כשמולאו שם או טלפון — "אפשר לפנות" בלי למי אינו עוזר.
   String get contactTitle;
 
   // ── עריכה ───────────────────────────────────────────────────────────────
-  /// מצב העריכה של דף העזרה: הסתרת שאלות, הוספת שאלות משלי, ואיש הקשר.
-  /// מיועד למי שמכין כונן לאחרים.
+  /// עריכת דף העזרה — למי שמכין כונן לאחרים.
   String get editButton;
   String get editDoneButton;
   String get editTitle;

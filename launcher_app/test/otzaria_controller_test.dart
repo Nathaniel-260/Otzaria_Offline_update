@@ -724,6 +724,37 @@ void main() {
     });
   });
 
+  group('onlineDownloadBytes — מה ההורדה צפויה להביא', () {
+    OtzariaRelease release(String tag, int size, {bool pre = false}) =>
+        OtzariaRelease(
+          tagName: tag,
+          name: tag,
+          isPrerelease: pre,
+          isDraft: false,
+          publishedAt: null,
+          installerKind: OtzariaInstallerKind.windowsSetupExe,
+          installerAssetName: 'otzaria-$tag.exe',
+          installerDownloadUrl: 'https://example.invalid/$tag',
+          installerSizeBytes: size,
+        );
+
+    test('רק מתקינים שהתג שלהם אינו בכונן; בלי בדיקה — לא ידוע', () async {
+      writeAppMirror(stableTag: '1.0.0');
+      final c = controllerFor();
+      await c.checkForUpdate();
+      expect(c.onlineDownloadBytes, isNull);
+
+      c.onlineChannels = OtzariaChannelReleases(
+        stable: release('1.0.0', 100),
+        prerelease: release('1.1.0', 250, pre: true),
+      );
+      expect(c.onlineDownloadBytes, 250);
+
+      c.onlineChannels = OtzariaChannelReleases(stable: release('1.0.0', 100));
+      expect(c.onlineDownloadBytes, isNull, reason: 'הכול כבר בכונן');
+    });
+  });
+
   group('download — משתמשת בתוצאת הבדיקה הקלה כשהיא טרייה', () {
     OtzariaChannelReleases cachedOnline(String tag) {
       const bytes = 'installer bytes';

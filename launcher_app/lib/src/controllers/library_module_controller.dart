@@ -9,6 +9,7 @@ import 'package:seforim_library_updater/seforim_library_updater.dart';
 import '../services/app_logger.dart';
 import '../services/elevation.dart';
 import 'dispose_guard.dart';
+import 'download_plan.dart' show LibrarySizeProbe;
 import 'online_check.dart';
 import 'progress_notifier.dart';
 import 'stage_clock.dart';
@@ -264,6 +265,27 @@ class LibraryModuleController extends ChangeNotifier
   /// מה ההורדה האחרונה הביאה במצב אישי, `null` כשלא רלוונטי. קיים כדי
   /// שהמצב לא יהיה שקוף: מי שהפעיל אותו בלי לרשום גרסה קיבל מסד מלא.
   LibraryPersonalDownloadNote? personalDownloadNote;
+
+  /// גודל ההורדה הבאה לפני שהספרייה מתחילה לרדת; null כשלא נבדק.
+  LibrarySizeProbe? downloadSizeProbe;
+
+  void clearDownloadSizeProbe() => downloadSizeProbe = null;
+
+  /// מריץ רק את התכנון של ההורדה (בלי התוכן). כשל משאיר את השורה בלי מספר.
+  Future<void> probeDownloadSize() async {
+    downloadSizeProbe = const LibrarySizeProbe.checking();
+    notifyProgress();
+    int? bytes;
+    try {
+      bytes = await _manager.probeMirrorDownloadBytes();
+    } catch (e) {
+      AppLogger.instance.info('בדיקת גודל הספרייה לפני ההורדה לא הצליחה: $e');
+    }
+    downloadSizeProbe = bytes == null
+        ? const LibrarySizeProbe.failed()
+        : LibrarySizeProbe.known(bytes);
+    notifyProgress();
+  }
 
   /// האם המחשב הזה נרשם כיעד לעדכון אישי. `true` גם כשהמצב כבוי, כי אז
   /// כל מחשב הוא יעד לגיטימי. ראו [LibraryModuleStatus.personalTargetElsewhere].

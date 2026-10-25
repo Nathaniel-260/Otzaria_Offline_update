@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -355,6 +356,11 @@ class LibraryManager {
     void Function(String warning)? onWarning,
     bool Function()? isCancelled,
   }) async {
+    // שני מייצאים על אותה מראה היו מתנגשים; הבדיקה המוקדמת נעצרת ומתפנה קודם.
+    if (_sizeProbe case final probe?) {
+      probe.stop();
+      await probe.done;
+    }
     final fromVersion = personalUpdateMode
         ? await recordedPersonalDbVersion()
         : null;
@@ -486,6 +492,73 @@ class LibraryManager {
       upToDate: !exported,
       repairedDamagedMirror: repaired,
     );
+  }
+
+  ({void Function() stop, Future<void> done})? _sizeProbe;
+
+  /// כמה [downloadToMirror] יביא בפועל, בלי להוריד דבר: מריץ את התכנון של המנוע
+  /// (קובצי התיאור בלבד) ועוצר כשהוא מכריז על היעד. null בכשל או אחרי [timeout].
+  Future<int?> probeMirrorDownloadBytes({
+    Duration timeout = const Duration(seconds: 45),
+  }) async {
+    var stopped = false;
+    int? exportBytes;
+    Future<int?> run() async {
+      final fromVersion = personalUpdateMode
+          ? await recordedPersonalDbVersion()
+          : null;
+      final exporter = LibraryMirrorExporter(
+        supportedDbSchemaVersion: kSupportedDbSchemaVersion,
+        client: _cloudClient,
+      );
+      final export = () async {
+        try {
+          final exported = await exporter.export(
+            destDir: mirrorDir,
+            allowPrerelease: allowPrerelease,
+            fromVersion: fromVersion,
+            onBytesProgress: (_, total) {
+              exportBytes ??= total ?? -1;
+              stopped = true;
+            },
+            isCancelled: () => stopped,
+          );
+          if (!exported) exportBytes ??= 0;
+        } on StateError {
+          if (exportBytes == null) rethrow;
+        } finally {
+          exporter.dispose();
+        }
+      }();
+      final companions = _companionsMirror
+          .peekPending(destDir: companionsMirrorDir)
+          .then((_) => _companionsMirror.peekedPendingBytes);
+      final results = await Future.wait<int?>([
+        export.then((_) => exportBytes),
+        companions,
+      ]);
+      if (results.any((bytes) => bytes == null || bytes < 0)) return null;
+      return results[0]! + results[1]!;
+    }
+
+    final work = run();
+    final probe = (
+      stop: () => stopped = true,
+      done: work.then<void>((_) {}, onError: (_) {}),
+    );
+    _sizeProbe = probe;
+    try {
+      return await work.timeout(timeout);
+    } on TimeoutException {
+      stopped = true;
+      return null;
+    } finally {
+      unawaited(
+        probe.done.whenComplete(() {
+          if (identical(_sizeProbe, probe)) _sizeProbe = null;
+        }),
+      );
+    }
   }
 
   /// "מה חדש" של כל release שהמראה מכסה. קובץ שעוד לא הועלה יובא בהורדה

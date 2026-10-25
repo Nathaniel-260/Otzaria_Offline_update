@@ -10,11 +10,8 @@ import '../../widgets/widgets_exports.dart';
 /// רכיבי התצוגה הקטנים של שני מסכי החנות (תוספים ותוכנות נוספות) — לפי
 /// חנות התוספים שבאתר ובמידות המוקאפ. אינם מיוצאים ל-`widgets/`.
 
-/// רוחב הפענוח שיש לבקש מ-`Image.file` עבור תמונה שתוצג ב-[logicalWidth].
-///
-/// בלי `cacheWidth` פלאטר מפענח בגודל המקור — תמונה של 1200×800 היא כ-3.8MB
-/// בזיכרון, וברשת של עשרות תוספים זה מאות MB. העיגול ל-64 מונע פענוח מחדש
-/// בכל פיקסל של שינוי גודל החלון.
+/// רוחב הפענוח ל-`Image.file`: בלי `cacheWidth` כל תמונה מפוענחת בגודל
+/// המקור (מאות MB ברשת); העיגול ל-64 חוסך פענוח בכל שינוי גודל.
 int? decodeWidthFor(BuildContext context, double logicalWidth) {
   if (!logicalWidth.isFinite || logicalWidth <= 0) return null;
   final physical = logicalWidth * MediaQuery.devicePixelRatioOf(context);

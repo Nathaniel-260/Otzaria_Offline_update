@@ -555,6 +555,45 @@ void main() {
       expect(find.byTooltip(t.deleteButton), findsOneWidget);
     });
 
+    testWidgets('חיבור שלא נבדק — "בדוק חיבור" בודק, ובזמן הבדיקה מושבת', (
+      tester,
+    ) async {
+      final service = _MemoryService()..pending.add(_report('p1'));
+      final reports = _controller(service);
+      var checks = 0;
+      Widget page({required bool checking, bool readOnly = false}) =>
+          ReportsPage(
+            errorReports: null,
+            searchFeedback: null,
+            connection: null,
+            isUploadingAll: false,
+            busy: false,
+            reportsToCollect: 0,
+            onCollect: () {},
+            onUpload: null,
+            readOnly: readOnly,
+            appReports: reports,
+            onCheckConnection: readOnly ? null : () => checks++,
+            checkingConnection: checking,
+          );
+      await pumpScreen(tester, page(checking: false));
+      await tester.pumpAndSettle();
+
+      final check = find.byKey(ShellKeys.reportsCheckConnection);
+      expect(check, findsOneWidget);
+      expect(find.byKey(const ValueKey('app-reports-flush')), findsNothing);
+      await tester.tap(check);
+      expect(checks, 1);
+
+      await pumpScreen(tester, page(checking: true));
+      await tester.pump();
+      expect(tester.widget<ActionButton>(check).onPressed, isNull);
+
+      await pumpScreen(tester, page(checking: false, readOnly: true));
+      await tester.pumpAndSettle();
+      expect(check, findsNothing);
+    });
+
     // התור והטופס נכתבים ל-stateDir, שבכונן מוגן עובר למחשב עצמו.
     testWidgets('כונן מוגן — הדיווחים של הכלי והטופס זמינים כרגיל', (
       tester,

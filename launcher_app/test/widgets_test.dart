@@ -17,6 +17,8 @@ import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'test_harness.dart' show drawnArrow;
+
 final AppStrings he = AppL10n.stringsFor(AppLanguage.hebrew);
 final AppStrings en = AppL10n.stringsFor(AppLanguage.english);
 
@@ -171,52 +173,48 @@ void main() {
       );
     });
 
-    // ההיפוך הכפול: העוזרים מוסרים ל-RtlIcon את הסמל ההפוך, והוא מהפך בחזרה.
-    testWidgets('חצי חזרה/קדימה נראים זהה בעברית ובאנגלית', (tester) async {
-      Future<(IconData, IconData)> arrowsFor(AppLanguage language) async {
+    testWidgets('חץ "חזרה" מצביע ימינה בעברית ושמאלה באנגלית', (tester) async {
+      Future<AxisDirection> backIn(AppLanguage language) async {
         await tester.pumpWidget(
           wrap(
-            Builder(
-              builder: (context) => Row(
-                children: [
-                  RtlIcon(context.backArrowIcon, key: const Key('back')),
-                  RtlIcon(context.forwardArrowIcon, key: const Key('forward')),
-                ],
-              ),
-            ),
+            const RtlIcon(FluentIcons.arrow_left_24_regular),
             language: language,
           ),
         );
-        return (
-          renderedIcon(tester, find.byKey(const Key('back'))),
-          renderedIcon(tester, find.byKey(const Key('forward'))),
-        );
+        return drawnArrow(tester, find.byType(Icon));
       }
 
-      final hebrew = await arrowsFor(AppLanguage.hebrew);
-      final english = await arrowsFor(AppLanguage.english);
-
-      expect(hebrew.$1, english.$1);
-      expect(hebrew.$2, english.$2);
-      // ושני החצים באמת מנוגדים — אחרת ההשוואה למעלה חסרת משמעות.
-      expect(hebrew.$1, isNot(hebrew.$2));
+      expect(await backIn(AppLanguage.hebrew), AxisDirection.right);
+      expect(await backIn(AppLanguage.english), AxisDirection.left);
     });
 
     testWidgets('RtlIcon מחליף אייקון ממופה ב-RTL ומשאיר אותו ב-LTR', (
       tester,
     ) async {
-      const arrow = FluentIcons.arrow_right_24_regular;
+      const panel = FluentIcons.panel_left_24_regular;
 
-      await tester.pumpWidget(wrap(const RtlIcon(arrow)));
+      await tester.pumpWidget(wrap(const RtlIcon(panel)));
       expect(
         renderedIcon(tester, find.byType(RtlIcon)),
-        FluentIcons.arrow_left_24_regular,
+        FluentIcons.panel_right_24_regular,
       );
 
       await tester.pumpWidget(
-        wrap(const RtlIcon(arrow), language: AppLanguage.english),
+        wrap(const RtlIcon(panel), language: AppLanguage.english),
       );
-      expect(renderedIcon(tester, find.byType(RtlIcon)), arrow);
+      expect(renderedIcon(tester, find.byType(RtlIcon)), panel);
+    });
+
+    // Icon מהפך בעצמו גליף עם matchTextDirection; היפוך נוסף מחזיר אותו לאחור.
+    testWidgets('RtlIcon אינו מהפך חץ שכבר מתהפך מעצמו', (tester) async {
+      await tester.pumpWidget(
+        wrap(const RtlIcon(FluentIcons.chevron_right_20_regular)),
+      );
+      expect(
+        renderedIcon(tester, find.byType(RtlIcon)),
+        FluentIcons.chevron_right_20_regular,
+      );
+      expect(drawnArrow(tester, find.byType(Icon)), AxisDirection.left);
     });
 
     testWidgets('אייקון בלי גרסת RTL מתהפך גאומטרית, ואייקון נייטרלי לא', (
@@ -423,10 +421,7 @@ void main() {
       );
 
       expect(find.byType(RtlIcon), findsOneWidget);
-      expect(
-        renderedIcon(tester, find.byType(RtlIcon)),
-        FluentIcons.arrow_left_24_regular,
-      );
+      expect(drawnArrow(tester, find.byType(Icon)), AxisDirection.left);
     });
 
     testWidgets('spinning מסובב את האייקון ומשאיר את הטקסט', (tester) async {
@@ -833,10 +828,11 @@ void main() {
         ),
       );
 
-      expect(
-        renderedIcon(tester, find.byType(RtlIcon).first),
-        FluentIcons.arrow_left_24_regular,
+      final icon = find.descendant(
+        of: find.byType(RtlIcon).first,
+        matching: find.byType(Icon),
       );
+      expect(drawnArrow(tester, icon), AxisDirection.left);
     });
   });
 
@@ -992,11 +988,7 @@ void main() {
       expect(find.text('42%'), findsOneWidget);
       expect(find.text(he.units.progressOf('1', '2')), findsOneWidget);
       expect(
-        tester
-            .widget<LinearProgressIndicator>(
-              find.byType(LinearProgressIndicator),
-            )
-            .value,
+        tester.widget<AppProgressBar>(find.byType(AppProgressBar)).value,
         0.42,
       );
 
@@ -1005,11 +997,7 @@ void main() {
       );
       expect(find.textContaining('%'), findsNothing);
       expect(
-        tester
-            .widget<LinearProgressIndicator>(
-              find.byType(LinearProgressIndicator),
-            )
-            .value,
+        tester.widget<AppProgressBar>(find.byType(AppProgressBar)).value,
         isNull,
       );
     });
@@ -1019,11 +1007,13 @@ void main() {
         wrap(InfoProgressRow(
             stage: he.libraryDomain.applyVerifying, progress: 0.42)),
       );
-      final bar = tester.widget<LinearProgressIndicator>(
-        find.byType(LinearProgressIndicator),
+      expect(
+        find.bySemanticsLabel(he.libraryDomain.applyVerifying),
+        findsWidgets,
       );
+      final bar = tester.widget<AppProgressBar>(find.byType(AppProgressBar));
       expect(bar.semanticsLabel, he.libraryDomain.applyVerifying);
-      expect(bar.semanticsValue, '42%');
+      expect(bar.value, 0.42);
     });
 
     testWidgets('CardActionsRow פורס את הפעולות שקיבל', (tester) async {

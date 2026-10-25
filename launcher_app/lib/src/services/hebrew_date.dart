@@ -1,8 +1,5 @@
-/// המרת תאריך לועזי לתאריך עברי בגימטריה — למשל `ט"ו שבט ה'תשפ"ו`.
-///
-/// האתר מקבל את זה מ-`Intl` בדפדפן (`he-IL-u-ca-hebrew`), אבל ל-`package:intl`
-/// ב-Dart אין לוח שנה עברי. לכן ההמרה מחושבת כאן: אלגוריתם המולד הסטנדרטי
-/// (Dershowitz & Reingold). מוצג דרך `formatStoreDate` שב-`timestamps.dart`.
+/// תאריך עברי בגימטריה (`ט"ו שבט ה'תשפ"ו`). ל-`package:intl` אין לוח עברי,
+/// ולכן אלגוריתם המולד (Dershowitz & Reingold).
 class HebrewDate {
   const HebrewDate(this.year, this.month, this.day);
 

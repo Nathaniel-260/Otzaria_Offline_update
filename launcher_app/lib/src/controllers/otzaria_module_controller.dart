@@ -200,6 +200,27 @@ class OtzariaModuleController extends ChangeNotifier
         _channelHasMore(online.prerelease?.tagName, prereleaseVersion);
   }
 
+  /// כמה הורדה למראה תביא לפי הבדיקה ברשת: מתקין שהתג שלו אינו בכונן.
+  /// `null` כשלא נבדק או שאין מה למדוד.
+  int? get onlineDownloadBytes {
+    final online = onlineChannels;
+    if (online == null) return null;
+    final mirrored = {stableVersion, prereleaseVersion};
+    final lacksArm64 = _lastCheck?.mirrorLacksArchitectures ?? false;
+    final seen = <String>{};
+    var bytes = 0;
+    for (final release in [online.stable, online.prerelease]) {
+      if (release == null || !seen.add(release.tagName)) continue;
+      final arm64 = release.arm64Variant?.installerSizeBytes ?? 0;
+      if (!mirrored.contains(release.tagName)) {
+        bytes += release.installerSizeBytes + arm64;
+      } else if (lacksArm64) {
+        bytes += arm64;
+      }
+    }
+    return bytes > 0 ? bytes : null;
+  }
+
   /// יש ברשת תג שאינו זה שיושב במראה באותו ערוץ. ערוץ שאינו ברשת אינו
   /// "עדכון": הניקוי שלו קורה בהורדה הבאה, ולא כדאי שידליק את ההודעה על
   /// משהו שאין מה להוריד עבורו.

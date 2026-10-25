@@ -58,6 +58,17 @@ Future<void> toggleAppLanguage(SettingsController settings) {
   return settings.update(current.copyWith(languagePreference: next));
 }
 
+/// Esc בשדה טקסט (חיפוש בחנות) יוצא מהשדה ולא חוזר לבית. `true` — יצא.
+@visibleForTesting
+bool leaveTextField() {
+  final focus = FocusManager.instance.primaryFocus;
+  if (focus?.context?.findAncestorStateOfType<EditableTextState>() == null) {
+    return false;
+  }
+  focus!.unfocus();
+  return true;
+}
+
 /// מסגרת האפליקציה: שורת כותרת מותאמת למעלה, ומתחתיה הגוף — הבית או דף
 /// משנה שנפתח ממנו. אין סרגל ניווט ואין דף שמכסה את שורת הכותרת.
 class AppShell extends StatefulWidget {
@@ -632,6 +643,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onDismissLegacy: () =>
               unawaited(_session.dismissLegacyReportsNotice()),
           appReports: widget.appReports,
+          onCheckConnection:
+              widget.readOnly ? null : () => unawaited(s.checkOnline()),
+          checkingConnection: s.isCheckingOnline,
         ),
       ShellSection.launcher => LauncherUpdatePage(
           controller: s.launcherUpdate,
@@ -641,6 +655,8 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onInstall: () => unawaited(s.installLauncherUpdate()),
           onOpenFolder: () => unawaited(_openLauncherFolder()),
           onRestartElevated: _restartElevated,
+          onCheck: s.checkNowBlocked ? null : () => unawaited(s.checkNow()),
+          checking: s.isCheckingNow,
         ),
       ShellSection.settings when _managesApps(section) => CustomAppsManagePage(
           controller: s.customApps,
@@ -674,6 +690,10 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     };
   }
 
+  void _onEscape() {
+    if (!leaveTextField()) _navigator.back();
+  }
+
   @override
   Widget build(BuildContext context) {
     return CallbackShortcuts(
@@ -682,7 +702,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
             unawaited(_session.refreshFromKeyboard()),
         const SingleActivator(LogicalKeyboardKey.f5): () =>
             unawaited(_session.refreshFromKeyboard()),
-        const SingleActivator(LogicalKeyboardKey.escape): _navigator.back,
+        const SingleActivator(LogicalKeyboardKey.escape): _onEscape,
       },
       child: Focus(autofocus: true, child: _scaffold(context)),
     );
@@ -770,6 +790,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         final total = s.otzaria.downloadTotal;
         return DownloadSnapshot(
           current: MirrorComponent.app,
+          libraryProbe: s.library.downloadSizeProbe,
           received: received,
           total: total,
           fraction: received != null && total != null && total > 0
@@ -786,10 +807,11 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       case MirrorComponent.plugins:
         return DownloadSnapshot(
           current: MirrorComponent.plugins,
+          libraryProbe: s.library.downloadSizeProbe,
           fraction: s.plugins.syncProgress,
         );
       case null:
-        return const DownloadSnapshot();
+        return DownloadSnapshot(libraryProbe: s.library.downloadSizeProbe);
     }
   }
 
@@ -851,7 +873,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
               unawaited(s.otzaria.launch());
             },
             onHome: _dismissTask,
-            onRetry: _updateHere,
+            onRetry: () => unawaited(s.retryUpdateHere()),
             onOpenPage: (stage) => _leaveTaskTo(switch (stage) {
               GuidanceItem.library => ShellSection.library,
               GuidanceItem.app => ShellSection.otzaria,

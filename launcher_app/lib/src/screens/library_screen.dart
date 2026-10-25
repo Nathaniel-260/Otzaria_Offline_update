@@ -13,9 +13,8 @@ import '../widgets/screen_body.dart';
 import '../widgets/widgets_exports.dart';
 import 'reports/reports_page.dart' show showReportsDisclosure;
 
-/// דף "הספרייה": כרטיס מצב עם פעולה אחת, הסכמה לחיפוש החכם, מה חדש,
-/// ומתקדם — מיקום, בניית החיפוש מחדש, הספרייה המלאה, עדכון למחשב מסוים
-/// והתיקייה שבכונן. ההחלה עצמה רצה במסך המשימה ("עדכון כאן", הספרייה בלבד).
+/// דף "הספרייה": כרטיס מצב, הסכמה לחיפוש החכם, מה חדש ומתקדם.
+/// ההחלה עצמה רצה במסך המשימה ("עדכון כאן", הספרייה בלבד).
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen({
     super.key,
@@ -162,7 +161,7 @@ class LibraryScreen extends StatelessWidget {
       if (otzariaIsRunning)
         NoticeBanner(
           kind: NoticeKind.banner,
-          leading: const IconTile(icon: FluentIcons.warning_24_regular),
+          leading: const IconTile(child: OtzariaLogo()),
           title: g.otzariaOpenTitle,
           body: g.otzariaOpenBody,
           actions: [CloseOtzariaButton(onClose: onCloseOtzaria)],
@@ -195,6 +194,12 @@ class LibraryScreen extends StatelessWidget {
       LibraryModuleStatus.updateAvailable => (
           StatusKind.updateAvailable,
           t.chipUpdateOnDrive,
+        ),
+      LibraryModuleStatus.needsDownload ||
+      LibraryModuleStatus.upToDate when c.hasOnlineUpdate =>
+        (
+          StatusKind.updateAvailable,
+          g.chipNewOnline,
         ),
       LibraryModuleStatus.upToDate => (StatusKind.ok, t.chipUpToDate),
       LibraryModuleStatus.needsDownload => (
@@ -260,6 +265,18 @@ class LibraryScreen extends StatelessWidget {
               ? t.downloadedOn(formatDate(downloadedAt))
               : null,
         ),
+        if (c.onlineCheckedAt != null && c.onlineLibraryProofError == null)
+          StatusValue(
+            label: t.onlineAvailable,
+            value: switch (c.onlineUpdateVersion) {
+              final online? => t.libVersion(online),
+              null
+                  when c.onlinePendingCompanions.isNotEmpty ||
+                      c.onlineSemanticPending =>
+                c.onlinePendingCompanionNames,
+              null => t.nothingNewOnline,
+            },
+          ),
       ],
       extra: [
         if (updating) libraryApplyProgressRow(context, c),
@@ -474,7 +491,7 @@ class LibraryScreen extends StatelessWidget {
           key: ShellKeys.libraryLocation,
           title: t.libLocationTitle,
           subtitle: location == null ? t.libLocationNone : null,
-          below: location == null ? null : PathText(location),
+          below: location == null ? null : PathText(location, copyable: true),
           trailing: Wrap(
             spacing: 8,
             runSpacing: 8,

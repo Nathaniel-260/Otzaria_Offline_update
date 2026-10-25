@@ -737,7 +737,7 @@ void main() {
       expect(collected, 1);
     });
 
-    testWidgets('רשומות חיפוש: שורה נפרדת, ונספרות בנפרד בכותרת', (
+    testWidgets('נתוני אימון: שורה נפרדת, ונספרות בנפרד בכותרת', (
       tester,
     ) async {
       await pumpScreen(tester, page(reports: 1, searchRecords: 3));
@@ -750,7 +750,7 @@ void main() {
       expect(inDisclosure(g.reportsDisclosureStorage), findsOneWidget);
     });
 
-    testWidgets('רשומות חיפוש בלבד — בלי שורת הדיווחים', (tester) async {
+    testWidgets('נתוני אימון בלבד — בלי שורת הדיווחים', (tester) async {
       await pumpScreen(tester, page(searchRecords: 2));
       expect(find.byKey(ShellKeys.reportsCollect), findsOneWidget);
       expect(inDisclosure(g.reportsDisclosureSearch), findsOneWidget);
@@ -781,14 +781,14 @@ void main() {
         expect(guide.reportsDisclosureStorage,
             contains(he ? 'מי שמחזיק בכונן' : 'anyone holding the drive'));
         expect(guide.reportsDisclosureReports,
-            contains(he ? 'כתובת המייל' : 'email address'));
+            contains(he ? 'כתובת הדואר האלקטרוני' : 'email address'));
         expect(guide.reportsDisclosureReports,
             contains(he ? 'צילומי מסך' : 'screenshots'));
         expect(guide.reportsDisclosureReports,
             contains(he ? 'זיכרון התוכנה ברגע הקריסה' : 'app memory'));
         // רק תמונות אפשר לצרף, והפרטים הטכניים נוסעים עם הדיווח.
         expect(guide.reportsDisclosureReports,
-            contains(he ? 'תמונות שצירפתם' : 'images you attached'));
+            contains(he ? 'תמונות שצירפת' : 'images you attached'));
         expect(guide.reportsDisclosureReports,
             isNot(contains(he ? 'קבצים' : 'files')));
         expect(guide.reportsDisclosureReports,

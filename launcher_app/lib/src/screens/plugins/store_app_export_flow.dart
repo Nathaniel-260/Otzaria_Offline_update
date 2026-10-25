@@ -192,14 +192,24 @@ Future<void> _showDoneDialog(
           const SizedBox(height: AppTokens.spaceSM),
           PathText(outcome.destinationDir),
           const SizedBox(height: AppTokens.spaceXS),
-          ActionButton.ghost(
-            text: t.storeAppOpenFolder,
-            icon: FluentIcons.folder_open_20_regular,
-            size: ActionButtonSize.sm,
-            onPressed: () {
-              Navigator.of(dialogContext).pop(false);
-              unawaited(FileReveal.revealDirectory(outcome.destinationDir));
-            },
+          Wrap(
+            spacing: AppTokens.spaceSM,
+            runSpacing: AppTokens.spaceXS,
+            children: [
+              ActionButton.ghost(
+                text: t.storeAppOpenFolder,
+                icon: FluentIcons.folder_open_20_regular,
+                size: ActionButtonSize.sm,
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(false);
+                  unawaited(FileReveal.revealDirectory(outcome.destinationDir));
+                },
+              ),
+              CopyPathButton(
+                path: outcome.destinationDir,
+                size: ActionButtonSize.sm,
+              ),
+            ],
           ),
         ],
       ),

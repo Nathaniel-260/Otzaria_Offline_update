@@ -35,11 +35,18 @@ void main() {
     tempDir.deleteSync(recursive: true);
   });
 
-  Widget page({bool readOnly = false, bool busy = false, bool admin = true}) =>
+  Widget page({
+    bool readOnly = false,
+    bool busy = false,
+    bool admin = true,
+    bool checking = false,
+  }) =>
       LauncherUpdatePage(
         controller: c,
         readOnly: readOnly,
         busy: busy,
+        onCheck: busy ? null : () => calls.add('check'),
+        checking: checking,
         onDownload: () => calls.add('download'),
         onInstall: () => calls.add('install'),
         onOpenFolder: () => calls.add('folder'),
@@ -113,6 +120,15 @@ void main() {
 
     expect(find.text(stringsOf().common.notCheckedYet), findsOneWidget);
     expect(find.text(p.selfChipUpToDate), findsNothing);
+    // "בדוק עכשיו" כמו בבית — לא מבוי סתום.
+    expect(primary(tester).text, stringsOf().guide.checkNowLink);
+    await tester.tap(find.byKey(ShellKeys.statusPrimary));
+    expect(calls, ['check']);
+
+    await pumpScreen(tester, page(checking: true));
+    expect(primary(tester).onPressed, isNull);
+    await pumpScreen(tester, page(busy: true));
+    expect(primary(tester).onPressed, isNull);
   });
 
   testWidgets('כונן מוגן — ההורדה מושבתת, עם הסבר', (tester) async {

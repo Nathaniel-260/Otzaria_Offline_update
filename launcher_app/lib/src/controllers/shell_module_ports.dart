@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:io';
 
 import 'package:plugins_manager/plugins_manager.dart' show StorePlugin;
@@ -119,6 +121,12 @@ class LibraryModulePort
 
   @override
   bool get downloadNeedsRetry => _library.downloadNeedsRetry;
+
+  @override
+  void startDownloadSizeProbe() => unawaited(_library.probeDownloadSize());
+
+  @override
+  void clearDownloadSizeProbe() => _library.clearDownloadSizeProbe();
 
   @override
   bool get isFreshInstall => _library.isFreshInstall;
@@ -266,7 +274,8 @@ class LauncherUpdatePort implements LauncherUpdateTarget {
 class CancelledDownloadRollback implements DownloadRollback {
   CancelledDownloadRollback._(
     this._undo,
-    this._before, {
+    this._before,
+    this._dirs, {
     required OtzariaModuleController otzaria,
     required LibraryModuleController library,
     required PluginsModuleController plugins,
@@ -278,16 +287,19 @@ class CancelledDownloadRollback implements DownloadRollback {
     required OtzariaModuleController otzaria,
     required LibraryModuleController library,
     required PluginsModuleController plugins,
-    required List<String> mirrorDirs,
+    required Map<MirrorComponent, List<String>> mirrorDirs,
   }) async {
     final before = OnlineAnswersBeforeDownload.capture(
       library: library,
       plugins: plugins,
     );
-    final undo = await MirrorDownloadUndo.capture(mirrorDirs);
+    final undo = await MirrorDownloadUndo.capture([
+      for (final dirs in mirrorDirs.values) ...dirs,
+    ]);
     return CancelledDownloadRollback._(
       undo,
       before,
+      mirrorDirs,
       otzaria: otzaria,
       library: library,
       plugins: plugins,
@@ -296,20 +308,22 @@ class CancelledDownloadRollback implements DownloadRollback {
 
   final MirrorDownloadUndo _undo;
   final OnlineAnswersBeforeDownload _before;
+  final Map<MirrorComponent, List<String>> _dirs;
   final OtzariaModuleController _otzaria;
   final LibraryModuleController _library;
   final PluginsModuleController _plugins;
 
   @override
-  Future<void> rollback() async {
+  Future<void> rollback(MirrorComponent? inProgress) async {
     try {
-      await _undo.revert();
+      await _undo.revert(roots: _dirs[inProgress] ?? const []);
     } finally {
       await refreshAfterCancelledDownload(
         otzaria: _otzaria,
         library: _library,
         plugins: _plugins,
         before: _before,
+        reverted: inProgress,
       );
     }
   }

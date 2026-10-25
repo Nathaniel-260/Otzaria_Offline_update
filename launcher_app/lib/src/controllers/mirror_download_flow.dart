@@ -18,6 +18,10 @@ abstract interface class LibraryMirrorModule {
   });
   bool get downloadFailed;
   bool get downloadNeedsRetry;
+
+  /// בודק ברקע כמה ירד, בזמן שרכיבים קודמים יורדים.
+  void startDownloadSizeProbe();
+  void clearDownloadSizeProbe();
 }
 
 abstract interface class PluginsMirrorModule {
@@ -29,7 +33,8 @@ abstract interface class PluginsMirrorModule {
 }
 
 abstract interface class DownloadRollback {
-  Future<void> rollback();
+  /// מחזיר רק את [inProgress]; רכיבים שהסתיימו נשארים בכונן.
+  Future<void> rollback(MirrorComponent? inProgress);
 }
 
 abstract interface class MirrorDownloadHost {
@@ -45,7 +50,12 @@ abstract interface class MirrorDownloadHost {
   Future<void> sweepMirror();
   void stateChanged();
   void downloadSnapshotFailed(Object error);
-  void downloadCancelled({Object? revertError});
+
+  /// [kept]: רכיבים שירדו עד הסוף ונשארו בכונן.
+  void downloadCancelled({
+    Object? revertError,
+    List<MirrorComponent> kept = const [],
+  });
   void downloadEnded();
 
   /// חריג שלא נתפס בזרימה — המסך עובר לכשל, ולא נשאר תקוע ב"מתכונן".
@@ -210,6 +220,11 @@ class MirrorDownloadFlow {
         return;
       }
       bool cancelled() => _cancelRequested;
+      library.clearDownloadSizeProbe();
+      // כשהספרייה ראשונה הגודל האמיתי מגיע מיד. לחיפוש החכם אין תכנון מוקדם.
+      if (plan.runsLibrary(s) && plan.runsApp(s) && !includeSemanticSearch) {
+        library.startDownloadSizeProbe();
+      }
 
       if (plan.runsApp(s)) {
         _current = MirrorComponent.app;
@@ -230,12 +245,23 @@ class MirrorDownloadFlow {
         _current = MirrorComponent.plugins;
         await plugins.syncStoreApp();
       }
+      final inProgress = _current;
       _current = null;
 
       if (cancelled()) {
+        final failed = plan.failed(
+          s,
+          appFailed: app.downloadFailed,
+          libraryFailed: library.downloadFailed,
+          pluginsFailed: plugins.lastSyncFailed,
+        );
+        final kept = [
+          for (final c in _components.takeWhile((c) => c != inProgress))
+            if (!failed.contains(c)) c,
+        ];
         Object? revertError;
         try {
-          await rollback.rollback();
+          await rollback.rollback(inProgress);
         } catch (error) {
           revertError = error;
         }
@@ -243,7 +269,7 @@ class MirrorDownloadFlow {
         _isDownloading = false;
         _cancelRequested = false;
         host.stateChanged();
-        host.downloadCancelled(revertError: revertError);
+        host.downloadCancelled(revertError: revertError, kept: kept);
         return;
       }
       if (!host.isActive) return;
