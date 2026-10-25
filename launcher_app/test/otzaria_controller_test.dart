@@ -710,7 +710,8 @@ void main() {
       expect(c.hasOnlineUpdate, isFalse);
     });
 
-    test('בדיקה חוזרת מנקה את השגיאה הקודמת לפני שהיא מנסה שוב', () async {
+    // ניקוי בתחילה הפך כשל ל"מחובר, מעודכן" בבית עד שהבדיקה חזרה.
+    test('בדיקה חוזרת שומרת את הכשל הקודם עד שהתשובה החדשה מגיעה', () async {
       final c = controllerFor();
       await c.checkOnline();
       expect(c.onlineCheckError, isNotNull);
@@ -719,8 +720,8 @@ void main() {
       c.addListener(() => errors.add(c.onlineCheckError));
       await c.checkOnline();
 
-      expect(errors.first, isNull, reason: 'ההודעה הראשונה היא איפוס');
-      expect(errors.last, isNotNull);
+      expect(errors, isNotEmpty);
+      expect(errors, everyElement(isNotNull));
     });
   });
 

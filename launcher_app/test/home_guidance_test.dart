@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
+import 'package:launcher_app/src/shell/home_guidance_session.dart';
 
 typedef _Case = ({
   String name,
@@ -369,6 +370,276 @@ void main() {
       ),
     ];
     _runCases(cases);
+  });
+
+  group('מה הבדיקה ברשת הוכיחה', () {
+    const failed = OnlineProof.failed;
+    final cases = [
+      _case(
+        'מחשב לא מחובר (כל הבדיקות נכשלו) — מה שבכונן מותקן, ורמז',
+        const GuidanceFacts(
+          online: false,
+          appProof: failed,
+          libraryProof: failed,
+          pluginsProof: failed,
+        ),
+        GuidancePrimary.upToDate,
+        secondary: GuidanceSecondary.offlineHint,
+      ),
+      _case(
+        'כשל חלקי — "לא הצלחתי לבדוק"',
+        const GuidanceFacts(online: true, libraryProof: failed),
+        GuidancePrimary.checkFailed,
+      ),
+      // רק בדיקת הכלי הצליחה: המחשב מחובר, ולכן זה כשל — לא "מעודכן".
+      _case(
+        'רק בדיקת הכלי הצליחה — לא "הכול מעודכן"',
+        const GuidanceFacts(
+          online: true,
+          appProof: failed,
+          libraryProof: failed,
+          pluginsProof: failed,
+        ),
+        GuidancePrimary.checkFailed,
+      ),
+      _case(
+        'כשל ברכיב שאינו מסומן אינו כשל',
+        const GuidanceFacts(
+          online: true,
+          libraryProof: failed,
+          syncLibrary: false,
+        ),
+        GuidancePrimary.upToDate,
+      ),
+      _case(
+        'בדיקה ישנה בלי חדש — עדיין "מעודכן", בלי רענון',
+        const GuidanceFacts(online: true, libraryProof: OnlineProof.stale),
+        GuidancePrimary.upToDate,
+      ),
+      _case(
+        'בדיקה ישנה שמצאה חדש — ההורדה נשארת',
+        const GuidanceFacts(
+          online: true,
+          libraryProof: OnlineProof.stale,
+          onlineLibrary: true,
+        ),
+        GuidancePrimary.downloadToDrive,
+        download: [_library],
+      ),
+      _case(
+        'רכיב שנבחר עוד לא נבדק במחשב מחובר — "בדוק עכשיו"',
+        const GuidanceFacts(
+          online: true,
+          pluginsProof: OnlineProof.unchecked,
+        ),
+        GuidancePrimary.upToDate,
+        secondary: GuidanceSecondary.checkOnlineNow,
+      ),
+      _case(
+        'כשל חלקי, אבל יש מה להתקין כאן — הפעולה קודמת',
+        const GuidanceFacts(
+          online: true,
+          libraryProof: failed,
+          otzariaStatus: AppStatusFact.updateAvailable,
+        ),
+        GuidancePrimary.updateHere,
+        here: [_app],
+      ),
+      _case(
+        'כשל חלקי, ויש חדש ברכיב אחר — ההורדה קודמת',
+        const GuidanceFacts(
+          online: true,
+          libraryProof: failed,
+          onlineApp: true,
+        ),
+        GuidancePrimary.downloadToDrive,
+        download: [_app],
+      ),
+      _case(
+        'בדיקת הכלי חזרה ושל הספרייה עוד רצה — בודק, לא "מעודכן"',
+        const GuidanceFacts(
+          online: true,
+          isCheckingOnline: true,
+          libraryProof: OnlineProof.unchecked,
+        ),
+        GuidancePrimary.checking,
+      ),
+      _case(
+        'בדיקה חוזרת אחרי תשובה קודמת — התשובה נשארת עד שמתחלפת',
+        const GuidanceFacts(online: true, isCheckingOnline: true),
+        GuidancePrimary.upToDate,
+      ),
+      _case(
+        'שבת: רק התוספים לא נבדקו — הערת השבת, לא "לא הצלחתי לבדוק"',
+        const GuidanceFacts(
+          online: true,
+          pluginsProof: OnlineProof.unchecked,
+          pluginsClosedForShabbat: true,
+        ),
+        GuidancePrimary.upToDate,
+        secondary: GuidanceSecondary.siteClosedForShabbat,
+      ),
+      _case(
+        'שבת ובדיקה חוזרת — לא "בודק" בגלל התוספים',
+        const GuidanceFacts(
+          online: true,
+          isCheckingOnline: true,
+          pluginsProof: OnlineProof.unchecked,
+          pluginsClosedForShabbat: true,
+        ),
+        GuidancePrimary.upToDate,
+        secondary: GuidanceSecondary.siteClosedForShabbat,
+      ),
+      _case(
+        'שום רכיב לא נבחר ואין חדש — בלי "בדוק עכשיו"',
+        const GuidanceFacts(
+          online: true,
+          syncApp: false,
+          syncLibrary: false,
+          syncPlugins: false,
+        ),
+        GuidancePrimary.upToDate,
+      ),
+      _case(
+        'כונן מוגן — אין "לא הצלחתי לבדוק"',
+        const GuidanceFacts(readOnly: true, online: true, libraryProof: failed),
+        GuidancePrimary.upToDate,
+      ),
+    ];
+    _runCases(cases);
+
+    test('"הכול מעודכן" רק כשכל רכיב שנבחר הוכח', () {
+      bool proven(GuidanceFacts f) => deriveHomeGuidance(f).onlineProven;
+      expect(proven(const GuidanceFacts(online: true)), isTrue);
+      expect(
+        proven(
+          const GuidanceFacts(
+            online: true,
+            appProof: OnlineProof.stale,
+            libraryProof: OnlineProof.proven,
+            pluginsProof: OnlineProof.proven,
+          ),
+        ),
+        isTrue,
+      );
+      expect(proven(const GuidanceFacts(online: false)), isFalse);
+      // בלי בחירה אין מה שהוכח — הגוף לא יטען "מעודכנים".
+      expect(
+        proven(
+          const GuidanceFacts(
+            online: true,
+            syncApp: false,
+            syncLibrary: false,
+            syncPlugins: false,
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        proven(
+          const GuidanceFacts(
+            online: true,
+            pluginsProof: OnlineProof.unchecked,
+            pluginsClosedForShabbat: true,
+          ),
+        ),
+        isFalse,
+      );
+      expect(proven(const GuidanceFacts()), isFalse);
+      expect(
+          proven(const GuidanceFacts(readOnly: true, online: true)), isFalse);
+      expect(
+        proven(
+          const GuidanceFacts(
+              online: true, libraryProof: OnlineProof.unchecked),
+        ),
+        isFalse,
+      );
+    });
+
+    test('כשל חלקי: מה לא נבדק ומה כן, והאריח אומר "טרם נבדק"', () {
+      const f = GuidanceFacts(online: true, libraryProof: failed);
+      final g = deriveHomeGuidance(f);
+      expect(g.uncheckedItems, [_library]);
+      expect(g.checkedItems, [_app, _plugins]);
+      expect(
+        deriveTileStatus(_library, f, unchecked: g.uncheckedItems),
+        TileStatus.notCheckedOnline,
+      );
+      expect(
+        deriveTileStatus(_app, f, unchecked: g.uncheckedItems),
+        TileStatus.upToDate,
+      );
+      // עדכון בכונן גובר — האריח אומר מה לעשות.
+      const here = GuidanceFacts(
+        online: true,
+        libraryProof: failed,
+        libraryStatus: LibraryStatusFact.updateAvailable,
+      );
+      expect(
+        deriveTileStatus(_library, here, unchecked: const [_library]),
+        TileStatus.updateHere,
+      );
+    });
+  });
+
+  group('עקביות עם שורת הכלי ועם התוכנות הנוספות', () {
+    test('"הכול מעודכן" אינו מסתיר עדכון של הכלי או תוכנה שמחכה', () {
+      final g = deriveHomeGuidance(
+        const GuidanceFacts(
+          online: true,
+          launcherUpdate: true,
+          customAppsPending: true,
+        ),
+      );
+      expect(g.primary, GuidancePrimary.upToDate);
+      expect(g.otherUpdates, [OtherUpdate.launcher, OtherUpdate.customApps]);
+      // גם במחשב לא מחובר: "כל מה שבכונן מותקן" אינו נכון כשתוכנה מחכה.
+      expect(
+        deriveHomeGuidance(
+          const GuidanceFacts(online: false, customAppsPending: true),
+        ).otherUpdates,
+        [OtherUpdate.customApps],
+      );
+      expect(deriveHomeGuidance(const GuidanceFacts()).otherUpdates, isEmpty);
+    });
+
+    test('במצב שיש בו פעולה — הם לא נכנסים לגיבור', () {
+      final g = deriveHomeGuidance(
+        const GuidanceFacts(
+          online: false,
+          launcherUpdate: true,
+          libraryStatus: LibraryStatusFact.updateAvailable,
+        ),
+      );
+      expect(g.primary, GuidancePrimary.updateHere);
+      expect(g.otherUpdates, isEmpty);
+    });
+  });
+
+  group('onlineProofOf', () {
+    final now = DateTime(2026, 10, 25, 12);
+    test('כשל גובר, ואחריו "לא נבדק", "ישנה" ו"הוכח"', () {
+      final fresh = now.subtract(const Duration(minutes: 5));
+      final old = now.subtract(const Duration(hours: 2));
+      expect(onlineProofOf([(fresh, null)], now: now), OnlineProof.proven);
+      expect(onlineProofOf([(old, null)], now: now), OnlineProof.stale);
+      expect(onlineProofOf([(null, null)], now: now), OnlineProof.unchecked);
+      expect(onlineProofOf([(fresh, 'down')], now: now), OnlineProof.failed);
+      // התוספים: קטלוג וחנות — שתי הבדיקות יחד.
+      expect(
+        onlineProofOf([(fresh, null), (old, 'down')], now: now),
+        OnlineProof.failed,
+      );
+      expect(
+        onlineProofOf([(fresh, null), (null, null)], now: now),
+        OnlineProof.unchecked,
+      );
+      expect(
+        onlineProofOf([(fresh, null), (old, null)], now: now),
+        OnlineProof.stale,
+      );
+    });
   });
 
   test('הסכמה ממתינה: האריח והגיבור מסכימים על העדכון', () {

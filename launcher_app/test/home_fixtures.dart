@@ -19,10 +19,14 @@ const homeScenarios = [
   'checking',
   'downloadOnly',
   'firstWithApps',
+  'uptodateOnline',
+  'checkFailed',
+  'othersPending',
 ];
 
 final _checkedAt = DateTime(2026, 10, 23, 23, 14);
 const _newPlugins = ['דף יומי', 'מילון ארמית'];
+const _mb = 1 << 20;
 
 HomeViewModel _model(
   GuidanceFacts f, {
@@ -46,16 +50,25 @@ HomeViewModel _model(
   bool semanticOffer = false,
   String? failedDownloads,
   FoundNothing? foundNothing,
+  int? appDownloadBytes,
+  int? libraryDownloadBytes,
+  int? driveFreeBytes,
 }) {
   final guidance = deriveHomeGuidance(f);
-  TileStatus tile(GuidanceItem item) =>
-      deriveTileStatus(item, f, download: guidance.downloadItems);
+  TileStatus tile(GuidanceItem item) => deriveTileStatus(
+        item,
+        f,
+        download: guidance.downloadItems,
+        unchecked: guidance.uncheckedItems,
+      );
+  bool checked(GuidanceItem item) => f.proofOf(item).succeeded;
   return HomeViewModel(
     guidance: guidance,
     online: f.online,
     installedVersion: installed,
     driveAppVersion: drive,
     onlineAppVersion: onlineApp,
+    onlineAppLatest: checked(GuidanceItem.app) ? onlineApp ?? drive : null,
     libraryHereVersion: installed == null
         ? null
         : f.libraryStatus == LibraryStatusFact.updateAvailable
@@ -64,9 +77,14 @@ HomeViewModel _model(
     libraryFreshInstall: installed == null,
     driveLibraryVersion: 146,
     onlineLibraryVersion: onlineLibrary,
+    onlineLibraryLatest:
+        checked(GuidanceItem.library) ? onlineLibrary ?? 146 : null,
     pluginUpdatesOnDrive: pluginUpdates,
     onlinePluginChanges: onlinePlugins,
     onlineStoreApp: onlineStoreApp,
+    appDownloadBytes: appDownloadBytes,
+    libraryDownloadBytes: libraryDownloadBytes,
+    driveFreeBytes: driveFreeBytes,
     syncApp: f.syncApp,
     syncLibrary: f.syncLibrary,
     syncPlugins: f.syncPlugins,
@@ -90,7 +108,6 @@ HomeViewModel _model(
     newPlugins: newPlugins,
     canLaunch: canLaunch && installed != null,
     launcher: launcher,
-    checkedAt: _checkedAt,
     driveName: 'E:',
   );
 }
@@ -130,6 +147,9 @@ HomeViewModel homeScenario(String name) => switch (name) {
           onlineLibrary: 147,
           onlinePlugins: 3,
           onlineStoreApp: true,
+          appDownloadBytes: 96 * _mb,
+          libraryDownloadBytes: 1229 * _mb,
+          driveFreeBytes: 29082 * _mb,
           pluginUpdates: 3,
           customApps: 3,
           customAppsPending: 2,
@@ -223,6 +243,9 @@ HomeViewModel homeScenario(String name) => switch (name) {
           onlineApp: '0.10.5',
           onlineLibrary: 147,
           onlinePlugins: 5,
+          appDownloadBytes: 96 * _mb,
+          libraryDownloadBytes: 1229 * _mb,
+          driveFreeBytes: 29082 * _mb,
           customApps: 2,
           reportsToSend: 3,
           offersElevation: true,
@@ -289,6 +312,37 @@ HomeViewModel homeScenario(String name) => switch (name) {
           ),
           foundNothing: FoundNothing.rechecked,
           failedDownloads: 'תלמוד בבלי',
+        ),
+      // מחובר, וכל רכיב שנבחר נבדק בלי חדש — "הכול מעודכן".
+      'uptodateOnline' => _model(
+          const GuidanceFacts(online: true),
+          installed: '0.10.4',
+          customApps: 3,
+          semanticOffer: true,
+        ),
+      // מחובר, ובדיקת הספרייה לבדה נכשלה — "לא הצלחתי לבדוק".
+      'checkFailed' => _model(
+          const GuidanceFacts(
+            online: true,
+            libraryProof: OnlineProof.failed,
+          ),
+          installed: '0.10.4',
+          customApps: 3,
+        ),
+      // אוצריא מעודכנת, אבל הכלי ותוכנות נוספות מחכים — לא "הכול מעודכן".
+      'othersPending' => _model(
+          const GuidanceFacts(
+            online: true,
+            launcherUpdate: true,
+            customAppsPending: true,
+          ),
+          installed: '0.10.4',
+          customApps: 3,
+          customAppsPending: 2,
+          launcher: const LauncherLine(
+            LauncherLineKind.online,
+            version: '3.3.0',
+          ),
         ),
       _ => throw ArgumentError.value(name, 'name'),
     };

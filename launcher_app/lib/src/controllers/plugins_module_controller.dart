@@ -22,6 +22,7 @@ typedef PluginsCatalogOnlineAnswers = ({
   PluginsOnlineStatus? status,
   String? checkError,
   DateTime? checkedAt,
+  bool closedForShabbat,
 });
 
 typedef StoreAppOnlineAnswers = ({
@@ -231,6 +232,9 @@ class PluginsModuleController extends ChangeNotifier
   String? onlineCheckError;
   DateTime? onlineCheckedAt;
 
+  /// [onlineCheckError] הוא סגירת האתר בשבת — לא נבדק, אבל גם לא כשל.
+  bool onlineClosedForShabbat = false;
+
   /// `true` כשיש בחנות תוסף חדש או גרסה חדשה שאינם במראה המקומית.
   ///
   /// **הקטלוג בלבד** — [hasOnlineUpdate] מוסיף לו את תוכנת החנות. השניים
@@ -247,12 +251,14 @@ class PluginsModuleController extends ChangeNotifier
         status: onlineStatus,
         checkError: onlineCheckError,
         checkedAt: onlineCheckedAt,
+        closedForShabbat: onlineClosedForShabbat,
       );
 
   void restoreCatalogOnlineAnswers(PluginsCatalogOnlineAnswers answers) {
     onlineStatus = answers.status;
     onlineCheckError = answers.checkError;
     onlineCheckedAt = answers.checkedAt;
+    onlineClosedForShabbat = answers.closedForShabbat;
     notifyListeners();
   }
 
@@ -508,8 +514,7 @@ class PluginsModuleController extends ChangeNotifier
   /// מגיטהאב. במקביל, ועם דיווח כשל נפרד: אתר שאינו עונה אינו אומר דבר על
   /// הזמינות של השני, ודגל כשל משותף היה מבטל את הדילוג של שניהם.
   Future<void> checkOnline() async {
-    onlineCheckError = null;
-    storeAppCheckError = null;
+    // הכשל הקודם נשאר עד התשובה החדשה — ראו `LibraryModuleController.checkOnline`.
     notifyListeners();
 
     // אותן גרסאות שהסנכרון יקבל — אחרת ההצצה מדווחת על עדכון שההורדה
@@ -522,13 +527,17 @@ class PluginsModuleController extends ChangeNotifier
   Future<void> _peekCatalog(List<String> appVersions) async {
     try {
       onlineStatus = await _manager.peekOnlineUpdates(appVersions: appVersions);
+      onlineCheckError = null;
+      onlineClosedForShabbat = false;
     } on PluginStoreShabbatException catch (e) {
       onlineStatus = null;
       onlineCheckError = e.message;
+      onlineClosedForShabbat = true;
       AppLogger.instance.info('בדיקת עדכונים ברשת (תוספים): האתר סגור בשבת');
     } catch (e) {
       onlineStatus = null;
       onlineCheckError = e.toString();
+      onlineClosedForShabbat = false;
       // ראו `LibraryModuleController.checkOnline` — בלי stack trace בכוונה.
       AppLogger.instance.info('בדיקת עדכונים ברשת (תוספים) לא הצליחה: $e');
     }
@@ -538,6 +547,7 @@ class PluginsModuleController extends ChangeNotifier
   Future<void> _peekStoreApp() async {
     try {
       storeAppOnline = await _manager.peekStoreApp();
+      storeAppCheckError = null;
     } catch (e) {
       storeAppOnline = null;
       storeAppCheckError = e.toString();
@@ -615,6 +625,7 @@ class PluginsModuleController extends ChangeNotifier
         onlineStatus = PluginsOnlineStatus.empty;
         onlineCheckedAt = DateTime.now();
         onlineCheckError = null;
+        onlineClosedForShabbat = false;
       }
       await load();
     } on PluginStoreShabbatException catch (e) {

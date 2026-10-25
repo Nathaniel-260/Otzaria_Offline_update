@@ -96,8 +96,8 @@ state.** `deriveHomeGuidance` (`launcher_app/lib/src/shell/home_guidance.dart`,
 pure Dart, table-tested) turns what is installed here, what is on the drive and
 whether a check reached the network into one sentence and one primary button:
 update this computer from the drive, download updates to the drive, or "everything
-is up to date". "No internet" is a hint there, never an error. Nothing about it is
-a stored flag or a question to the user.
+is up to date". A machine that is not connected is a hint there, never an error.
+Nothing about it is a stored flag or a question to the user.
 
 | Step | API | Network |
 | --- | --- | --- |
@@ -596,6 +596,23 @@ downloaded". The flow calls `downloadFoundNothing`, and `AppSession.foundNothing
 makes the home say so in every primary: "checked again" when a check just ran,
 otherwise "nothing new" — each with the time of the latest successful check of a
 selected component. Cleared by a check, the next download or a settings change.
+
+**"Everything is up to date" needs every selected component's own check.**
+`online` is true when any check succeeded — the launcher's own one included —
+so a failed library check read as "up to date". `onlineProofOf`: all selected
+succeeded (stale too) → up to date; all failed → offline "installed here", not
+a failure; some failed while connected → `checkFailed`. `checkOnline` keeps the
+previous answer, a failure included, until the new one (clearing it flashed
+"connected, up to date" offline). Smart search counts only in "always"
+(`onlineAnswerError`); Shabbat is unchecked, not failed.
+
+**The sizes in the home's download list are upper bounds known before the
+click.** `LibraryManager.peekedDownloadBytesBound` (newest full DB, every patch
+of the mirror's releases and the pending companions, less what is complete in
+the mirror; smart search only in "always") and
+`OtzariaModuleController.onlineDownloadBytes`, from the light peeks alone;
+plugins have none. No bound means no number — never `probeMirrorDownloadBytes`
+before a click: it runs the real export planning.
 
 **Filtered networks get their own messages and NetFree's CA.** A filter answers
 418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
@@ -2095,14 +2112,19 @@ waiting in Otzaria (a count on the reports tile; locked on a read-only drive). T
 prompt alone stays a `DialogQueue` dialog. Other dialogs answer a click the user just
 made: confirming the launcher install, cancelling a download or closing during a task
 (warnings), consents, reset, trust, passwords, the custom-app form and the report form.
-"Check now" sits next to "checked at" in the
-status bar pinned to the bottom of the home page (`AppSession.checkNow`: `checkAll`, then `checkOnline`; on a read-only drive
-`checkAll` only). `checkAll` includes `_autoInstallIfEnabled`, so with auto-install on,
-"check now" can start an install without a dialog. The link, the hero's "check again" and
-the action share one block (`checkNowBlocked` = `longTaskRunning`), and the startup check
-counts as a running check (`isCheckingNow`). Ctrl+R/F5 stay local-only. Collecting reports
-has no dialog: the reports page shows the full disclosure (what is copied, unencrypted on
-the drive, who receives it) above "Collect to the drive", so the click is the consent.
+"Check now" sits at the end of the status bar pinned to the bottom of the home
+page (`AppSession.checkNow`: `checkAll`, then `checkOnline`; on a read-only
+drive `checkAll` only), after "checked at" — the last successful online check,
+on a connected machine only. The hero repeats nothing the status bar shows, and
+nothing the home shows on an offline machine says "internet" (maintainer
+decision): "not connected", "the connected computer". `checkAll` includes
+`_autoInstallIfEnabled`, so with auto-install on, "check now" can start an
+install without a dialog. The link, the hero's "check again" and the action
+share one block (`checkNowBlocked` = `longTaskRunning`), and the startup check
+counts as a running check (`isCheckingNow`). Ctrl+R/F5 stay local-only.
+Collecting reports has no dialog: the reports page shows the full disclosure
+(what is copied, unencrypted on the drive, who receives it) above "Collect to
+the drive", so the click is the consent.
 
 **Store images must pass `cacheWidth`.** Without it Flutter decodes at source
 resolution; a 1200×800 catalogue image is ~3.8MB of RAM, times every plugin. See

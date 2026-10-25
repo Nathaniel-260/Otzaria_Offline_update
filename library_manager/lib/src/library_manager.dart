@@ -668,13 +668,24 @@ class LibraryManager {
 
   String? _onlineLibraryTag;
 
+  /// ה-releases של [peekLatestOnlineVersion] האחרון שהצליח; `null` אחרי כשל.
+  List<LibraryRelease>? _peekedReleases;
+
+  /// חסם עליון לחיפוש החכם לפי [peekPendingSemanticSearch] האחרון.
+  int? get peekedSemanticBytes => _peekedSemanticBytes;
+  int? _peekedSemanticBytes;
+
   Future<bool> peekPendingSemanticSearch() async {
+    _peekedSemanticBytes = null;
     if (_onlineLibraryTag == null) await peekLatestOnlineVersion();
     final tag = _onlineLibraryTag;
-    if (tag == null) return false;
+    if (tag == null) {
+      _peekedSemanticBytes = 0;
+      return false;
+    }
     final semantic = SemanticSearchAssets();
     try {
-      return await semantic.peekPending(
+      final pending = await semantic.peekPending(
         mirrorDir: semanticMirrorDir,
         libraryTag: tag,
         // The online machine's Otzaria fetches its vectors itself.
@@ -682,6 +693,8 @@ class LibraryManager {
           await _stateStore.liveSemanticStates(excludeOwn: true),
         ),
       );
+      _peekedSemanticBytes = semantic.peekedPendingBytes;
+      return pending;
     } finally {
       semantic.dispose();
     }
@@ -702,9 +715,89 @@ class LibraryManager {
 
   Future<int?> peekLatestOnlineVersion() async {
     _onlineLibraryTag = null;
-    final latest = _latestOnline(await _cloudClient.fetchFreshReleases());
+    _peekedReleases = null;
+    final releases = await _cloudClient.fetchFreshReleases();
+    final latest = _latestOnline(releases);
+    _peekedReleases = releases;
     _onlineLibraryTag = latest?.tag;
     return latest?.version;
+  }
+
+  /// חסם עליון ל-[downloadToMirror] (בלי חיפוש חכם) מההצצות האחרונות, בלי רשת.
+  /// `null` אחרי הצצה שנכשלה, במצב אישי ובמסד מפוצל.
+  Future<int?> peekedDownloadBytesBound() async {
+    final releases = _peekedReleases;
+    final companions = _companionsMirror.peekedPendingBytes;
+    if (releases == null || companions == null || personalUpdateMode) {
+      return null;
+    }
+    final exporter = LibraryMirrorExporter(
+      supportedDbSchemaVersion: kSupportedDbSchemaVersion,
+      client: _cloudClient,
+    );
+    final List<LibraryRelease> relevant;
+    try {
+      relevant = exporter.recentReleases(
+        LibraryUpdateDiscovery.eligibleReleases(
+          releases,
+          allowPrerelease: allowPrerelease,
+        ),
+      );
+    } finally {
+      exporter.dispose();
+    }
+
+    ({LibraryRelease release, ReleaseAsset asset})? fullDb;
+    for (final release in relevant) {
+      final asset = release.fullDbAssetFor(
+        maxSchemaVersion: kSupportedDbSchemaVersion,
+      );
+      if (asset == null) continue;
+      if (fullDb == null ||
+          LibraryUpdateDiscovery.releaseVersionOf(release) >
+              LibraryUpdateDiscovery.releaseVersionOf(fullDb.release)) {
+        fullDb = (release: release, asset: asset);
+      }
+    }
+    if (fullDb != null && fullDb.asset.isSplitFullDbManifest) return null;
+
+    final held = await _mirroredAssets();
+    var bytes = companions;
+    for (final release in relevant) {
+      for (final asset in release.assets) {
+        // קובצי עדכון ומניפסטים; המסד המלא נספר פעם אחת בלבד, מהחדש.
+        final counted =
+            asset.name.startsWith('patch-') || identical(asset, fullDb?.asset);
+        if (!counted || held.contains((release.tag, asset.name, asset.size))) {
+          continue;
+        }
+        bytes += asset.size;
+      }
+    }
+    return bytes;
+  }
+
+  /// (tag, שם, גודל) של כל נכס שיושב שלם במראה המקומית.
+  Future<Set<(String, String, int)>> _mirroredAssets() async {
+    if (!await hasMirror) return const {};
+    final List<LibraryRelease> mirrored;
+    try {
+      mirrored = await LocalMirrorLibraryReleaseClient(
+        mirrorDir: mirrorDir,
+      ).fetchReleases();
+    } catch (_) {
+      return const {};
+    }
+    final held = <(String, String, int)>{};
+    for (final release in mirrored) {
+      for (final asset in release.assets) {
+        final file = File(asset.downloadUrl);
+        if (await file.exists() && await file.length() == asset.size) {
+          held.add((release.tag, asset.name, asset.size));
+        }
+      }
+    }
+    return held;
   }
 
   ({String tag, int version})? _latestOnline(List<LibraryRelease> all) =>

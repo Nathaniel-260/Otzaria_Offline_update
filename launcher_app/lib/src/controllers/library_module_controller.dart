@@ -46,6 +46,8 @@ typedef LibraryOnlineAnswers = ({
   bool semanticPending,
   String? semanticCheckError,
   bool semanticChecked,
+  int? downloadBytesBound,
+  int? semanticBytes,
 });
 
 /// מה ההורדה האחרונה עשתה במצב "עדכון אישי".
@@ -345,6 +347,25 @@ class LibraryModuleController extends ChangeNotifier
   /// הבדיקה של החיפוש החכם רצה בפועל. בלעדיה — "לא נבדק", לעולם לא "מעודכן".
   bool semanticChecked = false;
 
+  /// חסמים עליונים מהבדיקה הקלה — `LibraryManager.peekedDownloadBytesBound`
+  /// ו-`peekedSemanticBytes`; `null` כשאין חסם מוגדר.
+  int? onlineDownloadBytesBound;
+  int? onlineSemanticBytes;
+
+  /// "עד X" של הספרייה בבית: עם החיפוש החכם רק ב"תמיד", כי ב"לשאול" הוא
+  /// יורד רק אחרי השאלה. `null` — אין חסם, ולכן אין מספר.
+  int? get onlineDownloadUpperBound {
+    final bound = onlineDownloadBytesBound;
+    if (bound == null) return null;
+    // אותו תנאי שבו ההורדה מוסיפה אותו — גם כשבדיקתו נכשלה.
+    if (_semanticPreference != SemanticDownloadPreference.always ||
+        !shouldOfferSemanticDownload) {
+      return bound;
+    }
+    final semantic = onlineSemanticBytes;
+    return semantic == null ? null : bound + semantic;
+  }
+
   /// נלווים שנשארו חסרים אחרי הורדה של הספרייה שהסתיימה — לא מוצעים שוב עד
   /// [forgetDownloadFailures]; אחרת הבית מציע אותם בכל פתיחה ונכשל שוב.
   Set<CompanionAsset> failedCompanions = const {};
@@ -391,6 +412,14 @@ class LibraryModuleController extends ChangeNotifier
   String? get onlineLibraryProofError =>
       onlineCheckError ?? onlineCompanionsCheckError;
 
+  /// הבדיקה כפי שהבית רואה אותה: כשל של החיפוש החכם נחשב רק ב"תמיד" — בשאר
+  /// הוא אינו חלק מהעדכון.
+  String? get onlineAnswerError =>
+      onlineLibraryProofError ??
+      (_semanticPreference == SemanticDownloadPreference.always
+          ? onlineSemanticCheckError
+          : null);
+
   /// לשאול על הורדת החיפוש החכם רק כשהבדיקה לא הוכיחה שהכונן כבר מחזיק אותו —
   /// אחרת "כן" מריץ את כל הורדת הספרייה בלי שום דבר חדש להביא.
   bool get shouldOfferSemanticDownload =>
@@ -416,6 +445,8 @@ class LibraryModuleController extends ChangeNotifier
         semanticPending: onlineSemanticPending,
         semanticCheckError: onlineSemanticCheckError,
         semanticChecked: semanticChecked,
+        downloadBytesBound: onlineDownloadBytesBound,
+        semanticBytes: onlineSemanticBytes,
       );
 
   void restoreOnlineAnswers(LibraryOnlineAnswers answers) {
@@ -427,6 +458,8 @@ class LibraryModuleController extends ChangeNotifier
     onlineSemanticPending = answers.semanticPending;
     onlineSemanticCheckError = answers.semanticCheckError;
     semanticChecked = answers.semanticChecked;
+    onlineDownloadBytesBound = answers.downloadBytesBound;
+    onlineSemanticBytes = answers.semanticBytes;
     notifyListeners();
   }
 
@@ -454,48 +487,69 @@ class LibraryModuleController extends ChangeNotifier
   int? get onlineUpdateVersion =>
       _hasOnlineDbUpdate ? onlineLatestVersion : null;
 
+  /// התשובה הקודמת — גם כשל — נשארת עד שהחדשה מוכנה: ניקוי בתחילה הפך כשל
+  /// ל"הוכח" באמצע בדיקה חוזרת (`onlineProofOf`).
   Future<void> checkOnline() async {
-    onlineCheckError = null;
-    onlineCompanionsCheckError = null;
     notifyListeners();
 
+    int? latest;
+    String? checkError;
+    var companions = const <CompanionAsset>{};
+    String? companionsError;
     await Future.wait<void>([
       () async {
         try {
-          onlineLatestVersion = await _manager.peekLatestOnlineVersion();
+          latest = await _manager.peekLatestOnlineVersion();
         } catch (e) {
-          onlineLatestVersion = null;
-          onlineCheckError = e.toString();
+          checkError = e.toString();
           AppLogger.instance.info('בדיקת עדכונים ברשת (ספרייה) לא הצליחה: $e');
         }
       }(),
       () async {
         try {
-          onlinePendingCompanions = await _manager.peekPendingCompanions();
+          companions = await _manager.peekPendingCompanions();
         } catch (e) {
-          onlinePendingCompanions = const {};
-          onlineCompanionsCheckError = e.toString();
+          companionsError = e.toString();
           AppLogger.instance.info('בדיקת הקבצים הנלווים ברשת לא הצליחה: $e');
         }
       }(),
     ]);
     AppLogger.instance.info(
-      'checkOnline (ספרייה): latest=$onlineLatestVersion '
-      'companions=[${_companionNames(onlinePendingCompanions)}]',
+      'checkOnline (ספרייה): latest=$latest '
+      'companions=[${_companionNames(companions)}]',
     );
-    onlineSemanticCheckError = null;
-    onlineSemanticPending = false;
-    semanticChecked = false;
-    if (onlineCheckError == null &&
+    String? semanticError;
+    var semanticPending = false;
+    var checkedSemantic = false;
+    int? semanticBytes;
+    if (checkError == null &&
         _semanticPreference != SemanticDownloadPreference.never) {
       try {
-        onlineSemanticPending = await _manager.peekPendingSemanticSearch();
+        semanticPending = await _manager.peekPendingSemanticSearch();
+        semanticBytes = _manager.peekedSemanticBytes;
       } catch (e) {
-        onlineSemanticCheckError = e.toString();
+        semanticError = e.toString();
         AppLogger.instance.info('בדיקת החיפוש החכם ברשת לא הצליחה: $e');
       }
-      semanticChecked = true;
+      checkedSemantic = true;
     }
+    int? bound;
+    if (checkError == null && companionsError == null) {
+      try {
+        bound = await _manager.peekedDownloadBytesBound();
+      } catch (e) {
+        AppLogger.instance.info('חישוב גודל ההורדה של הספרייה לא הצליח: $e');
+      }
+    }
+    onlineLatestVersion = latest;
+    onlineCheckError = checkError;
+    onlinePendingCompanions = companions;
+    onlineCompanionsCheckError = companionsError;
+    onlineSemanticPending = semanticPending;
+    onlineSemanticCheckError = semanticError;
+    semanticChecked = checkedSemantic;
+    onlineSemanticBytes = semanticBytes;
+    onlineDownloadBytesBound = bound;
     onlineCheckedAt = DateTime.now();
     notifyListeners();
   }

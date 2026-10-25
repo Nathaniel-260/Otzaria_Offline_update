@@ -1234,6 +1234,46 @@ void main() {
       expect(controller.isSyncing, isFalse);
     });
 
+    test('a successful sync after Shabbat drops the Shabbat closure', () async {
+      final open = PluginsModuleController(
+        mirrorRootDir: p.join(tempDir.path, 'mirror'),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode([]),
+            200,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+      addTearDown(open.dispose);
+      await open.load();
+      open
+        ..onlineCheckError = 'closed'
+        ..onlineClosedForShabbat = true;
+
+      await open.sync();
+
+      expect(open.lastSyncFailed, isFalse);
+      expect(open.onlineCheckError, isNull);
+      expect(open.onlineClosedForShabbat, isFalse);
+    });
+
+    test('a re-check keeps the previous errors until the new answer', () async {
+      controller
+        ..onlineCheckError = 'old catalog'
+        ..storeAppCheckError = 'old store';
+      final seen = <(String?, String?)>[];
+      controller.addListener(
+        () => seen.add(
+          (controller.onlineCheckError, controller.storeAppCheckError),
+        ),
+      );
+
+      await controller.checkOnline();
+
+      expect(seen.first, ('old catalog', 'old store'));
+    });
+
     test('a second sync while one runs joins the same run', () async {
       final first = controller.sync();
       final second = controller.sync();
@@ -1264,6 +1304,12 @@ void main() {
         closed.onlineCheckError,
         AppL10n.strings.pluginsDomain.siteClosedForShabbat,
       );
+      // לבית: לא נבדק, אבל לא כשל — ונשמר גם בשחזור אחרי ביטול.
+      expect(closed.onlineClosedForShabbat, isTrue);
+      final answers = closed.catalogOnlineAnswers;
+      closed.onlineClosedForShabbat = false;
+      closed.restoreCatalogOnlineAnswers(answers);
+      expect(closed.onlineClosedForShabbat, isTrue);
     });
 
     test('שבת: המראה הקיימת נשארת מוכנה, עם הודעה ייעודית ובלי שגיאה',

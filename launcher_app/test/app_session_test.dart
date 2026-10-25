@@ -153,6 +153,32 @@ void main() {
       expect(s.lastCheckedAt, isNotNull);
       // בלי רשת אין גרסה חדשה של הכלי, ולכן גם אין שאלה על התקנה.
       expect(prompts.calls, isNot(contains('confirmLauncherInstall')));
+      // המקום הפנוי בכונן נמדד ב-isolate אחרי הבדיקה, לרשימת ההורדה.
+      for (var i = 0; i < 250 && s.driveFreeBytes == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(s.driveFreeBytes, greaterThan(0));
+    });
+
+    // בדיקה חוזרת במחשב לא מחובר: עד שהתשובה החדשה מגיעה, הכשל הקודם הוא
+    // התשובה — לא "מחובר" ולא "הכול מעודכן" לכמה שניות.
+    test('בדיקה חוזרת אחרי כשל: הבית לא נראה מחובר או מעודכן באמצע', () async {
+      final s = session();
+      await s.checkOnline();
+      expect(homeViewModelOf(s).online, isFalse);
+
+      final seen = <HomeViewModel>[];
+      s.addListener(() => seen.add(homeViewModelOf(s)));
+      await s.checkOnline();
+
+      expect(seen, isNotEmpty);
+      for (final model in seen) {
+        expect(model.online, isNot(isTrue));
+        expect(model.guidance.onlineProven, isFalse);
+        expect(model.guidance.primary, isNot(GuidancePrimary.checkFailed));
+      }
+      expect(s.library.onlineCheckError, isNotNull);
+      expect(s.otzaria.onlineCheckError, isNotNull);
     });
 
     test('כונן לקריאה בלבד: אינו בודק כלום ואינו מודיע', () async {

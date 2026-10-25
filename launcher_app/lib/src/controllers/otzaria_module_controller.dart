@@ -266,11 +266,12 @@ class OtzariaModuleController extends ChangeNotifier
   /// [onlineCheckError] ולא נזרק, כדי שבדיקה אוטומטית לא תציג שגיאה
   /// מפחידה כשפשוט אין רשת כרגע.
   Future<void> checkOnline() async {
-    onlineCheckError = null;
+    // הכשל הקודם נשאר עד התשובה החדשה — ראו `LibraryModuleController.checkOnline`.
     notifyListeners();
 
     try {
       onlineChannels = await _manager.peekOnlineChannels();
+      onlineCheckError = null;
     } catch (e) {
       onlineChannels = null;
       onlineCheckError = e.toString();

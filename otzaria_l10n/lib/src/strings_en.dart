@@ -332,7 +332,7 @@ class _Task extends TaskStrings {
       'Connect it to the computer where you study with Otzaria.';
   @override
   String whatNowOpen(String toolName) =>
-      'Open $toolName from the drive there, and click "Update Otzaria on this computer".';
+      'Open $toolName from the drive there, and click "Update this computer".';
   @override
   String get updateHereToo => 'Update this computer too';
   @override
@@ -891,7 +891,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get eyebrowOnline => 'This computer: online';
   @override
-  String get eyebrowOffline => 'This computer: no internet';
+  String get eyebrowOffline => 'This computer: not connected';
   @override
   String get eyebrowThisComputer => 'This computer';
   @override
@@ -918,7 +918,7 @@ class _Guide extends GuidanceStrings {
   String get updateHereBody =>
       'Your books, bookmarks and notes stay exactly as they are.';
   @override
-  String get updateHereButton => 'Update Otzaria on this computer';
+  String get updateHereButton => 'Update this computer';
   @override
   String get whatsNewButton => 'What is new?';
   @override
@@ -928,9 +928,7 @@ class _Guide extends GuidanceStrings {
       'Download them to this drive, and update any computer from it — even '
       'one without internet.';
   @override
-  String get downloadButton => 'Download updates to the drive';
-  @override
-  String get updateHereTooButton => 'Update here too';
+  String get downloadButton => 'Download everything to the drive';
   @override
   String updateHereTooNote(String? version) => version == null
       ? 'The drive already holds an update not installed on this computer. '
@@ -999,11 +997,58 @@ class _Guide extends GuidanceStrings {
   @override
   String get upToDateTitle => 'Everything is up to date on this computer';
   @override
-  String upToDateBody(String? version, {required bool offline}) {
-    final lead = version == null
-        ? 'Otzaria, the library and the plugins are up to date.'
-        : 'Otzaria $version, the library and the plugins are up to date.';
-    return offline ? '$lead The drive has no new update.' : lead;
+  String upToDateBody(String? version) => version == null
+      ? 'Otzaria, the library and the plugins are up to date.'
+      : 'Otzaria $version, the library and the plugins are up to date.';
+  @override
+  String get driveInstalledTitle =>
+      'Everything on the drive is already installed here';
+  @override
+  String driveInstalledBody(String? version) => version == null
+      ? 'Otzaria, the library and the plugins are installed.'
+      : 'Otzaria $version, the library and the plugins are installed.';
+  @override
+  String get othersPendingTitle => 'There are more updates';
+  @override
+  String get otherLauncherTitle => 'This tool';
+  @override
+  String otherLauncherOnline(String version) =>
+      'Version $version on the Otzaria site';
+  @override
+  String otherLauncherOnDrive(String version) =>
+      'Version $version on the drive';
+  @override
+  String get checkFailedTitle => 'Could not check online';
+  @override
+  String checkFailedBody({
+    required bool appFailed,
+    required bool libraryFailed,
+    required bool pluginsFailed,
+    required bool appChecked,
+    required bool libraryChecked,
+    required bool pluginsChecked,
+  }) {
+    List<String> names(bool app, bool library, bool plugins) => [
+          if (app) 'the Otzaria program',
+          if (library) 'the library',
+          if (plugins) 'the plugins',
+        ];
+    String join(List<String> all) => all.length < 2
+        ? all.join()
+        : '${all.sublist(0, all.length - 1).join(', ')} and ${all.last}';
+
+    final failed = join(names(appFailed, libraryFailed, pluginsFailed));
+    final lead = failed.isEmpty
+        ? 'The check on the Otzaria site failed.'
+        : 'The check of $failed on the Otzaria site failed.';
+    final checkedNames = names(appChecked, libraryChecked, pluginsChecked);
+    if (checkedNames.isEmpty) return lead;
+    final checked = join(checkedNames);
+    final plural = checkedNames.length > 1 || pluginsChecked;
+    final verb = plural
+        ? 'were checked and are up to date'
+        : 'was checked and is up to date';
+    return '$lead ${checked[0].toUpperCase()}${checked.substring(1)} $verb.';
   }
 
   @override
@@ -1012,8 +1057,8 @@ class _Guide extends GuidanceStrings {
   String get recheckButton => 'Check again';
   @override
   String get offlineNote =>
-      'To get updates, plug the drive into a computer with internet and open '
-      'it there.';
+      'New updates are downloaded to the drive on the connected computer, '
+      'and then the drive is plugged in here.';
   @override
   String get checkOnlineNowNote =>
       'The Otzaria site has not been checked yet. "Check again" checks now.';
@@ -1029,8 +1074,8 @@ class _Guide extends GuidanceStrings {
       'There is nothing to install from the drive.';
   @override
   String get newerNote =>
-      'To get newer updates, plug the drive into a computer with internet and '
-      'open it there.';
+      'Newer updates are downloaded to the drive on the connected computer, '
+      'and then the drive is plugged in here.';
   @override
   String get attentionAppTitle =>
       'Something in the Otzaria program needs a look';
@@ -1058,25 +1103,48 @@ class _Guide extends GuidanceStrings {
       'When it ends, you will see here what else this computer needs.';
 
   @override
-  String pillApp(String version) => 'Otzaria $version';
+  String itemUpdateTo(String version) => 'Update to $version';
   @override
-  String get pillLibraryUpdate => 'Library · update';
+  String itemLibraryUpdateTo(int version) => 'Update to version $version';
   @override
-  String get pillLibraryFull => 'Full library';
+  String get itemLibraryUpdate => 'Update';
   @override
-  String pillLibraryCompanions(String names) => 'Library · $names';
+  String get itemLibraryFull => 'The full library';
   @override
-  String pillPluginUpdates(int count) =>
+  String itemPluginUpdates(int count) =>
       count == 1 ? '1 plugin update' : '$count plugin updates';
   @override
-  String pillPlugins(int count) => count == 1 ? '1 plugin' : '$count plugins';
+  String itemPlugins(int count) => count == 1 ? '1 plugin' : '$count plugins';
   @override
-  String get pillPluginsCatalog => 'Plugin list';
+  String get itemPluginsCatalog => 'Plugin list';
   @override
-  String get pillStoreApp => 'Plugin store update';
+  String get itemStoreApp => 'Plugin store update';
   @override
-  String pillPluginsWithStore(int count) =>
-      '${pillPlugins(count)} · store update';
+  String itemPluginsWithStore(int count) =>
+      '${itemPlugins(count)} · store update';
+  @override
+  String itemUpTo(String size) => 'Up to $size';
+  @override
+  String downloadTotal(
+    String size, {
+    required bool plusApp,
+    required bool plusLibrary,
+    required bool plusPlugins,
+  }) {
+    final plus = [
+      if (plusApp) 'the program',
+      if (plusLibrary) 'the library',
+      if (plusPlugins) 'the plugins',
+    ];
+    if (plus.isEmpty) return 'Total up to $size';
+    final names = plus.length == 1
+        ? plus.single
+        : '${plus.sublist(0, plus.length - 1).join(', ')} and ${plus.last}';
+    return 'Total up to $size plus $names';
+  }
+
+  @override
+  String driveFree(String size) => 'Free on the drive: $size';
 
   @override
   String get otzariaOpenTitle => 'Otzaria is open right now';
@@ -1160,7 +1228,7 @@ class _Guide extends GuidanceStrings {
   @override
   String tileFactDrive(String value) => 'On the drive: $value';
   @override
-  String tileFactOnline(String value) => 'Available to download: $value';
+  String tileFactOnline(String value) => 'Online: $value';
   @override
   String tileFactVersion(String version) => 'version $version';
   @override
@@ -1194,14 +1262,14 @@ class _Guide extends GuidanceStrings {
       'This is how Otzaria reaches any computer, even without internet:';
   @override
   String get welcomeLeadOffline =>
-      'This drive is still empty, and this computer is not online. Here is '
+      'This drive is still empty, and this computer is not connected. Here is '
       'how to start:';
   @override
   String step(int number) => 'Step $number';
   @override
   String get youAreHere => 'You are here';
   @override
-  String get step1Title => 'On a computer with internet';
+  String get step1Title => 'On a connected computer';
   @override
   String get step1BodyOnline => 'Download Otzaria to this drive.';
   @override
@@ -1228,7 +1296,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get welcomeOfflineNote =>
       'Nothing can be downloaded from this computer. Plug the drive into a '
-      'computer with internet and open the tool there.';
+      'connected computer and open the tool there.';
   @override
   String get welcomeAlsoOnDrive => 'Also on this drive:';
 
@@ -1904,7 +1972,7 @@ class _Plugins extends PluginsStrings {
       'Plugins come to the drive with the Otzaria updates. "Refresh" downloads them now.';
   @override
   String get emptyBodyOffline =>
-      'Plugins come to the drive with the Otzaria updates. On a computer with internet, click "Download updates to the drive" on the home page, and they will appear here.';
+      'Plugins come to the drive with the Otzaria updates. On a computer with internet, click "Download everything to the drive" on the home page, and they will appear here.';
   @override
   String get searchHint => 'Search plugins by name or topic';
   @override
@@ -2155,7 +2223,7 @@ class _Faq extends FaqStrings {
   String get aOfflineFlow =>
       'That is exactly what this program is for. Copy the whole program folder '
       'onto a USB drive, plug the drive into a computer that does have '
-      'internet, open the program there and press "Download updates to the drive" — everything is '
+      'internet, open the program there and press "Download everything to the drive" — everything is '
       'collected into that same folder on the drive. Then unplug the drive, '
       'plug it into your own computer, open the program from there and '
       'install. No internet is needed at that stage.';
@@ -2177,7 +2245,7 @@ class _Faq extends FaqStrings {
   @override
   String get aDownloadStopped =>
       'No. The download remembers what it already fetched, and pressing '
-      '"Download updates to the drive" again continues from there. Cancelling on purpose does not '
+      '"Download everything to the drive" again continues from there. Cancelling on purpose does not '
       'erase what has finished downloading or earlier runs — it only clears the '
       'part that was in progress.';
   @override

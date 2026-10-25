@@ -1312,6 +1312,22 @@ void main() {
         expect(offline.downloadedWhatsNew, contains('חדש'));
       });
 
+      test('בדיקה חוזרת שומרת את הכשל הקודם עד התשובה החדשה', () async {
+        final controller = LauncherUpdateController(
+          dataDir: temp.path,
+          updater: updater(),
+        );
+        addTearDown(controller.dispose);
+        controller.onlineCheckError = 'offline';
+        final errors = <String?>[];
+        controller.addListener(() => errors.add(controller.onlineCheckError));
+
+        await controller.checkOnline();
+
+        expect(errors.first, 'offline');
+        expect(errors.last, isNull);
+      });
+
       test('כשל בשליפת היומן אינו מפיל את ההורדה', () async {
         final controller = LauncherUpdateController(
           dataDir: temp.path,

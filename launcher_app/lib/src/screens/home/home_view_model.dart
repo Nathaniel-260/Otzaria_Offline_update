@@ -35,16 +35,21 @@ class HomeViewModel {
     this.driveAppVersion,
     this.appAwaitsNewerStable,
     this.onlineAppVersion,
+    this.onlineAppLatest,
     this.libraryHereVersion,
     this.libraryFreshInstall = false,
     this.driveLibraryVersion,
     this.driveCompanionNames,
     this.onlineLibraryVersion,
+    this.onlineLibraryLatest,
     this.onlineCompanionNames,
     this.pluginUpdatesOnDrive = 0,
     this.onlinePluginChanges = 0,
     this.onlinePluginCatalogChanged = false,
     this.onlineStoreApp = false,
+    this.appDownloadBytes,
+    this.libraryDownloadBytes,
+    this.driveFreeBytes,
     this.syncApp = true,
     this.syncLibrary = true,
     this.syncPlugins = true,
@@ -76,7 +81,6 @@ class HomeViewModel {
     this.checkingNow = false,
     this.checkBlocked = false,
     this.launcher,
-    this.checkedAt,
     this.driveName,
   });
 
@@ -92,6 +96,9 @@ class HomeViewModel {
   final bool? appAwaitsNewerStable;
   final String? onlineAppVersion;
 
+  /// הגרסה שברשת לפי בדיקה שהצליחה, גם כשאין בה חדש — "ברשת:" באריח.
+  final String? onlineAppLatest;
+
   /// `null` — לא מותקנת ([libraryFreshInstall]) או לא ידועה.
   final int? libraryHereVersion;
   final bool libraryFreshInstall;
@@ -100,6 +107,9 @@ class HomeViewModel {
   /// בכונן יש רק קבצים נלווים לספרייה, בלי גרסת מסד חדשה.
   final String? driveCompanionNames;
   final int? onlineLibraryVersion;
+
+  /// כמו [onlineAppLatest], לספרייה.
+  final int? onlineLibraryLatest;
   final String? onlineCompanionNames;
   final int pluginUpdatesOnDrive;
 
@@ -111,6 +121,14 @@ class HomeViewModel {
 
   /// באתר יש גרסה חדשה של חנות התוספים שבאוצריא.
   final bool onlineStoreApp;
+
+  /// "עד X" ברשימת ההורדה — חסם עליון שידוע לפני לחיצה, `null` כשאין. לתוספים
+  /// אין חסם: גודל הקטלוג אינו כולל את התמונות.
+  final int? appDownloadBytes;
+  final int? libraryDownloadBytes;
+
+  /// `AppSession.driveFreeBytes`.
+  final int? driveFreeBytes;
   final bool syncApp;
   final bool syncLibrary;
   final bool syncPlugins;
@@ -125,7 +143,8 @@ class HomeViewModel {
   /// `AppSession.foundNothing`.
   final FoundNothing? foundNothing;
 
-  /// הבדיקה האחרונה ברשת שהצליחה — לשעה ב-[FoundNothing.earlierCheck].
+  /// הבדיקה האחרונה ברשת שהצליחה — לשעה ב-[FoundNothing.earlierCheck]
+  /// ובשורת המצב (במחשב מחובר בלבד).
   final DateTime? onlineCheckedAt;
   final TileStatus appTile;
   final TileStatus libraryTile;
@@ -164,7 +183,6 @@ class HomeViewModel {
 
   /// `null` — אין מה לומר על הכלי עצמו.
   final LauncherLine? launcher;
-  final DateTime? checkedAt;
 
   /// "E:" — שם הכונן שהכלי רץ ממנו, כשיש כזה.
   final String? driveName;
@@ -187,7 +205,11 @@ class HomeViewModel {
 
 /// בונה את המודל מהסשן. נקרא בכל בנייה של הבית — הכול כאן קריאת שדות.
 HomeViewModel homeViewModelOf(AppSession s) {
-  final facts = guidanceFactsFromSession(s);
+  final launcher = s.readOnly ? null : launcherLineOf(s.launcherUpdate);
+  final facts = guidanceFactsFromSession(
+    s,
+    launcherUpdate: launcherOffersUpdate(launcher),
+  );
   final otzaria = s.otzaria;
   final library = s.library;
   final plugins = s.plugins;
@@ -196,8 +218,12 @@ HomeViewModel homeViewModelOf(AppSession s) {
   final customApps = s.customApps;
 
   final guidance = deriveHomeGuidance(facts);
-  TileStatus tile(GuidanceItem item) =>
-      deriveTileStatus(item, facts, download: guidance.downloadItems);
+  TileStatus tile(GuidanceItem item) => deriveTileStatus(
+        item,
+        facts,
+        download: guidance.downloadItems,
+        unchecked: guidance.uncheckedItems,
+      );
 
   return HomeViewModel(
     guidance: guidance,
@@ -208,6 +234,10 @@ HomeViewModel homeViewModelOf(AppSession s) {
         otzaria.awaitsNewerInSelectedChannel ? !otzaria.preferPrerelease : null,
     onlineAppVersion:
         otzaria.hasOnlineUpdate ? otzaria.onlineUpdateVersion : null,
+    onlineAppLatest: otzaria.onlineCheckError != null
+        ? null
+        : (otzaria.hasOnlineUpdate ? otzaria.onlineUpdateVersion : null) ??
+            otzaria.onlineLatestRelease?.tagName,
     libraryHereVersion: library.localVersion,
     libraryFreshInstall: library.isFreshInstall,
     driveLibraryVersion: library.targetVersion,
@@ -215,6 +245,8 @@ HomeViewModel homeViewModelOf(AppSession s) {
         library.companionsOnly ? library.pendingCompanionNames : null,
     onlineLibraryVersion:
         library.hasOnlineLibraryUpdate ? library.onlineUpdateVersion : null,
+    onlineLibraryLatest:
+        library.onlineCheckError != null ? null : library.onlineLatestVersion,
     onlineCompanionNames: library.onlinePendingCompanionNames.isEmpty
         ? null
         : library.onlinePendingCompanionNames,
@@ -223,6 +255,9 @@ HomeViewModel homeViewModelOf(AppSession s) {
     onlinePluginCatalogChanged:
         plugins.hasCatalogOnlineUpdate && pluginChanges == 0,
     onlineStoreApp: plugins.storeAppOnline != null,
+    appDownloadBytes: otzaria.onlineDownloadBytes,
+    libraryDownloadBytes: library.onlineDownloadUpperBound,
+    driveFreeBytes: s.driveFreeBytes,
     syncApp: settings.syncApp,
     syncLibrary: settings.downloadsLibrary,
     syncPlugins: settings.syncPlugins,
@@ -236,7 +271,7 @@ HomeViewModel homeViewModelOf(AppSession s) {
     onlineCheckedAt: latestOnlineCheck([
       if (settings.syncApp) (otzaria.onlineCheckedAt, otzaria.onlineCheckError),
       if (settings.downloadsLibrary)
-        (library.onlineCheckedAt, library.onlineProofError),
+        (library.onlineCheckedAt, library.onlineAnswerError),
       if (settings.syncPlugins) ...[
         (plugins.onlineCheckedAt, plugins.onlineCheckError),
         (plugins.storeAppCheckedAt, plugins.storeAppCheckError),
@@ -275,11 +310,15 @@ HomeViewModel homeViewModelOf(AppSession s) {
     isCheckingOnline: s.isCheckingOnline,
     checkingNow: s.isCheckingNow,
     checkBlocked: s.checkNowBlocked,
-    launcher: s.readOnly ? null : launcherLineOf(s.launcherUpdate),
-    checkedAt: s.lastCheckedAt,
+    launcher: launcher,
     driveName: driveNameOf(s.dataDir),
   );
 }
+
+/// שורת הכלי מציעה גרסה. כשל בלי גרסה ידועה אינו עדכון שמחכה.
+bool launcherOffersUpdate(LauncherLine? line) =>
+    line != null &&
+    !(line.kind == LauncherLineKind.error && line.version == null);
 
 /// המאוחרת מבין הבדיקות ברשת שהצליחו (של הרכיבים שנבחרו); `null` כשאין כזו.
 DateTime? latestOnlineCheck(List<(DateTime?, Object?)> checks) {

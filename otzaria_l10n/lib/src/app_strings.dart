@@ -499,7 +499,6 @@ abstract class GuidanceStrings {
   String get downloadTitle;
   String get downloadBody;
   String get downloadButton;
-  String get updateHereTooButton;
 
   /// [version] — גרסת אוצריא שבכונן, כשהיא חלק מהעדכון.
   String updateHereTooNote(String? version);
@@ -534,8 +533,33 @@ abstract class GuidanceStrings {
 
   /// קבצים שנכשלו בהורדה האחרונה — לא מוצעים שוב עד "נסה שוב" או בדיקה ידנית.
   String failedDownloadsNote(String names);
+
+  /// כל רכיב שנבחר נבדק ברשת בלי חדש — במחשב מחובר בלבד.
   String get upToDateTitle;
-  String upToDateBody(String? version, {required bool offline});
+  String upToDateBody(String? version);
+
+  /// מה שידוע בלי בדיקה ברשת: מה שבכונן כבר מותקן. במחשב לא מחובר אין כאן
+  /// שום מילה על הרשת.
+  String get driveInstalledTitle;
+  String driveInstalledBody(String? version);
+
+  /// "הכול מעודכן" שליד "עדכון זמין" בשורת המצב, או תוכנות נוספות שמחכות.
+  String get othersPendingTitle;
+  String get otherLauncherTitle;
+  String otherLauncherOnline(String version);
+  String otherLauncherOnDrive(String version);
+
+  /// כשל חלקי: המחשב מחובר, ובדיקה של רכיב שנבחר נכשלה. [appFailed] וכו' —
+  /// מה לא נבדק; [appChecked] וכו' — מה נבדק ונמצא מעודכן.
+  String get checkFailedTitle;
+  String checkFailedBody({
+    required bool appFailed,
+    required bool libraryFailed,
+    required bool pluginsFailed,
+    required bool appChecked,
+    required bool libraryChecked,
+    required bool pluginsChecked,
+  });
   String get launchButton;
   String get recheckButton;
   String get offlineNote;
@@ -556,18 +580,30 @@ abstract class GuidanceStrings {
   String get taskBusyTitle;
   String get taskBusyBody;
 
-  // ── מה ייכלל ──
-  String pillApp(String version);
-  String get pillLibraryUpdate;
-  String get pillLibraryFull;
-  String pillLibraryCompanions(String names);
-  String pillPluginUpdates(int count);
-  String pillPlugins(int count);
-  String get pillPluginsCatalog;
+  // ── רשימת מה ייכלל ──
+  String itemUpdateTo(String version);
+  String itemLibraryUpdateTo(int version);
+  String get itemLibraryUpdate;
+  String get itemLibraryFull;
+  String itemPluginUpdates(int count);
+  String itemPlugins(int count);
+  String get itemPluginsCatalog;
 
   /// גרסה חדשה לחנות התוספים שבאוצריא — בלי מספר: אינה רכיב שהמשתמש מכיר.
-  String get pillStoreApp;
-  String pillPluginsWithStore(int count);
+  String get itemStoreApp;
+  String itemPluginsWithStore(int count);
+
+  /// חסם עליון שידוע לפני ההורדה; [size] מ-`formatBytes`.
+  String itemUpTo(String size);
+
+  /// סכום החסמים, ו"ועוד" לכל רכיב שאין לו חסם.
+  String downloadTotal(
+    String size, {
+    required bool plusApp,
+    required bool plusLibrary,
+    required bool plusPlugins,
+  });
+  String driveFree(String size);
 
   // ── הודעות ופסים ──
   String get otzariaOpenTitle;

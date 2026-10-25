@@ -577,6 +577,109 @@ void main() {
     });
   });
 
+  group('"עד X" — החסם שבבית', () {
+    _DownloadManager manager({bool semantic = false}) {
+      controller.dispose();
+      final manager = _DownloadManager(tempDir.path, const {})
+        ..semanticPending = semantic
+        ..bound = 900
+        ..semanticBytes = 300;
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        manager: manager,
+      );
+      return manager;
+    }
+
+    test('הספרייה בלבד; החיפוש החכם נוסף רק ב"תמיד"', () async {
+      manager(semantic: true);
+      await controller.checkOnline();
+      expect(controller.onlineDownloadUpperBound, 900);
+
+      controller.semanticPreference = SemanticDownloadPreference.always;
+      expect(controller.onlineDownloadUpperBound, 1200);
+
+      controller.semanticPreference = SemanticDownloadPreference.never;
+      expect(controller.onlineDownloadUpperBound, 900);
+    });
+
+    test('"תמיד" בלי גודל ידוע לחיפוש החכם — אין חסם', () async {
+      manager(semantic: true).semanticBytes = null;
+      controller.semanticPreference = SemanticDownloadPreference.always;
+      await controller.checkOnline();
+      expect(controller.onlineDownloadUpperBound, isNull);
+    });
+
+    test('בדיקה שנכשלה — אין חסם, ולא שואלים עליו', () async {
+      controller.dispose();
+      final failing = _ConcurrentPeekManager(tempDir.path, fail: true);
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        manager: failing,
+      );
+      await controller.checkOnline();
+      expect(controller.onlineDownloadBytesBound, isNull);
+      expect(controller.onlineDownloadUpperBound, isNull);
+    });
+
+    test('"תמיד" וכשל בבדיקת החיפוש החכם — ההורדה תביא אותו, ולכן אין חסם',
+        () async {
+      manager().semanticFails = true;
+      controller.semanticPreference = SemanticDownloadPreference.always;
+      await controller.checkOnline();
+      expect(controller.shouldOfferSemanticDownload, isTrue);
+      expect(controller.onlineDownloadUpperBound, isNull);
+
+      controller.semanticPreference = SemanticDownloadPreference.ask;
+      expect(controller.onlineDownloadUpperBound, 900);
+    });
+
+    test('כשל בחיפוש החכם מכשיל את בדיקת הספרייה בבית רק ב"תמיד"', () async {
+      manager().semanticFails = true;
+      await controller.checkOnline();
+      expect(controller.onlineSemanticCheckError, isNotNull);
+      expect(controller.onlineAnswerError, isNull);
+      controller.semanticPreference = SemanticDownloadPreference.never;
+      expect(controller.onlineAnswerError, isNull);
+      controller.semanticPreference = SemanticDownloadPreference.always;
+      expect(controller.onlineAnswerError, isNotNull);
+    });
+
+    test('בדיקה חוזרת שומרת את הכשל הקודם עד שהתשובה החדשה מגיעה', () async {
+      controller.dispose();
+      final gated = _GatedPeekManager(tempDir.path);
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        manager: gated,
+      );
+      gated.next = Completer<int>()..completeError(StateError('offline'));
+      await controller.checkOnline();
+      expect(controller.onlineCheckError, isNotNull);
+      final failedAt = controller.onlineCheckedAt;
+
+      gated.next = Completer<int>();
+      final retry = controller.checkOnline();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.onlineCheckError, isNotNull);
+      expect(controller.onlineCheckedAt, failedAt);
+
+      gated.next.complete(31);
+      await retry;
+      expect(controller.onlineCheckError, isNull);
+      expect(controller.onlineLatestVersion, 31);
+    });
+
+    test('החסם חוזר עם תשובות הרשת אחרי ביטול', () async {
+      final m = manager();
+      await controller.checkOnline();
+      expect(m.boundAsked, 1);
+      final answers = controller.onlineAnswers;
+      controller.onlineDownloadBytesBound = 5;
+      controller.restoreOnlineAnswers(answers);
+      expect(controller.onlineDownloadUpperBound, 900);
+    });
+  });
+
   group('downloadProgress — חישוב המד', () {
     test('בלי שום דיווח אין אחוז', () {
       expect(controller.downloadProgress, isNull);
@@ -1332,7 +1435,20 @@ class _DownloadManager extends LibraryManager {
   final MirrorDownloadOutcome outcome;
   bool downloaded = false;
   bool semanticPending = false;
+  bool semanticFails = false;
   int semanticPeeks = 0;
+  int? bound;
+  int? semanticBytes;
+  var boundAsked = 0;
+
+  @override
+  Future<int?> peekedDownloadBytesBound() async {
+    boundAsked++;
+    return bound;
+  }
+
+  @override
+  int? get peekedSemanticBytes => semanticBytes;
 
   @override
   Future<LibraryUpdateCheckResult> checkForUpdate() async =>
@@ -1348,6 +1464,7 @@ class _DownloadManager extends LibraryManager {
   @override
   Future<bool> peekPendingSemanticSearch() async {
     semanticPeeks++;
+    if (semanticFails) throw StateError('semantic down');
     return semanticPending;
   }
 
@@ -1365,6 +1482,21 @@ class _DownloadManager extends LibraryManager {
     downloaded = true;
     return outcome;
   }
+}
+
+class _GatedPeekManager extends LibraryManager {
+  _GatedPeekManager(String dataDir) : super(dataDir: dataDir);
+
+  late Completer<int> next;
+
+  @override
+  Future<int> peekLatestOnlineVersion() => next.future;
+
+  @override
+  Future<Set<CompanionAsset>> peekPendingCompanions() async => const {};
+
+  @override
+  Future<bool> peekPendingSemanticSearch() async => false;
 }
 
 class _ConcurrentPeekManager extends LibraryManager {

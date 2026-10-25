@@ -125,11 +125,14 @@ void main() {
     final expectations = <String, ({String title, String? button})>{
       'offline': (title: g.updateHereTitle, button: g.updateHereButton),
       'online': (title: g.downloadTitle, button: g.downloadButton),
-      'uptodate': (title: g.upToDateTitle, button: g.launchButton),
+      'uptodate': (title: g.driveInstalledTitle, button: g.launchButton),
       'newer': (title: g.newerTitle, button: g.launchButton),
       'open': (title: g.updateHereTitle, button: g.updateHereButton),
       'readonly': (title: g.updateHereTitle, button: g.updateHereButton),
-      'drivefull': (title: g.upToDateTitle, button: g.launchButton),
+      'drivefull': (title: g.driveInstalledTitle, button: g.launchButton),
+      'uptodateOnline': (title: g.upToDateTitle, button: g.launchButton),
+      'checkFailed': (title: g.checkFailedTitle, button: g.launchButton),
+      'othersPending': (title: g.othersPendingTitle, button: g.launchButton),
     };
 
     for (final MapEntry(key: name, value: want) in expectations.entries) {
@@ -175,20 +178,23 @@ void main() {
       });
     }
 
-    testWidgets('offline: מה ייכלל — תוכנה, ספרייה ותוספים, בסדר הזה', (
+    testWidgets('offline: מה ייכלל — רשימה של תוכנה, ספרייה ותוספים, בלי גדלים',
+        (
       tester,
     ) async {
       await pumpScreen(tester, HomePage(model: homeScenario('offline')));
 
-      final app = tester.getCenter(find.text(g.pillApp('0.10.4')));
-      final library = tester.getCenter(find.text(g.pillLibraryUpdate));
-      final plugins = tester.getCenter(find.text(g.pillPluginUpdates(3)));
-      // מימין לשמאל; גלולה שלא נכנסה בשורה יורדת לשורה הבאה.
-      expect(app.dx, greaterThan(library.dx));
-      expect(
-        plugins.dy > library.dy || plugins.dx < library.dx,
-        isTrue,
-      );
+      final list = find.byKey(ShellKeys.heroItems);
+      Finder inList(String text) =>
+          find.descendant(of: list, matching: find.text(text));
+      final app = tester.getCenter(inList(g.itemUpdateTo('0.10.4')));
+      final library = tester.getCenter(inList(g.itemLibraryUpdateTo(146)));
+      final plugins = tester.getCenter(inList(g.itemPluginUpdates(3)));
+      expect(app.dy, lessThan(library.dy));
+      expect(library.dy, lessThan(plugins.dy));
+      // הכול כבר בכונן — אין "עד X" ואין שורת סיכום.
+      expect(find.byKey(ShellKeys.heroTotal), findsNothing);
+      expect(find.textContaining(g.itemUpTo('')), findsNothing);
       expect(find.text(g.eyebrowOffline), findsOneWidget);
       expect(find.text(g.eyebrowOtzaria('0.10.3')), findsOneWidget);
     });
@@ -199,30 +205,69 @@ void main() {
       await pumpScreen(tester, HomePage(model: homeScenario('online')));
 
       // הגרסה הגולמית מהאתר ('v0.10.5+812') מוצגת בלי v ובלי build, וחנות
-      // התוספים מתמזגת לגלולת התוספים, בלי גרסה.
-      expect(find.text(g.pillApp('0.10.5')), findsOneWidget);
-      expect(find.text(g.pillLibraryUpdate), findsOneWidget);
-      expect(find.text(g.pillPluginsWithStore(3)), findsOneWidget);
+      // התוספים מתמזגת לשורת התוספים, בלי גרסה.
+      final list = find.byKey(ShellKeys.heroItems);
+      Finder inList(String text) =>
+          find.descendant(of: list, matching: find.text(text));
+      expect(inList(g.tileFactVersion('0.10.5')), findsOneWidget);
+      expect(inList(he.pages.libVersion(147)), findsOneWidget);
+      expect(inList(g.itemPluginsWithStore(3)), findsOneWidget);
       expect(find.textContaining('812'), findsNothing);
       expect(find.textContaining('v0.10'), findsNothing);
+      // "עד X" לתוכנה ולספרייה; לתוספים אין חסם — והסיכום אומר זאת.
+      expect(inList(g.itemUpTo(formatBytes(96 << 20))), findsOneWidget);
+      expect(inList(g.itemUpTo(formatBytes(1229 << 20))), findsOneWidget);
+      final pluginsRow = find.ancestor(
+        of: inList(g.itemPluginsWithStore(3)),
+        matching: find.byType(AppRow),
+      );
+      expect(
+        find.descendant(
+          of: pluginsRow,
+          matching: find.textContaining(g.itemUpTo('')),
+        ),
+        findsNothing,
+      );
+      expect(
+        inList(
+          g.downloadTotal(
+            formatBytes(1325 << 20),
+            plusApp: false,
+            plusLibrary: false,
+            plusPlugins: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(inList(g.driveFree(formatBytes(29082 << 20))), findsOneWidget);
+      // הסמל העגול יורד — הרשימה צריכה את הרוחב.
+      expect(
+        inHero(find.byIcon(FluentIcons.usb_stick_24_regular)),
+        findsNothing,
+      );
       expect(
         tester.widget<ActionButton>(find.byKey(ShellKeys.heroSecondary)).text,
-        g.updateHereTooButton,
+        g.updateHereButton,
       );
       expect(find.text(g.updateHereTooNote('0.10.4')), findsOneWidget);
       expect(find.text(g.eyebrowOnline), findsOneWidget);
     });
 
-    testWidgets('uptodate: הרמז על כונן בלי אינטרנט, ופס התוספים החדשים', (
+    testWidgets('uptodate: מחשב לא מחובר — מה שבכונן מותקן, ופס התוספים החדשים',
+        (
       tester,
     ) async {
       await pumpScreen(tester, HomePage(model: homeScenario('uptodate')));
 
-      expect(
-        find.text(g.upToDateBody('0.10.4', offline: true)),
-        findsOneWidget,
-      );
+      expect(find.text(g.driveInstalledBody('0.10.4')), findsOneWidget);
+      expect(find.text(g.upToDateTitle), findsNothing);
       expect(find.text(g.offlineNote), findsOneWidget);
+      // בלי שורה עליונה, בלי "בדוק שוב" בגיבור, ובלי המילה של הרשת.
+      expect(find.byKey(ShellKeys.eyebrow), findsNothing);
+      expect(find.byKey(ShellKeys.heroSecondary), findsNothing);
+      expect(find.byKey(ShellKeys.checkNow), findsOneWidget);
+      expect(find.textContaining('אינטרנט'), findsNothing);
+      expect(find.textContaining('מעודכן לפי הכונן'), findsNothing);
       expect(find.byKey(ShellKeys.newPluginsBanner), findsOneWidget);
       expect(
         find.byKey(ShellKeys.tile(ShellSection.customApps)),
@@ -421,7 +466,7 @@ void main() {
       await tapIn('online', ShellKeys.heroPrimary);
       await tapIn('online', ShellKeys.heroSecondary);
       await tapIn('uptodate', ShellKeys.heroPrimary);
-      await tapIn('uptodate', ShellKeys.heroSecondary);
+      await tapIn('uptodateOnline', ShellKeys.heroSecondary);
       await tapIn('online', ShellKeys.heroLaunch);
       await tapIn('offline', ShellKeys.heroLaunch);
       expect(calls, [
@@ -468,7 +513,7 @@ void main() {
       );
 
       expect(find.text(g.installHereTitle), findsOneWidget);
-      expect(find.text(g.pillLibraryFull), findsOneWidget);
+      expect(find.text(g.itemLibraryFull), findsOneWidget);
       expect(find.text(g.eyebrowNotInstalled), findsOneWidget);
       await tester.tap(find.byKey(ShellKeys.heroPrimary));
       expect(installs, 1);
@@ -679,34 +724,37 @@ void main() {
           libraryDownloadFailed: libraryFailed,
         );
 
-    testWidgets('תוספים וחנות התוספים — גלולה אחת, בלי מספר גרסה', (
+    testWidgets('תוספים וחנות התוספים — שורה אחת, בלי מספר גרסה', (
       tester,
     ) async {
       await pumpScreen(
         tester,
         HomePage(model: model(pluginChanges: 4, storeApp: true)),
       );
-      expect(find.text(g.pillPluginsWithStore(4)), findsOneWidget);
-      expect(find.text(g.pillPlugins(4)), findsNothing);
-      expect(find.text(g.pillStoreApp), findsNothing);
-      expect(find.text(g.pillApp('0.10.5')), findsOneWidget);
+      expect(find.text(g.itemPluginsWithStore(4)), findsOneWidget);
+      expect(find.text(g.itemPlugins(4)), findsNothing);
+      expect(find.text(g.itemStoreApp), findsNothing);
+      expect(inHero(find.text(g.tileFactVersion('0.10.5'))), findsOneWidget);
     });
 
     testWidgets('רק חנות התוספים התחדשה — "עדכון לחנות התוספים"', (
       tester,
     ) async {
       await pumpScreen(tester, HomePage(model: model(storeApp: true)));
-      expect(find.text(g.pillStoreApp), findsOneWidget);
+      expect(find.text(g.itemStoreApp), findsOneWidget);
     });
 
     // תחליף ל'חנות שאין בה מה חדש אינה מוסיפה שורות לכרטיס'.
-    testWidgets('בחנות אין מה חדש — אין גלולת תוספים', (tester) async {
+    testWidgets('בחנות אין מה חדש — אין שורת תוספים', (tester) async {
       await pumpScreen(tester, HomePage(model: model()));
-      expect(find.text(g.pillApp('0.10.5')), findsOneWidget);
-      expect(
-        inHero(find.byIcon(FluentIcons.puzzle_piece_16_regular)),
-        findsNothing,
-      );
+      expect(inHero(find.text(g.tileApp)), findsOneWidget);
+      expect(inHero(find.text(g.tilePlugins)), findsNothing);
+    });
+
+    testWidgets('בלי חסם ידוע — בלי מספר, ובלי סיכום', (tester) async {
+      await pumpScreen(tester, HomePage(model: model(pluginChanges: 2)));
+      expect(find.textContaining(g.itemUpTo('')), findsNothing);
+      expect(find.byKey(ShellKeys.heroTotal), findsNothing);
     });
 
     test('תוסף שהקובץ שלו חסר בכונן נספר; תוסף שהוסר מהאתר — לא', () {
@@ -734,7 +782,7 @@ void main() {
       tester,
     ) async {
       await pumpScreen(tester, HomePage(model: model(catalogOnly: true)));
-      expect(find.text(g.pillPluginsCatalog), findsOneWidget);
+      expect(find.text(g.itemPluginsCatalog), findsOneWidget);
     });
 
     testWidgets('רכיב כבוי בהגדרות נאמר, עם קישור להגדרות', (tester) async {
@@ -751,7 +799,7 @@ void main() {
         findsOneWidget,
       );
       // התוספים לא יירדו, ולכן גם אינם ב"מה ייכלל".
-      expect(find.text(g.pillPlugins(2)), findsNothing);
+      expect(find.text(g.itemPlugins(2)), findsNothing);
       await tester.tap(find.text(g.changeInSettingsLink));
       expect(settings, 1);
     });
@@ -797,10 +845,11 @@ void main() {
     HomeViewModel withLauncher(LauncherLine? line, {bool busy = false}) =>
         HomeViewModel(
           guidance: deriveHomeGuidance(
-            GuidanceFacts(online: false, longTaskRunning: busy),
+            GuidanceFacts(online: true, longTaskRunning: busy),
           ),
+          online: true,
           launcher: line,
-          checkedAt: DateTime(2026, 10, 23, 9, 5),
+          onlineCheckedAt: DateTime(2026, 10, 23, 9, 5),
           driveName: 'E:',
         );
 
@@ -896,8 +945,9 @@ void main() {
         HomePage(
           model: HomeViewModel(
             guidance: here.guidance,
+            online: true,
             installedVersion: '0.10.3',
-            checkedAt: DateTime(2026, 10, 23, 9, 5),
+            onlineCheckedAt: DateTime(2026, 10, 23, 9, 5),
           ),
           actions: HomeActions(onRecheck: () => checks++),
         ),
@@ -939,14 +989,15 @@ void main() {
         'משימה שחוסמת את הבדיקה (ייצוא, סנכרון) — אין קישור, ו"בדוק שוב" מושבת',
         (tester) async {
       var checks = 0;
-      final uptodate = homeScenario('uptodate');
+      final uptodate = homeScenario('uptodateOnline');
       await pumpScreen(
         tester,
         HomePage(
           model: HomeViewModel(
             guidance: uptodate.guidance,
+            online: true,
             installedVersion: uptodate.installedVersion,
-            checkedAt: DateTime(2026, 10, 23, 9, 5),
+            onlineCheckedAt: DateTime(2026, 10, 23, 9, 5),
             checkBlocked: true,
           ),
           actions: HomeActions(onRecheck: () => checks++),
@@ -1041,6 +1092,26 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('שעת הבדיקה ברשת — רק במחשב מחובר', (tester) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('uptodateOnline')));
+      expect(find.text(g.checkedAt('23:14')), findsOneWidget);
+
+      // במחשב לא מחובר שורת המצב אינה מקבלת שעה, גם כשיש בדיקה ישנה.
+      final online = homeScenario('uptodateOnline');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: homeScenario('uptodate').guidance,
+            online: false,
+            onlineCheckedAt: online.onlineCheckedAt,
+          ),
+        ),
+      );
+      expect(find.byKey(ShellKeys.checkedAt), findsNothing);
+      expect(find.byKey(ShellKeys.checkNow), findsOneWidget);
     });
 
     testWidgets('גרסת הכלי מוצגת בלי v', (tester) async {
@@ -1278,6 +1349,28 @@ void main() {
       expect(launcherLineOf(c), isNull);
     });
 
+    test('כשל בלי גרסה ידועה אינו עדכון שמחכה בגיבור', () {
+      expect(launcherOffersUpdate(null), isFalse);
+      expect(
+        launcherOffersUpdate(
+          const LauncherLine(LauncherLineKind.error, error: 'down'),
+        ),
+        isFalse,
+      );
+      expect(
+        launcherOffersUpdate(
+          const LauncherLine(LauncherLineKind.error, version: '3.3.0'),
+        ),
+        isTrue,
+      );
+      expect(
+        launcherOffersUpdate(
+          const LauncherLine(LauncherLineKind.ready, version: '3.3.0'),
+        ),
+        isTrue,
+      );
+    });
+
     test('נמצאה גרסה ברשת — הצעה לפרטים, לא התקנה', () {
       c
         ..onlineRelease = release
@@ -1477,6 +1570,23 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets('מחובר ומעודכן: "ברשת:" גם כשאין חדש; לא מחובר — בלעדיה', (
+      tester,
+    ) async {
+      await pumpScreen(tester, HomePage(model: homeScenario('uptodateOnline')));
+      expect(
+        find.text(g.tileFactOnline(he.pages.libVersion(146))),
+        findsOneWidget,
+      );
+      expect(
+        find.text(g.tileFactOnline(g.tileFactVersion('0.10.4'))),
+        findsOneWidget,
+      );
+
+      await pumpScreen(tester, HomePage(model: homeScenario('uptodate')));
+      expect(find.textContaining(g.tileFactOnline('')), findsNothing);
+    });
   });
 
   group('הגיבור — ליטוש', () {
@@ -1507,8 +1617,17 @@ void main() {
       }
     });
 
-    testWidgets('"בודק..." — מחוון פעילות בגיבור', (tester) async {
-      await pumpScreen(tester, HomePage(model: homeScenario('checking')));
+    testWidgets('"בודק..." — מחוון פעילות, ו"פתיחת אוצריא" לא מחכה לו', (
+      tester,
+    ) async {
+      var launches = 0;
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('checking'),
+          actions: HomeActions(onLaunch: () => launches++),
+        ),
+      );
       expect(find.text(g.checkingTitle), findsOneWidget);
       expect(
         find.descendant(
@@ -1517,7 +1636,133 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(primary(tester).text, g.launchButton);
+      await tester.tap(find.byKey(ShellKeys.heroPrimary));
+      expect(launches, 1);
+
+      // בלי אוצריא מותקנת אין מה לפתוח.
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: homeScenario('checking').guidance,
+          ),
+        ),
+      );
       expect(find.byKey(ShellKeys.heroPrimary), findsNothing);
+    });
+
+    testWidgets('בדיקה חלקית: מה לא נבדק ומה כן, ו"נסה שוב" בודק שוב', (
+      tester,
+    ) async {
+      var checks = 0;
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('checkFailed'),
+          actions: HomeActions(onRecheck: () => checks++),
+        ),
+      );
+      expect(
+        find.text(
+          g.checkFailedBody(
+            appFailed: false,
+            libraryFailed: true,
+            pluginsFailed: false,
+            appChecked: true,
+            libraryChecked: false,
+            pluginsChecked: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(g.upToDateTitle), findsNothing);
+      final retry = find.byKey(ShellKeys.heroSecondary);
+      expect(tester.widget<ActionButton>(retry).text, he.common.retry);
+      await tester.tap(retry);
+      expect(checks, 1);
+      // האריח של הספרייה: "טרם נבדק", עם הגרסאות — ובלי "ברשת:".
+      final libraryTile = find.byKey(ShellKeys.tile(ShellSection.library));
+      final chip = tester.widget<StatusChip>(
+        find.descendant(of: libraryTile, matching: find.byType(StatusChip)),
+      );
+      expect((chip.kind, chip.label),
+          (StatusKind.unknown, he.common.notCheckedYet));
+      expect(
+        find.descendant(
+          of: libraryTile,
+          matching: find.text(g.tileFactDrive(he.pages.libVersion(146))),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: libraryTile,
+          matching: find.textContaining(g.tileFactOnline('')),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('שבת: הערת השבת, בלי "לא הצלחתי לבדוק" ובלי "הכול מעודכן"', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                online: true,
+                pluginsProof: OnlineProof.unchecked,
+                pluginsClosedForShabbat: true,
+              ),
+            ),
+            online: true,
+            installedVersion: '0.10.4',
+          ),
+        ),
+      );
+      expect(find.text(he.pluginsDomain.siteClosedForShabbat), findsOneWidget);
+      expect(find.text(g.checkFailedTitle), findsNothing);
+      expect(find.text(g.upToDateTitle), findsNothing);
+      expect(find.text(g.checkOnlineNowNote), findsNothing);
+    });
+
+    testWidgets('הכלי ותוכנות נוספות מחכים — לא "הכול מעודכן", והשורות נפתחות',
+        (tester) async {
+      final calls = <Object>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('othersPending'),
+          actions: HomeActions(
+            onOpenLauncherUpdate: () => calls.add('launcher'),
+            onOpenSection: calls.add,
+          ),
+        ),
+      );
+      expect(find.text(g.upToDateTitle), findsNothing);
+      expect(find.text(g.upToDateBody('0.10.4')), findsOneWidget);
+      final list = find.byKey(ShellKeys.heroItems);
+      await tester.tap(
+        find.descendant(of: list, matching: find.text(g.otherLauncherTitle)),
+      );
+      await tester.tap(
+        find.descendant(of: list, matching: find.text(g.tileCustomApps)),
+      );
+      expect(calls, ['launcher', ShellSection.customApps]);
+      expect(
+        find.descendant(
+          of: list,
+          matching: find.text(g.otherLauncherOnline('3.3.0')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: list, matching: find.text(g.chipAppsPending(2))),
+        findsOneWidget,
+      );
     });
   });
 

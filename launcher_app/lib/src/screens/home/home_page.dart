@@ -2,6 +2,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
+import '../../services/byte_size.dart';
 import '../../services/timestamps.dart';
 import '../../shell/home_guidance.dart';
 import '../../shell/shell_keys.dart';
@@ -328,7 +329,23 @@ Widget _logo(double size) => Image.asset(
 
 // ── הגיבור ────────────────────────────────────────────────────────────────────
 
-typedef _Pill = ({IconData icon, String text});
+/// שורה ברשימת הגיבור: מה יירד, יותקן או עוד מחכה. [size] — "עד X" כשיש חסם.
+typedef _Item = ({
+  Widget icon,
+  String title,
+  String? subtitle,
+  String? size,
+  VoidCallback? onTap,
+});
+
+_Item _item(
+  Widget icon,
+  String title, {
+  String? subtitle,
+  String? size,
+  VoidCallback? onTap,
+}) =>
+    (icon: icon, title: title, subtitle: subtitle, size: size, onTap: onTap);
 
 /// הערה קטנה בגיבור (`.hero-note`), עם קישור אופציונלי בסופה.
 class _Note {
@@ -339,6 +356,32 @@ class _Note {
   final String text;
   final String? link;
   final VoidCallback? onLink;
+}
+
+class _HeroSpec {
+  const _HeroSpec({
+    required this.title,
+    this.body,
+    this.items = const [],
+    this.total,
+    this.free,
+    this.actions = const [],
+    this.notes = const [],
+    this.eyebrow = true,
+  });
+
+  final String title;
+  final String? body;
+  final List<_Item> items;
+
+  /// שורת הסיכום שבתחתית הרשימה.
+  final String? total;
+  final String? free;
+  final List<Widget> actions;
+  final List<_Note> notes;
+
+  /// "המחשב הזה · אוצריא X". במחשב לא מחובר שבכונן שלו אין חדש — בלעדיה.
+  final bool eyebrow;
 }
 
 class _Hero extends StatelessWidget {
@@ -361,6 +404,7 @@ class _Hero extends StatelessWidget {
     final pad = narrow
         ? const EdgeInsets.all(24)
         : const EdgeInsets.symmetric(horizontal: 32, vertical: 28);
+    final spec = _spec(context);
 
     return Container(
       key: ShellKeys.hero,
@@ -371,8 +415,9 @@ class _Hero extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(child: _content(context)),
-          if (!narrow) ...[
+          Expanded(child: _content(context, spec)),
+          // הרשימה צריכה את הרוחב.
+          if (!narrow && spec.items.isEmpty) ...[
             const SizedBox(width: 24),
             _emblem(),
             const SizedBox(width: 6),
@@ -394,7 +439,9 @@ class _Hero extends StatelessWidget {
             icon: FluentIcons.desktop_24_regular,
             mini: FluentIcons.arrow_download_16_regular,
           ),
-        GuidancePrimary.attention => const _Emblem(
+        GuidancePrimary.attention ||
+        GuidancePrimary.checkFailed =>
+          const _Emblem(
             icon: FluentIcons.desktop_24_regular,
             mini: FluentIcons.warning_16_regular,
           ),
@@ -414,14 +461,15 @@ class _Hero extends StatelessWidget {
           ),
       };
 
-  Widget _content(BuildContext context) {
+  Widget _content(BuildContext context, _HeroSpec spec) {
     final cs = Theme.of(context).colorScheme;
-    final spec = _spec(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _eyebrow(context),
-        const SizedBox(height: 10),
+        if (spec.eyebrow) ...[
+          _eyebrow(context),
+          const SizedBox(height: 10),
+        ],
         Text(
           spec.title,
           style: AppTextStyles.heroTitle.copyWith(color: cs.onSurface),
@@ -436,13 +484,9 @@ class _Hero extends StatelessWidget {
             ),
           ),
         ],
-        if (spec.pills.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [for (final pill in spec.pills) _PillChip(pill)],
-          ),
+        if (spec.items.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _ItemList(items: spec.items, total: spec.total, free: spec.free),
         ],
         if (progress != null && _g.primary == GuidancePrimary.taskInProgress)
           progress!,
@@ -499,13 +543,7 @@ class _Hero extends StatelessWidget {
     );
   }
 
-  ({
-    String title,
-    String? body,
-    List<_Pill> pills,
-    List<Widget> actions,
-    List<_Note> notes,
-  }) _spec(BuildContext context) {
+  _HeroSpec _spec(BuildContext context) {
     final g = context.strings.guide;
     final m = model;
 
@@ -534,6 +572,10 @@ class _Hero extends StatelessWidget {
         );
 
     final busy = m.isCheckingOnline;
+    final offline = m.online == false;
+    final launch =
+        primary(g.launchButton, m.canLaunch ? actions.onLaunch : null);
+    final recheck = m.checkingNow || m.checkBlocked ? null : actions.onRecheck;
     // כשהגיבור מציע עדכון — אוצריא המותקנת עדיין נפתחת מכאן.
     final launchToo = [
       if (m.installedVersion != null &&
@@ -545,13 +587,15 @@ class _Hero extends StatelessWidget {
           onPressed: actions.onLaunch,
         ),
     ];
+    // במחשב לא מחובר "בדוק עכשיו" נשאר בשורת המצב בלבד.
     final quietActions = [
-      primary(g.launchButton, m.canLaunch ? actions.onLaunch : null),
-      secondary(
-        g.recheckButton,
-        m.checkingNow || m.checkBlocked ? null : actions.onRecheck,
-        icon: FluentIcons.arrow_sync_24_regular,
-      ),
+      launch,
+      if (!offline)
+        secondary(
+          g.recheckButton,
+          recheck,
+          icon: FluentIcons.arrow_sync_24_regular,
+        ),
     ];
 
     final blocked = busy || m.checkBlocked;
@@ -582,29 +626,31 @@ class _Hero extends StatelessWidget {
           text,
         ),
     ];
+    String? installed() =>
+        m.installedVersion == null ? null : displayVersion(m.installedVersion!);
 
     switch (_g.primary) {
       case GuidancePrimary.checking || GuidancePrimary.welcome:
-        return (
+        return _HeroSpec(
           title: g.checkingTitle,
           body: g.checkingBody,
-          pills: const [],
-          actions: const [],
+          // הבדיקה אינה סיבה לחכות עם אוצריא שכבר מותקנת.
+          actions: [if (m.installedVersion != null) launch],
           notes: recheckNote,
         );
       case GuidancePrimary.installHere:
-        return (
+        return _HeroSpec(
           title: g.installHereTitle,
           body: g.installHereBody,
-          pills: _herePills(context),
+          items: _hereItems(context),
           actions: [primary(g.installHereButton, actions.onInstallHere)],
           notes: [...recheckNote, ...downloadNotes],
         );
       case GuidancePrimary.updateHere:
-        return (
+        return _HeroSpec(
           title: g.updateHereTitle,
           body: g.updateHereBody,
-          pills: _herePills(context),
+          items: _hereItems(context),
           actions: [
             primary(g.updateHereButton, actions.onUpdateHere),
             secondary(g.whatsNewButton, () {
@@ -616,10 +662,15 @@ class _Hero extends StatelessWidget {
         );
       case GuidancePrimary.downloadToDrive:
         final hereToo = _g.secondary == GuidanceSecondary.updateHereToo;
-        return (
+        final items = _downloadItems(context);
+        return _HeroSpec(
           title: g.downloadTitle,
           body: g.downloadBody,
-          pills: _downloadPills(context),
+          items: items,
+          total: _total(context),
+          free: m.driveFreeBytes == null
+              ? null
+              : g.driveFree(formatBytes(m.driveFreeBytes!)),
           actions: [
             // בזמן הבדיקה ברשת: מחוון בכפתור, כדי שלא ייראה כבוי בלי סיבה.
             primary(
@@ -630,10 +681,15 @@ class _Hero extends StatelessWidget {
                   : FluentIcons.arrow_download_24_regular,
               spinning: busy,
             ),
+            // שתי פעולות אמיתיות — השנייה ניטרלית, לא קישור.
             if (hereToo)
-              secondary(
-                g.updateHereTooButton,
-                m.installedVersion == null
+              ActionButton.neutral(
+                key: ShellKeys.heroSecondary,
+                text: m.installedVersion == null
+                    ? g.installHereButton
+                    : g.updateHereButton,
+                size: ActionButtonSize.lg,
+                onPressed: m.installedVersion == null
                     ? actions.onInstallHere
                     : actions.onUpdateHere,
               ),
@@ -662,7 +718,7 @@ class _Hero extends StatelessWidget {
           ],
         );
       case GuidancePrimary.newerHereThanDrive:
-        return (
+        return _HeroSpec(
           title: switch (m.appAwaitsNewerStable) {
             final stable? => g.newerChannelTitle(stable: stable),
             null => g.newerTitle,
@@ -683,7 +739,6 @@ class _Hero extends StatelessWidget {
                 ),
               ),
           },
-          pills: const [],
           actions: quietActions,
           notes: [
             ...recheckNote,
@@ -694,34 +749,69 @@ class _Hero extends StatelessWidget {
           ],
         );
       case GuidancePrimary.upToDate:
-        return (
-          title: switch (m.foundNothing) {
-            FoundNothing.rechecked => g.recheckNothingTitle,
-            FoundNothing.earlierCheck => g.nothingNewTitle,
-            null => g.upToDateTitle,
-          },
-          body: switch ((m.foundNothing, m.onlineCheckedAt)) {
-            (FoundNothing.rechecked, final at?) =>
-              g.recheckNothingBody(formatClock(at)),
-            (FoundNothing.earlierCheck, final at?) =>
-              g.nothingNewBody(formatClock(at)),
-            _ => g.upToDateBody(
-                m.installedVersion == null
-                    ? null
-                    : displayVersion(m.installedVersion!),
-                offline: m.online == false,
-              ),
-          },
-          pills: const [],
+        final others = _otherItems(context);
+        // "הכול מעודכן" רק כשכל רכיב שנבחר נבדק ברשת; אחרת — מה שידוע.
+        final proven = _g.onlineProven;
+        final foundNothingTitle = proven && others.isEmpty;
+        return _HeroSpec(
+          title: others.isNotEmpty
+              ? g.othersPendingTitle
+              : !proven
+                  ? g.driveInstalledTitle
+                  : switch (m.foundNothing) {
+                      FoundNothing.rechecked => g.recheckNothingTitle,
+                      FoundNothing.earlierCheck => g.nothingNewTitle,
+                      null => g.upToDateTitle,
+                    },
+          body: !proven
+              ? g.driveInstalledBody(installed())
+              : switch ((
+                  foundNothingTitle ? m.foundNothing : null,
+                  m.onlineCheckedAt
+                )) {
+                  (FoundNothing.rechecked, final at?) =>
+                    g.recheckNothingBody(formatClock(at)),
+                  (FoundNothing.earlierCheck, final at?) =>
+                    g.nothingNewBody(formatClock(at)),
+                  _ => g.upToDateBody(installed()),
+                },
+          items: others,
+          eyebrow: !offline,
           actions: quietActions,
-          notes: [..._quietNotes(context, offline: true), ...downloadNotes],
+          notes: [
+            if (!foundNothingTitle) ...recheckNote,
+            ..._quietNotes(context, offline: true),
+            ...downloadNotes,
+          ],
+        );
+      case GuidancePrimary.checkFailed:
+        bool failed(GuidanceItem i) => _g.uncheckedItems.contains(i);
+        bool checked(GuidanceItem i) => _g.checkedItems.contains(i);
+        return _HeroSpec(
+          title: g.checkFailedTitle,
+          body: g.checkFailedBody(
+            appFailed: failed(GuidanceItem.app),
+            libraryFailed: failed(GuidanceItem.library),
+            pluginsFailed: failed(GuidanceItem.plugins),
+            appChecked: checked(GuidanceItem.app),
+            libraryChecked: checked(GuidanceItem.library),
+            pluginsChecked: checked(GuidanceItem.plugins),
+          ),
+          actions: [
+            launch,
+            secondary(
+              context.strings.common.retry,
+              recheck,
+              icon: FluentIcons.arrow_sync_24_regular,
+            ),
+          ],
+          notes: [...recheckNote, ...downloadNotes],
         );
       case GuidancePrimary.attention:
         final library = _g.attentionItem == GuidanceItem.library;
-        return (
+        return _HeroSpec(
           title: library ? g.attentionLibraryTitle : g.attentionAppTitle,
           body: g.attentionBody,
-          pills: const [],
           actions: [
             primary(
               library ? g.attentionLibraryButton : g.attentionAppButton,
@@ -740,33 +830,22 @@ class _Hero extends StatelessWidget {
             );
         return switch (m.task) {
           // ההורדה מוצגת במסך המשימה, שמכסה את הבית; כאן רק למקרה ביניים.
-          HomeTask.downloading => (
+          HomeTask.downloading => _HeroSpec(
               title: g.taskDownloadingTitle,
               body: g.taskDownloadingBody,
-              pills: _downloadPills(context),
-              actions: const [],
-              notes: const [],
+              items: _downloadItems(context),
             ),
-          HomeTask.installingApp => (
+          HomeTask.installingApp => _HeroSpec(
               title: g.taskInstallingAppTitle,
-              body: null,
-              pills: const [],
               actions: [showProgress()],
-              notes: const [],
             ),
-          HomeTask.updatingLibrary => (
+          HomeTask.updatingLibrary => _HeroSpec(
               title: g.taskUpdatingLibraryTitle,
-              body: null,
-              pills: const [],
               actions: [showProgress()],
-              notes: const [],
             ),
-          HomeTask.other => (
+          HomeTask.other => _HeroSpec(
               title: g.taskBusyTitle,
               body: g.taskBusyBody,
-              pills: const [],
-              actions: const [],
-              notes: const [],
             ),
         };
     }
@@ -787,6 +866,12 @@ class _Hero extends StatelessWidget {
         ],
       GuidanceSecondary.checkOnlineNow => [
           _Note(FluentIcons.info_16_regular, g.checkOnlineNowNote),
+        ],
+      GuidanceSecondary.siteClosedForShabbat => [
+          _Note(
+            FluentIcons.info_16_regular,
+            context.strings.pluginsDomain.siteClosedForShabbat,
+          ),
         ],
       GuidanceSecondary.noSyncSelection => [
           _Note(
@@ -823,87 +908,221 @@ class _Hero extends StatelessWidget {
     ];
   }
 
-  List<_Pill> _herePills(BuildContext context) {
+  static Widget _itemIcon(GuidanceItem item) => switch (item) {
+        GuidanceItem.app => IconTile(size: IconTileSize.sm, child: _logo(20)),
+        GuidanceItem.library => const IconTile(
+            size: IconTileSize.sm,
+            icon: FluentIcons.library_24_regular,
+          ),
+        GuidanceItem.plugins => const IconTile(
+            size: IconTileSize.sm,
+            icon: FluentIcons.puzzle_piece_24_regular,
+          ),
+      };
+
+  /// מה שיותקן כאן — בלי גדלים, הכול כבר בכונן.
+  List<_Item> _hereItems(BuildContext context) {
     final g = context.strings.guide;
     final m = model;
     final firstInstall = m.installedVersion == null;
+    final drive = m.driveAppVersion;
     // סדר התצוגה קבוע (תוכנה, ספרייה, תוספים), גם כשהעדכון רץ בסדר אחר.
     final items = [..._g.hereItems]..sort((a, b) => a.index - b.index);
     return [
       for (final item in items)
         switch (item) {
-          GuidanceItem.app => (
-              icon: FluentIcons.desktop_16_regular,
-              text: g.pillApp(
-                displayVersion(
-                  m.driveAppVersion ?? '',
-                  other: m.installedVersion,
-                ),
-              ),
+          GuidanceItem.app => _item(
+              _itemIcon(item),
+              g.tileApp,
+              subtitle: drive == null
+                  ? null
+                  : firstInstall
+                      ? g.tileFactVersion(displayVersion(drive))
+                      : g.itemUpdateTo(
+                          displayVersion(drive, other: m.installedVersion),
+                        ),
             ),
-          GuidanceItem.library => (
-              icon: FluentIcons.library_16_regular,
-              text: firstInstall
-                  ? g.pillLibraryFull
-                  : m.driveCompanionNames != null
-                      ? g.pillLibraryCompanions(m.driveCompanionNames!)
-                      : g.pillLibraryUpdate,
+          GuidanceItem.library => _item(
+              _itemIcon(item),
+              g.tileLibrary,
+              subtitle: firstInstall || m.libraryFreshInstall
+                  ? g.itemLibraryFull
+                  : m.driveCompanionNames ??
+                      (m.driveLibraryVersion == null
+                          ? g.itemLibraryUpdate
+                          : g.itemLibraryUpdateTo(m.driveLibraryVersion!)),
             ),
-          GuidanceItem.plugins => (
-              icon: FluentIcons.puzzle_piece_16_regular,
-              text: g.pillPluginUpdates(m.pluginUpdatesOnDrive),
+          GuidanceItem.plugins => _item(
+              _itemIcon(item),
+              g.tilePlugins,
+              subtitle: g.itemPluginUpdates(m.pluginUpdatesOnDrive),
             ),
         },
     ];
   }
 
-  List<_Pill> _downloadPills(BuildContext context) {
+  /// מה שיירד לכונן. תוספים בלי שינוי שאפשר לנקוב בו אינם שורה.
+  List<GuidanceItem> _shownDownloads(GuidanceStrings g) => [
+        for (final item in _g.downloadItems)
+          if (item != GuidanceItem.plugins ||
+              _onlinePluginsText(model, g) != null)
+            item,
+      ];
+
+  /// חסם עליון שידוע בלי למדוד ברשת; לתוספים אין.
+  int? _bytesOf(GuidanceItem item) => switch (item) {
+        GuidanceItem.app => model.appDownloadBytes,
+        GuidanceItem.library => model.libraryDownloadBytes,
+        GuidanceItem.plugins => null,
+      };
+
+  List<_Item> _downloadItems(BuildContext context) {
     final g = context.strings.guide;
     final m = model;
+    final library = [
+      if (m.onlineLibraryVersion != null)
+        context.strings.pages.libVersion(m.onlineLibraryVersion!),
+      if (m.onlineCompanionNames != null) m.onlineCompanionNames!,
+    ];
     return [
-      for (final item in _g.downloadItems)
-        ...switch (item) {
-          GuidanceItem.app => [
-              (
-                icon: FluentIcons.desktop_16_regular,
-                text: m.onlineAppVersion == null
-                    ? g.tileApp
-                    : g.pillApp(
-                        displayVersion(
-                          m.onlineAppVersion!,
-                          other: m.installedVersion,
-                        ),
-                      ),
+      for (final item in _shownDownloads(g))
+        _item(
+          _itemIcon(item),
+          switch (item) {
+            GuidanceItem.app => g.tileApp,
+            GuidanceItem.library => g.tileLibrary,
+            GuidanceItem.plugins => g.tilePlugins,
+          },
+          subtitle: switch (item) {
+            GuidanceItem.app => m.onlineAppVersion == null
+                ? null
+                : g.tileFactVersion(
+                    displayVersion(
+                      m.onlineAppVersion!,
+                      other: m.installedVersion,
+                    ),
+                  ),
+            GuidanceItem.library =>
+              library.isEmpty ? null : library.join(' · '),
+            GuidanceItem.plugins => _onlinePluginsText(m, g),
+          },
+          size: switch (_bytesOf(item)) {
+            final bytes? => g.itemUpTo(formatBytes(bytes)),
+            null => null,
+          },
+        ),
+    ];
+  }
+
+  /// הסכום לצד כמה פריטים; פריט בלי חסם נאמר בשמו ("ועוד התוספים").
+  String? _total(BuildContext context) {
+    final g = context.strings.guide;
+    final items = _shownDownloads(g);
+    final known = items.map(_bytesOf).whereType<int>();
+    if (items.length < 2 || known.isEmpty) return null;
+    bool unknown(GuidanceItem item) =>
+        items.contains(item) && _bytesOf(item) == null;
+    return g.downloadTotal(
+      formatBytes(known.fold(0, (sum, bytes) => sum + bytes)),
+      plusApp: unknown(GuidanceItem.app),
+      plusLibrary: unknown(GuidanceItem.library),
+      plusPlugins: unknown(GuidanceItem.plugins),
+    );
+  }
+
+  /// הכלי עצמו ותוכנות נוספות — כדי ש"הכול מעודכן" לא יסתיר אותם.
+  List<_Item> _otherItems(BuildContext context) {
+    final g = context.strings.guide;
+    final m = model;
+    final launcher = m.launcher;
+    final version =
+        launcher?.version == null ? null : displayVersion(launcher!.version!);
+    return [
+      for (final other in _g.otherUpdates)
+        switch (other) {
+          OtherUpdate.launcher => _item(
+              const IconTile(
+                size: IconTileSize.sm,
+                icon: FluentIcons.usb_stick_24_regular,
               ),
-            ],
-          GuidanceItem.library => [
-              (
-                icon: FluentIcons.library_16_regular,
-                text: m.onlineLibraryVersion == null &&
-                        m.onlineCompanionNames != null
-                    ? g.pillLibraryCompanions(m.onlineCompanionNames!)
-                    : g.pillLibraryUpdate,
+              g.otherLauncherTitle,
+              subtitle: switch (launcher?.kind) {
+                LauncherLineKind.downloading => g.launcherDownloading,
+                LauncherLineKind.ready ||
+                LauncherLineKind.readyManual when version != null =>
+                  g.otherLauncherOnDrive(version),
+                _ when version != null => g.otherLauncherOnline(version),
+                _ => null,
+              },
+              onTap: actions.onOpenLauncherUpdate,
+            ),
+          OtherUpdate.customApps => _item(
+              const IconTile(
+                size: IconTileSize.sm,
+                icon: FluentIcons.apps_24_regular,
               ),
-            ],
-          GuidanceItem.plugins => [
-              if (_onlinePluginsPill(m, g) case final text?)
-                (icon: FluentIcons.puzzle_piece_16_regular, text: text),
-            ],
+              g.tileCustomApps,
+              subtitle: g.chipAppsPending(m.customAppsPending),
+              onTap: () => actions.onOpenSection(ShellSection.customApps),
+            ),
         },
     ];
   }
 }
 
-/// התוספים וחנות התוספים שבאוצריא — גלולה אחת.
-String? _onlinePluginsPill(HomeViewModel m, GuidanceStrings g) {
+/// התוספים וחנות התוספים שבאוצריא — שורה אחת.
+String? _onlinePluginsText(HomeViewModel m, GuidanceStrings g) {
   final changes = m.onlinePluginChanges;
   if (changes > 0) {
     return m.onlineStoreApp
-        ? g.pillPluginsWithStore(changes)
-        : g.pillPlugins(changes);
+        ? g.itemPluginsWithStore(changes)
+        : g.itemPlugins(changes);
   }
-  if (m.onlinePluginCatalogChanged) return g.pillPluginsCatalog;
-  return m.onlineStoreApp ? g.pillStoreApp : null;
+  if (m.onlinePluginCatalogChanged) return g.itemPluginsCatalog;
+  return m.onlineStoreApp ? g.itemStoreApp : null;
+}
+
+/// רשימת הגיבור — שורות על רקע נבחר, ושורת סיכום בתחתית.
+class _ItemList extends StatelessWidget {
+  const _ItemList({required this.items, this.total, this.free});
+
+  final List<_Item> items;
+  final String? total;
+  final String? free;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final meta = AppTextStyles.meta.copyWith(color: cs.onSurfaceVariant);
+    return AppCard.section(
+      key: ShellKeys.heroItems,
+      selected: true,
+      children: [
+        for (final item in items)
+          AppRow(
+            leading: item.icon,
+            title: item.title,
+            subtitle: item.subtitle,
+            trailing: item.size == null ? null : Text(item.size!, style: meta),
+            onTap: item.onTap,
+          ),
+        if (total != null || free != null)
+          Padding(
+            key: ShellKeys.heroTotal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(child: Text(total ?? '', style: meta)),
+                if (free != null) ...[
+                  const SizedBox(width: 14),
+                  Text(free!, style: meta),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 /// הסמל העגול שבצד הגיבור (`.emblem`): 72, טבעת 6, ותג קטן בפינה.
@@ -968,37 +1187,6 @@ class _Emblem extends StatelessWidget {
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// "מה ייכלל" (`.inc`): גלולה עם מסגרת, סמל 16 ו-13.
-class _PillChip extends StatelessWidget {
-  const _PillChip(this.pill);
-
-  final _Pill pill;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      height: AppTokens.chipHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        borderRadius: AppTokens.pill,
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(pill.icon, size: 16, color: cs.primary),
-          const SizedBox(width: 6),
-          Text(
-            pill.text,
-            style: AppTextStyles.small.copyWith(color: cs.onSurfaceVariant),
-          ),
         ],
       ),
     );
@@ -1107,8 +1295,8 @@ class _Tiles extends StatelessWidget {
             ? t.nothingYet
             : version(m.driveAppVersion!, m.installedVersion),
       ),
-      if (m.onlineAppVersion != null)
-        g.tileFactOnline(version(m.onlineAppVersion!, m.driveAppVersion)),
+      if (m.onlineAppLatest != null)
+        g.tileFactOnline(version(m.onlineAppLatest!, m.driveAppVersion)),
     ];
   }
 
@@ -1117,8 +1305,8 @@ class _Tiles extends StatelessWidget {
     if (!_factsKnown(m.libraryTile)) return const [];
     final g = context.strings.guide;
     final t = context.strings.pages;
-    final online = m.onlineLibraryVersion != null
-        ? t.libVersion(m.onlineLibraryVersion!)
+    final online = m.onlineLibraryLatest != null
+        ? t.libVersion(m.onlineLibraryLatest!)
         : m.onlineCompanionNames;
     return [
       g.tileFactHere(
@@ -1145,7 +1333,7 @@ class _Tiles extends StatelessWidget {
     // אותו אוצר מילים לתוכנה ולספרייה: השבב הוא הפעולה, העובדות בשורות.
     (StatusKind, String, IconData?) shared(TileStatus status) =>
         switch (status) {
-          TileStatus.unknown => (
+          TileStatus.unknown || TileStatus.notCheckedOnline => (
               StatusKind.unknown,
               common.notCheckedYet,
               null
@@ -1369,7 +1557,8 @@ class _StatusBar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final g = context.strings.guide;
     final style = AppTextStyles.meta.copyWith(color: cs.onSurfaceVariant);
-    final checkedAt = model.checkedAt;
+    // שעת הבדיקה ברשת — במחשב מחובר בלבד.
+    final checkedAt = model.online == true ? model.onlineCheckedAt : null;
     final drive = model.driveName;
     final online = model.online;
 

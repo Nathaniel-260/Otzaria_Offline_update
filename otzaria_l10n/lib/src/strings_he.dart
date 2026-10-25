@@ -329,7 +329,7 @@ class _Task extends TaskStrings {
   String get whatNowConnect => 'חבר אותו למחשב שבו לומדים עם אוצריא.';
   @override
   String whatNowOpen(String toolName) =>
-      'פתח שם את $toolName מתוך הכונן, ולחץ "עדכון אוצריא במחשב הזה".';
+      'פתח שם את $toolName מתוך הכונן, ולחץ "עדכון המחשב הזה".';
   @override
   String get updateHereToo => 'לעדכן גם במחשב הזה';
   @override
@@ -863,7 +863,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get eyebrowOnline => 'המחשב הזה: מחובר לאינטרנט';
   @override
-  String get eyebrowOffline => 'המחשב הזה: בלי אינטרנט';
+  String get eyebrowOffline => 'המחשב הזה: לא מחובר';
   @override
   String get eyebrowThisComputer => 'המחשב הזה';
   @override
@@ -887,7 +887,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get updateHereBody => 'הספרים, הסימניות וההערות שלך נשמרים כמו שהם.';
   @override
-  String get updateHereButton => 'עדכון אוצריא במחשב הזה';
+  String get updateHereButton => 'עדכון המחשב הזה';
   @override
   String get whatsNewButton => 'מה חדש?';
   @override
@@ -896,9 +896,7 @@ class _Guide extends GuidanceStrings {
   String get downloadBody =>
       'מורידים אותם לכונן הזה, ומשם מעדכנים כל מחשב — גם מחשב בלי אינטרנט.';
   @override
-  String get downloadButton => 'הורדת העדכונים לכונן';
-  @override
-  String get updateHereTooButton => 'לעדכן גם כאן';
+  String get downloadButton => 'הורדת הכול לכונן';
   @override
   String updateHereTooNote(String? version) => version == null
       ? 'בכונן כבר יש עדכון שלא הותקן במחשב הזה. אפשר להתקין אותו עכשיו, '
@@ -965,11 +963,59 @@ class _Guide extends GuidanceStrings {
   @override
   String get upToDateTitle => 'הכול מעודכן במחשב הזה';
   @override
-  String upToDateBody(String? version, {required bool offline}) {
-    final lead = version == null
-        ? 'אוצריא, הספרייה והתוספים מעודכנים.'
-        : 'אוצריא ${_ltr(version)}, הספרייה והתוספים מעודכנים.';
-    return offline ? '$lead בכונן אין עדכון חדש.' : lead;
+  String upToDateBody(String? version) => version == null
+      ? 'אוצריא, הספרייה והתוספים מעודכנים.'
+      : 'אוצריא ${_ltr(version)}, הספרייה והתוספים מעודכנים.';
+  @override
+  String get driveInstalledTitle => 'כל מה שבכונן כבר מותקן כאן';
+  @override
+  String driveInstalledBody(String? version) => version == null
+      ? 'אוצריא, הספרייה והתוספים מותקנים.'
+      : 'אוצריא ${_ltr(version)}, הספרייה והתוספים מותקנים.';
+  @override
+  String get othersPendingTitle => 'יש עוד עדכונים';
+  @override
+  String get otherLauncherTitle => 'הכלי הזה';
+  @override
+  String otherLauncherOnline(String version) =>
+      'גרסה ${_ltr(version)} באתר אוצריא';
+  @override
+  String otherLauncherOnDrive(String version) => 'גרסה ${_ltr(version)} בכונן';
+  @override
+  String get checkFailedTitle => 'לא הצלחתי לבדוק ברשת';
+  @override
+  String checkFailedBody({
+    required bool appFailed,
+    required bool libraryFailed,
+    required bool pluginsFailed,
+    required bool appChecked,
+    required bool libraryChecked,
+    required bool pluginsChecked,
+  }) {
+    String names(bool app, bool library, bool plugins) {
+      final all = [
+        if (app) 'תוכנת אוצריא',
+        if (library) 'הספרייה',
+        if (plugins) 'התוספים',
+      ];
+      if (all.length < 2) return all.join();
+      return '${all.sublist(0, all.length - 1).join(', ')} ו${all.last}';
+    }
+
+    final failed = names(appFailed, libraryFailed, pluginsFailed);
+    final lead = failed.isEmpty
+        ? 'הבדיקה באתר אוצריא לא הצליחה.'
+        : 'הבדיקה של $failed באתר אוצריא לא הצליחה.';
+    final checked = names(appChecked, libraryChecked, pluginsChecked);
+    if (checked.isEmpty) return lead;
+    final count =
+        [appChecked, libraryChecked, pluginsChecked].where((c) => c).length;
+    final verb = pluginsChecked
+        ? 'נבדקו ומעודכנים'
+        : count == 1
+            ? 'נבדקה ומעודכנת'
+            : 'נבדקו ומעודכנות';
+    return '$lead $checked $verb.';
   }
 
   @override
@@ -978,7 +1024,7 @@ class _Guide extends GuidanceStrings {
   String get recheckButton => 'בדוק שוב';
   @override
   String get offlineNote =>
-      'כדי לקבל עדכונים, חבר את הכונן למחשב עם אינטרנט ופתח אותו שם.';
+      'עדכונים חדשים מורידים לכונן במחשב המחובר, ואז מחברים אותו לכאן.';
   @override
   String get checkOnlineNowNote =>
       'עוד לא נבדק אם יש באתר אוצריא משהו חדש. "בדוק שוב" בודק עכשיו.';
@@ -994,8 +1040,7 @@ class _Guide extends GuidanceStrings {
       'להתקין מהכונן.';
   @override
   String get newerNote =>
-      'כדי לקבל עדכונים חדשים יותר, חבר את הכונן למחשב עם אינטרנט ופתח '
-      'אותו שם.';
+      'עדכונים חדשים יותר מורידים לכונן במחשב המחובר, ואז מחברים אותו לכאן.';
   @override
   String get attentionAppTitle => 'משהו בתוכנת אוצריא צריך בדיקה';
   @override
@@ -1022,25 +1067,48 @@ class _Guide extends GuidanceStrings {
       'כשהיא תסתיים, יופיע כאן מה עוד אפשר לעשות במחשב הזה.';
 
   @override
-  String pillApp(String version) => 'אוצריא ${_ltr(version)}';
+  String itemUpdateTo(String version) => 'עדכון ל-${_ltr(version)}';
   @override
-  String get pillLibraryUpdate => 'ספרייה · עדכון';
+  String itemLibraryUpdateTo(int version) => 'עדכון לגרסה $version';
   @override
-  String get pillLibraryFull => 'ספרייה מלאה';
+  String get itemLibraryUpdate => 'עדכון';
   @override
-  String pillLibraryCompanions(String names) => 'ספרייה · $names';
+  String get itemLibraryFull => 'הספרייה המלאה';
   @override
-  String pillPluginUpdates(int count) =>
+  String itemPluginUpdates(int count) =>
       count == 1 ? '1 עדכון תוסף' : '$count עדכוני תוספים';
   @override
-  String pillPlugins(int count) => count == 1 ? '1 תוסף' : '$count תוספים';
+  String itemPlugins(int count) => count == 1 ? '1 תוסף' : '$count תוספים';
   @override
-  String get pillPluginsCatalog => 'רשימת התוספים';
+  String get itemPluginsCatalog => 'רשימת התוספים';
   @override
-  String get pillStoreApp => 'עדכון לחנות התוספים';
+  String get itemStoreApp => 'עדכון לחנות התוספים';
   @override
-  String pillPluginsWithStore(int count) =>
-      '${pillPlugins(count)} · עדכון לחנות';
+  String itemPluginsWithStore(int count) =>
+      '${itemPlugins(count)} · עדכון לחנות';
+  @override
+  String itemUpTo(String size) => 'עד $size';
+  @override
+  String downloadTotal(
+    String size, {
+    required bool plusApp,
+    required bool plusLibrary,
+    required bool plusPlugins,
+  }) {
+    final plus = [
+      if (plusApp) 'התוכנה',
+      if (plusLibrary) 'הספרייה',
+      if (plusPlugins) 'התוספים',
+    ];
+    if (plus.isEmpty) return 'סה״כ עד $size';
+    final names = plus.length == 1
+        ? plus.single
+        : '${plus.sublist(0, plus.length - 1).join(', ')} ו${plus.last}';
+    return 'סה״כ עד $size ועוד $names';
+  }
+
+  @override
+  String driveFree(String size) => 'פנוי בכונן: $size';
 
   @override
   String get otzariaOpenTitle => 'אוצריא פתוחה כרגע';
@@ -1127,7 +1195,7 @@ class _Guide extends GuidanceStrings {
   @override
   String tileFactDrive(String value) => 'בכונן: $value';
   @override
-  String tileFactOnline(String value) => 'זמין להורדה: $value';
+  String tileFactOnline(String value) => 'ברשת: $value';
   @override
   String tileFactVersion(String version) => 'גרסה ${_ltr(version)}';
   @override
@@ -1161,13 +1229,13 @@ class _Guide extends GuidanceStrings {
       'כך מביאים את אוצריא לכל מחשב, גם בלי אינטרנט:';
   @override
   String get welcomeLeadOffline =>
-      'הכונן הזה עוד ריק, והמחשב הזה לא מחובר לאינטרנט. כך מתחילים:';
+      'הכונן הזה עוד ריק, והמחשב הזה לא מחובר. כך מתחילים:';
   @override
   String step(int number) => 'שלב $number';
   @override
   String get youAreHere => 'אתה כאן';
   @override
-  String get step1Title => 'במחשב עם אינטרנט';
+  String get step1Title => 'במחשב מחובר';
   @override
   String get step1BodyOnline => 'מורידים את אוצריא לכונן הזה.';
   @override
@@ -1191,8 +1259,8 @@ class _Guide extends GuidanceStrings {
   String get welcomeHelpButton => 'איך מתחילים?';
   @override
   String get welcomeOfflineNote =>
-      'אי אפשר להוריד מהמחשב הזה. חבר את הכונן למחשב עם אינטרנט ופתח שם '
-      'את הכלי.';
+      'אי אפשר להוריד מהמחשב הזה. חבר את הכונן למחשב מחובר ופתח שם את '
+      'הכלי.';
   @override
   String get welcomeAlsoOnDrive => 'גם בכונן הזה:';
 
@@ -1836,7 +1904,7 @@ class _Plugins extends PluginsStrings {
       'תוספים יורדים לכונן יחד עם עדכוני אוצריא. "רענון" מוריד אותם עכשיו.';
   @override
   String get emptyBodyOffline =>
-      'תוספים יורדים לכונן יחד עם עדכוני אוצריא. במחשב עם אינטרנט לחץ "הורדת העדכונים לכונן" בדף הבית, והם יופיעו כאן.';
+      'תוספים יורדים לכונן יחד עם עדכוני אוצריא. במחשב עם אינטרנט לחץ "הורדת הכול לכונן" בדף הבית, והם יופיעו כאן.';
   @override
   String get searchHint => 'חפש תוסף לפי שם או נושא';
   @override
@@ -2075,7 +2143,7 @@ class _Faq extends FaqStrings {
   String get aOfflineFlow =>
       'בשביל זה התוכנה נבנתה. מעתיקים את תיקיית התוכנה כולה לכונן נייד '
       '(דיסק און קי), מחברים אותו למחשב שיש בו אינטרנט, פותחים את התוכנה '
-      'ולוחצים "הורדת העדכונים לכונן" — היא אוספת את כל העדכונים אל אותה תיקייה שעל הכונן. '
+      'ולוחצים "הורדת הכול לכונן" — היא אוספת את כל העדכונים אל אותה תיקייה שעל הכונן. '
       'אחר כך מוציאים את הכונן, מחברים אותו למחשב שלך, פותחים את התוכנה '
       'משם ומתקינים. בשלב הזה אין צורך באינטרנט כלל.';
   @override
@@ -2092,7 +2160,7 @@ class _Faq extends FaqStrings {
   String get qDownloadStopped => 'ההורדה נעצרה באמצע — צריך להתחיל מהתחלה?';
   @override
   String get aDownloadStopped =>
-      'לא. ההורדה זוכרת מה הספיקה להביא, ולחיצה נוספת על "הורדת העדכונים לכונן" ממשיכה '
+      'לא. ההורדה זוכרת מה הספיקה להביא, ולחיצה נוספת על "הורדת הכול לכונן" ממשיכה '
       'מאותה נקודה. גם ביטול ההורדה שומר את מה שכבר ירד עד הסוף ואת מה שירד '
       'בהורדות קודמות — הוא מוחק רק את החלק שהיה באמצע.';
   @override

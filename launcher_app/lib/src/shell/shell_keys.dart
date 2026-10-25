@@ -14,6 +14,8 @@ abstract final class ShellKeys {
   static const heroFoundNothing = ValueKey('home.hero.foundNothing');
   static const eyebrow = ValueKey('home.eyebrow');
   static const heroChecking = ValueKey('home.hero.checking');
+  static const heroItems = ValueKey('home.hero.items');
+  static const heroTotal = ValueKey('home.hero.total');
 
   static const readOnlyNotice = ValueKey('home.notice.readOnly');
   static const driveFullNotice = ValueKey('home.notice.driveFull');

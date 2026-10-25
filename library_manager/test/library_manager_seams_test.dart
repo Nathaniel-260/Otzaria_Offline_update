@@ -172,6 +172,188 @@ void main() {
     });
   });
 
+  group('peekedDownloadBytesBound — the size shown before a click', () {
+    late List<Map<String, dynamic>> releases;
+    late bool companionsDown;
+    late int releaseRequests;
+
+    Map<String, dynamic> release(String tag, Map<String, int> assets) => {
+      'tag_name': tag,
+      'prerelease': false,
+      'draft': false,
+      'published_at': '2026-06-27T21:00:00Z',
+      'assets': [
+        for (final MapEntry(key: name, value: size) in assets.entries)
+          {
+            'name': name,
+            'browser_download_url': 'https://lib/$tag/$name',
+            'size': size,
+            'id': '$tag/$name'.hashCode.abs(),
+          },
+      ],
+    };
+
+    Map<String, dynamic> companionAsset(String name, int size) => {
+      'name': name,
+      'browser_download_url': 'https://x/$name',
+      'size': size,
+      'id': name.hashCode.abs(),
+    };
+
+    final companionsApi = MockClient((request) async {
+      final url = request.url.toString();
+      if (companionsDown) return http.Response('', 503);
+      if (url.contains('/repos/Otzaria/otzaria-library/')) {
+        return http.Response(
+          jsonEncode({
+            'tag_name': 'lib-v9',
+            'assets': [companionAsset('talmud_bavli_latest.tar.zst', 400)],
+          }),
+          200,
+        );
+      }
+      if (url.contains('/repos/Otzaria/otzar-HB_catalog/')) {
+        return http.Response(
+          jsonEncode({
+            'tag_name': 'cat-v3',
+            'assets': [
+              companionAsset('otzar-HB_catalog.db.zst', 30),
+              companionAsset('version.txt', 2),
+            ],
+          }),
+          200,
+        );
+      }
+      if (url.contains('/repos/Otzaria/SeforimMagicIndexer/')) {
+        return http.Response(
+          jsonEncode({
+            'tag_name': 'dict-v7',
+            'assets': [companionAsset('lexical.db', 20)],
+          }),
+          200,
+        );
+      }
+      return http.Response('55', 200);
+    });
+
+    setUp(() {
+      companionsDown = false;
+      releaseRequests = 0;
+      releases = [
+        release('v8-20261011', {
+          'patch-v7-v8.db.zst.manifest.json': 2,
+          'patch-v7-v8.db.zst': 100,
+          'seforim.db.zst': 1000,
+          'notes.txt': 7,
+        }),
+        release('v7-20261011', {
+          'patch-v6-v7.db.zst.manifest.json': 2,
+          'patch-v6-v7.db.zst': 50,
+          'seforim.db.zst': 900,
+        }),
+      ];
+    });
+
+    LibraryManager manager({bool personal = false}) {
+      final manager = LibraryManager(
+        dataDir: p.join(temporary.path, 'drive'),
+        environment: const {},
+        personalUpdateMode: personal,
+        processGuard: _FakeGuard(running: false),
+        releaseClient: RecentLibraryReleasesClient(
+          httpClient: MockClient((request) async {
+            releaseRequests++;
+            final page = request.url.queryParameters['page'];
+            return http.Response(
+              jsonEncode(page == '1' ? releases : const []),
+              200,
+            );
+          }),
+        ),
+      );
+      addTearDown(manager.dispose);
+      return manager;
+    }
+
+    Future<int?> peekAndBound(LibraryManager library) =>
+        http.runWithClient(() async {
+          await library.peekLatestOnlineVersion();
+          try {
+            await library.peekPendingCompanions();
+          } catch (_) {}
+          return library.peekedDownloadBytesBound();
+        }, () => companionsApi);
+
+    test('newest full DB, every patch and the pending companions — the older '
+        'full DB and unrelated assets do not count', () async {
+      final library = manager();
+      expect(await peekAndBound(library), 2 + 100 + 1000 + 2 + 50 + 450);
+
+      // החישוב עצמו אינו פונה לרשת — רק ההצצות שלפניו.
+      final before = releaseRequests;
+      final again = await http.runWithClient(
+        library.peekedDownloadBytesBound,
+        () => MockClient((request) async => fail('network: ${request.url}')),
+      );
+      expect(again, 2 + 100 + 1000 + 2 + 50 + 450);
+      expect(releaseRequests, before);
+    });
+
+    test('assets already complete in the mirror are left out', () async {
+      final library = manager();
+      final mirror = Directory(library.mirrorDir)..createSync(recursive: true);
+      String held(String tag, String name, int size) {
+        final relative = 'assets/$tag/$name';
+        File(p.join(mirror.path, relative))
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(List.filled(size, 0));
+        return relative;
+      }
+
+      File(p.join(mirror.path, 'releases.json')).writeAsStringSync(
+        jsonEncode({
+          'releases': [
+            {
+              'tag': 'v8-20261011',
+              'assets': [
+                {
+                  'name': 'seforim.db.zst',
+                  'downloadUrl': held('v8-20261011', 'seforim.db.zst', 1000),
+                  'size': 1000,
+                },
+                // נכס קטוע אינו שלם — עדיין נספר.
+                {
+                  'name': 'patch-v7-v8.db.zst',
+                  'downloadUrl': held('v8-20261011', 'patch-v7-v8.db.zst', 60),
+                  'size': 100,
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      expect(await peekAndBound(library), 2 + 100 + 2 + 50 + 450);
+    });
+
+    test('no bound without a successful peek, in personal mode, or for a '
+        'split full DB', () async {
+      expect(await manager().peekedDownloadBytesBound(), isNull);
+
+      companionsDown = true;
+      expect(await peekAndBound(manager()), isNull);
+      companionsDown = false;
+
+      expect(await peekAndBound(manager(personal: true)), isNull);
+
+      releases.insert(
+        0,
+        release('v9-20261011', {'seforim.db.zst.manifest.json': 3}),
+      );
+      expect(await peekAndBound(manager()), isNull);
+    });
+  });
+
   group('smart-search install gate', () {
     late String db;
     late String launch;

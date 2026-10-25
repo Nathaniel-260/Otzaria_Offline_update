@@ -115,7 +115,7 @@ class LauncherUpdateController extends ChangeNotifier
   /// בדיקה קלה ברשת. כשל (בעיקר "אין חיבור") הוא מצב תקין ונשמר בשקט, בדיוק
   /// כמו במודולים האחרים — בדיקה אוטומטית לא מציגה שגיאה כשאין רשת.
   Future<void> checkOnline() async {
-    onlineCheckError = null;
+    // הכשל הקודם נשאר עד התשובה החדשה, כדי ששורת המצב לא תאמר "מחובר" באמצע.
     notifyListeners();
 
     try {
@@ -125,6 +125,7 @@ class LauncherUpdateController extends ChangeNotifier
       if (online != null && hasOnlineUpdate) {
         onlineRelease = await _updater.withChangelog(online);
       }
+      onlineCheckError = null;
     } catch (e) {
       onlineRelease = null;
       onlineCheckError = e.toString();

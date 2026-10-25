@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/widgets.dart';
 import 'package:library_manager/library_manager.dart';
@@ -7,6 +8,8 @@ import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:plugins_manager/plugins_manager.dart' show StorePlugin;
+import 'package:seforim_library_updater/seforim_library_updater.dart'
+    show DiskSpaceProbe;
 
 import '../app_report/launcher_crash_session.dart';
 import '../controllers/app_reports_controller.dart';
@@ -220,6 +223,31 @@ class AppSession extends ChangeNotifier {
       !readOnly &&
       settings.settings.downloadsLibrary &&
       _library.onlineSemanticOffer;
+
+  /// המקום הפנוי בכונן, ליד רשימת ההורדה בבית. נמדד אחרי בדיקה ברשת ואחרי
+  /// הורדה; `null` עד אז או כשהמדידה נכשלה.
+  int? get driveFreeBytes => _driveFreeBytes;
+  int? _driveFreeBytes;
+
+  /// ב-isolate: ב-macOS המדידה מריצה `df`, ותהליך חוסם את ה-UI (§5.9).
+  Future<void> _measureDriveFree() async {
+    int? free;
+    Object? failure;
+    try {
+      free = await _freeBytesInIsolate(dataDir);
+    } catch (e) {
+      failure = e;
+    }
+    if (!isActive) return;
+    if (failure != null) {
+      AppLogger.instance.info('מדידת המקום הפנוי בכונן לא הצליחה: $failure');
+    }
+    _update(() => _driveFreeBytes = free);
+  }
+
+  // סטטית: סגור בתוך מתודה async היה לוכד את ה-Future שלה, שאינו נשלח ל-isolate.
+  static Future<int?> _freeBytesInIsolate(String dir) =>
+      Isolate.run(() => DiskSpaceProbe.freeBytesFor(dir));
 
   /// בדיקה רצה — "בדוק עכשיו", הבדיקה שבעלייה, או בדיקה ברשת.
   bool get isCheckingNow => _checkingNow || _isCheckingOnline;
@@ -677,6 +705,7 @@ class AppSession extends ChangeNotifier {
     if (!isActive) return;
     _update(() => _isCheckingOnline = false);
     _markChecked();
+    unawaited(_measureDriveFree());
   }
 
   /// "הורדה והפעלה מחדש" בדף הכלי: מה חדש כבר מוצג בדף, ולכן אישור
@@ -805,6 +834,7 @@ class AppSession extends ChangeNotifier {
     if (_foundNothing != null) _update(() => _foundNothing = null);
     tasks.prepareDownload();
     await _downloads.downloadAll(forceSemantic: forceSemantic);
+    if (isActive) unawaited(_measureDriveFree());
     // בקשה שבוטלה לא סוגרת את המסך של בקשה חדשה שנפתחה אחריה.
     if (isActive && request == _downloadRequest) tasks.abandonDownload();
   }

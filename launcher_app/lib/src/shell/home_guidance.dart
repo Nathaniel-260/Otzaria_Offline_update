@@ -38,9 +38,28 @@ enum GuidancePrimary {
   downloadToDrive,
   upToDate,
   newerHereThanDrive,
+
+  /// המחשב מחובר, אבל הבדיקה של רכיב שנבחר נכשלה — "לא הצלחתי לבדוק".
+  checkFailed,
   attention,
   taskInProgress,
 }
+
+/// מה הבדיקה ברשת אומרת על רכיב אחד.
+enum OnlineProof {
+  /// הצליחה, בתוך `onlineCheckMaxAge`.
+  proven,
+
+  /// הצליחה, אבל ישנה. עדיין התשובה שמוצגת — אין רענון בלי לחיצה.
+  stale,
+  failed,
+  unchecked;
+
+  bool get succeeded => this == proven || this == stale;
+}
+
+/// עדכון שאינו של אוצריא, הספרייה או התוספים — ואסור ל"הכול מעודכן" להסתיר.
+enum OtherUpdate { launcher, customApps }
 
 /// "הורדה" שלא מצאה מה להביא — מה הבית אומר במקום מסך משימה.
 enum FoundNothing {
@@ -60,6 +79,9 @@ enum GuidanceSecondary {
   checkOnlineNow,
   offlineHint,
   noSyncSelection,
+
+  /// רק התוספים לא נבדקו, כי אתר אוצריא סגור בשבת — לא "בדוק עכשיו".
+  siteClosedForShabbat,
 }
 
 /// מה האריח אומר על הרכיב שלו.
@@ -77,6 +99,9 @@ enum TileStatus {
 
   /// באתר יש חדש שההורדה לכונן תביא — כמו "מה ייכלל" בגיבור.
   onlineAvailable,
+
+  /// מה שבכונן מותקן, אבל הבדיקה ברשת של הרכיב נכשלה (`checkFailed`).
+  notCheckedOnline,
 }
 
 class GuidanceFacts {
@@ -94,6 +119,9 @@ class GuidanceFacts {
     this.pluginsLoading = false,
     this.pluginUpdatesOnDrive = 0,
     this.online,
+    this.appProof,
+    this.libraryProof,
+    this.pluginsProof,
     this.onlineApp = false,
     this.onlineLibrary = false,
     this.onlinePlugins = false,
@@ -104,6 +132,9 @@ class GuidanceFacts {
     this.isCheckingOnline = false,
     this.longTaskRunning = false,
     this.installing = false,
+    this.launcherUpdate = false,
+    this.customAppsPending = false,
+    this.pluginsClosedForShabbat = false,
   });
 
   final bool readOnly;
@@ -121,8 +152,14 @@ class GuidanceFacts {
   /// תוספים מותקנים שבכונן יש להם גרסה חדשה יותר.
   final int pluginUpdatesOnDrive;
 
-  /// `null` = לא נבדק; `true` = לפחות בדיקה אחת הצליחה; `false` = כולן נכשלו.
+  /// החיבור, לשורת המצב: `null` = לא נבדק; `true` = לפחות בדיקה אחת הצליחה
+  /// (גם של הכלי עצמו); `false` = כולן נכשלו.
   final bool? online;
+
+  /// מה הבדיקה ברשת הוכיחה על כל רכיב. `null` — לפי [online] (לטבלאות).
+  final OnlineProof? appProof;
+  final OnlineProof? libraryProof;
+  final OnlineProof? pluginsProof;
 
   /// יש ברשת משהו שעוד אינו בכונן (`hasOnlineUpdate` של כל מודול).
   final bool onlineApp;
@@ -140,7 +177,28 @@ class GuidanceFacts {
   final bool longTaskRunning;
   final bool installing;
 
+  /// שורת הכלי בתחתית מציעה עדכון (`HomeViewModel.launcher`).
+  final bool launcherUpdate;
+
+  /// בכונן תוכנות נוספות שממתינות להתקנה או לעדכון כאן.
+  final bool customAppsPending;
+
+  /// בדיקת התוספים לא רצה כי האתר סגור בשבת ([pluginsProof] — לא נבדק).
+  final bool pluginsClosedForShabbat;
+
   bool get hasSyncSelection => syncApp || syncLibrary || syncPlugins;
+
+  OnlineProof proofOf(GuidanceItem item) =>
+      switch (item) {
+        GuidanceItem.app => appProof,
+        GuidanceItem.library => libraryProof,
+        GuidanceItem.plugins => pluginsProof,
+      } ??
+      switch (online) {
+        true => OnlineProof.proven,
+        false => OnlineProof.failed,
+        null => OnlineProof.unchecked,
+      };
 }
 
 class HomeGuidance {
@@ -150,6 +208,10 @@ class HomeGuidance {
     this.hereItems = const [],
     this.downloadItems = const [],
     this.attentionItem,
+    this.uncheckedItems = const [],
+    this.checkedItems = const [],
+    this.onlineProven = false,
+    this.otherUpdates = const [],
     this.showOtzariaOpenBanner = false,
     this.readOnly = false,
     this.driveFull = false,
@@ -166,6 +228,18 @@ class HomeGuidance {
 
   /// הרכיב שהדף שלו מסביר מה לא בסדר, כש-[primary] הוא `attention`.
   final GuidanceItem? attentionItem;
+
+  /// ב-`checkFailed`: הרכיבים שהבדיקה שלהם נכשלה, ואלה שנבדקו בלי חדש.
+  final List<GuidanceItem> uncheckedItems;
+  final List<GuidanceItem> checkedItems;
+
+  /// כל רכיב שנבחר נבדק ברשת בהצלחה — רק אז "הכול מעודכן". אחרת (מחשב לא
+  /// מחובר, כונן מוגן, טרם נבדק) נאמר רק מה שידוע: מה שבכונן מותקן.
+  final bool onlineProven;
+
+  /// ב-`upToDate`: מה שעוד מחכה, כדי שהגיבור לא יאמר "הכול מעודכן" לצד
+  /// "עדכון זמין" בשורת המצב.
+  final List<OtherUpdate> otherUpdates;
   final bool showOtzariaOpenBanner;
   final bool readOnly;
   final bool driveFull;
@@ -173,7 +247,8 @@ class HomeGuidance {
   @override
   String toString() => 'HomeGuidance($primary, $secondary, here: $hereItems, '
       'download: $downloadItems, attention: $attentionItem, '
-      'banner: $showOtzariaOpenBanner)';
+      'unchecked: $uncheckedItems, proven: $onlineProven, '
+      'others: $otherUpdates, banner: $showOtzariaOpenBanner)';
 }
 
 /// סדר שלבי "עדכון כאן": התקנה ראשונה — תוכנה ואז ספרייה, בלי תוספים;
@@ -224,24 +299,57 @@ GuidanceItem? _attentionItem(GuidanceFacts f) {
 }
 
 HomeGuidance deriveHomeGuidance(GuidanceFacts f) {
+  final selected = [
+    for (final item in GuidanceItem.values)
+      if (_selected(f, item)) item,
+  ];
+  final unchecked = [
+    for (final item in selected)
+      if (f.proofOf(item) == OnlineProof.failed) item,
+  ];
+  // בלי שום רכיב נבחר אין מה שהוכח — לא טוענים "מעודכנים" על אף אחד.
+  final onlineProven = !f.readOnly &&
+      f.online == true &&
+      selected.isNotEmpty &&
+      selected.every((item) => f.proofOf(item).succeeded);
+  final notChecked = [
+    for (final item in selected)
+      if (f.proofOf(item) == OnlineProof.unchecked) item,
+  ];
+  final closedForShabbat = f.pluginsClosedForShabbat &&
+      notChecked.length == 1 &&
+      notChecked.single == GuidanceItem.plugins;
+
   HomeGuidance result(
     GuidancePrimary primary, {
     GuidanceSecondary secondary = GuidanceSecondary.none,
     List<GuidanceItem> here = const [],
     List<GuidanceItem> download = const [],
     GuidanceItem? attention,
-  }) =>
-      HomeGuidance(
-        primary: primary,
-        secondary: secondary,
-        hereItems: here,
-        downloadItems: download,
-        attentionItem: attention,
-        showOtzariaOpenBanner:
-            f.otzariaRunning && here.any((i) => i != GuidanceItem.plugins),
-        readOnly: f.readOnly,
-        driveFull: f.driveFull,
-      );
+    List<OtherUpdate> others = const [],
+  }) {
+    final failed = primary == GuidancePrimary.checkFailed;
+    return HomeGuidance(
+      primary: primary,
+      secondary: secondary,
+      hereItems: here,
+      downloadItems: download,
+      attentionItem: attention,
+      uncheckedItems: failed ? unchecked : const [],
+      checkedItems: failed
+          ? [
+              for (final item in selected)
+                if (f.proofOf(item).succeeded) item,
+            ]
+          : const [],
+      onlineProven: onlineProven,
+      otherUpdates: others,
+      showOtzariaOpenBanner:
+          f.otzariaRunning && here.any((i) => i != GuidanceItem.plugins),
+      readOnly: f.readOnly,
+      driveFull: f.driveFull,
+    );
+  }
 
   if (f.longTaskRunning || f.installing || f.libraryApplyActive) {
     return result(GuidancePrimary.taskInProgress);
@@ -263,9 +371,10 @@ HomeGuidance deriveHomeGuidance(GuidanceFacts f) {
       f.pluginsLoading;
   final localUnchecked = f.otzariaStatus == AppStatusFact.idle ||
       f.libraryStatus == LibraryStatusFact.idle;
+  // גם כשבדיקת הכלי כבר חזרה ושל רכיב שנבחר עוד לא: אחרת "מעודכן" לרגע.
   final onlinePending = !f.readOnly &&
-      f.online == null &&
-      (f.isCheckingOnline || f.autoCheckUpdates);
+      ((f.online == null && (f.isCheckingOnline || f.autoCheckUpdates)) ||
+          (f.isCheckingOnline && notChecked.isNotEmpty && !closedForShabbat));
   if (localChecking || (onlinePending && here.isEmpty)) {
     return result(GuidancePrimary.checking);
   }
@@ -276,7 +385,8 @@ HomeGuidance deriveHomeGuidance(GuidanceFacts f) {
   if (!f.otzariaInstalled && driveEmpty) {
     return result(
       GuidancePrimary.welcome,
-      secondary: _quietSecondary(f, onlineItems, download),
+      secondary: _quietSecondary(
+          f, onlineItems, download, onlineProven, closedForShabbat),
       download: download,
     );
   }
@@ -304,21 +414,39 @@ HomeGuidance deriveHomeGuidance(GuidanceFacts f) {
   if (_attentionItem(f) case final item?) {
     return result(GuidancePrimary.attention, attention: item);
   }
+  // רק כשל חלקי: כשכל הבדיקות נכשלו המחשב פשוט לא מחובר, וזה מצב רגיל.
+  if (!f.readOnly && f.online == true && unchecked.isNotEmpty) {
+    return result(GuidancePrimary.checkFailed);
+  }
+  if (f.otzariaStatus == AppStatusFact.installedIsNewer) {
+    return result(
+      GuidancePrimary.newerHereThanDrive,
+      secondary: localUnchecked
+          ? GuidanceSecondary.checkOnlineNow
+          : _quietSecondary(
+              f, onlineItems, download, onlineProven, closedForShabbat),
+    );
+  }
   return result(
-    f.otzariaStatus == AppStatusFact.installedIsNewer
-        ? GuidancePrimary.newerHereThanDrive
-        : GuidancePrimary.upToDate,
+    GuidancePrimary.upToDate,
     secondary: localUnchecked
         ? GuidanceSecondary.checkOnlineNow
-        : _quietSecondary(f, onlineItems, download),
+        : _quietSecondary(
+            f, onlineItems, download, onlineProven, closedForShabbat),
+    others: [
+      if (f.launcherUpdate) OtherUpdate.launcher,
+      if (f.customAppsPending) OtherUpdate.customApps,
+    ],
   );
 }
 
-/// השורה המשנית כשאין מה לעשות: "אין אינטרנט" כאן הוא רמז, לא תקלה.
+/// השורה המשנית כשאין מה לעשות: מחשב לא מחובר הוא רמז, לא תקלה.
 GuidanceSecondary _quietSecondary(
   GuidanceFacts f,
   List<GuidanceItem> onlineItems,
   List<GuidanceItem> download,
+  bool onlineProven,
+  bool closedForShabbat,
 ) {
   // בכונן מוגן אין בדיקה ברשת (`AppSession.checkOnline`), ולכן אין מה לומר.
   if (f.readOnly) return GuidanceSecondary.none;
@@ -327,18 +455,27 @@ GuidanceSecondary _quietSecondary(
     null => GuidanceSecondary.checkOnlineNow,
     true when onlineItems.isNotEmpty && download.isEmpty =>
       GuidanceSecondary.noSyncSelection,
+    true when closedForShabbat => GuidanceSecondary.siteClosedForShabbat,
+    // רכיב שנבחר עוד לא נבדק, אף שהמחשב מחובר.
+    true when !onlineProven && f.hasSyncSelection =>
+      GuidanceSecondary.checkOnlineNow,
     true => GuidanceSecondary.none,
   };
 }
 
 /// [download] — `HomeGuidance.downloadItems`: רכיב שההורדה מביאה מוצג כך גם
-/// באריח, אחרת האריח ("מעודכנת", "עוד לא בכונן") סותר את הגיבור.
+/// באריח, אחרת האריח ("מעודכנת", "עוד לא בכונן") סותר את הגיבור. [unchecked]
+/// — `HomeGuidance.uncheckedItems`, מאותה סיבה.
 TileStatus deriveTileStatus(
   GuidanceItem item,
   GuidanceFacts f, {
   List<GuidanceItem> download = const [],
+  List<GuidanceItem> unchecked = const [],
 }) {
   final local = _localTileStatus(item, f);
+  if (unchecked.contains(item) && local == TileStatus.upToDate) {
+    return TileStatus.notCheckedOnline;
+  }
   if (!download.contains(item)) return local;
   return switch (local) {
     TileStatus.working ||

@@ -393,7 +393,7 @@ const _storePhases = {'phase4', 'phase4b'};
 
 /// הבית במצבי המוקאפ, בתוך שורת הכותרת — בלי סשן.
 Set<String> get _homeScenarioPhases =>
-    const {'phase2a', 'phase2a2', 'phase2a3', 'phase2b2'};
+    const {'phase2a', 'phase2a2', 'phase2a3', 'phase2b2', 'stage2_home'};
 
 /// מסכי המשימה מצולמים מהמודל — ראו `task_<scenario>`.
 const _taskPhases = {'phase2b', 'phase2b2'};
