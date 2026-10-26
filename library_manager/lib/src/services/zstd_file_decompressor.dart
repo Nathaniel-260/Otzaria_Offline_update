@@ -148,6 +148,11 @@ class ZstdOutputLimitExceeded extends ZstdStreamException {
   String toString() => message;
 }
 
+/// כשל משאבים (הקשר שלא נוצר, זיכרון) — לא פגם בקובץ שמחולץ.
+class ZstdResourceException extends ZstdStreamException {
+  const ZstdResourceException(super.message);
+}
+
 DynamicLibrary? _openLibrary() {
   final plugin = _tryOpen(switch (Platform.operatingSystem) {
     'windows' => 'zstandard_windows.dll',
@@ -218,7 +223,7 @@ const int _maxWindowLog = 31;
 
     dctx = zstd.ZSTD_createDCtx();
     if (dctx == nullptr) {
-      throw ZstdStreamException(strings.zstdContextCreationFailed);
+      throw ZstdResourceException(strings.zstdContextCreationFailed);
     }
     inPtr = malloc.allocate<Uint8>(inCapacity);
     outPtr = malloc.allocate<Uint8>(outCapacity);
@@ -235,7 +240,7 @@ const int _maxWindowLog = 31;
 
     final init = zstd.ZSTD_initDStream(dctx);
     if (zstd.ZSTD_isError(init) != 0) {
-      throw ZstdStreamException(strings.zstdContextCreationFailed);
+      throw ZstdResourceException(strings.zstdContextCreationFailed);
     }
     zstd.ZSTD_DCtx_setParameter(
       dctx,
@@ -268,9 +273,12 @@ const int _maxWindowLog = 31;
         outBuffer.ref.pos = 0;
         lastResult = zstd.ZSTD_decompressStream(dctx, outBuffer, inBuffer);
         if (zstd.ZSTD_isError(lastResult) != 0) {
-          throw ZstdStreamException(
-            strings.zstdDecompressionFailed(_errorName(zstd, lastResult)),
+          final message = strings.zstdDecompressionFailed(
+            _errorName(zstd, lastResult),
           );
+          throw _isAllocationError(zstd, lastResult)
+              ? ZstdResourceException(message)
+              : ZstdStreamException(message);
         }
         final produced = outBuffer.ref.pos;
         if (produced > 0) {
@@ -309,6 +317,16 @@ const int _maxWindowLog = 31;
     if (inPtr != nullptr) malloc.free(inPtr);
     if (outPtr != nullptr) malloc.free(outPtr);
     if (dctx != nullptr) zstd.ZSTD_freeDCtx(dctx);
+  }
+}
+
+// קוד שגיאה שה-bindings אינם מכירים (libzstd חדשה יותר) זורק ב-`fromValue`.
+bool _isAllocationError(ZstandardNativeBindings zstd, int code) {
+  try {
+    return zstd.ZSTD_getErrorCode(code) ==
+        ZSTD_ErrorCode.ZSTD_error_memory_allocation;
+  } catch (_) {
+    return false;
   }
 }
 

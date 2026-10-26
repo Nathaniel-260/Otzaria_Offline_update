@@ -55,6 +55,9 @@ enum LibraryPersonalDownloadNote {
 
   /// אין גרסה חדשה מזו שנרשמה — לא ירד דבר.
   upToDate,
+
+  /// `releases.json` שבמראה היה פגום — ירד המסד המלא כדי לתקן אותה.
+  mirrorRepaired,
 }
 
 class LibraryModuleController extends ChangeNotifier
@@ -128,6 +131,9 @@ class LibraryModuleController extends ChangeNotifier
   /// `true` כשאין מראה מקומית בכלל (טרם הורד דבר). נשמר בנפרד מ-[status], כי
   /// [hasOnlineUpdate] חייב לדעת זאת גם אחרי שה-status התקדם.
   bool mirrorMissing = false;
+
+  /// `releases.json` שבמראה אינו קריא — כמו [mirrorMissing], יש מה להוריד.
+  bool mirrorDamaged = false;
 
   /// נתיב ה-`seforim.db` שזוהה בפועל — מתעדכן בכל [checkForUpdate].
   String? dbPath;
@@ -345,7 +351,7 @@ class LibraryModuleController extends ChangeNotifier
     // מראה ריקה = יש מה להוריד, נקודה. הנפילה לגרסת המסד החי השוותה את הרשת
     // למחשב הזה במקום לכונן, ולכן כונן ריק במחשב שיש עליו אוצריא מעודכנת
     // קיבל "אין עדכונים", בלי כפתור הורדה ועם דילוג ב-downloadAll.
-    if (mirrorMissing) return true;
+    if (mirrorMissing || mirrorDamaged) return true;
     final mirrored = targetVersion ?? localVersion ?? 0;
     return online > mirrored;
   }
@@ -455,9 +461,11 @@ class LibraryModuleController extends ChangeNotifier
           ? null
           : outcome.upToDate
               ? LibraryPersonalDownloadNote.upToDate
-              : outcome.personalFromVersion == null
-                  ? LibraryPersonalDownloadNote.versionUnknown
-                  : LibraryPersonalDownloadNote.fromRecordedVersion;
+              : outcome.repairedDamagedMirror
+                  ? LibraryPersonalDownloadNote.mirrorRepaired
+                  : outcome.personalFromVersion == null
+                      ? LibraryPersonalDownloadNote.versionUnknown
+                      : LibraryPersonalDownloadNote.fromRecordedVersion;
       notifyListeners();
       // עכשיו יש מול מה להשוות — מרעננים את מצב העדכון מהתיקייה החדשה.
       await checkForUpdate();
@@ -496,7 +504,7 @@ class LibraryModuleController extends ChangeNotifier
       return true;
     } catch (e, st) {
       AppLogger.instance
-          .error('רישום גרסת המסד לעדכון אישי נכשל${_sqliteDetail(e)}', e, st);
+          .error('רישום גרסת המסד לעדכון אישי נכשל${_errorDetail(e)}', e, st);
       if (e is LocalDbUnreadableException) personalCaptureError = e.toString();
       return false;
     }
@@ -510,9 +518,12 @@ class LibraryModuleController extends ChangeNotifier
       e is LocalDbUnreadableException &&
       e.reason == LocalDbUnreadableReason.readOnlyLocation;
 
-  static String _sqliteDetail(Object e) => e is LocalDbUnreadableException
-      ? ' (${e.reason.name}, SQLite ${e.extendedResultCode}: ${e.detail})'
-      : '';
+  static String _errorDetail(Object e) => switch (e) {
+        LocalDbUnreadableException() =>
+          ' (${e.reason.name}, SQLite ${e.extendedResultCode}: ${e.detail})',
+        LibraryMirrorDamagedException() => ' (${e.detail})',
+        _ => '',
+      };
 
   /// הקבצים הנלווים שממתינים, בשמם — זה מה שהמסך אומר במקום "יש עדכון"
   /// סתמי ליד "גרסה 27 → 27". ריק כשההצעה היא על המסד עצמו.
@@ -595,6 +606,7 @@ class LibraryModuleController extends ChangeNotifier
       _lastCheck = check;
       isFreshInstall = check.isFreshInstall;
       mirrorMissing = false;
+      mirrorDamaged = false;
       // שגיאה מבדיקה קודמת אינה מתארת את זו: `LibraryScreen` הציג אותה כל עוד
       // השדה מלא, בלי קשר ל-status, ולכן היא שרדה בדיקה שהצליחה.
       errorMessage = null;
@@ -637,6 +649,7 @@ class LibraryModuleController extends ChangeNotifier
       // ולא מוצג כתקלה.
       status = LibraryModuleStatus.needsDownload;
       mirrorMissing = true;
+      mirrorDamaged = false;
       _lastCheck = null;
       pendingCompanions = const {};
       unavailableCompanions = const {};
@@ -652,11 +665,19 @@ class LibraryModuleController extends ChangeNotifier
       errorMessage = e.toString();
       _lastCheck = null;
       localDbUnreadable = e is LocalDbUnreadableException;
+      mirrorDamaged = e is LibraryMirrorDamagedException;
       needsElevation = unreadableDbNeedsElevation(e);
       pendingCompanions = const {};
       unavailableCompanions = const {};
       mirroredCompanions = const {};
-      AppLogger.instance.error('checkForUpdate נכשל${_sqliteDetail(e)}', e, st);
+      AppLogger.instance.error('checkForUpdate נכשל${_errorDetail(e)}', e, st);
+      if (mirrorDamaged) {
+        // כמו במראה חסרה: המסד נקרא לפני שהמראה נכשלה.
+        final local = await _manager.readLocalVersion();
+        localVersion =
+            (local?.hasVersionMeta ?? false) ? local!.dbVersion : null;
+        targetVersion = null;
+      }
     }
     await _refreshChangesNotes(check);
     // הבדיקה עצמה כבר איתרה את הנתיב — גם כשהיא נכשלה אחר כך (למשל אין
@@ -678,7 +699,8 @@ class LibraryModuleController extends ChangeNotifier
       'companionsMissingInMirror=[${_companionNames(unavailableCompanions)}] '
       'companionsInMirror=[${_companionNames(mirroredCompanions)}] '
       'fresh=$isFreshInstall '
-      'mirrorMissing=$mirrorMissing reindex=$hasPendingReindex db=$dbPath',
+      'mirrorMissing=$mirrorMissing mirrorDamaged=$mirrorDamaged '
+      'reindex=$hasPendingReindex db=$dbPath',
     );
     notifyListeners();
   }

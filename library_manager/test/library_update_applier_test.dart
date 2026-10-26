@@ -403,6 +403,8 @@ void main() {
         ]),
       );
       File(dbPath).writeAsStringSync('OLD DB');
+      final sidecar = File(PatchDownloader.resumeSidecarPath(compressedPath))
+        ..writeAsStringSync('token\netag\nverified');
 
       await expectLater(
         applier.applyFullDownload(
@@ -410,13 +412,58 @@ void main() {
           dbPath: dbPath,
         ),
         throwsA(
-          anyOf(isA<ZstdStreamException>(), isA<LibraryApplyException>()),
+          bindings == null
+              ? isA<LibraryApplyException>()
+              : isA<PatchDownloadException>().having(
+                  (e) => e.message,
+                  'message',
+                  AppL10n.strings.libraryDomain.localFileHashMismatch(
+                    compressedPath,
+                  ),
+                ),
         ),
       );
 
       expect(File(dbPath).readAsStringSync(), 'OLD DB');
       expect(File('$dbPath.new').existsSync(), isFalse);
       expect(File('$dbPath.download.zst').existsSync(), isFalse);
+      // issue #127: נכס שנפגם בכונן מאבד את סימון האימות, והמראה עצמה נשארת.
+      expect(File(compressedPath).existsSync(), isTrue);
+      if (bindings != null) expect(sidecar.existsSync(), isFalse);
+    });
+
+    test('כשל משאבים של zstd במסד מלא מקומי אינו "קובץ פגום"', () async {
+      final failing = LibraryUpdateApplier(
+        processGuard: const _FakeGuard(false),
+        streamFile:
+            (
+              sourcePath,
+              destPath, {
+              onProgress,
+              onSourceDigest,
+              onOutputDigest,
+              isCancelled,
+              maxOutputBytes,
+            }) async => throw ZstdResourceException(
+              AppL10n.strings.libraryDomain.zstdContextCreationFailed,
+            ),
+      );
+      addTearDown(failing.dispose);
+      final compressedPath = p.join(tempDir.path, 'seforim.db.zst');
+      File(compressedPath).writeAsBytesSync(Uint8List(8));
+      File(dbPath).writeAsStringSync('OLD DB');
+      final sidecar = File(PatchDownloader.resumeSidecarPath(compressedPath))
+        ..writeAsStringSync('token\netag\nverified');
+
+      await expectLater(
+        failing.applyFullDownload(
+          plan: fullPlanFor(compressedPath),
+          dbPath: dbPath,
+        ),
+        throwsA(isA<ZstdResourceException>()),
+      );
+      expect(File(dbPath).readAsStringSync(), 'OLD DB');
+      expect(sidecar.existsSync(), isTrue);
     });
 
     // הגודל שנכתב מושווה להצהרת כותרת ה-frame, ורק `<` נחשב כשל. ארכיון
@@ -563,6 +610,8 @@ void main() {
         pseudoRandomBytes(4096),
       );
       File(dbPath).writeAsStringSync('OLD DB');
+      final sidecar = File(PatchDownloader.resumeSidecarPath(compressedPath))
+        ..writeAsStringSync('token\netag\nverified');
 
       await expectLater(
         applier.applyFullDownload(
@@ -572,6 +621,9 @@ void main() {
         throwsA(isA<PatchDownloadException>()),
       );
       expect(File(dbPath).readAsStringSync(), 'OLD DB');
+      // issue #127: בלי סימון האימות, ההורדה הבאה מאמתת את הנכס ומחליפה אותו.
+      expect(File(compressedPath).existsSync(), isTrue);
+      expect(sidecar.existsSync(), isFalse);
     });
 
     test('digest בפורמט אחר מתעלמים ממנו במקום להיכשל', () async {
@@ -1790,24 +1842,26 @@ void main() {
         return;
       }
       final h = buildChainHashes();
+      final edge = buildEdge(
+        from: 1,
+        to: 2,
+        upsertRows: [
+          [2, 'bet'],
+        ],
+        fromHash: h.h1,
+        toHash: h.h2,
+        sha256Override: 'f' * 64,
+      );
+      final source = edge.patchFileUrls.values.single;
+      final sidecar = File(PatchDownloader.resumeSidecarPath(source))
+        ..writeAsStringSync('token\netag\nverified');
 
       await expectLater(
         applier.applyDelta(
           plan: LibraryUpdatePlan.delta(
             localVersion: 1,
             targetVersion: 2,
-            steps: [
-              buildEdge(
-                from: 1,
-                to: 2,
-                upsertRows: [
-                  [2, 'bet'],
-                ],
-                fromHash: h.h1,
-                toHash: h.h2,
-                sha256Override: 'f' * 64,
-              ),
-            ],
+            steps: [edge],
           ),
           dbPath: dbPath,
         ),
@@ -1815,9 +1869,7 @@ void main() {
           isA<PatchDownloadException>().having(
             (e) => e.message,
             'message',
-            AppL10n.strings.libraryDomain.checksumMismatch(
-              AppL10n.strings.libraryDomain.compressedFileHashLabel,
-            ),
+            AppL10n.strings.libraryDomain.localFileHashMismatch(source),
           ),
         ),
       );
@@ -1829,7 +1881,58 @@ void main() {
         isFalse,
       );
       expect(hashOf(dbPath), h.h1);
+      expect(File(source).existsSync(), isTrue);
+      expect(sidecar.existsSync(), isFalse);
     });
+
+    test(
+      'patch מקומי שנפגם בכונן (issue #127) — הודעה ברורה ובלי סימון אימות',
+      () async {
+        if (bindings == null) {
+          markTestSkipped('אין ספריית zstd לטעינה בסביבה הזו');
+          return;
+        }
+        final h = buildChainHashes();
+        final edge = buildEdge(
+          from: 1,
+          to: 2,
+          upsertRows: [
+            [2, 'bet'],
+          ],
+          fromHash: h.h1,
+          toHash: h.h2,
+        );
+        final source = edge.patchFileUrls.values.single;
+        // אשכול שנדרס: אותו גודל, תוכן אחר מהבייט הרביעי ואילך.
+        final bytes = File(source).readAsBytesSync();
+        bytes.fillRange(4, bytes.length, 0x5A);
+        File(source).writeAsBytesSync(bytes);
+        final sidecar = File(PatchDownloader.resumeSidecarPath(source))
+          ..writeAsStringSync('token\netag\nverified');
+
+        await expectLater(
+          applier.applyDelta(
+            plan: LibraryUpdatePlan.delta(
+              localVersion: 1,
+              targetVersion: 2,
+              steps: [edge],
+            ),
+            dbPath: dbPath,
+          ),
+          throwsA(
+            isA<PatchDownloadException>().having(
+              (e) => e.message,
+              'message',
+              AppL10n.strings.libraryDomain.localFileHashMismatch(source),
+            ),
+          ),
+        );
+
+        expect(hashOf(dbPath), h.h1);
+        expect(File(source).existsSync(), isTrue);
+        expect(sidecar.existsSync(), isFalse);
+      },
+    );
 
     test(
       'patch מקומי שמתנפח מעבר ל-uncompressedSize נעצר בתקרה ונדחה',
@@ -1841,24 +1944,26 @@ void main() {
         final h = buildChainHashes();
         const limit = 1024;
         final strings = AppL10n.strings.libraryDomain;
+        final edge = buildEdge(
+          from: 1,
+          to: 2,
+          upsertRows: [
+            [2, 'bet'],
+          ],
+          fromHash: h.h1,
+          toHash: h.h2,
+          uncompressedSizeOverride: limit,
+        );
+        final sidecar = File(
+          PatchDownloader.resumeSidecarPath(edge.patchFileUrls.values.single),
+        )..writeAsStringSync('token\netag\nverified');
 
         await expectLater(
           applier.applyDelta(
             plan: LibraryUpdatePlan.delta(
               localVersion: 1,
               targetVersion: 2,
-              steps: [
-                buildEdge(
-                  from: 1,
-                  to: 2,
-                  upsertRows: [
-                    [2, 'bet'],
-                  ],
-                  fromHash: h.h1,
-                  toHash: h.h2,
-                  uncompressedSizeOverride: limit,
-                ),
-              ],
+              steps: [edge],
             ),
             dbPath: dbPath,
           ),
@@ -1882,8 +1987,59 @@ void main() {
           isFalse,
         );
         expect(hashOf(dbPath), h.h1);
+        expect(sidecar.existsSync(), isFalse);
       },
     );
+
+    test('כשל משאבים של zstd בפאץ\' מקומי אינו "קובץ פגום"', () async {
+      if (bindings == null) {
+        markTestSkipped('אין ספריית zstd לטעינה בסביבה הזו');
+        return;
+      }
+      final h = buildChainHashes();
+      final edge = buildEdge(
+        from: 1,
+        to: 2,
+        upsertRows: [
+          [2, 'bet'],
+        ],
+        fromHash: h.h1,
+        toHash: h.h2,
+      );
+      final sidecar = File(
+        PatchDownloader.resumeSidecarPath(edge.patchFileUrls.values.single),
+      )..writeAsStringSync('token\netag\nverified');
+      final failing = LibraryUpdateApplier(
+        processGuard: const _FakeGuard(false),
+        streamFile:
+            (
+              sourcePath,
+              destPath, {
+              onProgress,
+              onSourceDigest,
+              onOutputDigest,
+              isCancelled,
+              maxOutputBytes,
+            }) async => throw ZstdResourceException(
+              AppL10n.strings.libraryDomain.zstdContextCreationFailed,
+            ),
+      );
+      addTearDown(failing.dispose);
+
+      await expectLater(
+        failing.applyDelta(
+          plan: LibraryUpdatePlan.delta(
+            localVersion: 1,
+            targetVersion: 2,
+            steps: [edge],
+          ),
+          dbPath: dbPath,
+        ),
+        throwsA(isA<ZstdResourceException>()),
+      );
+      expect(sidecar.existsSync(), isTrue);
+      expect(hashOf(dbPath), h.h1);
+    });
 
     test('ביטול בזמן חילוץ patch מקומי מדווח כביטול, והמחולץ נמחק', () async {
       if (bindings == null) {

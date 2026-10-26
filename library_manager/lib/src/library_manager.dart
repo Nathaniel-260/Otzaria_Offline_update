@@ -46,6 +46,18 @@ class LibraryMirrorMissingException implements Exception {
   String toString() => AppL10n.strings.libraryDomain.mirrorMissing;
 }
 
+/// `releases.json` קיים אך אינו קריא — כונן שמערכת הקבצים שלו נפגמה (issue
+/// #127). רק הורדה מחדש במחשב המקוון כותבת אותו מחדש; [detail] הולך ללוג.
+class LibraryMirrorDamagedException implements Exception {
+  const LibraryMirrorDamagedException(this.mirrorDir, this.detail);
+
+  final String mirrorDir;
+  final String detail;
+
+  @override
+  String toString() => AppL10n.strings.libraryDomain.mirrorDamaged;
+}
+
 /// מה [LibraryManager.downloadToMirror] הביא בפועל — קיים כדי שמצב "עדכון
 /// אישי" לא יהיה שקוף: משתמש שהפעיל אותו וגרסתו לא זוהתה מקבל בכל זאת מסד
 /// מלא, וזה צריך להיאמר.
@@ -53,6 +65,7 @@ class MirrorDownloadOutcome {
   const MirrorDownloadOutcome({
     this.personalFromVersion,
     this.upToDate = false,
+    this.repairedDamagedMirror = false,
   });
 
   /// הגרסה שממנה ירדו קובצי העדכון במצב אישי. `null` = ירד המסד המלא —
@@ -61,6 +74,9 @@ class MirrorDownloadOutcome {
 
   /// מצב אישי שבו אין במקור גרסה חדשה מזו שמותקנת — המראה לא נגעה.
   final bool upToDate;
+
+  /// מצב אישי "מעודכן" עם `releases.json` פגום — המראה נבנתה מחדש במסלול המלא.
+  final bool repairedDamagedMirror;
 }
 
 /// נקודת הכניסה היחידה שמודול ה-UI אמור להשתמש בה כדי **לבדוק** גרסת מסד
@@ -312,6 +328,23 @@ class LibraryManager {
     p.join(mirrorDir, LocalMirrorLibraryReleaseClient.manifestFileName),
   ).exists();
 
+  Future<bool> _mirrorManifestDamaged() async {
+    if (!await hasMirror) return false;
+    try {
+      await LocalMirrorLibraryReleaseClient(
+        mirrorDir: mirrorDir,
+      ).fetchReleases();
+      return false;
+    } catch (e) {
+      if (_isDamagedManifestError(e)) return true;
+      rethrow;
+    }
+  }
+
+  // שדה מסוג שגוי בתוך JSON תקין נופל ב-cast, לא ב-LocalMirrorException.
+  static bool _isDamagedManifestError(Object e) =>
+      e is LocalMirrorException || e is TypeError || e is FormatException;
+
   Future<MirrorDownloadOutcome> downloadToMirror({
     bool includeSemanticSearch = false,
     void Function(String stage)? onStage,
@@ -335,30 +368,46 @@ class LibraryManager {
 
     var exported = true;
     var exportFailed = false;
-    final exporter = LibraryMirrorExporter(
-      supportedDbSchemaVersion: kSupportedDbSchemaVersion,
-      client: _cloudClient,
-      scheduler: _scheduler,
-    );
+    var repaired = false;
 
-    final exportFuture = () async {
+    Future<bool> runExport(int? from) async {
+      final exporter = LibraryMirrorExporter(
+        supportedDbSchemaVersion: kSupportedDbSchemaVersion,
+        client: _cloudClient,
+        scheduler: _scheduler,
+      );
       try {
-        exported = await exporter.export(
+        return await exporter.export(
           destDir: mirrorDir,
           allowPrerelease: allowPrerelease,
-          fromVersion: fromVersion,
+          fromVersion: from,
           onStage: onStage,
           onAssetProgress: onAssetProgress,
           onBytesProgress: exportBytes.report,
           onWarning: onWarning,
           isCancelled: isCancelled,
         );
+      } finally {
+        exporter.dispose();
+      }
+    }
+
+    final exportFuture = () async {
+      try {
+        exported = await runExport(fromVersion);
+        // ייצוא אישי "מעודכן" אינו כותב את releases.json, ולכן מראה פגומה
+        // מתוקנת אז רק בייצוא מלא.
+        if (!exported && await _mirrorManifestDamaged()) {
+          onStage?.call(
+            AppL10n.strings.libraryDomain.exportPersonalMirrorDamaged,
+          );
+          exported = await runExport(null);
+          repaired = true;
+        }
       } catch (_) {
         exportFailed = true;
         _cloudClient.forgetReleases();
         rethrow;
-      } finally {
-        exporter.dispose();
       }
     }();
 
@@ -433,8 +482,9 @@ class LibraryManager {
     }
 
     return MirrorDownloadOutcome(
-      personalFromVersion: fromVersion,
+      personalFromVersion: repaired ? null : fromVersion,
       upToDate: !exported,
+      repairedDamagedMirror: repaired,
     );
   }
 
@@ -644,7 +694,13 @@ class LibraryManager {
     }
 
     final source = await _resolveSource();
-    final releases = await source.fetchReleases();
+    final List<LibraryRelease> releases;
+    try {
+      releases = await source.fetchReleases();
+    } catch (e) {
+      if (!_isDamagedManifestError(e)) rethrow;
+      throw LibraryMirrorDamagedException(mirrorDir, '$e');
+    }
     final discoverer = OfflineLibraryUpdateDiscovery(
       supportedDbSchemaVersion: kSupportedDbSchemaVersion,
       client: _FetchedReleasesSource(source, releases),

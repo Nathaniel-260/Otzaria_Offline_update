@@ -69,6 +69,51 @@ void main() {
       expect(controller.localVersion, 18);
     });
 
+    test('releases.json פגום — הודעה ברורה, וההורדה ברשת מוצעת (issue #127)',
+        () async {
+      final releases = File(
+        p.join(tempDir.path, 'mirror', 'library', 'releases.json'),
+      )..parent.createSync(recursive: true);
+      releases.writeAsBytesSync([0x52, 0x49, 0x46, 0x46, 0xFF, 0xFE, 0x00]);
+
+      await controller.setCustomDbPath(_dbWithVersion(tempDir, 'picked', 32));
+
+      expect(controller.status, LibraryModuleStatus.error);
+      expect(controller.mirrorDamaged, isTrue);
+      expect(
+        controller.errorMessage,
+        AppL10n.strings.libraryDomain.mirrorDamaged,
+      );
+      expect(controller.localVersion, 32);
+
+      // גרסה ישנה שנשארה מבדיקה קודמת אינה "הכונן כבר מחזיק את 32".
+      controller.targetVersion = 32;
+      controller.onlineLatestVersion = 32;
+      controller.onlineCheckedAt = DateTime.now();
+      expect(controller.hasOnlineUpdate, isTrue);
+    });
+
+    test('mirrorDamaged נשאר דלוק בזמן בדיקה חוזרת, ואין גרסת יעד', () async {
+      controller.dispose();
+      final manager = _DamagedMirrorManager(tempDir.path);
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        manager: manager,
+      );
+      controller.targetVersion = 31;
+      await controller.checkForUpdate();
+      expect(controller.mirrorDamaged, isTrue);
+      expect(controller.targetVersion, isNull);
+
+      final gate = manager.gate = Completer<void>();
+      final recheck = controller.checkForUpdate();
+      await manager.entered.future;
+      expect(controller.mirrorDamaged, isTrue);
+      gate.complete();
+      await recheck;
+      expect(controller.mirrorDamaged, isTrue);
+    });
+
     void useShortBusyTimeout() {
       controller.dispose();
       controller = LibraryModuleController(
@@ -391,6 +436,25 @@ void main() {
         expect(controller.hasOnlineUpdate, remaining.isNotEmpty);
       });
     }
+
+    test('מראה פגומה שתוקנה במצב אישי נאמרת בהערת ההורדה', () async {
+      controller.dispose();
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        manager: _DownloadManager(
+          tempDir.path,
+          const {},
+          outcome: const MirrorDownloadOutcome(repairedDamagedMirror: true),
+        ),
+      )..personalUpdateMode = true;
+
+      await controller.download();
+
+      expect(
+        controller.personalDownloadNote,
+        LibraryPersonalDownloadNote.mirrorRepaired,
+      );
+    });
   });
 
   group('downloadProgress — חישוב המד', () {
@@ -1087,6 +1151,22 @@ class _ApplyManager extends LibraryManager {
   }
 }
 
+class _DamagedMirrorManager extends LibraryManager {
+  _DamagedMirrorManager(String dataDir) : super(dataDir: dataDir);
+
+  Completer<void>? gate;
+  final entered = Completer<void>();
+
+  @override
+  Future<LibraryUpdateCheckResult> checkForUpdate() async {
+    if (gate case final gate?) {
+      entered.complete();
+      await gate.future;
+    }
+    throw LibraryMirrorDamagedException(mirrorDir, 'releases.json');
+  }
+}
+
 class _NeedsNewerOtzariaManager extends LibraryManager {
   _NeedsNewerOtzariaManager(String dataDir) : super(dataDir: dataDir);
 
@@ -1114,9 +1194,14 @@ class _NeedsNewerOtzariaManager extends LibraryManager {
 }
 
 class _DownloadManager extends LibraryManager {
-  _DownloadManager(String dataDir, this.remaining) : super(dataDir: dataDir);
+  _DownloadManager(
+    String dataDir,
+    this.remaining, {
+    this.outcome = const MirrorDownloadOutcome(),
+  }) : super(dataDir: dataDir);
 
   final Set<CompanionAsset> remaining;
+  final MirrorDownloadOutcome outcome;
   bool downloaded = false;
 
   @override
@@ -1145,7 +1230,7 @@ class _DownloadManager extends LibraryManager {
     bool Function()? isCancelled,
   }) async {
     downloaded = true;
-    return const MirrorDownloadOutcome();
+    return outcome;
   }
 }
 

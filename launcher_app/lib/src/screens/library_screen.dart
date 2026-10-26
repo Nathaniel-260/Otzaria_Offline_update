@@ -387,6 +387,8 @@ class LibraryScreen extends StatelessWidget {
                 t.downloadNotePersonalUnknownVersion,
               LibraryPersonalDownloadNote.upToDate =>
                 t.downloadNotePersonalUpToDate('${c.personalFromVersion}'),
+              LibraryPersonalDownloadNote.mirrorRepaired =>
+                t.downloadNotePersonalMirrorRepaired,
             },
           ),
       ],

@@ -406,6 +406,7 @@ abstract class LibraryScreenStrings {
   String get downloadNoteTitle;
   String downloadNotePersonal(String version);
   String get downloadNotePersonalUnknownVersion;
+  String get downloadNotePersonalMirrorRepaired;
   String downloadNotePersonalUpToDate(String version);
 }
 
@@ -1139,6 +1140,7 @@ abstract class LibraryDomainStrings {
   String exportPersonalFrom(int localVersion);
   String exportPersonalUpToDate(int localVersion);
   String get exportPersonalVersionUnknown;
+  String get exportPersonalMirrorDamaged;
 
   /// המסד המלא שכבר במראה נשמר, כי יש ממנו מסלול patches לגרסה האחרונה.
   String exportReusingFullDb(int version, String tag);
@@ -1340,6 +1342,7 @@ abstract class LibraryDomainStrings {
 
   // library_manager
   String get mirrorMissing;
+  String get mirrorDamaged;
   String interruptedUpdateCorruptDb(String detail);
   String get interruptedUpdateDefaultDetail;
   String get blockedNeedsManualAction;

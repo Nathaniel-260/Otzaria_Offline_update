@@ -11,7 +11,7 @@ import 'package:library_manager/src/services/recent_library_releases_client.dart
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:path/path.dart' as p;
 import 'package:seforim_library_updater/seforim_library_updater.dart'
-    show LibraryRelease;
+    show LibraryRelease, LocalMirrorLibraryReleaseClient;
 
 const _libraryReleasesPath = '/repos/Otzaria/SeforimLibrary/releases';
 const _talmudPath = '/repos/Otzaria/otzaria-library/releases/latest';
@@ -418,6 +418,78 @@ void main() {
         expect(github.count(_libraryReleasesPath), 2);
       });
     });
+
+    test('personal mode repairs a damaged releases.json with a full export '
+        '(issue #127)', () async {
+      await online(() async {
+        await LibraryStateStore(
+          p.join(dataDir, 'library_state.json'),
+        ).recordKnownDbVersion(await LibraryStateStore.currentMachineKey(), 2);
+        final manager = LibraryManager(
+          dataDir: dataDir,
+          personalUpdateMode: true,
+        );
+        addTearDown(manager.dispose);
+        final releases = File(p.join(manager.mirrorDir, 'releases.json'));
+        await releases.parent.create(recursive: true);
+        await releases.writeAsBytes([0x52, 0x49, 0x46, 0x46, 0xFF, 0xFE]);
+        final stages = <String>[];
+
+        final outcome = await manager.downloadToMirror(onStage: stages.add);
+
+        expect(outcome.upToDate, isFalse);
+        expect(outcome.repairedDamagedMirror, isTrue);
+        expect(outcome.personalFromVersion, isNull);
+        expect(
+          stages,
+          contains(AppL10n.strings.libraryDomain.exportPersonalMirrorDamaged),
+        );
+        expect(
+          await LocalMirrorLibraryReleaseClient(
+            mirrorDir: manager.mirrorDir,
+          ).fetchReleases(),
+          isNotEmpty,
+        );
+      });
+    });
+
+    for (final personal in [true, false]) {
+      test('a damaged releases.json behind latest is rewritten by the usual '
+          'export (personal: $personal)', () async {
+        await online(() async {
+          github.libraryTo = 3;
+          await LibraryStateStore(
+            p.join(dataDir, 'library_state.json'),
+          ).recordKnownDbVersion(
+            await LibraryStateStore.currentMachineKey(),
+            2,
+          );
+          final manager = LibraryManager(
+            dataDir: dataDir,
+            personalUpdateMode: personal,
+          );
+          addTearDown(manager.dispose);
+          final releases = File(p.join(manager.mirrorDir, 'releases.json'));
+          await releases.parent.create(recursive: true);
+          await releases.writeAsBytes([0x52, 0x49, 0x46, 0x46, 0xFF, 0xFE]);
+
+          final outcome = await manager.downloadToMirror();
+
+          expect(outcome.repairedDamagedMirror, isFalse);
+          expect(outcome.personalFromVersion, personal ? 2 : isNull);
+          expect(
+            github.requests.any((u) => u.path.endsWith('/seforim.db.zst')),
+            !personal,
+          );
+          expect(
+            await LocalMirrorLibraryReleaseClient(
+              mirrorDir: manager.mirrorDir,
+            ).fetchReleases(),
+            isNotEmpty,
+          );
+        });
+      });
+    }
 
     test('personal mode already up to date takes the smart-search tag from the '
         'same list', () async {

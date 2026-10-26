@@ -633,6 +633,10 @@ class _LibraryScreen extends LibraryScreenStrings {
       'עדכון אישי מופעל, אך לא זוהתה גרסת מסד מקומית — הורד המסד המלא. '
       'הפעילו את התוכנה פעם אחת במחשב שבו אוצריא מותקנת.';
   @override
+  String get downloadNotePersonalMirrorRepaired =>
+      'עדכון אישי מופעל, אך עדכוני הספרייה שבתיקייה היו פגומים — התיקייה '
+      'נבנתה מחדש עם המסד המלא.';
+  @override
   String downloadNotePersonalUpToDate(String version) =>
       'עדכון אישי — גרסה $version היא האחרונה, אין מה להוריד';
 }
@@ -1903,6 +1907,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get exportPersonalVersionUnknown =>
       'לא זוהתה גרסת מסד מקומית — מוריד את המסד המלא';
   @override
+  String get exportPersonalMirrorDamaged =>
+      'עדכוני הספרייה שבתיקייה פגומים — מוריד את המסד המלא';
+  @override
   String exportReusingFullDb(int version, String tag) =>
       'המסד המלא שכבר בתיקייה (גרסה $version, $tag) נשמר — יש ממנו מסלול '
       'קובצי עדכון לגרסה האחרונה, ולכן אין צורך להוריד אותו שוב';
@@ -2177,7 +2184,9 @@ class _LibraryDomain extends LibraryDomainStrings {
   String fullDbSizeMismatch(int downloaded, int expected) =>
       'גודל ה-DB שהורד ($downloaded) אינו תואם לצפוי ($expected)';
   @override
-  String get fullDbHashMismatch => 'sha256 של ה-DB המלא אינו תואם';
+  String get fullDbHashMismatch =>
+      'הקובץ שהורד נפגם (sha256 אינו תואם) ונמחק — יש להוריד שוב. אם זה '
+      'חוזר, ייתכן שהכונן תקול: כדאי לבדוק אותו לשגיאות או להחליף אותו.';
   @override
   String resumeRoundLimit(int maxRounds, String url) =>
       'חידוש ההורדה חרג ממספר הסבבים המרבי ($maxRounds): $url';
@@ -2229,7 +2238,8 @@ class _LibraryDomain extends LibraryDomainStrings {
       'גודל הקובץ המקומי אינו תואם: צפוי $expected, בפועל $actual ($url)';
   @override
   String localFileHashMismatch(String url) =>
-      'sha256 של הקובץ המקומי אינו תואם: $url';
+      'הקובץ שבכונן פגום ולא ניתן להשתמש בו: $url — יש להוריד שוב במחשב עם '
+      'חיבור לאינטרנט. אם זה חוזר, ייתכן שהכונן תקול.';
   @override
   String get manifestMissingPatchFormatVersion =>
       'שדה חובה חסר במניפסט של schema 4+: patchFormatVersion';
@@ -2289,6 +2299,12 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get mirrorMissing =>
       'עדיין לא הורדו עדכוני ספרייה לתיקייה המקומית — יש להריץ הורדה במחשב '
       'עם חיבור לאינטרנט.';
+  @override
+  String get mirrorDamaged =>
+      'עדכוני הספרייה שבתיקייה המקומית פגומים ולא ניתן לקרוא אותם — בדרך כלל '
+      'כונן שנשלף בלי "הוצאה בטוחה" או כונן תקול. יש להריץ הורדה שוב במחשב '
+      'עם חיבור לאינטרנט; אם זה חוזר, כדאי לבדוק את הכונן לשגיאות או להחליף '
+      'אותו.';
   @override
   String interruptedUpdateCorruptDb(String detail) =>
       '$detail — המסד נכשל בבדיקת quick_check, ולכן יש להחליף אותו '

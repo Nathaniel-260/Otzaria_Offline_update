@@ -675,6 +675,10 @@ class _LibraryScreen extends LibraryScreenStrings {
       'full database was downloaded. Run this program once on the computer '
       'where Otzaria is installed.';
   @override
+  String get downloadNotePersonalMirrorRepaired =>
+      'Personal update is on, but the library updates in the folder were '
+      'damaged — the folder was rebuilt with the full database.';
+  @override
   String downloadNotePersonalUpToDate(String version) =>
       'Personal update — version $version is the latest, nothing to download';
 }
@@ -2030,6 +2034,10 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get exportPersonalVersionUnknown =>
       'No local database version was detected — downloading the full database';
   @override
+  String get exportPersonalMirrorDamaged =>
+      'The library updates in the folder are damaged — downloading the full '
+      'database';
+  @override
   String exportReusingFullDb(int version, String tag) =>
       'Keeping the full database already in the folder (version $version, '
       '$tag) — update files can carry it to the latest version, so there is '
@@ -2341,7 +2349,9 @@ class _LibraryDomain extends LibraryDomainStrings {
       'expected size ($expected)';
   @override
   String get fullDbHashMismatch =>
-      'The sha256 of the full database does not match';
+      'The downloaded file is damaged (sha256 mismatch) and was deleted — '
+      'download again. If it keeps happening, the drive may be faulty: check '
+      'it for errors or replace it.';
   @override
   String resumeRoundLimit(int maxRounds, String url) =>
       'Resuming the download passed the maximum number of rounds '
@@ -2396,7 +2406,9 @@ class _LibraryDomain extends LibraryDomainStrings {
       '($url)';
   @override
   String localFileHashMismatch(String url) =>
-      'The sha256 of the local file does not match: $url';
+      'The file on the drive is damaged and cannot be used: $url — download '
+      'again on a computer with internet. If it keeps happening, the drive '
+      'may be faulty.';
   @override
   String get manifestMissingPatchFormatVersion =>
       'Required manifest field is missing for schema 4+: patchFormatVersion';
@@ -2464,6 +2476,12 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get mirrorMissing =>
       'No library updates have been downloaded into the local folder yet — '
       'run a download on a computer with internet.';
+  @override
+  String get mirrorDamaged =>
+      'The library updates in the local folder are damaged and cannot be '
+      'read — usually a drive that was unplugged without "Safely Remove" or '
+      'a faulty drive. Run the download again on a computer with internet; '
+      'if it keeps happening, check the drive for errors or replace it.';
   @override
   String interruptedUpdateCorruptDb(String detail) =>
       '$detail — the database failed quick_check, so it must be replaced by '

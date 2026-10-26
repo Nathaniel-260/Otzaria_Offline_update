@@ -367,9 +367,8 @@ class LibraryUpdateApplier {
       );
       if (!streamed) return null;
       if (sourceDigest?.toLowerCase() != patchFile.sha256.toLowerCase()) {
-        throw PatchDownloadException(
-          strings.checksumMismatch(strings.compressedFileHashLabel),
-        );
+        _forgetMirrorVerification(sourcePath);
+        throw PatchDownloadException(strings.localFileHashMismatch(sourcePath));
       }
       if (outputBytes != patchFile.uncompressedSize) {
         throw PatchDownloadException(
@@ -390,7 +389,15 @@ class LibraryUpdateApplier {
     } on ZstdOutputLimitExceeded catch (e) {
       _deleteQuietly(extractedPath);
       _throwIfCancelled(isCancelled);
+      _forgetMirrorVerification(sourcePath);
       throw PatchDownloadException(e.message);
+    } on ZstdStreamException catch (e) {
+      // קובץ שנפגם בכונן נופל כאן, לפני השוואת ה-sha256.
+      _deleteQuietly(extractedPath);
+      _throwIfCancelled(isCancelled);
+      if (!_isCorruptSource(e)) rethrow;
+      _forgetMirrorVerification(sourcePath);
+      throw PatchDownloadException(strings.localFileHashMismatch(sourcePath));
     } catch (_) {
       _deleteQuietly(extractedPath);
       _throwIfCancelled(isCancelled);
@@ -544,6 +551,7 @@ class LibraryUpdateApplier {
       }
       if (verifiesWhileExtracting &&
           sourceDigest?.toLowerCase() != expectedSha256.toLowerCase()) {
+        _forgetMirrorVerification(compressedPath);
         throw PatchDownloadException(
           AppL10n.strings.libraryDomain.localFileHashMismatch(compressedPath),
         );
@@ -555,6 +563,13 @@ class LibraryUpdateApplier {
       if (_isFileTooLargeError(e)) {
         throw LibraryApplyException(
           AppL10n.strings.libraryDomain.fileTooLargeForVolume(dir.path),
+        );
+      }
+      // קובץ שנפגם בכונן נופל בחילוץ, לפני השוואת ה-sha256.
+      if (isLocalSource && _isCorruptSource(e)) {
+        _forgetMirrorVerification(compressedPath);
+        throw PatchDownloadException(
+          AppL10n.strings.libraryDomain.localFileHashMismatch(compressedPath),
         );
       }
       rethrow;
@@ -881,6 +896,17 @@ class LibraryUpdateApplier {
     if (digest == null || !digest.startsWith(prefix)) return null;
     return digest.substring(prefix.length);
   }
+
+  /// נכס במראה שנכשל ב-sha256: בלי סימון האימות שלידו, ההורדה הבאה במחשב
+  /// המקוון מאמתת אותו מחדש ומחליפה אותו — אחרת גודל ו-mtime זהים מדלגים עליו.
+  void _forgetMirrorVerification(String mirrorPath) =>
+      _deleteQuietly(PatchDownloader.resumeSidecarPath(mirrorPath));
+
+  /// כשל zstd שמקורו בתוכן הקובץ — לא תקרת פלט ולא כשל משאבים.
+  static bool _isCorruptSource(Object e) =>
+      e is ZstdStreamException &&
+      e is! ZstdOutputLimitExceeded &&
+      e is! ZstdResourceException;
 
   void _deleteQuietly(String path) {
     try {

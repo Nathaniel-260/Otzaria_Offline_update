@@ -345,6 +345,45 @@ void main() {
         manager.dispose();
       });
     });
+
+    // issue #127: כונן שמערכת הקבצים שלו נפגמה — בייטים שאינם UTF-8 בכלל.
+    for (final (name, bytes) in [
+      ('בייטים שאינם UTF-8', [0x52, 0x49, 0x46, 0x46, 0xFF, 0xFE, 0x00, 0xC3]),
+      ('JSON בצורה לא צפויה', utf8.encode('[1, 2]')),
+      (
+        'שדה מסוג שגוי',
+        utf8.encode('{"releases": [{"tag": 5, "assets": []}]}'),
+      ),
+    ]) {
+      test(
+        'releases.json פגום ($name) — LibraryMirrorDamagedException',
+        () async {
+          await Directory(mirrorDir).create(recursive: true);
+          await File(p.join(mirrorDir, 'releases.json')).writeAsBytes(bytes);
+
+          await _withoutNetwork((_) async {
+            final manager = hermeticManager();
+            addTearDown(manager.dispose);
+            AppL10n.use(AppLanguage.english);
+            await expectLater(
+              manager.checkForUpdate(),
+              throwsA(
+                isA<LibraryMirrorDamagedException>()
+                    .having((e) => e.mirrorDir, 'mirrorDir', manager.mirrorDir)
+                    .having((e) => e.detail, 'detail', isNotEmpty)
+                    .having(
+                      (e) => e.toString(),
+                      'toString',
+                      AppL10n.stringsFor(
+                        AppLanguage.english,
+                      ).libraryDomain.mirrorDamaged,
+                    ),
+              ),
+            );
+          });
+        },
+      );
+    }
   });
 
   group('checkForUpdate — קורא מהמראה בלבד', () {
