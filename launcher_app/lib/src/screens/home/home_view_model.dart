@@ -109,6 +109,8 @@ class HomeViewModel {
     this.checkBlocked = false,
     this.launcher,
     this.driveName,
+    this.contactName = '',
+    this.contactPhone = '',
   });
 
   final HomeGuidance guidance;
@@ -235,6 +237,12 @@ class HomeViewModel {
 
   /// "E:" — שם הכונן שהכלי רץ ממנו, כשיש כזה.
   final String? driveName;
+
+  /// "לעזרה במקום" מהשאלות הנפוצות, כבר בלי רווחים בקצוות.
+  final String contactName;
+  final String contactPhone;
+
+  bool get hasContact => contactName.isNotEmpty || contactPhone.isNotEmpty;
 
   bool get readOnly => guidance.readOnly;
   bool get driveFull => guidance.driveFull;
@@ -397,6 +405,8 @@ HomeViewModel homeViewModelOf(AppSession s) {
     checkBlocked: s.checkNowBlocked,
     launcher: launcher,
     driveName: driveNameOf(s.dataDir),
+    contactName: s.faq.value.contactName.trim(),
+    contactPhone: s.faq.value.contactPhone.trim(),
   );
 }
 

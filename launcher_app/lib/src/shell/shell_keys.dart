@@ -53,6 +53,7 @@ abstract final class ShellKeys {
   static const checkNow = ValueKey('home.foot.checkNow');
   static const driveLine = ValueKey('home.foot.drive');
   static const driveLockedChip = ValueKey('home.foot.driveLocked');
+  static const homeContact = ValueKey('home.contact');
 
   static const welcome = ValueKey('home.welcome');
   static const welcomePrimary = ValueKey('home.welcome.primary');

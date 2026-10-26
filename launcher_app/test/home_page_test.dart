@@ -1232,6 +1232,65 @@ void main() {
       expect(checkNow.left, closeTo(bar.left + 16, 1));
     });
 
+    testWidgets('"לעזרה במקום" בתחתית הבית, מתחת לאריחים — רק כשהוגדר', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(const GuidanceFacts(online: true)),
+            installedVersion: '0.10.4',
+            contactName: 'ר׳ ישראל',
+            contactPhone: '050-0000000',
+          ),
+        ),
+      );
+      final contact = find.byKey(ShellKeys.homeContact);
+      await tester.scrollUntilVisible(contact, 200);
+      expect(
+        find.descendant(of: contact, matching: find.text(he.faq.contactLead)),
+        findsOneWidget,
+      );
+      final phone = find.descendant(
+        of: contact,
+        matching: find.text('050-0000000'),
+      );
+      expect(tester.widget<Text>(phone).textDirection, TextDirection.ltr);
+      final tiles = find.byKey(
+        ShellKeys.tile(ShellSection.library),
+        skipOffstage: false,
+      );
+      expect(
+        tester.getRect(contact).top,
+        greaterThanOrEqualTo(tester.getRect(tiles).bottom),
+      );
+      // מעל שורת המצב, לא בתוכה.
+      expect(
+        find.descendant(
+          of: find.byKey(ShellKeys.statusBar),
+          matching: contact,
+        ),
+        findsNothing,
+      );
+
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(const GuidanceFacts(online: true)),
+            installedVersion: '0.10.4',
+          ),
+        ),
+      );
+      // עד סוף הרשימה — רשימה עצלה לא בונה מה שמחוץ לחלון.
+      await tester.drag(find.byType(ListView), const Offset(0, -3000));
+      await tester.pumpAndSettle();
+      expect(tiles, findsOneWidget);
+      expect(
+          find.byKey(ShellKeys.homeContact, skipOffstage: false), findsNothing);
+    });
+
     testWidgets('כונן מוגן: שבב אדום עם מנעול ליד הכונן, ובלי מוגן — אין שבב', (
       tester,
     ) async {

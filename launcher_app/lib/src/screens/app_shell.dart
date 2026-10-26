@@ -491,6 +491,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       listenable: Listenable.merge([
         s.errorReports,
         if (s.appReports != null) s.appReports!,
+        s.faq,
       ]),
       builder: (context, _) {
         final model = homeViewModelOf(s);

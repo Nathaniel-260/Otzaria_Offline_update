@@ -380,6 +380,28 @@ void main() {
       expect(find.text('ר׳ ישראל'), findsOneWidget);
       expect(find.text('050-0000000'), findsOneWidget);
     });
+
+    testWidgets('איש הקשר בראש דף העזרה, לפני השאלות', (tester) async {
+      await tester.runAsync(
+        () => faq.update(const FaqCustomization(
+          contactName: 'ר׳ ישראל',
+          contactPhone: '050-0000000',
+        )),
+      );
+      await pumpBody(tester);
+
+      final contact = find.byKey(const ValueKey('faq.contact'));
+      expect(contact, findsOneWidget);
+      expect(
+        find.descendant(of: contact, matching: find.text('050-0000000')),
+        findsOneWidget,
+      );
+      final firstGroup = find.text(faqGroups(stringsOf()).first.title);
+      expect(
+        tester.getRect(contact).bottom,
+        lessThan(tester.getRect(firstGroup).top),
+      );
+    });
   });
 
   group('השמירה לדיסק', () {

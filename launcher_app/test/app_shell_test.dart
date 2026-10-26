@@ -1949,6 +1949,14 @@ void main() {
         ),
       );
     });
+
+    test('הבית נבנה מחדש כשאיש הקשר שבעזרה משתנה', () {
+      expect(
+        shellSource,
+        contains('        if (s.appReports != null) s.appReports!,\n'
+            '        s.faq,\n'),
+      );
+    });
   });
 
   group('מצב סייפר — הכניסה להגדרות', () {

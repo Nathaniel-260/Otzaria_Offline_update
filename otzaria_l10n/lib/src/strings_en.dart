@@ -2452,6 +2452,9 @@ class _Faq extends FaqStrings {
   String get contactTitle => 'Help on site';
 
   @override
+  String get contactLead => 'Help on site:';
+
+  @override
   String get editButton => 'Edit';
   @override
   String get editDoneButton => 'Done';

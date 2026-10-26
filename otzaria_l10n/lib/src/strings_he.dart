@@ -2347,6 +2347,9 @@ class _Faq extends FaqStrings {
   String get contactTitle => 'לעזרה במקום';
 
   @override
+  String get contactLead => 'לעזרה במקום:';
+
+  @override
   String get editButton => 'עריכה';
   @override
   String get editDoneButton => 'סיום עריכה';

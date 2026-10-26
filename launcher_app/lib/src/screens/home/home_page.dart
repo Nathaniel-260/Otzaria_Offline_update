@@ -173,6 +173,11 @@ class HomePage extends StatelessWidget {
                 ] else
                   SectionLabel(context.strings.guide.tilesLabel),
                 _Tiles(model: model, onOpen: actions.onOpenSection),
+                if (model.hasContact)
+                  _ContactLine(
+                    name: model.contactName,
+                    phone: model.contactPhone,
+                  ),
               ],
             ),
           ),
@@ -1836,6 +1841,41 @@ class _Tile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// "לעזרה במקום" בתחתית הבית: שורה שקטה אחת, כדי לא להתחרות בגיבור.
+class _ContactLine extends StatelessWidget {
+  const _ContactLine({required this.name, required this.phone});
+
+  final String name;
+  final String phone;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final style = AppTextStyles.meta.copyWith(color: cs.onSurfaceVariant);
+    return Padding(
+      key: ShellKeys.homeContact,
+      padding: const EdgeInsets.only(top: 24),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Icon(FluentIcons.person_16_regular, size: 16, color: cs.primary),
+          Text(context.strings.faq.contactLead, style: style),
+          if (name.isNotEmpty)
+            Text(name, style: style.copyWith(color: cs.onSurface)),
+          if (phone.isNotEmpty)
+            Text(
+              phone,
+              textDirection: TextDirection.ltr,
+              style: style.copyWith(color: cs.onSurface),
+            ),
+        ],
       ),
     );
   }

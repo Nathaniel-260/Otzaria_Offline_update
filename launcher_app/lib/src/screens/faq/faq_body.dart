@@ -225,6 +225,12 @@ class _FaqBodyState extends State<FaqBody> {
     final t = context.strings.faq;
     final groups = faqGroups(context.strings, custom: _custom);
     return [
+      // רק למי שמילא פרטים, ובראש הדף: אדם שאפשר להתקשר אליו עוזר יותר מכל
+      // תשובה כתובה. "אפשר לפנות אלינו" בלי לומר למי אינו עוזר לאיש.
+      if (_custom.hasContact) ...[
+        SectionLabel(t.contactTitle),
+        _ContactCard(key: const ValueKey('faq.contact'), custom: _custom),
+      ],
       for (final group in groups) ...[
         SectionLabel(group.title),
         for (final entry in group.entries)
@@ -235,11 +241,6 @@ class _FaqBodyState extends State<FaqBody> {
               () => _openKey = _openKey == entry.id ? null : entry.id,
             ),
           ),
-      ],
-      // רק למי שמילא פרטים. "אפשר לפנות אלינו" בלי לומר למי אינו עוזר לאיש.
-      if (_custom.hasContact) ...[
-        SectionLabel(t.contactTitle),
-        _ContactCard(custom: _custom),
       ],
     ];
   }
@@ -470,7 +471,7 @@ class _IconAction extends StatelessWidget {
 
 /// איש הקשר בקריאה: שם וטלפון בשורה אחת.
 class _ContactCard extends StatelessWidget {
-  const _ContactCard({required this.custom});
+  const _ContactCard({super.key, required this.custom});
 
   final FaqCustomization custom;
 
