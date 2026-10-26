@@ -2497,4 +2497,7 @@ abstract class AppReportsStrings {
 
   /// כותרת הדיווח על קריסה שאין לה חתימה.
   String get crashFallbackTitle;
+
+  /// הודעה שקטה בעלייה, אחרי שדיווח על הסגירה נשלח מעצמו ("לשלוח תמיד").
+  String get crashAutoSentSnack;
 }

@@ -2214,7 +2214,9 @@ queued. Code: `lib/src/launcher_report/`, `launcher_app/lib/src/app_report/`.
 also when detection fails) and every orderly exit must clear it
 (`closeWindow`, `exitCleanly`, `onExitRequested`) — miss one and every run
 looks like a crash. A lock from another `host` is overwritten, never
-prompted. The prompt waits for a free dialog without a time limit. Evidence
+prompted. The prompt waits for a free dialog without a time limit. The
+default is `always` (maintainer, 2026-10-26), with a snack after sending;
+`fromJson` turns a stored `ask` from schema ≤14 into it. Evidence
 rules and **known limitations** (Windows logoff, native crashes):
 `error_reports_manager/README.md`.
 

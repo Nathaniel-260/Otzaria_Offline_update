@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:error_reports_manager/error_reports_manager.dart'
+    show CrashReportOutcome;
 import 'package:flutter/widgets.dart';
 import 'package:library_manager/library_manager.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
@@ -556,12 +558,15 @@ class AppSession extends ChangeNotifier {
     await WidgetsBinding.instance.endOfFrame;
     if (!isActive) return;
     reports.startBackground();
-    await reports.runCrashCheck(
+    final outcome = await reports.runCrashCheck(
       showPrompt: (candidate) async {
         final shown = await prompts.showCrashPrompt(reports, candidate);
         return shown ?? false;
       },
     );
+    if (outcome == CrashReportOutcome.sentAutomatically && isActive) {
+      UiSnack.show(AppL10n.strings.appReports.crashAutoSentSnack);
+    }
   }
 
   bool get _needsElevation =>

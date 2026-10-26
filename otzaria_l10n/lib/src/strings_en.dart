@@ -4525,7 +4525,9 @@ class _AppReports extends AppReportsStrings {
   String get crashModeTitle => 'After the tool closes unexpectedly';
   @override
   String get crashModeSubtitle =>
-      'Send the developers a short report about what happened.';
+      'A short report to the developers: version and system details, an '
+      'excerpt of the activity log and the email you saved in the report '
+      'form, if any. Paths and the user name are hidden.';
   @override
   String get crashModeAsk => 'Ask';
   @override
@@ -4770,6 +4772,11 @@ class _AppReports extends AppReportsStrings {
       'Settings.';
   @override
   String get crashFallbackTitle => 'Unexpected exit';
+  @override
+  String get crashAutoSentSnack =>
+      'The tool closed unexpectedly last time. A short report was sent to the '
+      'developers, or will be once there is a connection. You can change this '
+      'in the settings.';
 }
 
 /// "about 3 to 5 minutes"; a collapsed range — "about 2 minutes".

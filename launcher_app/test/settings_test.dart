@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:error_reports_manager/error_reports_manager.dart'
+    show AppCrashReportMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
@@ -169,7 +171,7 @@ void main() {
       expect(restored.saferModeActive, isTrue);
 
       final json = restored.toJson();
-      expect(json['schemaVersion'], 14);
+      expect(json['schemaVersion'], AppSettings.schemaVersion);
       expect(
         (json['ui'] as Map<String, dynamic>).keys,
         unorderedEquals(['language', 'textScale']),
@@ -188,6 +190,37 @@ void main() {
         (restored.toJson()['sync'] as Map<String, dynamic>)['semantic'],
         'ask',
       );
+    });
+
+    // סכימה 15: "לשלוח תמיד" הוא ברירת המחדל אחרי סגירה לא צפויה.
+    test('ברירת המחדל לסגירה לא צפויה היא "לשלוח תמיד", גם באיפוס', () {
+      expect(const AppSettings().crashReportMode, AppCrashReportMode.always);
+      expect(AppSettings.fromJson(const {}).crashReportMode,
+          AppCrashReportMode.always);
+      expect(
+        AppSettings.fromJson({
+          'reports': {'crashMode': 'x'},
+        }).crashReportMode,
+        AppCrashReportMode.always,
+      );
+    });
+
+    test('"לשאול" מסכימה 14 ומטה עובר ל"לשלוח תמיד"; "לא לשלוח" נשמר', () {
+      AppCrashReportMode read(Object? version, String mode) =>
+          AppSettings.fromJson({
+            if (version != null) 'schemaVersion': version,
+            'reports': {'crashMode': mode},
+          }).crashReportMode;
+
+      expect(read(14, 'ask'), AppCrashReportMode.always);
+      expect(read(null, 'ask'), AppCrashReportMode.always);
+      expect(read(14, 'never'), AppCrashReportMode.never);
+      expect(read(14, 'always'), AppCrashReportMode.always);
+      // מסכימה 15 "לשאול" כבר נבחר במפורש.
+      expect(read(15, 'ask'), AppCrashReportMode.ask);
+      const chosen = AppSettings(crashReportMode: AppCrashReportMode.ask);
+      expect(AppSettings.fromJson(chosen.toJson()).crashReportMode,
+          AppCrashReportMode.ask);
     });
 
     test('sync.semantic נשמר ונקרא; ערך לא מוכר חוזר ל"לשאול"', () {

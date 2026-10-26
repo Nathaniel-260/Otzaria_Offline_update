@@ -267,7 +267,7 @@ void main() {
       expect(back.crashReportMode, AppCrashReportMode.always);
       expect(back.reportSenderEmails, {'PC1': 'a@b.co'});
       expect(AppSettings.fromJson(const {}).crashReportMode,
-          AppCrashReportMode.ask);
+          AppCrashReportMode.always);
     });
   });
 
@@ -663,7 +663,13 @@ void main() {
       final logs = p.join(tmp.path, 'logs');
       writeCrashOf(logs);
       final service = _MemoryService();
-      final reports = _controller(service, logsDirectory: logs);
+      final reports = _controller(
+        service,
+        logsDirectory: logs,
+        settings: _MemorySettings(
+          const AppSettings(crashReportMode: AppCrashReportMode.ask),
+        ),
+      );
       CrashCandidate? shown;
       final outcome = await reports.runCrashCheck(
         showPrompt: (c) async {
@@ -975,6 +981,7 @@ void main() {
         AppSettings(
           saferModeEnabled: true,
           saferModePassword: SaferModePassword.encode('1234'),
+          crashReportMode: AppCrashReportMode.ask,
         ),
       );
       final gate = SaferModeGate(settings);

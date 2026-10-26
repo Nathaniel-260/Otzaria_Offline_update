@@ -18,8 +18,14 @@ AppStrings stringsOf([AppLanguage language = AppLanguage.hebrew]) =>
 /// מה שקובע RTL גלובלי לכל עץ ה-widgets, ו-[AppStringsScope] שממנו המסכים
 /// שואבים את המלל. שניהם חייבים להיות כאן כמו ב-`main.dart`, אחרת
 /// `context.strings` נופל.
-Widget wrap(Widget child, {AppLanguage language = AppLanguage.hebrew}) =>
+/// [navigatorKey] — כשהבדיקה צריכה לראות את `UiSnack`.
+Widget wrap(
+  Widget child, {
+  AppLanguage language = AppLanguage.hebrew,
+  GlobalKey<NavigatorState>? navigatorKey,
+}) =>
     MaterialApp(
+      navigatorKey: navigatorKey,
       localizationsDelegates: const [
         GlobalCupertinoLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

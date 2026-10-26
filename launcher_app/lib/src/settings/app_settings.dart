@@ -74,9 +74,9 @@ AppLanguage systemLanguage() {
 /// **אין כאן נתיבים.** תיקיית הנתונים תמיד צמודה לקובץ ההרצה (ראו
 /// `AppPaths`), והמיקום של אוצריא עצמה מתגלה ואינו מוגדר.
 class AppSettings {
-  /// הגרסה נכתבת ואינה נבדקת בקריאה: מפתח חסר מקבל ברירת מחדל, ומפתח לא
-  /// מוכר נמחק בשמירה הבאה.
-  static const int schemaVersion = 14;
+  /// מפתח חסר מקבל ברירת מחדל, ומפתח לא מוכר נמחק בשמירה הבאה. הגרסה
+  /// נבדקת רק להסבת `reports.crashMode` (ראו [AppSettings.fromJson]).
+  static const int schemaVersion = 15;
 
   /// בדיקת עדכונים בפתיחה — גם מקומית (התיקייה שלצד התוכנה) וגם קלה מול
   /// GitHub כשיש רשת: מטא-דאטה בלבד, בלי הורדה, וכשל (אין רשת) נבלע בשקט.
@@ -146,7 +146,7 @@ class AppSettings {
     this.textScale = 1.0,
     this.saferModeEnabled = false,
     this.saferModePassword = '',
-    this.crashReportMode = AppCrashReportMode.ask,
+    this.crashReportMode = AppCrashReportMode.always,
     this.reportSenderEmails = const {},
   });
 
@@ -279,6 +279,17 @@ class AppSettings {
       return (a is bool ? a : fallback) && (b is bool ? b : fallback);
     }
 
+    // עד סכימה 14 "לשאול" היה ברירת המחדל ונכתב לכל קובץ, כך שאין לדעת אם
+    // נבחר; ברירת המחדל החדשה (לבקשת המתחזק) חלה גם עליו. "לא לשלוח" נשמר.
+    AppCrashReportMode crashMode() {
+      final mode = AppCrashReportMode.parse(reports['crashMode']);
+      final version = json['schemaVersion'];
+      final legacy = version is! int || version < 15;
+      return legacy && mode == AppCrashReportMode.ask
+          ? AppCrashReportMode.always
+          : mode;
+    }
+
     return AppSettings(
       autoCheckUpdates: merged(
         'checkUpdates',
@@ -310,7 +321,7 @@ class AppSettings {
       saferModePassword: protection['password'] is String
           ? protection['password'] as String
           : defaults.saferModePassword,
-      crashReportMode: AppCrashReportMode.parse(reports['crashMode']),
+      crashReportMode: crashMode(),
       reportSenderEmails: {
         if (reports['senderEmails'] case final Map<dynamic, dynamic> emails)
           for (final entry in emails.entries)

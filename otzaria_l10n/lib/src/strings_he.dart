@@ -4279,7 +4279,9 @@ class _AppReports extends AppReportsStrings {
   @override
   String get crashModeTitle => 'אחרי סגירה לא צפויה של הכלי';
   @override
-  String get crashModeSubtitle => 'לשלוח למפתחים דיווח קצר על מה שקרה.';
+  String get crashModeSubtitle =>
+      'דיווח קצר למפתחים: פרטי הגרסה והמערכת, קטע מיומן הפעילות וכתובת הדואר '
+      'ששמרת בטופס, אם יש. נתיבים ושם המשתמש מוסתרים.';
   @override
   String get crashModeAsk => 'לשאול';
   @override
@@ -4515,6 +4517,10 @@ class _AppReports extends AppReportsStrings {
       'הדיווח על הקריסה לא נשלח. ניתן לדווח בכל עת דרך ההגדרות.';
   @override
   String get crashFallbackTitle => 'סגירה לא צפויה';
+  @override
+  String get crashAutoSentSnack =>
+      'הכלי נסגר בפעם הקודמת באופן לא צפוי. דיווח קצר נשלח למפתחים, או יישלח '
+      'כשיהיה חיבור. אפשר לשנות זאת בהגדרות.';
 }
 
 /// "כ-3 עד 5 דקות"; טווח שהתמזג — "כשתי דקות", לא "כ-2 עד 2 דקות".

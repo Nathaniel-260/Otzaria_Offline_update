@@ -20,6 +20,8 @@ import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
+import 'package:launcher_app/src/widgets/ui_snack.dart' show navigatorKey;
+import 'package:otzaria_l10n/otzaria_l10n.dart' show AppL10n;
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 
@@ -94,7 +96,11 @@ void main() {
         isProcessAlive: (_) => false,
       );
 
-  Widget shell(AppReportsController reports, MemoryNoticesStore notices) =>
+  Widget shell(
+    AppReportsController reports,
+    MemoryNoticesStore notices, {
+    GlobalKey<NavigatorState>? navigator,
+  }) =>
       wrap(
         AppShell(
           dataDir: tempDir.path,
@@ -104,6 +110,7 @@ void main() {
           showWindowButtons: false,
           appReports: reports,
         ),
+        navigatorKey: navigator,
       );
 
   testWidgets('השליחה ברקע מופעלת אחרי הפריים הראשון, לא ב-initState',
@@ -159,6 +166,11 @@ void main() {
       '${start.add(const Duration(minutes: 1)).toIso8601String()} [ERROR] '
       '${LauncherLogFormat.uncaughtMessage(LauncherLogFormat.zoneError, StateError('x'))}\n',
     );
+    await tester.runAsync(
+      () => settings.update(
+        settings.settings.copyWith(crashReportMode: AppCrashReportMode.ask),
+      ),
+    );
     final reports = controller(_CountingService(), logs: logs);
     // לא נראה עדיין: ההסבר החד-פעמי רוצה לעלות באותה עלייה.
     final notices = MemoryNoticesStore();
@@ -195,6 +207,33 @@ void main() {
     expect(sawIntro, isTrue);
     expect(sawCrash, isTrue);
     expect(maxOpen, 1);
+  });
+
+  testWidgets('"לשלוח תמיד": בלי דו-שיח, והודעה שקטה שהדיווח נשלח',
+      (tester) async {
+    useViewSize(tester, const Size(1400, 1000));
+    final reports = _AutoSentController(
+      service: _CountingService(),
+      collector: _Collector(),
+      settings: settings,
+      logsDirectory: '',
+      redactor: AppReportRedactor(environment: const {}),
+    );
+    await tester.pumpWidget(
+      shell(
+        reports,
+        MemoryNoticesStore(seen: {NoticesSeenStore.errorReportsIntro}),
+        navigator: navigatorKey,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(CrashPromptDialog), findsNothing);
+    expect(
+      find.text(AppL10n.strings.appReports.crashAutoSentSnack),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 8));
   });
 
   group('ההצעה אחרי קריסה ממתינה לדיאלוג פתוח', () {
@@ -264,6 +303,22 @@ void main() {
       // טיימר שנשאר תלוי היה מפיל את הבדיקה בסיומה.
     });
   });
+}
+
+class _AutoSentController extends AppReportsController {
+  _AutoSentController({
+    required super.service,
+    required super.collector,
+    required super.settings,
+    required super.logsDirectory,
+    required super.redactor,
+  });
+
+  @override
+  Future<CrashReportOutcome?> runCrashCheck({
+    required Future<bool> Function(CrashCandidate candidate) showPrompt,
+  }) async =>
+      CrashReportOutcome.sentAutomatically;
 }
 
 class _PromptingController extends AppReportsController {
