@@ -191,6 +191,36 @@ class _Host implements UpdateHereHost {
 
   @override
   void closeFailed() => closeFailures++;
+
+  /// כמו הסשן: הסכמה חסרה שלא נענתה; כל תשובה (ורק תשובה) סוגרת אותה.
+  bool consentUnanswered = false;
+  bool? consentAnswer = false;
+  int asks = 0;
+  int declines = 0;
+  int grants = 0;
+
+  @override
+  Future<bool> semanticConsentUnanswered() async => consentUnanswered;
+
+  @override
+  Future<bool?> askSemanticConsent() async {
+    asks++;
+    return consentAnswer;
+  }
+
+  @override
+  Future<void> declineSemanticConsent() async {
+    declines++;
+    log.add('decline');
+    consentUnanswered = false;
+  }
+
+  @override
+  Future<void> grantSemanticConsent() async {
+    grants++;
+    log.add(running ? 'grant-while-open' : 'grant');
+    consentUnanswered = false;
+  }
 }
 
 void main() {
@@ -733,6 +763,79 @@ void main() {
       // בלי _abandon/updateCancelledByUser על notifier מפורק.
       expect(task()!.phase, UpdateHereTaskPhase.running);
       expect(library.applies, 0);
+    });
+  });
+
+  group('החלון על החיפוש החכם', () {
+    setUp(() => host.consentUnanswered = true);
+
+    test('הסכמה — נכתבת לפני הספרייה, והעדכון ממשיך', () async {
+      host.consentAnswer = true;
+      await flow.run(both);
+      expect(host.asks, 1);
+      expect(log, ['grant', 'library', 'app']);
+      expect(task()!.phase, UpdateHereTaskPhase.done);
+    });
+
+    test('הסכמה כשאוצריא פתוחה — נכתבת רק אחרי "סגירה והמשך"', () async {
+      host
+        ..consentAnswer = true
+        ..running = true;
+      final run = flow.run(both);
+      await settle();
+      expect(task()!.phase, UpdateHereTaskPhase.closeOtzaria);
+      expect(host.grants, 0);
+      host.tasks.respond(true);
+      await run;
+      expect(log, ['close', 'grant', 'library', 'app']);
+    });
+
+    test('"המשך בלי" — נרשם, והעדכון רץ בלי לכתוב הסכמה', () async {
+      host.consentAnswer = false;
+      await flow.run(both);
+      expect(log, ['decline', 'library', 'app']);
+      expect(host.grants, 0);
+      expect(task()!.phase, UpdateHereTaskPhase.done);
+    });
+
+    test('אחרי תשובה — לא שואל שוב', () async {
+      await flow.run(const [GuidanceItem.library]);
+      library.hasUpdateAvailable = true;
+      await flow.run(const [GuidanceItem.library]);
+      expect(host.asks, 1);
+    });
+
+    test('"חזרה" — שום דבר לא מתחיל, ובפעם הבאה שואל שוב', () async {
+      host.consentAnswer = null;
+      expect(await flow.run(both), isTrue);
+      expect(host.tasks.hasTask, isFalse);
+      expect(log, isEmpty);
+      await flow.run(both);
+      expect(host.asks, 2);
+    });
+
+    test('בלי הספרייה בשלבים, או בלי אוצריא מותקנת — לא שואל', () async {
+      await flow.run(const [GuidanceItem.app]);
+      expect(host.asks, 0);
+
+      app
+        ..isInstalled = false
+        ..hasUpdateAvailable = true;
+      library.isFreshInstall = true;
+      await flow.run(both);
+      expect(host.asks, 0);
+    });
+
+    test('"נסה שוב" עובר באותו חלון', () async {
+      host.consentUnanswered = false;
+      library.succeeds = false;
+      await flow.run(const [GuidanceItem.library]);
+      expect(task()!.phase, UpdateHereTaskPhase.failed);
+      host.consentUnanswered = true;
+      library.succeeds = true;
+      await flow.retry();
+      expect(host.asks, 1);
+      expect(log.last, 'library');
     });
   });
 }

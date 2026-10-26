@@ -29,6 +29,9 @@ abstract interface class SessionPrompts {
 
   Future<bool> confirmSemanticConsent();
 
+  /// לפני "עדכון המחשב הזה": `true` הסכמה, `false` בלי חיפוש חכם, `null` חזרה.
+  Future<bool?> askSemanticConsentBeforeUpdate();
+
   Future<bool> confirmLibraryReindex();
 
   Future<void> uploadReports({

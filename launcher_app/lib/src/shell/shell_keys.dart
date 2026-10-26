@@ -37,6 +37,12 @@ abstract final class ShellKeys {
   static const libraryElsewhereNotice =
       ValueKey('home.notice.libraryElsewhere');
   static const semanticConsentNotice = ValueKey('home.notice.semanticConsent');
+  static const semanticAskDialog = ValueKey('dialog.semanticAsk');
+  static const semanticAskApprove = ValueKey('dialog.semanticAsk.approve');
+  static const semanticAskDecline = ValueKey('dialog.semanticAsk.decline');
+  static const semanticAskWhatIsSent =
+      ValueKey('dialog.semanticAsk.whatIsSent');
+  static const settingsSemanticConsent = ValueKey('settings.semanticConsent');
 
   static const launcherLine = ValueKey('home.foot.launcher');
   static const launcherUpdateButton = ValueKey('home.foot.launcherUpdate');

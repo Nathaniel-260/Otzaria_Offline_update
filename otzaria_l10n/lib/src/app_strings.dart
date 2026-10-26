@@ -869,6 +869,12 @@ abstract class SettingsScreenStrings {
   String get semanticDownloadAlways;
   String get semanticDownloadNever;
 
+  /// ההסכמה לחיפוש החכם באוצריא שבמחשב הזה. ביטול — רק בהגדרות של אוצריא.
+  String get semanticConsentRowTitle;
+  String get semanticConsentRowOn;
+  String get semanticConsentRowOff;
+  String get semanticConsentRowEnable;
+
   // ── עדכון למחשב מסוים ──
   /// רק קובצי העדכון מהגרסה המותקנת — הכונן אינו משמש עוד למחשבים אחרים.
   String get personalModeTitle;
@@ -1748,8 +1754,19 @@ abstract class LibraryDomainStrings {
   String get semanticConsentRequired;
   String get semanticFullDownloadNeeded;
   String get semanticConsentTitle;
+
+  /// נוסח ההסכמה של אוצריא עצמה, בלי המשפט על הכלי הזה.
+  String get semanticConsentTerms;
   String get semanticConsentText;
   String get semanticConsentConfirm;
+
+  /// החלון שלפני "עדכון המחשב הזה", פעם אחת במחשב. בלי "אינטרנט": הוא מוצג
+  /// גם במחשב הלא מחובר.
+  String get semanticAskTitle;
+  String get semanticAskIntro;
+  String get semanticAskLater;
+  String get semanticAskApprove;
+  String get semanticAskDecline;
   String get semanticFeedbackFailed;
   String companionChecking(String name);
   String companionDownloading(String name);

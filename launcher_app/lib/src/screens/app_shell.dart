@@ -43,6 +43,7 @@ import 'help/help_page.dart';
 import 'home/home_page.dart';
 import 'home/home_progress.dart';
 import 'home/home_view_model.dart';
+import 'home/semantic_consent_dialog.dart';
 import 'home/whats_new_dialog.dart';
 import 'launcher/launcher_update_page.dart';
 import 'library_screen.dart';
@@ -325,6 +326,10 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       confirmText: t.semanticConsentConfirm,
     );
   }
+
+  @override
+  Future<bool?> askSemanticConsentBeforeUpdate() =>
+      showSemanticConsentAskDialog(context);
 
   @override
   Future<bool> confirmLibraryReindex() {
@@ -700,6 +705,14 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           // `select` ולא מעל ההגדרות: הדף אינו נעול, ו"חזרה" ממנו מובילה לבית.
           onOpenOtzariaAdvanced: () => unawaited(_goTo(ShellSection.otzaria)),
           otzariaChannelChoice: s.otzaria.hasChannelChoice,
+          semanticConsentGranted: s.otzaria.currentVersion != null &&
+                  (s.library.semanticPending ||
+                      s.library.semanticConsentGranted)
+              ? s.library.semanticConsentGranted
+              : null,
+          onEnableSemanticSearch: s.longTaskRunning
+              ? null
+              : () => unawaited(s.grantSemanticConsent()),
         ),
       ShellSection.help => HelpPage(
           faq: s.faq,

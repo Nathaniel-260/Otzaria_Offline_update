@@ -556,6 +556,84 @@ void main() {
       expect(prompts.closeDownloading, [false, false]);
     });
 
+    group('החלון על החיפוש החכם לפני "עדכון המחשב הזה"', () {
+      const answered = NoticesSeenStore.semanticConsentAnswered;
+
+      AppSession withPendingConsent(MemoryNoticesStore notices) {
+        final s = session(notices: notices);
+        s.otzaria.currentVersion = '0.9.90';
+        s.library
+          ..status = LibraryModuleStatus.updateAvailable
+          ..semanticPending = true;
+        return s;
+      }
+
+      test('לא בעלייה; שואל בלחיצה, ו"המשך בלי" משקיט את הבית', () async {
+        final notices = MemoryNoticesStore(
+          seen: {NoticesSeenStore.errorReportsIntro},
+        );
+        final s = withPendingConsent(notices)..start();
+        await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+        expect(prompts.calls, isNot(contains('askSemantic')));
+        expect(homeViewModelOf(s).semanticConsent, isTrue);
+
+        await s.updateHere(const [GuidanceItem.library]);
+        expect(prompts.calls, contains('askSemantic'));
+        expect(notices.marked, [answered]);
+        expect(s.tasks.hasTask, isTrue);
+        expect(s.semanticConsentUnanswered, isFalse);
+        expect(homeViewModelOf(s).semanticConsent, isFalse);
+        expect(
+          guidanceFactsFromSession(s).semanticConsentRequired,
+          isFalse,
+        );
+      });
+
+      test('תשובה שנשמרה במחשב הזה — אינו שואל שוב, והבית שקט', () async {
+        final notices = MemoryNoticesStore(
+          seen: {NoticesSeenStore.errorReportsIntro, answered},
+        );
+        final s = withPendingConsent(notices)..start();
+        await waitFor(() => !s.semanticConsentUnanswered);
+        expect(homeViewModelOf(s).semanticConsent, isFalse);
+        await s.updateHere(const [GuidanceItem.library]);
+        expect(prompts.calls, isNot(contains('askSemantic')));
+        await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      });
+
+      test('"חזרה" — שום דבר לא מתחיל ולא נרשם', () async {
+        final notices = MemoryNoticesStore();
+        final s = withPendingConsent(notices);
+        prompts.semanticAnswer = null;
+        await s.updateHere(const [GuidanceItem.library]);
+        expect(s.tasks.hasTask, isFalse);
+        expect(notices.marked, isEmpty);
+        expect(s.semanticConsentUnanswered, isTrue);
+      });
+
+      test('הסכמה שלא נכתבה (אין אוצריא לכתוב אליה) — לא נרשמת', () async {
+        final notices = MemoryNoticesStore();
+        final s = withPendingConsent(notices);
+        prompts.semanticAnswer = true;
+        await s.updateHere(const [GuidanceItem.library]);
+        await waitFor(() => s.tasks.current?.isFinished ?? true);
+        expect(notices.marked, isEmpty);
+        expect(s.semanticConsentUnanswered, isTrue);
+      });
+
+      test('כונן לקריאה בלבד — אותו חלון: התשובה נשמרת במחשב', () async {
+        final notices = MemoryNoticesStore();
+        final s = session(readOnly: true, notices: notices);
+        s.otzaria.currentVersion = '0.9.90';
+        s.library
+          ..status = LibraryModuleStatus.updateAvailable
+          ..semanticPending = true;
+        await s.updateHere(const [GuidanceItem.library]);
+        expect(prompts.calls, contains('askSemantic'));
+        expect(notices.marked, [answered]);
+      });
+    });
+
     test('"נסה שוב" כשאין עוד מה להתקין — חוזרים לבית, לא כפתור מת', () async {
       final s = session();
       s.tasks.startUpdateHere(
@@ -975,6 +1053,14 @@ class _FakePrompts implements SessionPrompts {
 
   @override
   Future<bool> confirmSemanticConsent() async => false;
+
+  bool? semanticAnswer = false;
+
+  @override
+  Future<bool?> askSemanticConsentBeforeUpdate() async {
+    calls.add('askSemantic');
+    return semanticAnswer;
+  }
 
   @override
   Future<bool> confirmLibraryReindex() async => false;

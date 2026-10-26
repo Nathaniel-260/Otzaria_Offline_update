@@ -322,7 +322,7 @@ HomeViewModel homeViewModelOf(AppSession s) {
         library.status == LibraryModuleStatus.personalTargetElsewhere
             ? '${library.personalFromVersion ?? ''}'
             : null,
-    semanticConsent: library.semanticConsentRequired,
+    semanticConsent: s.semanticConsentUnanswered,
     onlineCheckedAt: latestOnlineCheck([
       if (settings.syncApp) (otzaria.onlineCheckedAt, otzaria.onlineCheckError),
       if (settings.downloadsLibrary)

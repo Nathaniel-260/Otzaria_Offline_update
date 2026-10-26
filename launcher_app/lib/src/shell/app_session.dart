@@ -195,6 +195,8 @@ class AppSession extends ChangeNotifier {
   bool get isActive => !_disposed;
 
   Future<void> _errorReportsIntro = Future<void>.value();
+  Future<void> _semanticAnswerLoaded = Future<void>.value();
+  bool _semanticConsentAnswered = false;
   bool _reportsIntroPending = false;
   bool _autoInstallSkipped = false;
   int _errorReportsToCollect = 0;
@@ -368,6 +370,7 @@ class AppSession extends ChangeNotifier {
     unawaited(_searchFeedback.refreshOutbox());
     unawaited(_errorReports.refreshOutbox());
     _errorReportsIntro = _loadReportsIntro();
+    _semanticAnswerLoaded = _loadSemanticConsentAnswer();
     settings.addListener(_onChange);
     _applySettings(s);
 
@@ -470,6 +473,22 @@ class AppSession extends ChangeNotifier {
   Future<void> _loadReportsIntro() async {
     final seen = await _notices.hasSeen(NoticesSeenStore.errorReportsIntro);
     if (!seen && isActive) _update(() => _reportsIntroPending = true);
+  }
+
+  Future<void> _loadSemanticConsentAnswer() async {
+    final answered =
+        await _notices.hasSeen(NoticesSeenStore.semanticConsentAnswered);
+    if (answered && isActive) _update(() => _semanticConsentAnswered = true);
+  }
+
+  /// הסכמה חסרה שעוד לא נענתה בחלון שלפני העדכון — אחרי תשובה הבית שקט,
+  /// וההפעלה נשארת בהגדרות ובדף הספרייה.
+  bool get semanticConsentUnanswered =>
+      _library.semanticConsentRequired && !_semanticConsentAnswered;
+
+  Future<void> _recordSemanticConsentAnswer() async {
+    _update(() => _semanticConsentAnswered = true);
+    await _notices.markSeen(NoticesSeenStore.semanticConsentAnswered);
   }
 
   /// "הבנתי" בהודעה — נרשם רק עכשיו, ולא כשהיא הופיעה.
@@ -661,12 +680,18 @@ class AppSession extends ChangeNotifier {
     if (!isActive) return;
     final agreed = await prompts.confirmSemanticConsent();
     if (!agreed || !isActive) return;
+    await _writeSemanticConsent();
+  }
+
+  /// בכשל — הודעה, והעדכון שמסביב ממשיך בלי החיפוש החכם.
+  Future<void> _writeSemanticConsent() async {
     final t = AppL10n.strings.libraryDomain;
     try {
       if (!await _searchFeedback.grantConsent()) {
         UiSnack.showError(t.semanticConsentRequired);
         return;
       }
+      await _recordSemanticConsentAnswer();
       await _library.checkForUpdate();
     } catch (error, stack) {
       AppLogger.instance.error('כתיבת ההסכמה לחיפוש החכם נכשלה', error, stack);
@@ -1171,6 +1196,23 @@ class _SessionUpdateHost implements UpdateHereHost {
   @override
   void closeFailed() =>
       UiSnack.showError(AppL10n.strings.common.closeOtzariaFailedSnack);
+
+  @override
+  Future<bool> semanticConsentUnanswered() async {
+    await _session._semanticAnswerLoaded;
+    return _session.semanticConsentUnanswered;
+  }
+
+  @override
+  Future<bool?> askSemanticConsent() =>
+      _session.prompts.askSemanticConsentBeforeUpdate();
+
+  @override
+  Future<void> declineSemanticConsent() =>
+      _session._recordSemanticConsentAnswer();
+
+  @override
+  Future<void> grantSemanticConsent() => _session._writeSemanticConsent();
 }
 
 class _SessionLauncherHost implements LauncherUpdateHost {

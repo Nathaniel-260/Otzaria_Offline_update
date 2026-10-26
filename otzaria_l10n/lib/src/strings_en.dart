@@ -1616,6 +1616,19 @@ class _Settings extends SettingsScreenStrings {
   String get semanticDownloadAlways => 'Always download';
   @override
   String get semanticDownloadNever => "Don't download";
+  @override
+  String get semanticConsentRowTitle => 'Smart search on this computer';
+  @override
+  String get semanticConsentRowOn =>
+      'On: consent to send training data is active in Otzaria. It can be '
+      'revoked only in Otzaria settings: System → Smart search (experimental) '
+      '→ Improve the engine.';
+  @override
+  String get semanticConsentRowOff =>
+      'Off: the smart search on the drive is installed with the next update '
+      'only after consent to send training data. Otzaria must be closed.';
+  @override
+  String get semanticConsentRowEnable => 'Enable smart search';
 
   @override
   String get personalModeTitle => 'Prepare an update for a specific computer';
@@ -3332,8 +3345,26 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get semanticConsentTitle => 'Help improve the engine';
   @override
+  String get semanticConsentTerms =>
+      'This is experimental search, and your searches help improve it. Using it requires consent to send usage data: search terms, displayed results and their rankings, passages opened or rated (like / dislike) and time spent reading them, plus the app and operating system versions. Content from personal books is not sent. Recognized email addresses and file paths are masked in search text, but other personal details may still be sent. Do not include personal details in search text. You can revoke consent at any time in settings; revoking it disables this search mode.';
+  @override
   String get semanticConsentText =>
       'This is experimental search, and your searches help improve it. Using it requires consent to send usage data: search terms, displayed results and their rankings, passages opened or rated (like / dislike) and time spent reading them, plus the app and operating system versions. Content from personal books is not sent. Recognized email addresses and file paths are masked in search text, but other personal details may still be sent. Do not include personal details in search text. You can revoke consent at any time in settings; revoking it disables this search mode.\n\nConfirming enables consent in Otzaria settings. From then on, the app collects the data onto the drive and sends it to Otzaria whenever there is an internet connection, automatically and without notifications. The data, including search terms, is stored on the drive unencrypted until it is sent, together with the anonymous key that signs it.';
+  @override
+  String get semanticAskTitle => 'Smart search on this computer';
+  @override
+  String get semanticAskIntro =>
+      'The drive also carries smart search: search by meaning, which finds '
+      'sources even when the words differ from what you searched for. You can '
+      'install it now, together with the update.';
+  @override
+  String get semanticAskLater =>
+      'You will not be asked again on this computer. You can change this in '
+      'the settings of this tool.';
+  @override
+  String get semanticAskApprove => 'Agree and install smart search';
+  @override
+  String get semanticAskDecline => 'Continue without smart search';
   @override
   String get semanticConsentConfirm => 'I agree';
   @override

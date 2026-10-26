@@ -11,6 +11,7 @@ import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
+import 'package:launcher_app/src/screens/home/semantic_consent_dialog.dart';
 import 'package:launcher_app/src/screens/library_screen.dart';
 import 'package:launcher_app/src/screens/otzaria_advanced_page.dart';
 import 'package:launcher_app/src/screens/payload_mismatch_screen.dart';
@@ -309,6 +310,83 @@ void main() {
       find.widgetWithText(ActionButton, 'בחירת מיקום ידנית'),
     );
     expect(button.onPressed, isNotNull);
+  });
+
+  testWidgets('שורת החיפוש החכם בהגדרות: הפעלה כשכבוי, ביטול רק באוצריא', (
+    tester,
+  ) async {
+    final t = stringsOf().settings;
+    var enables = 0;
+    Widget screen(bool? granted) => SettingsScreen(
+          key: ValueKey(granted),
+          controller: settings,
+          onOpenLog: () {},
+          launcherVersion: launcherVersion,
+          semanticConsentGranted: granted,
+          onEnableSemanticSearch: () => enables++,
+        );
+
+    await pumpScreen(tester, screen(null));
+    expect(find.byKey(ShellKeys.settingsSemanticConsent), findsNothing);
+
+    await pumpScreen(tester, screen(false));
+    expect(find.text(t.semanticConsentRowOff), findsOneWidget);
+    await tester.tap(find.text(t.semanticConsentRowEnable));
+    expect(enables, 1);
+
+    await pumpScreen(tester, screen(true));
+    expect(find.text(t.semanticConsentRowOn), findsOneWidget);
+    expect(find.text(t.semanticConsentRowEnable), findsNothing);
+  });
+
+  testWidgets('החלון שלפני העדכון: שתי תשובות, Esc בלי תשובה, ו"מה נשלח?"', (
+    tester,
+  ) async {
+    final t = stringsOf().libraryDomain;
+    final answers = <bool?>[];
+    await pumpScreen(
+      tester,
+      Builder(
+        builder: (context) => TextButton(
+          onPressed: () async =>
+              answers.add(await showSemanticConsentAskDialog(context)),
+          child: const Text('open'),
+        ),
+      ),
+      size: const Size(760, 560),
+    );
+
+    Future<void> open() async {
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(ShellKeys.semanticAskDialog), findsOneWidget);
+    }
+
+    await open();
+    expect(find.text(t.semanticConsentTerms), findsOneWidget);
+    expect(find.textContaining('אינטרנט'), findsNothing);
+    // ב-760×560 הקישור מתחת לנוסח, והחלון גולל.
+    await tester.ensureVisible(find.byKey(ShellKeys.semanticAskWhatIsSent));
+    await tester.tap(find.byKey(ShellKeys.semanticAskWhatIsSent));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(stringsOf().guide.reportsDisclosureSearch),
+      findsOneWidget,
+    );
+    await tester.tap(find.text(stringsOf().common.close));
+    await tester.pumpAndSettle();
+    expect(find.byKey(ShellKeys.semanticAskDialog), findsOneWidget);
+
+    await tester.tap(find.byKey(ShellKeys.semanticAskApprove));
+    await tester.pumpAndSettle();
+    await open();
+    await tester.tap(find.byKey(ShellKeys.semanticAskDecline));
+    await tester.pumpAndSettle();
+    await open();
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(answers, [true, false, null]);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('בחירת רכיבי ההורדה היא שורת שבבים אחת, והיא נשמרת', (

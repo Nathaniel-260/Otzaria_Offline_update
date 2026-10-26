@@ -954,6 +954,15 @@ which differs from the DB's parent when a library folder name is set.
 `SemanticSearchAssets`, `LibraryManager.resolveSemanticVectorsRoot`, and
 `OtzariaSettingsWriter.finishSemanticInstall` install and enable the data.
 
+**Smart-search consent is a dialog on "update this computer", once per machine.**
+As a library-page card and a home notice it went unnoticed (maintainer,
+2026-10). `UpdateHereFlow._semanticConsent` asks only with a library stage and
+Otzaria installed; "back" starts and records nothing; an answer goes to
+`NoticesSeenStore.semanticConsentAnswered` (per host, in `stateFilesDir`). The
+consent is written after `_ensureClosed`, then rechecked. Answered → the home is
+quiet (`semanticConsentUnanswered`); Settings only enables — Otzaria's `revoke()`
+also purges its queue. Not behind safer mode: no launcher setting changes.
+
 **The offline machine picks the fastest route it has, and that route can be the full
 database.** `OfflineLibraryUpdatePlanner` used to take the delta chain whenever it reached
 at least as high as the full route — but by then both assets sit on the drive, so
@@ -2113,7 +2122,8 @@ auto-install, new plugins and updates, pending custom apps (marked seen only whi
 their page is shown — `TickerMode`), a newer launcher ("עדכון זמין" in the status
 bar, also when only on the drive), "restart as administrator" and reports in
 Otzaria. Only the crash prompt stays a `DialogQueue` dialog; other dialogs answer a
-click just made. Collecting reports has none: the disclosure sits above "Collect to
+click just made (smart-search consent asks on "update this computer", §5.4, never on
+launch). Collecting reports has none: the disclosure sits above "Collect to
 the drive".
 
 **"Check now" is `checkAll` then `checkOnline`, and `checkAll` can install.** With

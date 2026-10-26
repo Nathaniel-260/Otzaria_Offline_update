@@ -29,7 +29,7 @@ GuidanceFacts guidanceFactsFromSession(
     libraryApplyActive: library.isApplying,
     libraryStatus: LibraryStatusFact.values.byName(library.status.name),
     libraryFreshInstall: library.isFreshInstall,
-    semanticConsentRequired: library.semanticConsentRequired,
+    semanticConsentRequired: s.semanticConsentUnanswered,
     pluginsLoading: pluginsLoading,
     pluginUpdatesOnDrive: pluginsReady ? plugins.updatablePlugins.length : 0,
     online: onlineState(s),

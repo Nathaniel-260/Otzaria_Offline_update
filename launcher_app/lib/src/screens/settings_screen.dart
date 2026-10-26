@@ -41,6 +41,8 @@ class SettingsScreen extends StatelessWidget {
     this.onOpenLibrary,
     this.onOpenOtzariaAdvanced,
     this.otzariaChannelChoice = false,
+    this.semanticConsentGranted,
+    this.onEnableSemanticSearch,
   });
 
   final SettingsController controller;
@@ -84,6 +86,13 @@ class SettingsScreen extends StatelessWidget {
 
   /// בכונן שתי גרסאות — הקישור מזכיר את בחירת הגרסה.
   final bool otzariaChannelChoice;
+
+  /// ההסכמה לחיפוש החכם באוצריא שבמחשב הזה; `null` — אין חיפוש חכם בכונן
+  /// או שאוצריא אינה מותקנת, והשורה מוסתרת.
+  final bool? semanticConsentGranted;
+
+  /// אותו אישור כמו בדף הספרייה; `null` בזמן משימה ארוכה.
+  final VoidCallback? onEnableSemanticSearch;
 
   AppSettings get _s => controller.settings;
 
@@ -131,12 +140,16 @@ class SettingsScreen extends StatelessWidget {
                 driveFull: driveFull,
               ),
             ],
-            if (appReports case final reports?) ...[
+            if (appReports != null || semanticConsentGranted != null)
               SectionLabel(t.groupPrivacy),
+            if (appReports case final reports?)
               AppReportsSettingsCard(
                 reports: reports,
                 onOpenReports: onOpenReports,
               ),
+            if (semanticConsentGranted case final granted?) ...[
+              if (appReports != null) const SizedBox(height: AppTokens.spaceSM),
+              _semanticConsentRow(context, granted: granted),
             ],
             AdvancedSection(
               key: ShellKeys.pageAdvanced,
@@ -383,6 +396,35 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// ביטול ההסכמה רק באוצריא: הביטול שלה גם מוחק את מה שטרם נשלח.
+  Widget _semanticConsentRow(BuildContext context, {required bool granted}) {
+    final t = context.strings.settings;
+    return RowsCard(
+      children: [
+        AppRow(
+          key: ShellKeys.settingsSemanticConsent,
+          alignTop: true,
+          leading: const IconTile(
+            icon: FluentIcons.sparkle_24_regular,
+            size: _tile,
+            tone: _quiet,
+          ),
+          title: t.semanticConsentRowTitle,
+          subtitle: granted ? t.semanticConsentRowOn : t.semanticConsentRowOff,
+          trailing: granted
+              ? StatusChip(
+                  kind: StatusKind.ok,
+                  label: context.strings.pages.libSemanticActive,
+                )
+              : ActionButton.neutral(
+                  text: t.semanticConsentRowEnable,
+                  onPressed: onEnableSemanticSearch,
+                ),
+        ),
+      ],
     );
   }
 

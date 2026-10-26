@@ -84,6 +84,16 @@ abstract interface class UpdateHereHost {
   /// סגירה נכשלה — הודעה, והשאלה חוזרת.
   void closeFailed();
   ShellTasks get tasks;
+
+  /// חיפוש חכם בכונן מחכה להסכמה, והחלון עליו עוד לא נענה במחשב הזה.
+  Future<bool> semanticConsentUnanswered();
+
+  /// `null` — "חזרה": אין תשובה, ושום דבר לא מתחיל.
+  Future<bool?> askSemanticConsent();
+  Future<void> declineSemanticConsent();
+
+  /// אחרי שאוצריא נסגרה: הכתיבה להגדרות שלה דורשת אותה סגורה.
+  Future<void> grantSemanticConsent();
 }
 
 /// "עדכון כאן": הספרייה, התוכנה ואז התוספים; בהתקנה ראשונה התוכנה ואז הספרייה.
@@ -147,6 +157,10 @@ class UpdateHereFlow {
       fullLibrary: fullLibrary,
     );
     if (stages.isEmpty) return false;
+    final grantConsent = await _semanticConsent(stages);
+    if (grantConsent == null || !host.isActive || _tasks.isRunning) {
+      return true;
+    }
     final hasApp = stages.contains(GuidanceItem.app);
     final hasLibrary = stages.contains(GuidanceItem.library);
     final id = _tasks.startUpdateHere(
@@ -173,6 +187,7 @@ class UpdateHereFlow {
         first: !app.isInstalled,
         reinstallApp: reinstallApp,
         fullLibrary: fullLibrary,
+        grantConsent: grantConsent,
       );
     } catch (error, stackTrace) {
       AppLogger.maybeInstance
@@ -196,12 +211,28 @@ class UpdateHereFlow {
     );
   }
 
+  /// חלון אחד במחשב, רק כשיש מה להחיל בספרייה ואוצריא מותקנת (ההסכמה נכתבת
+  /// להגדרות שלה). `true` — ההסכמה תיכתב בשלב הספרייה; `null` — "חזרה".
+  Future<bool?> _semanticConsent(List<GuidanceItem> stages) async {
+    if (!app.isInstalled ||
+        !stages.contains(GuidanceItem.library) ||
+        !await host.semanticConsentUnanswered() ||
+        !host.isActive) {
+      return false;
+    }
+    final approve = await host.askSemanticConsent();
+    if (approve == null || !host.isActive) return null;
+    if (!approve) await host.declineSemanticConsent();
+    return approve;
+  }
+
   Future<void> _run(
     int id,
     List<GuidanceItem> stages, {
     required bool first,
     required bool reinstallApp,
     required bool fullLibrary,
+    required bool grantConsent,
   }) async {
     if (stages.contains(GuidanceItem.app) && app.elevatedAsOtherUser) {
       final go = await _tasks.askOtherUser();
@@ -217,6 +248,7 @@ class UpdateHereFlow {
             first: first,
             ranAny: ranAny,
             full: fullLibrary,
+            grantConsent: grantConsent,
           ),
         GuidanceItem.app => await _app(
             first: first,
@@ -264,6 +296,7 @@ class UpdateHereFlow {
     required bool first,
     required bool ranAny,
     bool full = false,
+    bool grantConsent = false,
   }) async {
     if (first) {
       // מיקום המסד נגזר ממה שהאשף בחר — בודקים מחדש אחרי ההתקנה.
@@ -290,6 +323,7 @@ class UpdateHereFlow {
     } else {
       final closed = await _ensureClosed(ranAny: ranAny);
       if (closed != true) return closed;
+      if (grantConsent) await host.grantSemanticConsent();
     }
     if (!host.isActive) return false;
     _tasks.stageRunning(GuidanceItem.library);
