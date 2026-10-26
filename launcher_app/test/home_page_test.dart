@@ -1291,6 +1291,43 @@ void main() {
           find.byKey(ShellKeys.homeContact, skipOffstage: false), findsNothing);
     });
 
+    for (final (name, phone) in const [
+      ('ר׳ ישראל', ''),
+      ('', '050-0000000'),
+    ]) {
+      testWidgets('"לעזרה במקום" עם ${name.isEmpty ? 'טלפון' : 'שם'} בלבד', (
+        tester,
+      ) async {
+        await pumpScreen(
+          tester,
+          HomePage(
+            model: HomeViewModel(
+              guidance: deriveHomeGuidance(const GuidanceFacts(online: true)),
+              installedVersion: '0.10.4',
+              contactName: name,
+              contactPhone: phone,
+            ),
+          ),
+        );
+        final contact = find.byKey(ShellKeys.homeContact);
+        await tester.scrollUntilVisible(contact, 200);
+        final texts = tester
+            .widgetList<Text>(
+              find.descendant(of: contact, matching: find.byType(Text)),
+            )
+            .map((w) => w.data)
+            .toList();
+        expect(texts, [he.faq.contactLead, name.isEmpty ? phone : name]);
+        if (phone.isNotEmpty) {
+          final shown = find.descendant(
+            of: contact,
+            matching: find.text(phone),
+          );
+          expect(tester.widget<Text>(shown).textDirection, TextDirection.ltr);
+        }
+      });
+    }
+
     testWidgets('כונן מוגן: שבב אדום עם מנעול ליד הכונן, ובלי מוגן — אין שבב', (
       tester,
     ) async {
@@ -1327,6 +1364,31 @@ void main() {
       await pumpScreen(tester, HomePage(model: withLauncher(null)));
       expect(find.byKey(ShellKeys.driveLine), findsOneWidget);
       expect(find.byKey(ShellKeys.driveLockedChip), findsNothing);
+    });
+
+    testWidgets('כונן מלא: השבב האדום אומר "מלא" עם סמל אחסון, לא מנעול', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(readOnly: true, driveFull: true),
+            ),
+            driveName: 'E:',
+          ),
+        ),
+      );
+      final chip = find.descendant(
+        of: find.byKey(ShellKeys.driveLine),
+        matching: find.byKey(ShellKeys.driveLockedChip),
+      );
+      expect(chip, findsOneWidget);
+      final widget = tester.widget<StatusChip>(chip);
+      expect(widget.kind, StatusKind.error);
+      expect(widget.label, g.driveFullSuffix);
+      expect(widget.icon, FluentIcons.storage_16_regular);
     });
 
     testWidgets('"עדכון זמין" בתחילת שורת המצב — מימין בעברית', (

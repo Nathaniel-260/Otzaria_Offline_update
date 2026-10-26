@@ -1369,6 +1369,8 @@ abstract class SetupErrorStrings {
   String get appTranslocatedTitle;
   String get runningFromTemp;
   String get runningFromTempTitle;
+  String get systemDrive;
+  String get systemDriveTitle;
 
   /// macOS (TCC) חסם כתיבה לתיקייה שליד התוכנה — EPERM, לא הרשאות קובץ.
   String get macVolumeAccessDenied;

@@ -402,6 +402,40 @@ void main() {
         lessThan(tester.getRect(firstGroup).top),
       );
     });
+
+    testWidgets('איש קשר עם שם בלבד: השם לבדו, בלי שורת טלפון', (tester) async {
+      await tester.runAsync(
+        () => faq.update(const FaqCustomization(contactName: 'ר׳ ישראל')),
+      );
+      await pumpBody(tester);
+
+      final contact = find.byKey(const ValueKey('faq.contact'));
+      expect(contact, findsOneWidget);
+      final texts = tester
+          .widgetList<Text>(
+              find.descendant(of: contact, matching: find.byType(Text)))
+          .map((w) => w.data)
+          .toList();
+      expect(texts, ['ר׳ ישראל']);
+    });
+
+    testWidgets('איש קשר עם טלפון בלבד: הטלפון הוא הכותרת, משמאל לימין', (
+      tester,
+    ) async {
+      await tester.runAsync(
+        () => faq.update(const FaqCustomization(contactPhone: '050-0000000')),
+      );
+      await pumpBody(tester);
+
+      final contact = find.byKey(const ValueKey('faq.contact'));
+      expect(contact, findsOneWidget);
+      final phone = find.descendant(
+        of: contact,
+        matching: find.text('050-0000000'),
+      );
+      expect(phone, findsOneWidget);
+      expect(tester.widget<Text>(phone).textDirection, TextDirection.ltr);
+    });
   });
 
   group('השמירה לדיסק', () {

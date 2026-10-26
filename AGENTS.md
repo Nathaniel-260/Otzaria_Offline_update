@@ -129,7 +129,12 @@ was announced by nothing while the launcher said "no new updates online".
 that is what makes the drive self-contained. If it is not writable (the app was
 moved into `Program Files`), the launcher shows `SetupErrorScreen` and refuses to
 run rather than falling back to `%APPDATA%`, which would leave the data behind on
-the online machine.
+the online machine. On Windows it also refuses the system drive
+(`AppPathsFailure.systemDrive`, `AppPaths.isOnSystemDrive`): the tool must live
+on a portable drive. Any other letter, fixed external disks included, and UNC
+paths are allowed; dev runs are exempt because only the stub sets
+`OTZARIA_LAUNCHER_STUB`, which is the path checked. The stub refuses first
+(see §5.8); the Dart check is defense in depth.
 
 ```
 mirror/library/     releases.json + assets/                               ← LibraryManager.mirrorDir
@@ -1859,14 +1864,19 @@ just launch. Five load-bearing details:
   are **copied by hand** from `AppPalette.light`/the seeded `ColorScheme` into
   `stub.c` — change one, change both. Debug-only `STUB_SLOW_DEMO` slows it
   down for screenshots; the shipped build never defines it.
-- Its inline Hebrew strings — the first-run window and its two message boxes
-  (the failure, and "extract me first") — are the **only** user-visible
-  strings in this repo outside `otzaria_l10n`; C cannot depend on a Dart package.
+- Its inline Hebrew strings — the first-run window and its three message boxes
+  (the failure, "extract me first", "not from the system drive") — are the
+  **only** user-visible strings in this repo outside `otzaria_l10n`; C cannot
+  depend on a Dart package.
 - **It refuses to run from under `%TEMP%`** (a temp that is a drive root
   does not count; a folder merely named `*.zip` elsewhere is fine)
   (`IsTemporaryLocation`; Dart twin `AppPaths.isTemporaryLocation` →
   `AppPathsFailure.runningFromTemp`). Explorer runs an exe opened in a zip from
   `%TEMP%\Temp1_<name>.zip\`, and everything downloaded there was discarded.
+- **It refuses to run from the system drive** (`IsOnSystemDrive` vs
+  `%SystemDrive%`; UNC allowed; Dart twin `AppPaths.isOnSystemDrive` →
+  `AppPathsFailure.systemDrive`), before `PrepareLog`, so nothing is extracted
+  there. `stub_contract_test.dart` pins that order.
 - **It recovers a self-update cut between its two renames.** `_replaceFile`
   writes the real exe name to `.launcher-update.target` before the first
   rename (users rename the exe, e.g. `Otzaria-Updates (1).exe`); run as

@@ -114,7 +114,7 @@ void main() {
             Directory.systemTemp.path,
             version: launcherVersion,
           );
-          AppLogger.instance.error('תיקיית הנתונים אינה זמינה לכתיבה: $e');
+          AppLogger.instance.error('מסך עצירה בעלייה (${e.kind.name}): $e');
         } catch (_) {}
         runApp(SetupErrorApp(error: e));
         return;

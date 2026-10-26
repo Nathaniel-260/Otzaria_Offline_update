@@ -1564,6 +1564,11 @@ void main() {
       stringsOf().setupError.runningFromTempTitle,
       stringsOf().setupError.runningFromTemp,
     ),
+    (
+      AppPathsFailure.systemDrive,
+      stringsOf().setupError.systemDriveTitle,
+      stringsOf().setupError.systemDrive,
+    ),
   ]) {
     testWidgets('מסך השגיאה עבור ${kind.name}: כותרת והנחיה ייעודיות בלבד', (
       tester,

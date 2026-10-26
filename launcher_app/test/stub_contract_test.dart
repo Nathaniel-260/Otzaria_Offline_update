@@ -187,6 +187,13 @@ void main() {
     expect(stubC, contains('kDataDirName[] = L"${AppPaths.dirName}"'));
   });
 
+  test('ה-stub נעצר בכונן המערכת לפני שהוא יוצר קובץ כלשהו', () {
+    final check = stubC.indexOf('if (IsOnSystemDrive(stub_dir))');
+    expect(check, greaterThan(0));
+    expect(check, lessThan(stubC.indexOf('PrepareLog(work_dir);')));
+    expect(stubC, contains('L"SystemDrive"'));
+  });
+
   test('החילוץ אינו נשען על tar.exe ולא על שום תהליך חיצוני', () {
     // התלות הזאת היא ששברה חילוץ בשטח: `tar.exe` קיים רק מ-Windows 10 1803,
     // והנתיבים עברו אליו דרך שורת פקודה ב-ANSI. אם היא חוזרת — שתיפול כאן.

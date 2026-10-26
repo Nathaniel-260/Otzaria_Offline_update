@@ -2465,8 +2465,8 @@ class _Faq extends FaqStrings {
       'so that it all travels together on the drive. If it was moved '
       'somewhere without write permission — Program Files, for instance — '
       'there is nowhere to save, so it stops rather than leaving the files on '
-      'the wrong computer. The fix: move the whole program folder to the USB '
-      'drive, or to an ordinary folder on the disk, and run it from there.';
+      'the wrong computer. The fix: move the whole program folder to a USB '
+      'stick or an external drive, and run it from there.';
   @override
   String get qLauncherSelfUpdate => 'Does this program update itself too?';
   @override
@@ -2576,8 +2576,8 @@ class _SetupError extends SetupErrorStrings {
       'the drive, a burned disc, or read-only permissions) — remove the '
       'protection, download the updates, and then you can lock it again and '
       'install from it on any computer. Otherwise — move the whole program '
-      'folder onto the removable drive (or into any folder on disk that is '
-      'not under Program Files), and run it from there.';
+      'folder onto a USB stick or an external drive, and run it from '
+      'there.';
   @override
   String get attemptedDirTitle => 'Folder that was tried';
   @override
@@ -2603,11 +2603,19 @@ class _SetupError extends SetupErrorStrings {
   String get runningFromTemp =>
       'This program was started from inside a ZIP file or a temporary folder, '
       'and everything it downloads there would be deleted along with that '
-      'folder. Extract the file to the USB drive (or a permanent folder on '
-      'disk) and run it from there.';
+      'folder. Extract the file to a USB stick or an external drive and run '
+      'it from there.';
   @override
   String get runningFromTempTitle =>
       'Extract the file to a drive before running it';
+  @override
+  String get systemDrive =>
+      'This program carries the updates from one computer to another, so it '
+      'has to be on a USB stick or an external drive — not on the '
+      "computer's main drive. Copy the whole program folder (including the "
+      'app-files folder) to the portable drive and run it from there.';
+  @override
+  String get systemDriveTitle => 'Run the program from a portable drive';
   @override
   String get macVolumeAccessDenied =>
       'macOS did not allow this program to write to the folder next to it. '

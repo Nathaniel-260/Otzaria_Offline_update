@@ -206,8 +206,22 @@ static int ReportTemporaryLocation(void) {
   MessageBoxW(NULL,
               L"התוכנה הופעלה מתוך קובץ ZIP או מתיקייה זמנית.\n\n"
               L"כל מה שהיא מורידה משם נמחק יחד עם התיקייה הזמנית. "
-              L"יש לחלץ את הקובץ לכונן הנייד (או לתיקייה קבועה בדיסק) "
+              L"יש לחלץ את הקובץ לדיסק און קי או לכונן חיצוני "
               L"ולהפעיל אותו משם.",
+              L"עדכוני אוצריא",
+              MB_OK | MB_ICONWARNING | MB_RTLREADING | MB_RIGHT);
+  return EXIT_FAILURE;
+}
+
+// הטקסט השלישי שאינו ב-otzaria_l10n; = `setupError.systemDrive`. נבדק לפני
+// החילוץ, כדי לא להשאיר ערמת קבצים על כונן המערכת.
+static int ReportSystemDrive(void) {
+  MessageBoxW(NULL,
+              L"התוכנה נושאת את העדכונים ממחשב למחשב, ולכן היא צריכה "
+              L"להימצא על דיסק און קי או על כונן חיצוני — לא על הכונן "
+              L"הראשי של המחשב.\n\n"
+              L"יש להעתיק את כל תיקיית התוכנה (כולל התיקייה app-files) "
+              L"לכונן הנייד ולהפעיל אותה משם.",
               L"עדכוני אוצריא",
               MB_OK | MB_ICONWARNING | MB_RTLREADING | MB_RIGHT);
   return EXIT_FAILURE;
@@ -1161,6 +1175,21 @@ static BOOL IsTemporaryLocation(const wchar_t *dir) {
   return inside;
 }
 
+// = `AppPaths.isOnSystemDrive`. נתיב רשת (גם \\?\UNC\) אינו אות כונן — מותר.
+static BOOL IsOnSystemDrive(const wchar_t *dir) {
+  if (wcsncmp(dir, L"\\\\?\\", 4) == 0) {
+    dir += 4;
+  }
+  wchar_t system[MAX_PATH + 1];
+  const DWORD length =
+      GetEnvironmentVariableW(L"SystemDrive", system, ARRAYSIZE(system));
+  if (length < 2 || length >= ARRAYSIZE(system) || system[1] != L':' ||
+      dir[0] == L'\0' || dir[1] != L':') {
+    return FALSE;
+  }
+  return CompareStringOrdinal(dir, 1, system, 1, TRUE) == CSTR_EQUAL;
+}
+
 static BOOL FileExists(const wchar_t *path) {
   return path != NULL && GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES;
 }
@@ -1286,6 +1315,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   if (IsTemporaryLocation(stub_dir)) {
     return ReportTemporaryLocation();
+  }
+  if (IsOnSystemDrive(stub_dir)) {
+    return ReportSystemDrive();
   }
 
   wchar_t *work_dir =
