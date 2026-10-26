@@ -954,6 +954,32 @@ class _Guide extends GuidanceStrings {
   String get noSyncSelectionNote =>
       'Nothing is selected for download in the settings.';
   @override
+  String syncOffOnlyNote({
+    required bool app,
+    required bool library,
+    required bool plugins,
+  }) {
+    final off = [
+      if (app) 'the program',
+      if (library) 'the library',
+      if (plugins) 'the plugins',
+    ];
+    if (off.length > 1) {
+      final names =
+          '${off.sublist(0, off.length - 1).join(', ')} and ${off.last}';
+      return 'There is something new online for $names, but their download '
+          'is turned off in the settings.';
+    }
+    if (plugins) {
+      return 'There are plugin updates online, but their download is turned '
+          'off in the settings.';
+    }
+    if (off.isEmpty) return noSyncSelectionNote;
+    return 'There is a new version of ${off.single} online, but its download '
+        'is turned off in the settings.';
+  }
+
+  @override
   String get downloadBusySnack =>
       'Another task is running. You can download once it finishes.';
   @override
@@ -1098,6 +1124,27 @@ class _Guide extends GuidanceStrings {
   @override
   String get taskBusyBody =>
       'When it ends, you will see here what else this computer needs.';
+  @override
+  String get taskNamedBody =>
+      'When this ends, you will see here what else this computer needs.';
+  @override
+  String get taskSyncingPluginsTitle =>
+      'Downloading the plugin store to the drive';
+  @override
+  String get taskUpdatingPluginsTitle => 'Updating the plugins';
+  @override
+  String get taskExportingStoreTitle => 'Copying the plugin store';
+  @override
+  String get taskDownloadingCustomAppsTitle =>
+      'Downloading additional programs to the drive';
+  @override
+  String get taskCustomAppsTitle => 'Working on an additional program';
+  @override
+  String get taskInstallingLauncherTitle =>
+      'Installing the new version of this tool';
+  @override
+  String get taskRestartingElevatedTitle =>
+      'Restarting this tool as administrator';
 
   @override
   String itemUpdateTo(String version) => 'Update to $version';

@@ -1101,9 +1101,29 @@ class _Hero extends StatelessWidget {
               title: g.taskUpdatingLibraryTitle,
               actions: [showProgress()],
             ),
-          HomeTask.other => _HeroSpec(
-              title: g.taskBusyTitle,
-              body: g.taskBusyBody,
+          HomeTask.restartingElevated => _HeroSpec(
+              title: g.taskRestartingElevatedTitle,
+            ),
+          final task => _HeroSpec(
+              title: switch (task) {
+                HomeTask.syncingPlugins => g.taskSyncingPluginsTitle,
+                HomeTask.updatingPlugins => g.taskUpdatingPluginsTitle,
+                HomeTask.exportingStore => g.taskExportingStoreTitle,
+                HomeTask.downloadingCustomApps =>
+                  g.taskDownloadingCustomAppsTitle,
+                HomeTask.customApps => g.taskCustomAppsTitle,
+                HomeTask.installingLauncher => g.taskInstallingLauncherTitle,
+                _ => g.taskBusyTitle,
+              },
+              body: task == HomeTask.other ? g.taskBusyBody : g.taskNamedBody,
+              actions: [
+                if (task.section case final section?)
+                  ActionButton.recommended(
+                    key: ShellKeys.heroShowProgress,
+                    text: context.strings.task.showProgress,
+                    onPressed: () => actions.onOpenSection(section),
+                  ),
+              ],
             ),
         };
     }
@@ -1154,12 +1174,14 @@ class _Hero extends StatelessWidget {
             onLink: actions.onOpenSettings,
           ),
         ],
+      GuidanceSecondary.syncOff => _syncOffNotes(context, quiet: true),
       _ => const [],
     };
   }
 
-  /// מה שיש ברשת ואינו מסומן להורדה — נאמר, כדי שלא ידלג בשקט.
-  List<_Note> _syncOffNotes(BuildContext context) {
+  /// מה שיש ברשת ואינו מסומן להורדה — נאמר, כדי שלא ידלג בשקט. [quiet] — אין
+  /// הורדה לצידו, ולכן הנוסח אומר שיש חדש ולא "לא יירד".
+  List<_Note> _syncOffNotes(BuildContext context, {bool quiet = false}) {
     final g = context.strings.guide;
     final m = model;
     final app = m.onlineAppVersion != null && !m.syncApp;
@@ -1174,7 +1196,10 @@ class _Hero extends StatelessWidget {
     return [
       _Note(
         FluentIcons.info_16_regular,
-        g.syncOffNote(app: app, library: library, plugins: plugins),
+        quiet
+            ? g.syncOffOnlyNote(app: app, library: library, plugins: plugins)
+            : g.syncOffNote(app: app, library: library, plugins: plugins),
+        key: quiet ? ShellKeys.homeSyncOffNote : null,
         link: g.changeInSettingsLink,
         onLink: actions.onOpenSettings,
       ),

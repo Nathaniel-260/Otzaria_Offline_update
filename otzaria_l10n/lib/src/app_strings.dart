@@ -513,6 +513,13 @@ abstract class GuidanceStrings {
   });
   String get noSyncSelectionNote;
 
+  /// כמו [syncOffNote], כשאין שום הורדה לצידה: יש חדש, וההורדה שלו כבויה.
+  String syncOffOnlyNote({
+    required bool app,
+    required bool library,
+    required bool plugins,
+  });
+
   /// "הורדה" בזמן שמשימה אחרת (או הורדת עדכון של הכלי) רצה.
   String get downloadBusySnack;
   String get changeInSettingsLink;
@@ -582,6 +589,14 @@ abstract class GuidanceStrings {
   String get taskUpdatingLibraryTitle;
   String get taskBusyTitle;
   String get taskBusyBody;
+  String get taskNamedBody;
+  String get taskSyncingPluginsTitle;
+  String get taskUpdatingPluginsTitle;
+  String get taskExportingStoreTitle;
+  String get taskDownloadingCustomAppsTitle;
+  String get taskCustomAppsTitle;
+  String get taskInstallingLauncherTitle;
+  String get taskRestartingElevatedTitle;
 
   // ── רשימת מה ייכלל ──
   String itemUpdateTo(String version);

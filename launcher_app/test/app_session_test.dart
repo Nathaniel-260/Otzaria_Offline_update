@@ -890,18 +890,22 @@ void main() {
 
       s.plugins.isExporting = true;
       expect(primary(s), GuidancePrimary.taskInProgress);
+      expect(homeViewModelOf(s).task, HomeTask.exportingStore);
       s.plugins.isExporting = false;
 
       s.customApps.isLearning = true;
       expect(primary(s), GuidancePrimary.taskInProgress);
+      expect(homeViewModelOf(s).task, HomeTask.customApps);
       s.customApps.isLearning = false;
 
       s.customApps.downloadAllTotal = 2;
       expect(primary(s), GuidancePrimary.taskInProgress);
+      expect(homeViewModelOf(s).task, HomeTask.downloadingCustomApps);
       s.customApps.downloadAllTotal = null;
 
       s.launcherUpdate.status = LauncherUpdateStatus.installing;
       expect(primary(s), GuidancePrimary.taskInProgress);
+      expect(homeViewModelOf(s).task, HomeTask.installingLauncher);
     });
 
     test('סנכרון החנות', () async {
@@ -909,6 +913,7 @@ void main() {
       final run = s.plugins.sync();
       expect(s.plugins.isSyncing, isTrue);
       expect(primary(s), GuidancePrimary.taskInProgress);
+      expect(homeViewModelOf(s).task, HomeTask.syncingPlugins);
       try {
         await run;
       } catch (_) {}

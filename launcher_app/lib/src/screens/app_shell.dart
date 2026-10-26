@@ -791,9 +791,13 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
               _navigator.isBuilt(section)
                   ? TickerMode(
                       enabled: section == current && task == null,
-                      child: ExcludeFocus(
-                        excluding: task != null,
-                        child: _sectionWidget(context, section),
+                      // בועה בשכבת העל שדעיכתה נעצרה עם הטיקרים נשארת קפואה.
+                      child: TooltipVisibility(
+                        visible: section == current && task == null,
+                        child: ExcludeFocus(
+                          excluding: task != null,
+                          child: _sectionWidget(context, section),
+                        ),
                       ),
                     )
                   : const SizedBox.shrink(),

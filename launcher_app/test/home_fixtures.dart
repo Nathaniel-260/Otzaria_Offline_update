@@ -34,6 +34,9 @@ const homeScenarios = [
   'libraryNotices',
   'libraryNotFound',
   'libraryElsewhere',
+  'downloadV32',
+  'syncOff',
+  'taskPluginsSync',
 ];
 
 final _checkedAt = DateTime(2026, 10, 23, 23, 14);
@@ -71,6 +74,7 @@ HomeViewModel _model(
   bool libraryNotFound = false,
   String? libraryElsewhereFrom,
   bool semanticConsent = false,
+  HomeTask? task,
 }) {
   final guidance = deriveHomeGuidance(f);
   TileStatus tile(GuidanceItem item) => deriveTileStatus(
@@ -116,7 +120,7 @@ HomeViewModel _model(
     libraryNotFound: libraryNotFound,
     libraryElsewhereFrom: libraryElsewhereFrom,
     semanticConsent: semanticConsent,
-    task: f.installing ? HomeTask.installingApp : HomeTask.other,
+    task: task ?? (f.installing ? HomeTask.installingApp : HomeTask.other),
     appTile: tile(GuidanceItem.app),
     libraryTile: tile(GuidanceItem.library),
     pluginsTile: tile(GuidanceItem.plugins),
@@ -278,6 +282,29 @@ HomeViewModel homeScenario(String name) => switch (name) {
             LauncherLineKind.online,
             version: 'v3.3.0',
           ),
+        ),
+      // הספרייה v32 לכונן ריק: החסם שהבית מציג לפני הלחיצה.
+      'downloadV32' => _model(
+          const GuidanceFacts(online: true, onlineLibrary: true),
+          installed: '0.10.4',
+          onlineLibrary: 32,
+          libraryDownloadBytes: 2955264720,
+          driveFreeBytes: 29082 * _mb,
+        ),
+      // באתר ספרייה חדשה, וההורדה שלה כבויה; השאר מסומן.
+      'syncOff' => _model(
+          const GuidanceFacts(
+            online: true,
+            onlineLibrary: true,
+            syncLibrary: false,
+          ),
+          installed: '0.10.4',
+          onlineLibrary: 147,
+        ),
+      'taskPluginsSync' => _model(
+          const GuidanceFacts(online: true, longTaskRunning: true),
+          installed: '0.10.4',
+          task: HomeTask.syncingPlugins,
         ),
       // כונן ריק מאוצריא, אבל יש בו תוכנות נוספות ודיווחים, והוא מוגן.
       'firstWithApps' => _model(

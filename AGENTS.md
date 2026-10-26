@@ -606,12 +606,15 @@ previous answer, a failure included, until the new one (clearing it flashed
 (`onlineAnswerError`); Shabbat is unchecked, not failed.
 
 **The sizes in the home's download list are upper bounds known before the
-click.** `LibraryManager.peekedDownloadBytesBound` (newest full DB, every patch
-of the mirror's releases and the pending companions, less what is complete in
-the mirror; smart search only in "always") and
-`OtzariaModuleController.onlineDownloadBytes`, from the light peeks alone;
-plugins have none. No bound means no number — never `probeMirrorDownloadBytes`
-before a click: it runs the real export planning.
+click.** `LibraryManager.peekedDownloadBytesBound` → `mirrorDownloadBytesBound`
+applies the exporter's rules that need only names and sizes: a patch slower than
+a DB swap (`ApplyTimeEstimate`, no credit), dead ends by `patch-vA-vB` names, and
+edges a manifest already on the drive rules out. Counting every patch showed 4.8GB
+for a 2.5GB download (v32); unknown edges count as valid, so stubs keep it ~3GB.
+An older full DB on the drive that may be reused is `null`. App:
+`OtzariaModuleController.onlineDownloadBytes`; plugins have none. No bound means
+no number — never `probeMirrorDownloadBytes` before a click: it runs the real
+export planning.
 
 **Filtered networks get their own messages and NetFree's CA.** A filter answers
 418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a
@@ -2105,7 +2108,9 @@ plugin store — a card grid with one `Image.file` per plugin — was built and 
 launch, before the user opened it. Sections are created on first visit
 (`ShellNavigator.isBuilt`) and kept after. `IndexedStack` does not disable tickers, so
 each built section is wrapped in `TickerMode(enabled: section == current)`; otherwise a
-hidden section's spinner keeps requesting frames for the whole operation.
+hidden section's spinner keeps requesting frames for the whole operation. The same
+wrapper sets `TooltipVisibility`: a tooltip lives in the root overlay, and one
+fading out when its section was hidden froze half-transparent over the home.
 
 **The safer-mode gate is the navigator's, for every route that puts Settings on the
 stack.** `ShellNavigator.canEnter` (`AppShell._canEnter`) asks before Settings,

@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -863,6 +864,39 @@ void main() {
       await tester.pump();
       expect(nav.section, ShellSection.home);
       expect(nav.stack, [const HomeRoute()]);
+    });
+
+    testWidgets('בועת "חזרה" אינה נשארת מעל הבית: במקטע מוסתר אין בועות', (
+      tester,
+    ) async {
+      await pumpShell(tester);
+      await open(tester, ShellSection.settings);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(mouse.removePointer);
+      await mouse.addPointer(location: Offset.zero);
+      final backButton = find.byTooltip(shell.backTooltip);
+      await mouse.moveTo(tester.getCenter(backButton));
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text(shell.backTooltip), findsOneWidget);
+
+      // לחיצה שנמשכת: הבועה מתחילה לדעוך, והמקטע מוסתר באמצע הדעיכה — בלי
+      // טיקרים היא הייתה נשארת קפואה וחצי שקופה.
+      await mouse.down(tester.getCenter(backButton));
+      await tester.pump(const Duration(milliseconds: 30));
+      await mouse.up();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(navigatorOf(tester).section, ShellSection.home);
+      expect(find.text(shell.backTooltip, skipOffstage: false), findsNothing);
+      final hidden = find.byWidgetPredicate(
+        (w) => w is Tooltip && w.message == shell.backTooltip,
+        skipOffstage: false,
+      );
+      expect(TooltipVisibility.of(tester.element(hidden)), isFalse);
+
+      await open(tester, ShellSection.settings);
+      expect(TooltipVisibility.of(tester.element(backButton)), isTrue);
     });
 
     testWidgets('Esc בשדה טקסט יוצא מהשדה במקום לחזור לבית', (tester) async {

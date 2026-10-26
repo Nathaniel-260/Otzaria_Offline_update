@@ -424,6 +424,7 @@ Set<String> get _homeScenarioPhases => const {
       'phase2b2',
       'stage2_home',
       'stage3',
+      'fixbatch',
     };
 
 /// מסכי המשימה מצולמים מהמודל — ראו `task_<scenario>`.

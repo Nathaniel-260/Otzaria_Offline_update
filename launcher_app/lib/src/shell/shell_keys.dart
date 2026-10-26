@@ -33,6 +33,7 @@ abstract final class ShellKeys {
   static const newPluginsBanner = ValueKey('home.banner.newPlugins');
   static const libraryMissingNotice = ValueKey('home.notice.libraryMissing');
   static const libraryAbsentNotice = ValueKey('home.notice.libraryAbsent');
+  static const homeSyncOffNote = ValueKey('home.note.syncOff');
   static const libraryNotFoundNotice = ValueKey('home.notice.libraryNotFound');
   static const libraryElsewhereNotice =
       ValueKey('home.notice.libraryElsewhere');

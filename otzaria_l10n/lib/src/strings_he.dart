@@ -921,6 +921,33 @@ class _Guide extends GuidanceStrings {
   @override
   String get noSyncSelectionNote => 'בהגדרות לא נבחר שום דבר להוריד.';
   @override
+  String syncOffOnlyNote({
+    required bool app,
+    required bool library,
+    required bool plugins,
+  }) {
+    final off = [
+      if (app) 'בתוכנה',
+      if (library) 'בספרייה',
+      if (plugins) 'בתוספים',
+    ];
+    if (off.length > 1) {
+      final names = '${off.sublist(0, off.length - 1).join(', ')} ו${off.last}';
+      return 'באתר יש חדש $names, אבל ההורדה שלהם כבויה בהגדרות.';
+    }
+    if (plugins) {
+      return 'באתר יש עדכונים לתוספים, אבל ההורדה שלהם כבויה בהגדרות.';
+    }
+    if (app) {
+      return 'באתר יש גרסה חדשה של התוכנה, אבל ההורדה שלה כבויה בהגדרות.';
+    }
+    if (library) {
+      return 'באתר יש גרסה חדשה של הספרייה, אבל ההורדה שלה כבויה בהגדרות.';
+    }
+    return noSyncSelectionNote;
+  }
+
+  @override
   String get downloadBusySnack =>
       'משימה אחרת רצה עכשיו. אפשר להוריד כשהיא תסתיים.';
   @override
@@ -1059,6 +1086,23 @@ class _Guide extends GuidanceStrings {
   @override
   String get taskBusyBody =>
       'כשהיא תסתיים, יופיע כאן מה עוד אפשר לעשות במחשב הזה.';
+  @override
+  String get taskNamedBody =>
+      'כשהפעולה תסתיים, יופיע כאן מה עוד אפשר לעשות במחשב הזה.';
+  @override
+  String get taskSyncingPluginsTitle => 'מוריד את חנות התוספים לכונן';
+  @override
+  String get taskUpdatingPluginsTitle => 'מעדכן את התוספים';
+  @override
+  String get taskExportingStoreTitle => 'מעתיק את חנות התוספים';
+  @override
+  String get taskDownloadingCustomAppsTitle => 'מוריד תוכנות נוספות לכונן';
+  @override
+  String get taskCustomAppsTitle => 'עובד על תוכנה נוספת';
+  @override
+  String get taskInstallingLauncherTitle => 'מתקין את הגרסה החדשה של הכלי';
+  @override
+  String get taskRestartingElevatedTitle => 'מפעיל את הכלי מחדש כמנהל';
 
   @override
   String itemUpdateTo(String version) => 'עדכון ל-${_ltr(version)}';

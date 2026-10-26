@@ -43,7 +43,8 @@ class HomeTaskProgress extends StatelessWidget {
             listenable: Listenable.merge([otzaria, otzaria.progress]),
             builder: (context, _) => _installRow(context),
           ),
-        HomeTask.other => const SizedBox.shrink(),
+        // השאר — "הצג התקדמות" פותח את הדף שבו הן רצות.
+        _ => const SizedBox.shrink(),
       };
 
   /// "הפסק להמתין" רק כשהאשף ממשיך בחלון משלו — אז ההמתנה לו היא שנעצרת.

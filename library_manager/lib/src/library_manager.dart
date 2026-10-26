@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -19,6 +20,7 @@ import 'services/library_db_locator.dart';
 import 'services/library_state_store.dart';
 import 'services/library_update_applier.dart';
 import 'services/library_updater_l10n.dart';
+import 'services/mirror_download_bound.dart';
 import 'services/otzaria_instance_lock.dart';
 import 'services/otzaria_process_guard.dart';
 import 'services/otzaria_settings_reader.dart';
@@ -723,8 +725,9 @@ class LibraryManager {
     return latest?.version;
   }
 
-  /// חסם עליון ל-[downloadToMirror] (בלי חיפוש חכם) מההצצות האחרונות, בלי רשת.
-  /// `null` אחרי הצצה שנכשלה, במצב אישי ובמסד מפוצל.
+  /// חסם עליון ל-[downloadToMirror] (בלי חיפוש חכם) מההצצות האחרונות, בלי רשת
+  /// — ראו [mirrorDownloadBytesBound]. `null` אחרי הצצה שנכשלה, במצב אישי,
+  /// במסד מפוצל, וכשמסד מלא ישן בכונן עשוי להיבחר במקום החדש.
   Future<int?> peekedDownloadBytesBound() async {
     final releases = _peekedReleases;
     final companions = _companionsMirror.peekedPendingBytes;
@@ -736,6 +739,7 @@ class LibraryManager {
       client: _cloudClient,
     );
     final List<LibraryRelease> relevant;
+    final ApplyTimeEstimate applyTime;
     try {
       relevant = exporter.recentReleases(
         LibraryUpdateDiscovery.eligibleReleases(
@@ -743,62 +747,47 @@ class LibraryManager {
           allowPrerelease: allowPrerelease,
         ),
       );
+      applyTime = exporter.applyTime;
     } finally {
       exporter.dispose();
     }
 
-    ({LibraryRelease release, ReleaseAsset asset})? fullDb;
-    for (final release in relevant) {
-      final asset = release.fullDbAssetFor(
-        maxSchemaVersion: kSupportedDbSchemaVersion,
-      );
-      if (asset == null) continue;
-      if (fullDb == null ||
-          LibraryUpdateDiscovery.releaseVersionOf(release) >
-              LibraryUpdateDiscovery.releaseVersionOf(fullDb.release)) {
-        fullDb = (release: release, asset: asset);
-      }
-    }
-    if (fullDb != null && fullDb.asset.isSplitFullDbManifest) return null;
-
-    final held = await _mirroredAssets();
-    var bytes = companions;
+    final held = <(String, String)>{};
+    final manifests = <(String, String), DeltaManifest>{};
     for (final release in relevant) {
       for (final asset in release.assets) {
-        // קובצי עדכון ומניפסטים; המסד המלא נספר פעם אחת בלבד, מהחדש.
-        final counted =
-            asset.name.startsWith('patch-') || identical(asset, fullDb?.asset);
-        if (!counted || held.contains((release.tag, asset.name, asset.size))) {
+        final file = File(_mirrorAssetPath(release.tag, asset.name));
+        if (!await file.exists() || await file.length() != asset.size) {
           continue;
         }
-        bytes += asset.size;
-      }
-    }
-    return bytes;
-  }
-
-  /// (tag, שם, גודל) של כל נכס שיושב שלם במראה המקומית.
-  Future<Set<(String, String, int)>> _mirroredAssets() async {
-    if (!await hasMirror) return const {};
-    final List<LibraryRelease> mirrored;
-    try {
-      mirrored = await LocalMirrorLibraryReleaseClient(
-        mirrorDir: mirrorDir,
-      ).fetchReleases();
-    } catch (_) {
-      return const {};
-    }
-    final held = <(String, String, int)>{};
-    for (final release in mirrored) {
-      for (final asset in release.assets) {
-        final file = File(asset.downloadUrl);
-        if (await file.exists() && await file.length() == asset.size) {
-          held.add((release.tag, asset.name, asset.size));
+        held.add((release.tag, asset.name));
+        if (!asset.isDeltaManifest) continue;
+        try {
+          manifests[(release.tag, asset.name)] = DeltaManifest.fromJson(
+            jsonDecode(await file.readAsString()) as Map<String, dynamic>,
+          );
+        } catch (_) {
+          // manifest שאינו נקרא — הקשת נחשבת תקפה, כמו בלי manifest.
         }
       }
     }
-    return held;
+    final bytes = mirrorDownloadBytesBound(
+      relevant: relevant,
+      supportedDbSchemaVersion: kSupportedDbSchemaVersion,
+      applyTime: applyTime,
+      complete: (release, asset) => held.contains((release.tag, asset.name)),
+      heldManifest: (release, asset) => manifests[(release.tag, asset.name)],
+    );
+    return bytes == null ? null : bytes + companions;
   }
+
+  /// הנתיב שבו [LibraryMirrorExporter] שומר נכס — כמו `_safeDirName` שלו.
+  String _mirrorAssetPath(String tag, String name) => p.join(
+    mirrorDir,
+    'assets',
+    tag.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_'),
+    name,
+  );
 
   ({String tag, int version})? _latestOnline(List<LibraryRelease> all) =>
       OfflineLibraryUpdateDiscovery.latestOnlineRelease(

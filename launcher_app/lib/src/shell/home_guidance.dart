@@ -80,6 +80,9 @@ enum GuidanceSecondary {
   offlineHint,
   noSyncSelection,
 
+  /// באתר יש חדש רק ברכיבים שההורדה שלהם כבויה, ורכיב אחר כן מסומן.
+  syncOff,
+
   /// רק התוספים לא נבדקו, כי אתר אוצריא סגור בשבת — לא "בדוק עכשיו".
   siteClosedForShabbat,
 }
@@ -464,8 +467,9 @@ GuidanceSecondary _quietSecondary(
   return switch (f.online) {
     false => GuidanceSecondary.offlineHint,
     null => GuidanceSecondary.checkOnlineNow,
-    true when onlineItems.isNotEmpty && download.isEmpty =>
-      GuidanceSecondary.noSyncSelection,
+    true when onlineItems.isNotEmpty && download.isEmpty => f.hasSyncSelection
+        ? GuidanceSecondary.syncOff
+        : GuidanceSecondary.noSyncSelection,
     true when closedForShabbat => GuidanceSecondary.siteClosedForShabbat,
     // רכיב שנבחר עוד לא נבדק, אף שהמחשב מחובר.
     true when !onlineProven && f.hasSyncSelection =>

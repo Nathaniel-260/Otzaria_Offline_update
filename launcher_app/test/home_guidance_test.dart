@@ -209,12 +209,30 @@ void main() {
         GuidancePrimary.upToDate,
         secondary: GuidanceSecondary.noSyncSelection,
       ),
+      // רכיבים אחרים מסומנים, ולכן לא "לא נבחר שום דבר".
       _case(
         'חדש ברשת רק ברכיב שאינו מסומן',
         const GuidanceFacts(
             online: true, onlineLibrary: true, syncLibrary: false),
         GuidancePrimary.upToDate,
-        secondary: GuidanceSecondary.noSyncSelection,
+        secondary: GuidanceSecondary.syncOff,
+      ),
+      _case(
+        'חדש ברשת בספרייה ובתוספים, ורק התוכנה מסומנת',
+        const GuidanceFacts(
+          online: true,
+          onlineLibrary: true,
+          onlinePlugins: true,
+          syncLibrary: false,
+          syncPlugins: false,
+        ),
+        GuidancePrimary.upToDate,
+        secondary: GuidanceSecondary.syncOff,
+      ),
+      _case(
+        'רכיב כבוי בלי חדש ברשת — שקט',
+        const GuidanceFacts(online: true, syncLibrary: false),
+        GuidancePrimary.upToDate,
       ),
       _case(
         'רק רכיב מסומן נכלל בהורדה',

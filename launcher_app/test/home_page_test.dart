@@ -730,6 +730,67 @@ void main() {
     });
   });
 
+  group('פעולה שרצה מחוץ לבית — נאמר מה רץ, ואיפה ההתקדמות', () {
+    Future<List<ShellSection>> pumpTask(
+      WidgetTester tester,
+      HomeTask task,
+    ) async {
+      final opened = <ShellSection>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(longTaskRunning: true),
+            ),
+            task: task,
+          ),
+          actions: HomeActions(onOpenSection: opened.add),
+        ),
+      );
+      return opened;
+    }
+
+    final cases = {
+      HomeTask.syncingPlugins: (
+        g.taskSyncingPluginsTitle,
+        ShellSection.plugins
+      ),
+      HomeTask.updatingPlugins: (
+        g.taskUpdatingPluginsTitle,
+        ShellSection.plugins
+      ),
+      HomeTask.exportingStore: (
+        g.taskExportingStoreTitle,
+        ShellSection.plugins
+      ),
+      HomeTask.downloadingCustomApps: (
+        g.taskDownloadingCustomAppsTitle,
+        ShellSection.customApps,
+      ),
+      HomeTask.customApps: (g.taskCustomAppsTitle, ShellSection.customApps),
+      HomeTask.installingLauncher: (
+        g.taskInstallingLauncherTitle,
+        ShellSection.launcher,
+      ),
+    };
+    for (final MapEntry(key: task, value: (title, section)) in cases.entries) {
+      testWidgets('$task: הכותרת והדף שלה', (tester) async {
+        final opened = await pumpTask(tester, task);
+        expect(find.text(title), findsOneWidget);
+        expect(find.text(g.taskBusyTitle), findsNothing);
+        await tester.tap(find.byKey(ShellKeys.heroShowProgress));
+        expect(opened, [section]);
+      });
+    }
+
+    testWidgets('הפעלה מחדש כמנהל — בלי דף להראות', (tester) async {
+      await pumpTask(tester, HomeTask.restartingElevated);
+      expect(find.text(g.taskRestartingElevatedTitle), findsOneWidget);
+      expect(find.byKey(ShellKeys.heroShowProgress), findsNothing);
+    });
+  });
+
   group('הורדה לכונן — מה ייכלל ומה לא', () {
     HomeViewModel model({
       bool syncApp = true,
@@ -873,6 +934,41 @@ void main() {
       expect(find.text(g.downloadButton), findsNothing);
       expect(find.text(g.noSyncSelectionNote), findsOneWidget);
       await tester.tap(find.text(g.chooseInSettingsLink));
+      expect(settings, 1);
+    });
+
+    testWidgets(
+        'יש חדש באתר רק ברכיב שההורדה שלו כבויה — נאמר מה, לא '
+        '"לא נבחר שום דבר"', (tester) async {
+      var settings = 0;
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                online: true,
+                onlineLibrary: true,
+                syncLibrary: false,
+              ),
+            ),
+            online: true,
+            installedVersion: '0.10.4',
+            onlineLibraryVersion: 33,
+            syncLibrary: false,
+          ),
+          actions: HomeActions(onOpenSettings: () => settings++),
+        ),
+      );
+      expect(find.text(g.noSyncSelectionNote), findsNothing);
+      expect(
+        find.text(
+          g.syncOffOnlyNote(app: false, library: true, plugins: false),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(ShellKeys.homeSyncOffNote), findsOneWidget);
+      await tester.tap(find.text(g.changeInSettingsLink));
       expect(settings, 1);
     });
   });

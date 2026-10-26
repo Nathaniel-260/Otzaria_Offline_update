@@ -11,9 +11,26 @@ import '../../controllers/otzaria_module_controller.dart';
 import '../../shell/app_session.dart';
 import '../../shell/home_guidance.dart';
 import '../../shell/home_guidance_session.dart';
+import '../../shell/shell_navigator.dart';
 
-/// מה רץ כשהגיבור במצב `taskInProgress`.
-enum HomeTask { downloading, installingApp, updatingLibrary, other }
+/// מה רץ כשהגיבור במצב `taskInProgress`. [section] — הדף שמציג את ההתקדמות.
+enum HomeTask {
+  downloading,
+  installingApp,
+  updatingLibrary,
+  syncingPlugins(ShellSection.plugins),
+  updatingPlugins(ShellSection.plugins),
+  exportingStore(ShellSection.plugins),
+  downloadingCustomApps(ShellSection.customApps),
+  customApps(ShellSection.customApps),
+  installingLauncher(ShellSection.launcher),
+  restartingElevated,
+  other;
+
+  const HomeTask([this.section]);
+
+  final ShellSection? section;
+}
 
 enum LauncherLineKind { online, ready, readyManual, downloading, error }
 
@@ -360,6 +377,13 @@ HomeViewModel homeViewModelOf(AppSession s) {
           when library.isApplying ||
               library.status == LibraryModuleStatus.updating =>
         HomeTask.updatingLibrary,
+      _ when plugins.isUpdatingAll => HomeTask.updatingPlugins,
+      _ when plugins.isSyncing => HomeTask.syncingPlugins,
+      _ when plugins.isExporting => HomeTask.exportingStore,
+      _ when customApps.isDownloadingAll => HomeTask.downloadingCustomApps,
+      _ when customApps.isBusy || customApps.isLearning => HomeTask.customApps,
+      _ when s.launcherUpdate.isInstalling => HomeTask.installingLauncher,
+      _ when s.exitPending => HomeTask.restartingElevated,
       _ => HomeTask.other,
     },
     isCheckingOnline: s.isCheckingOnline,
