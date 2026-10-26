@@ -11,13 +11,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
-import 'package:launcher_app/src/controllers/error_reports_controller.dart';
 import 'package:launcher_app/src/controllers/download_plan.dart';
+import 'package:launcher_app/src/controllers/error_reports_controller.dart';
 import 'package:launcher_app/src/controllers/launcher_update_controller.dart';
 import 'package:launcher_app/src/controllers/library_module_controller.dart';
 import 'package:launcher_app/src/controllers/otzaria_module_controller.dart';
-import 'package:launcher_app/src/controllers/search_feedback_controller.dart';
 import 'package:launcher_app/src/controllers/plugins_module_controller.dart';
+import 'package:launcher_app/src/controllers/search_feedback_controller.dart';
 import 'package:launcher_app/src/screens/app_shell.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_manage_page.dart';
 import 'package:launcher_app/src/screens/custom_apps/custom_apps_settings_card.dart';
@@ -29,7 +29,6 @@ import 'package:launcher_app/src/screens/library_screen.dart';
 import 'package:launcher_app/src/screens/otzaria_advanced_page.dart';
 import 'package:launcher_app/src/screens/plugins/plugin_detail_view.dart';
 import 'package:launcher_app/src/screens/plugins/plugins_screen.dart';
-import 'package:launcher_app/src/screens/reports_upload_section.dart';
 import 'package:launcher_app/src/screens/reports/reports_page.dart';
 import 'package:launcher_app/src/screens/settings_screen.dart';
 import 'package:launcher_app/src/screens/store_kit/store_kit.dart';
@@ -1435,7 +1434,7 @@ void main() {
       expect(collect, contains('disclosedReports: s.errorReportsToCollect'));
       expect(
         collect,
-        contains('disclosedSearchRecords: s.searchRecordsToCollect'),
+        isNot(contains('searchFeedback:')),
       );
       expect(collect, contains('await s.recountReportsToCollect()'));
     });
@@ -1581,7 +1580,7 @@ void main() {
       restorePrint();
       expect(find.byType(AlertDialog), findsNothing);
       expect(snacks, isEmpty);
-      expect(find.text(stringsOf().errorReports.uploadButton(2)), findsNothing);
+      expect(find.text(stringsOf().pages.repSendStoredButton(2)), findsNothing);
       expect(
         find.textContaining(stringsOf().errorReports.uploadPendingOffline(2)),
         findsNothing,
@@ -1623,8 +1622,7 @@ void main() {
       await settle(tester, () => transport.uploads > 0);
 
       restorePrint();
-      expect(
-          find.text(stringsOf().errorReports.introDialogTitle), findsOneWidget);
+      expect(find.byKey(ShellKeys.reportsIntroNotice), findsOneWidget);
       expect(transport.sent, 2);
       expect(snacks, isEmpty);
     });
@@ -1679,10 +1677,7 @@ void main() {
       await settle(tester, () => false);
       locator.isRunning = true;
       await tester.runAsync(
-        () => tester
-            .widget<HomeScreen>(screen(HomeScreen))
-            .otzaria
-            .refreshRunningState(force: true),
+        () => sessionOf(tester).otzaria.refreshRunningState(force: true),
       );
       await tester.pump();
       locator.isRunning = false;
@@ -1741,166 +1736,53 @@ void main() {
   });
 
   group('דיווחי הטעויות לצד משוב החיפוש', () {
-    final t = stringsOf().errorReports;
-    late _ShellFeedback transport;
-    late _ShellReportQueue queue;
-    late ErrorReportsController reports;
-
-    setUp(() {
-      transport = _ShellFeedback();
-      queue = _ShellReportQueue();
-      reports = ErrorReportsController(
-        outbox: queue.outbox,
-        resolveQueue: () async => queue,
-      );
-    });
-
-    SearchFeedbackController feedbackFor(_MutableLocator locator) =>
-        SearchFeedbackController(
-          transport: transport,
-          resolveSource: () async {
-            final probe = await locator.probe();
-            return probe.isRunning ? null : 'source';
-          },
-        );
-
-    Future<void> settle(WidgetTester tester, bool Function() done) async {
-      for (var i = 0; i < 120 && !done(); i++) {
+    testWidgets('משוב לבדו לא מוסיף אריח דיווחים או הודעת שליחה',
+        (tester) async {
+      final transport = _ShellFeedback();
+      final locator = _MutableLocator(isRunning: false);
+      final queue = _ShellReportQueue();
+      final reports = ErrorReportsController(
+          outbox: queue.outbox, resolveQueue: () async => queue);
+      final feedback = SearchFeedbackController(
+          transport: transport, resolveSource: () async => 'source');
+      await pumpShell(tester,
+          locator: locator, errorReports: reports, searchFeedback: feedback);
+      for (var i = 0; i < 40 && transport.sent == 0; i++) {
         await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 20)),
-        );
+            () => Future<void>.delayed(const Duration(milliseconds: 20)));
         await tester.pump(const Duration(milliseconds: 100));
       }
-    }
-
-    Future<void> pumpBoth(WidgetTester tester, _MutableLocator locator) async {
-      await pumpShell(
-        tester,
-        locator: locator,
-        errorReports: reports,
-        searchFeedback: feedbackFor(locator),
-      );
-      final otzaria = tester.widget<HomeScreen>(screen(HomeScreen)).otzaria;
-      await settle(
-          tester, () => otzaria.status != OtzariaModuleStatus.checking);
-      expect(otzaria.status, isNot(OtzariaModuleStatus.checking));
-      otzaria.launchPath = 'x';
-    }
-
-    Future<void> openAndClose(
-      WidgetTester tester,
-      _MutableLocator locator,
-    ) async {
-      final otzaria = tester.widget<HomeScreen>(screen(HomeScreen)).otzaria;
-      locator.isRunning = true;
-      await tester.runAsync(() => otzaria.refreshRunningState(force: true));
-      await tester.pump();
-      expect(otzaria.isRunning, isTrue);
-      locator.isRunning = false;
-      await tester.pump(const Duration(seconds: 4));
-      await settle(tester, () => false);
-    }
-
-    final dialog = find.text(t.collectDialogTitle);
-
-    testWidgets('שני מחזורים: סירוב, איסוף מוצלח, ואז דיווח בודד מוצע', (
-      tester,
-    ) async {
-      final locator = _MutableLocator(isRunning: true);
-      await pumpBoth(tester, locator);
-      queue.pending = 3;
-      transport.sourceEvents = 2;
-
-      locator.isRunning = false;
-      await tester.pump(const Duration(seconds: 4));
-      await settle(tester, () => dialog.evaluate().isNotEmpty);
-      expect(dialog, findsOneWidget);
-      expect(find.text(t.collectDialogContent(3)), findsOneWidget);
-      await tester.tap(find.text(t.collectLater));
-      await settle(tester, () => dialog.evaluate().isEmpty);
-      expect(queue.outbox.reports, isEmpty);
       expect(transport.sent, 2);
-
-      queue.pending = 4;
-      transport.sourceEvents = 1;
-      await openAndClose(tester, locator);
-      await settle(tester, () => dialog.evaluate().isNotEmpty);
-      expect(dialog, findsOneWidget);
-      expect(find.text(t.collectDialogContent(4)), findsOneWidget);
-      await tester.tap(find.text(t.collectConfirm));
-      await settle(tester, () => queue.outbox.reports.length == 4);
-      expect(queue.outbox.reports, hasLength(4));
-      expect(queue.pending, 0);
-      expect(transport.sent, 3);
-
-      queue.pending = 1;
-      await openAndClose(tester, locator);
-      await settle(tester, () => dialog.evaluate().isNotEmpty);
-      expect(dialog, findsOneWidget);
-      expect(find.text(t.collectDialogContent(1)), findsOneWidget);
-      await tester.tap(find.text(t.collectConfirm));
-      await settle(tester, () => queue.outbox.reports.length == 5);
-      expect(queue.outbox.reports, hasLength(5));
-      expect(queue.collects, 2);
-    });
-
-    testWidgets('משוב לבדו: בלי דיאלוג, כפתור, טקסט המתנה או סיכום דיווחים', (
-      tester,
-    ) async {
-      final locator = _MutableLocator(isRunning: false);
-      await pumpBoth(tester, locator);
-      await settle(tester, () => transport.uploads > 0);
-
-      expect(transport.sent, 2);
-      expect(queue.collects, 0);
-      expect(dialog, findsNothing);
-      expect(find.byType(ReportsUploadSection), findsOneWidget);
-      expect(find.text(t.uploadButton(2)), findsNothing);
-      expect(find.textContaining(t.uploadPendingOffline(2)), findsNothing);
-      expect(find.textContaining(t.uploadPendingUnchecked(2)), findsNothing);
       expect(reports.outboxCount, 0);
+      expect(sessionOf(tester).reportsToCollect, 0);
+      expect(find.byKey(ShellKeys.tile(ShellSection.reports)), findsNothing);
+      expect(find.byType(AlertDialog), findsNothing);
     });
 
-    testWidgets('העלאת משוב שנתקעה אינה מונעת הצעת דיווחים, ללא כפילות', (
-      tester,
-    ) async {
-      final gate = Completer<void>();
-      transport.uploadGate = gate;
+    testWidgets('העלאת משוב ברקע אינה חוסמת ספירת דיווחים', (tester) async {
+      final transport = _ShellFeedback()..uploadGate = Completer<void>();
       final locator = _MutableLocator(isRunning: false);
-      await pumpBoth(tester, locator);
-      queue.pending = 2;
-      await settle(tester, () => transport.uploads > 0);
+      final queue = _ShellReportQueue()..pending = 2;
+      final reports = ErrorReportsController(
+          outbox: queue.outbox, resolveQueue: () async => queue);
+      final feedback = SearchFeedbackController(
+          transport: transport, resolveSource: () async => 'source');
+      await pumpShell(tester,
+          locator: locator, errorReports: reports, searchFeedback: feedback);
+      for (var i = 0; i < 40 && transport.uploads == 0; i++) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(transport.uploads, 1);
-
-      await openAndClose(tester, locator);
-      await settle(tester, () => dialog.evaluate().isNotEmpty);
-      expect(dialog, findsOneWidget);
+      await tester.runAsync(() => sessionOf(tester).recountReportsToCollect());
+      await tester.pump();
+      expect(sessionOf(tester).reportsToCollect, 2);
+      expect(sessionOf(tester).exitWouldInterrupt, isFalse);
+      transport.uploadGate!.complete();
+      await tester.runAsync(() => feedback.stopAndWait());
+      await tester.pump();
       expect(transport.uploads, 1);
-      expect(transport.collections, 1);
-
-      gate.complete();
-      await tester.tap(find.text(t.collectLater));
-      await settle(tester, () => transport.sent > 0);
-      expect(transport.sent, 2);
-      expect(transport.uploads, 1);
-    });
-
-    testWidgets('פירוק בזמן העלאת משוב: אין פעילות אחריו', (tester) async {
-      final gate = Completer<void>();
-      transport.uploadGate = gate;
-      final locator = _MutableLocator(isRunning: false);
-      await pumpBoth(tester, locator);
-      await settle(tester, () => transport.uploads > 0);
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      gate.complete();
-      transport.online = false;
-      await settle(tester, () => false);
-      await tester.pump(const Duration(hours: 1));
-      expect(transport.uploads, 1);
-      expect(transport.collections, 1);
-      expect(transport.closed, isTrue);
-      expect(tester.takeException(), isNull);
     });
   });
 
@@ -1945,7 +1827,7 @@ void main() {
       expect(getters, contains('_errorReports.isCollecting'));
       expect(getters, contains('_errorReports.isUploading'));
       final interrupt = getters.substring(
-        getters.indexOf('bool get _exitWouldInterrupt'),
+        getters.indexOf('bool get exitWouldInterrupt'),
       );
       expect(interrupt, isNot(contains('_searchFeedback')));
     });
@@ -2005,11 +1887,11 @@ void main() {
       expect(body.substring(busy, restart), contains('t.busyNotice'));
     });
 
-    test('משוב ברקע נעצר בסדר אחרי האישור, לפני בדיקת החסימה', () {
-      final dialog = body.indexOf('showTwoActionsDialog');
-      final stop = body.indexOf('_searchFeedback.stopAndWait()', dialog);
-      expect(stop, greaterThan(dialog));
-      expect(stop, lessThan(body.indexOf('_exitWouldInterrupt', dialog)));
+    test('משוב ברקע נעצר לפני בדיקת החסימה', () {
+      final body = restartBody();
+      final stop = body.indexOf('_searchFeedback.stopAndWait()');
+      expect(stop, greaterThan(-1));
+      expect(stop, lessThan(body.indexOf('if (exitWouldInterrupt)')));
     });
 
     test('מסמנת המתנה ל-UAC סביב restartElevated ומאפסת בכשל', () {
@@ -2063,7 +1945,6 @@ void main() {
         contains(
           'Listenable.merge([\n'
           '        s.errorReports,\n'
-          '        s.searchFeedback,\n'
           '        if (s.appReports != null) s.appReports!,',
         ),
       );

@@ -9,6 +9,7 @@ import 'dispose_guard.dart';
 
 /// מצב ההסכמה במחשב הזה: ביטול מפורש שונה ממחשב שבו היא אינה ידועה.
 enum SearchFeedbackConsent { granted, revoked, unknown }
+
 /// איך נגמרה כתיבת ההסכמה לחיפוש החכם.
 enum ConsentWrite {
   granted,
@@ -27,7 +28,8 @@ class SearchFeedbackController extends ChangeNotifier
     required this.resolveSource,
     Future<ConsentWrite> Function()? grantConsent,
     Future<SearchFeedbackConsent> Function()? consentState,
-  }) : _grantConsent = grantConsent, _consentState = consentState;
+  })  : _grantConsent = grantConsent,
+        _consentState = consentState;
 
   factory SearchFeedbackController.forDrive({
     required String dataDir,

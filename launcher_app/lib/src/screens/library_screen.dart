@@ -562,6 +562,8 @@ class LibraryScreen extends StatelessWidget {
                 s.downloadNotePersonal('${c.personalFromVersion}'),
               LibraryPersonalDownloadNote.versionUnknown =>
                 s.downloadNotePersonalUnknownVersion,
+              LibraryPersonalDownloadNote.mirrorRepaired =>
+                s.downloadNotePersonalMirrorRepaired,
               LibraryPersonalDownloadNote.upToDate =>
                 s.downloadNotePersonalUpToDate('${c.personalFromVersion}'),
             },

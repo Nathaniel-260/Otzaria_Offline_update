@@ -174,9 +174,10 @@ class CustomAppLocalFileSection extends StatelessWidget {
 
     return FormLabelled(
       label: t.fileLabel,
-      help: kind == null
-          ? null
-          : t.installerKindSniffed(installerKindLabelOf(kind, t)),
+      help: error ??
+          (kind == null
+              ? null
+              : t.installerKindSniffed(installerKindLabelOf(kind, t))),
       child: Row(
         children: [
           Expanded(

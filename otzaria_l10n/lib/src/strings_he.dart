@@ -3052,7 +3052,7 @@ class _LibraryDomain extends LibraryDomainStrings {
       'גודל הקובץ המקומי אינו תואם: צפוי $expected, בפועל $actual (${_ltr(url)})';
   @override
   String localFileHashMismatch(String url) =>
-      'הקובץ שבכונן פגום ולא ניתן להשתמש בו: $url — יש להוריד שוב במחשב עם '
+      'הקובץ שבכונן פגום ולא ניתן להשתמש בו: ${_ltr(url)} — יש להוריד שוב במחשב עם '
       'חיבור לאינטרנט. אם זה חוזר, ייתכן שהכונן תקול.';
   @override
   String get manifestMissingPatchFormatVersion =>
@@ -3245,9 +3245,6 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get semanticFeedbackFailed =>
       'שליחת נתוני האימון לא הושלמה. אפשר לנסות שוב; הפרטים נשמרו ביומן.';
-  @override
-  String get semanticDownloadPrompt =>
-      'להוריד גם את קובצי החיפוש החכם למחשב הלא־מקוון? הקבצים עשויים לתפוס כמה ג׳יגה־בייט. השימוש בחיפוש מחייב הסכמה באוצריא לאיסוף נתוני אימון. ההורדה אינה משנה את ההסכמה.';
   @override
   String get semanticConsentRequired =>
       'קובצי החיפוש החכם נמצאים בכונן. לפני התקנתם יש לאשר איסוף נתוני אימון. אפשר לאשר כאן כשאוצריא סגורה, או להפעיל את ההסכמה בהגדרות אוצריא ולבדוק שוב.';
@@ -3659,7 +3656,7 @@ class _CustomAppsDomain extends CustomAppsDomainStrings {
       'קובץ ההתקנה אינו נמצא: ${_ltr(path)}';
   @override
   String installerUnsupportedFile(String fileName) =>
-      'הקובץ "$fileName" אינו חבילת התקנה נתמכת. יש לבחור מתקין Windows מסוג EXE או MSI, או ארכיון ZIP להעתקה. ארכיון קוד מקור אינו מתקין את התוכנה. אפשר לשנות את הקובץ בעריכת התוכנה.';
+      'הקובץ "${_ltr(fileName)}" אינו חבילת התקנה נתמכת. יש לבחור מתקין Windows מסוג EXE או MSI, או ארכיון ZIP להעתקה. ארכיון קוד מקור אינו מתקין את התוכנה. אפשר לשנות את הקובץ בעריכת התוכנה.';
   @override
   String installerExitCode(int exitCode, String output) =>
       'ההתקנה הסתיימה בשגיאה (קוד $exitCode).\n$output';
@@ -4228,6 +4225,7 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String uploadPendingUnchecked(int count) =>
       '${count == 1 ? 'ממתין' : 'ממתינים'} להעלאה ${_reports(count)}. טרם נבדק חיבור לרשת — בדקו חיבור כדי להעלות';
+  @override
   String get uploadingFeedbackStage => 'שולח את נתוני השיפור של החיפוש החכם…';
   @override
   String get uploadCollectingBusy =>

@@ -37,6 +37,7 @@ import '../services/file_reveal.dart';
 import '../services/mirror_junk_sweeper.dart';
 import '../services/notices_seen_store.dart';
 import '../services/report_offer_coordinator.dart';
+import '../services/search_feedback_auto_sync.dart';
 import '../services/sleep_inhibitor.dart';
 import '../settings/app_settings.dart';
 import '../settings/safer_mode.dart';
@@ -63,7 +64,8 @@ class AppSession extends ChangeNotifier {
     SleepInhibitor? sleepInhibitor,
     @visibleForTesting
     OtzariaLauncher otzariaLauncher = const OtzariaLauncher(),
-    @visibleForTesting SearchFeedbackController? searchFeedback,
+    SearchFeedbackController? searchFeedback,
+    ErrorReportsController? errorReports,
   })  : _noticesStore = noticesStore,
         _injectedSleepInhibitor = sleepInhibitor {
     final s = settings.settings;
@@ -127,12 +129,14 @@ class AppSession extends ChangeNotifier {
     _launcherUpdate = LauncherUpdateController(dataDir: dataDir)
       ..addListener(_onChange);
     _faq = FaqController(dataDir: stateDir);
-    _errorReports = ErrorReportsController.forDrive(
-      stateDir: stateDir,
-      dataDir: dataDir,
-      stateFilesDir: stateFilesDir,
-      launchPath: () async => _otzaria.launchPath,
-    )..addListener(_onReportsChange);
+    _errorReports = (errorReports ??
+        ErrorReportsController.forDrive(
+          stateDir: stateDir,
+          dataDir: dataDir,
+          stateFilesDir: stateFilesDir,
+          launchPath: () async => _otzaria.launchPath,
+        ))
+      ..addListener(_onReportsChange);
     _searchFeedback = (searchFeedback ??
         SearchFeedbackController.forDrive(
           dataDir: dataDir,
@@ -207,7 +211,6 @@ class AppSession extends ChangeNotifier {
   bool _reportsIntroPending = false;
   bool _autoInstallSkipped = false;
   int _errorReportsToCollect = 0;
-  int _searchRecordsToCollect = 0;
   DateTime? _checkedAt;
 
   /// "מה התחדש" כבר מוצג בדף הכלי, ולכן אישור ההתקנה לא חוזר עליו.
@@ -276,10 +279,9 @@ class AppSession extends ChangeNotifier {
   /// ההתקנה האוטומטית דילגה כי אוצריא הייתה פתוחה — הודעה קבועה בבית.
   bool get autoInstallSkipped => _autoInstallSkipped;
 
-  /// כמה דיווחים ומשובים ממתינים באוצריא לאיסוף — המונה של אריח הדיווחים.
-  int get reportsToCollect => _errorReportsToCollect + _searchRecordsToCollect;
+  /// כמה דיווחים ממתינים באוצריא לאיסוף — המונה של אריח הדיווחים.
+  int get reportsToCollect => _errorReportsToCollect;
   int get errorReportsToCollect => _errorReportsToCollect;
-  int get searchRecordsToCollect => _searchRecordsToCollect;
 
   /// הבדיקה האחרונה, מקומית או ברשת — "נבדק ב-" בתחתית הבית.
   DateTime? get lastCheckedAt => [
@@ -342,7 +344,16 @@ class AppSession extends ChangeNotifier {
     prepare: _prepareOffer,
     runDialog: prompts.runDialog,
     perform: recountReportsToCollect,
+    onResume: () {
+      if (!readOnly) _feedbackSync.resume();
+    },
   );
+
+  late final SearchFeedbackAutoSync _feedbackSync = SearchFeedbackAutoSync(
+    run: _syncSearchFeedback,
+    isBusy: () => _offers.busy,
+  );
+  final Completer<void> _firstFrame = Completer<void>();
 
   bool get isDownloading => _downloads.isDownloading;
   bool get isCancellingDownload => _downloads.isCancelling;
@@ -371,10 +382,10 @@ class AppSession extends ChangeNotifier {
 
   /// העבודה שבעלייה. נפרד מהבנאי כדי שבדיקות יוכלו לבנות סשן בלי להריץ אותה.
   void start() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _firstFrame.complete());
     final s = settings.settings;
     unawaited(_faq.load());
     // ספירה בלבד — גם בכונן מוגן, כדי שהבית יאמר שיש בו דיווחים.
-    unawaited(_searchFeedback.refreshOutbox());
     unawaited(_errorReports.refreshOutbox());
     _errorReportsIntro = _loadReportsIntro();
     unawaited(loadSemanticConsentAnswer());
@@ -393,7 +404,10 @@ class AppSession extends ChangeNotifier {
         unawaited(_asCheck(() async {
           await _otzaria.ensureChecked();
           _markChecked();
-        }).then((_) => _offers.request()));
+        }).then((_) {
+          _requestFeedbackSync();
+          return _offers.request();
+        }));
       });
     }
     if (appReports case final reports?) {
@@ -415,6 +429,7 @@ class AppSession extends ChangeNotifier {
     }
     _runningPoll?.cancel();
     _offers.dispose();
+    _feedbackSync.dispose();
     unawaited(_installDone.cancel());
     unawaited(_installRejected.cancel());
     settings.removeListener(_onChange);
@@ -446,6 +461,7 @@ class AppSession extends ChangeNotifier {
     if (!isActive) return;
     _syncSleepInhibition();
     _offers.onRunningState(running: _otzariaIsRunning);
+    if (!readOnly) _feedbackSync.onRunningState(running: _otzariaIsRunning);
     _offers.resume();
     _applySettings(settings.settings);
     _syncRunningPoll();
@@ -514,13 +530,11 @@ class AppSession extends ChangeNotifier {
     if (readOnly || !isActive) return;
     if (await refreshProcessState()) return;
     final reports = await _errorReports.pendingToOffer();
-    final feedback = await _searchFeedback.pendingToOffer();
     final legacy = _errorReports.unmigratedLegacy.isNotEmpty &&
         !await _notices.hasSeen(NoticesSeenStore.legacyReportsNotice);
     if (!isActive) return;
     _update(() {
       _errorReportsToCollect = reports;
-      _searchRecordsToCollect = feedback;
       _legacyReportsNotice = legacy;
     });
   }
@@ -590,6 +604,8 @@ class AppSession extends ChangeNotifier {
   Future<void> restartElevated() async {
     if (!Platform.isWindows || !_needsElevation || _elevationPending) return;
     final t = AppL10n.strings.elevation;
+    await _searchFeedback.stopAndWait();
+    if (!isActive) return;
     if (exitWouldInterrupt) {
       UiSnack.show(t.busyNotice);
       return;
@@ -677,6 +693,7 @@ class AppSession extends ChangeNotifier {
     await _autoInstallIfEnabled();
     if (!isActive) return;
     _markChecked();
+    _requestFeedbackSync();
     await _offers.request();
   }
 
@@ -684,6 +701,17 @@ class AppSession extends ChangeNotifier {
     await WidgetsBinding.instance.endOfFrame;
     await _errorReportsIntro;
     return isActive && _otzaria.launchPath != null;
+  }
+
+  Future<Duration?> _syncSearchFeedback() async {
+    await _firstFrame.future;
+    if (!isActive) return null;
+    if (exitPending) return SearchFeedbackController.minRetry;
+    return _searchFeedback.synchronize();
+  }
+
+  void _requestFeedbackSync() {
+    if (!readOnly && isActive) unawaited(_feedbackSync.request());
   }
 
   Future<void> grantSemanticConsent() async {
@@ -710,6 +738,7 @@ class AppSession extends ChangeNotifier {
           problem = t.semanticConsentBlocked;
           await _recordSemanticConsentAnswer();
         case ConsentWrite.granted:
+          _requestFeedbackSync();
           await _recordSemanticConsentAnswer();
           await _library.checkForUpdate(fresh: true);
       }
@@ -787,6 +816,8 @@ class AppSession extends ChangeNotifier {
 
   void _syncSleepInhibition() => _sleepInhibitor.setActive(
         exitWouldInterrupt ||
+            _searchFeedback.isCollecting ||
+            _searchFeedback.isUploading ||
             _launcherUpdate.isDownloading ||
             _library.downloadStatus == MirrorDownloadStatus.downloading ||
             _otzaria.downloadStatus == OtzariaDownloadStatus.downloading ||
@@ -797,8 +828,6 @@ class AppSession extends ChangeNotifier {
       longTaskRunning ||
       _errorReports.isCollecting ||
       _errorReports.isUploading ||
-      _searchFeedback.isCollecting ||
-      _searchFeedback.isUploading ||
       _uploadingReports;
 
   Future<void> installLauncherUpdate() =>
@@ -1265,6 +1294,9 @@ class _SessionLauncherHost implements LauncherUpdateHost {
 
   @override
   bool get wouldInterrupt => _session.exitWouldInterrupt;
+
+  @override
+  Future<void> settleBackgroundWork() => _session._searchFeedback.stopAndWait();
 
   @override
   Future<bool> confirmInstall(String version) =>

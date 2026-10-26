@@ -35,14 +35,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
-  late SettingsController settings;
+  late _TrackedSettings settings;
   late _FakePrompts prompts;
   final sessions = <AppSession>[];
 
   setUp(() async {
+    HttpOverrides.global = NoNetworkHttpOverrides();
     tempDir = Directory.systemTemp.createTempSync('app_session_test');
     await AppLogger.init(tempDir.path);
-    settings = SettingsController(dataDir: tempDir.path);
+    settings = _TrackedSettings(dataDir: tempDir.path);
     await settings.update(const AppSettings(autoCheckUpdates: false));
     prompts = _FakePrompts();
   });
@@ -53,8 +54,10 @@ void main() {
     }
     sessions.clear();
     LauncherCrashSession.resetForTest();
+    await settings.pending;
     settings.dispose();
     AppLogger.resetForTest();
+    HttpOverrides.global = null;
     await deleteTempDir(tempDir);
   });
 
@@ -578,6 +581,9 @@ void main() {
           seen: {NoticesSeenStore.errorReportsIntro},
         );
         final s = withPendingConsent(notices)..start();
+        await s.otzaria.ensureChecked();
+        await s.loadSemanticConsentAnswer();
+        s.otzaria.currentVersion = '0.9.90';
         await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
         expect(prompts.calls, isNot(contains('askSemantic')));
         expect(homeViewModelOf(s).semanticConsent, isTrue);
@@ -1288,4 +1294,13 @@ class _FailingLauncher extends OtzariaLauncher {
   @override
   Future<void> launch(String launchPath, {String? withUri}) async =>
       throw OtzariaUserError('הפעלה מדומה שנכשלה');
+}
+
+class _TrackedSettings extends SettingsController {
+  _TrackedSettings({required super.dataDir});
+
+  Future<void> pending = Future<void>.value();
+
+  @override
+  Future<void> update(AppSettings next) => pending = super.update(next);
 }

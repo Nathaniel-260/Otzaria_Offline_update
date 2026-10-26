@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/app_reports_controller.dart';
 import '../../controllers/error_reports_controller.dart';
-import '../../controllers/search_feedback_controller.dart';
 import '../../shell/shell_keys.dart';
 import '../../theme/theme_exports.dart';
 import '../../widgets/screen_body.dart';
@@ -17,12 +16,10 @@ class ReportsPage extends StatelessWidget {
   const ReportsPage({
     super.key,
     required this.errorReports,
-    required this.searchFeedback,
     required this.connection,
     required this.isUploadingAll,
     required this.busy,
     required this.reportsToCollect,
-    this.searchRecordsToCollect = 0,
     required this.onCollect,
     required this.onUpload,
     this.onStop,
@@ -36,7 +33,6 @@ class ReportsPage extends StatelessWidget {
   });
 
   final ErrorReportsController? errorReports;
-  final SearchFeedbackController? searchFeedback;
 
   /// `null` — עוד לא נבדק חיבור; ראו `onlineState`.
   final bool? connection;
@@ -47,7 +43,6 @@ class ReportsPage extends StatelessWidget {
 
   /// דיווחי תקלות שממתינים באוצריא, ורשומות החיפוש החכם שלצידם.
   final int reportsToCollect;
-  final int searchRecordsToCollect;
   final VoidCallback onCollect;
   final Future<void> Function()? onUpload;
   final VoidCallback? onStop;
@@ -72,7 +67,6 @@ class ReportsPage extends StatelessWidget {
     final t = context.strings.pages;
     final listenable = Listenable.merge([
       if (errorReports != null) errorReports!,
-      if (searchFeedback != null) searchFeedback!,
     ]);
     final reports = appReports;
 
@@ -158,20 +152,14 @@ class ReportsPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final sub = AppTextStyles.rowSub.copyWith(color: cs.onSurfaceVariant);
     final reports = errorReports;
-    final feedback = searchFeedback;
     final waitingReports = reports?.outboxCount ?? 0;
-    final waitingFeedback = feedback?.outboxCount ?? 0;
-    final waiting = waitingReports + waitingFeedback;
-    final collecting = reportsToCollect + searchRecordsToCollect;
-    final uploading = isUploadingAll ||
-        (reports?.isUploading ?? false) ||
-        (feedback?.isUploading ?? false);
+    final waiting = waitingReports;
+    final collecting = reportsToCollect;
+    final uploading = isUploadingAll || (reports?.isUploading ?? false);
 
     if (uploading) {
       final p = reports?.progress;
       final wait = p?.waitRemaining;
-      final feedbackPhase =
-          !(reports?.isUploading ?? false) && feedback?.isUploading == true;
       return StatusCard(
         icon: FluentIcons.send_24_regular,
         title: t.repSendingTitle,
@@ -180,21 +168,17 @@ class ReportsPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                feedbackPhase
-                    ? e.uploadingFeedbackStage
-                    : wait != null
-                        ? e.uploadWaitingStage(
-                            (wait.inMilliseconds / 1000).ceil(),
-                          )
-                        : e.uploadingStage(p?.done ?? 0, p?.total ?? 0),
+                wait != null
+                    ? e.uploadWaitingStage(
+                        (wait.inMilliseconds / 1000).ceil(),
+                      )
+                    : e.uploadingStage(p?.done ?? 0, p?.total ?? 0),
                 style: sub,
               ),
               const SizedBox(height: 8),
               AppProgressBar(
                 thin: true,
-                value: feedbackPhase || p == null || p.total == 0
-                    ? null
-                    : p.done / p.total,
+                value: p == null || p.total == 0 ? null : p.done / p.total,
               ),
             ],
           ),
@@ -206,7 +190,6 @@ class ReportsPage extends StatelessWidget {
             onPressed: () {
               onStop?.call();
               if (reports?.isUploading ?? false) reports!.stop();
-              if (feedback?.isUploading ?? false) feedback!.stop();
             },
           ),
         ],
@@ -221,7 +204,7 @@ class ReportsPage extends StatelessWidget {
             : collecting > 0
                 ? g.reportsCollectTitle(
                     reports: reportsToCollect,
-                    searchRecords: searchRecordsToCollect,
+                    searchRecords: 0,
                   )
                 : t.repNothingTitle,
         // בלי גילוי אין כפתור איסוף — גם לא מושבת.
@@ -246,7 +229,7 @@ class ReportsPage extends StatelessWidget {
         icon: FluentIcons.arrow_upload_24_regular,
         title: g.reportsCollectTitle(
           reports: reportsToCollect,
-          searchRecords: searchRecordsToCollect,
+          searchRecords: 0,
         ),
         subtitle: [
           if (waiting > 0) t.repAlsoStored(waiting),
@@ -261,8 +244,6 @@ class ReportsPage extends StatelessWidget {
               children: [
                 if (reportsToCollect > 0)
                   NewsBullet(g.reportsDisclosureReports, style: sub),
-                if (searchRecordsToCollect > 0)
-                  NewsBullet(g.reportsDisclosureSearch, style: sub),
                 const SizedBox(height: 6),
                 Text(g.reportsDisclosureStorage, style: sub),
               ],
@@ -294,7 +275,7 @@ class ReportsPage extends StatelessWidget {
       return StatusCard(
         icon: FluentIcons.send_24_regular,
         title: t.repWaitingTitle(waiting),
-        subtitle: t.repWaitingBody(withSearch: waitingFeedback > 0),
+        subtitle: t.repWaitingBody(withSearch: false),
         extra: [if (busyNote != null) busyNote],
         actions: [
           sendButton,
@@ -303,7 +284,7 @@ class ReportsPage extends StatelessWidget {
             onPressed: () => showReportsDisclosure(
               context,
               reports: waitingReports > 0,
-              search: waitingFeedback > 0,
+              search: false,
             ),
           ),
         ],

@@ -684,6 +684,7 @@ class SemanticSearchAssets {
         ),
     ],
   );
+
   /// חסם עליון למה ש-[sync] יוריד לפי [peekPending] האחרון: כל נכסי ה-release
   /// וכל קובצי המודל. `null` כשההצצה לא הצליחה.
   int? get peekedPendingBytes => _peekedPendingBytes;

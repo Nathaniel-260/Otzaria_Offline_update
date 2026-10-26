@@ -53,6 +53,22 @@ class _PluginFiltersBarState extends State<PluginFiltersBar> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _toolRow(context),
+        const SizedBox(height: 12),
+        AppDropdownField<PluginSortMode>(
+          value: _c.sortMode,
+          entries: [
+            AppMenuEntry(
+                value: PluginSortMode.recommended,
+                label: context.strings.plugins.sortRecommended),
+            AppMenuEntry(
+                value: PluginSortMode.newest,
+                label: context.strings.plugins.sortNewest),
+            AppMenuEntry(
+                value: PluginSortMode.updated,
+                label: context.strings.plugins.sortUpdated),
+          ],
+          onSelected: _c.setSortMode,
+        ),
         if (_c.shownCategories.isNotEmpty) ...[
           const SizedBox(height: 12),
           _categories(context),

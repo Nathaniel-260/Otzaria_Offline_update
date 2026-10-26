@@ -311,7 +311,6 @@ ReportsPage _reports(
   }
   return ReportsPage(
     errorReports: errors,
-    searchFeedback: null,
     connection: connection,
     isUploadingAll: progress != null,
     busy: busy,

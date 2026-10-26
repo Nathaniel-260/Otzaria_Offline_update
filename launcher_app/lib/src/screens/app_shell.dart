@@ -10,9 +10,11 @@ import 'package:path/path.dart' as p;
 
 import '../controllers/app_reports_controller.dart';
 import '../controllers/download_plan.dart';
+import '../controllers/error_reports_controller.dart';
 import '../controllers/launcher_update_flow.dart';
 import '../controllers/otzaria_module_controller.dart' show OtzariaModuleStatus;
 import '../controllers/plugins_module_controller.dart' show PluginsModuleStatus;
+import '../controllers/search_feedback_controller.dart';
 import '../flows/library_flows.dart'
     show
         capturePersonalVersion,
@@ -168,6 +170,8 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       noticesStore: widget.noticesStore,
       appReports: widget.appReports,
       sleepInhibitor: widget.sleepInhibitor,
+      searchFeedback: widget.searchFeedback,
+      errorReports: widget.errorReports,
     )
       ..addListener(_onSessionChange)
       ..addListener(_onSessionChangeInStore);
@@ -351,8 +355,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       uploadAllReports(
         context,
         errorReports: _session.errorReports,
-        searchFeedback: _session.searchFeedback,
-        isCancelled: isCancelled,
         onActiveChanged: onActiveChanged,
         onUploadingChanged: onUploadingChanged,
       );
@@ -447,9 +449,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       s.errorReports,
       readOnly: widget.readOnly,
       isOtzariaRunning: s.refreshProcessState,
-      searchFeedback: s.searchFeedback,
       disclosedReports: s.errorReportsToCollect,
-      disclosedSearchRecords: s.searchRecordsToCollect,
     );
     if (mounted) await s.recountReportsToCollect();
   }
@@ -490,7 +490,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       // מוני הדיווחים והשליחה אינם מעירים את הסשן כולו.
       listenable: Listenable.merge([
         s.errorReports,
-        s.searchFeedback,
         if (s.appReports != null) s.appReports!,
       ]),
       builder: (context, _) {
@@ -652,12 +651,10 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         ),
       ShellSection.reports => ReportsPage(
           errorReports: s.errorReports,
-          searchFeedback: s.searchFeedback,
           connection: s.isCheckingOnline ? null : onlineState(s),
           isUploadingAll: s.uploadingReports,
           busy: s.longTaskRunning,
           reportsToCollect: s.errorReportsToCollect,
-          searchRecordsToCollect: s.searchRecordsToCollect,
           onCollect: () => unawaited(_collectReports()),
           onUpload: s.uploadReports,
           onStop: s.stopReports,

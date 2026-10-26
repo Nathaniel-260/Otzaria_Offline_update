@@ -684,12 +684,10 @@ void main() {
                       Expanded(
                         child: ReportsPage(
                           errorReports: null,
-                          searchFeedback: null,
                           connection: null,
                           isUploadingAll: false,
                           busy: false,
                           reportsToCollect: counts.reports,
-                          searchRecordsToCollect: counts.searchRecords,
                           onCollect: () {},
                           onUpload: null,
                         ),

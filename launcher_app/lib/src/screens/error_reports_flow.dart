@@ -1,8 +1,6 @@
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../controllers/error_reports_controller.dart';
-import '../controllers/search_feedback_controller.dart';
-import '../services/app_logger.dart';
 import '../widgets/ui_snack.dart';
 
 enum DriveCollectOutcome {
@@ -17,14 +15,12 @@ enum DriveCollectOutcome {
 }
 
 /// "איסוף לכונן" מדף הדיווחים. הלחיצה היא האישור, ולכן אוספים רק מה שהגילוי
-/// שמעל הכפתור הציג: [disclosedReports] / [disclosedSearchRecords].
+/// שמעל הכפתור הציג: [disclosedReports].
 Future<DriveCollectOutcome> collectReportsToDrive(
   ErrorReportsController controller, {
   bool readOnly = false,
   required Future<bool> Function() isOtzariaRunning,
-  SearchFeedbackController? searchFeedback,
   required int disclosedReports,
-  required int disclosedSearchRecords,
 }) async {
   if (readOnly) return DriveCollectOutcome.blocked;
   final s = AppL10n.strings.errorReports;
@@ -33,13 +29,11 @@ Future<DriveCollectOutcome> collectReportsToDrive(
     return DriveCollectOutcome.otzariaOpen;
   }
   final count = await controller.pendingToOffer();
-  final feedbackCount = await searchFeedback?.pendingToOffer() ?? 0;
-  if ((count > 0 && disclosedReports <= 0) ||
-      (feedbackCount > 0 && disclosedSearchRecords <= 0)) {
+  if (count > 0 && disclosedReports <= 0) {
     UiSnack.show(s.collectDisclosureRefreshedSnack);
     return DriveCollectOutcome.disclosureStale;
   }
-  if (count + feedbackCount <= 0) return DriveCollectOutcome.nothing;
+  if (count <= 0) return DriveCollectOutcome.nothing;
   if (await isOtzariaRunning()) {
     UiSnack.show(s.collectOtzariaOpenSnack);
     return DriveCollectOutcome.otzariaOpen;

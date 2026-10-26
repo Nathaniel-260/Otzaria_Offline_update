@@ -365,12 +365,10 @@ HomeViewModel homeViewModelOf(AppSession s) {
     customApps: customApps.apps.length,
     customAppsPending: customApps.pendingApps.length,
     customAppsUnannounced: customApps.unannouncedApps.isNotEmpty,
-    reportsToSend: s.errorReports.outboxCount + s.searchFeedback.outboxCount,
+    reportsToSend: s.errorReports.outboxCount,
     reportsToCollect: s.reportsToCollect,
     toolReportsPending: s.appReports?.pendingCount ?? 0,
-    reportsSending: s.uploadingReports ||
-        s.errorReports.isUploading ||
-        s.searchFeedback.isUploading,
+    reportsSending: s.uploadingReports || s.errorReports.isUploading,
     reportsIntro: s.showsReportsIntro,
     autoInstallSkipped: s.autoInstallSkipped,
     offersElevation: s.offersElevation,

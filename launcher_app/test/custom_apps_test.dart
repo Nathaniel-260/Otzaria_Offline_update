@@ -24,9 +24,6 @@ import 'package:launcher_app/src/services/announced_apps_store.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/byte_size.dart';
 import 'package:launcher_app/src/services/custom_app_detection_snapshot.dart';
-import 'package:launcher_app/src/theme/theme_exports.dart';
-import 'package:launcher_app/src/widgets/settings_card.dart';
-import 'package:launcher_app/src/widgets/sub_page_header.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
@@ -534,7 +531,10 @@ void main() {
       // החזרת המיקוד לחלון אחרי הבורר עוברת בערוץ פלטפורמה אמיתי.
       Future<void> pick(String path) async {
         picker.next = path;
-        await tester.tap(find.text('בחירת קובץ'));
+        await tester.tap(find.descendant(
+            of: find.byType(CustomAppLocalFileSection),
+            matching:
+                find.text(AppL10n.strings.customApps.pickInstallerButton)));
         await tester.runAsync(
           () => Future<void>.delayed(const Duration(milliseconds: 50)),
         );
@@ -545,7 +545,7 @@ void main() {
           tester.widget(find.byType(CustomAppLocalFileSection));
 
       await openForm(tester);
-      await tester.tap(find.text('מקובץ שלי'));
+      await tester.tap(find.text(AppL10n.strings.customApps.sourceFileOption));
       await tester.pumpAndSettle();
 
       await pick(p.join(tempDir.path, sourceName));
@@ -562,9 +562,9 @@ void main() {
     Finder switchOf(String label) => find.descendant(
           of: find.ancestor(
             of: find.text(label),
-            matching: find.byType(SettingsActionTile),
+            matching: find.byType(FormCheckRow),
           ),
-          matching: find.byType(Switch),
+          matching: find.byType(Checkbox),
         );
 
     // pumpAndSettle אינו נרגע אחרי שמירה אמיתית; מחכים לרשומה עצמה.
@@ -590,7 +590,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final toggle = switchOf('התקנה רגילה במקום התקנה מהירה');
-      expect(tester.widget<Switch>(toggle).value, isFalse);
+      expect(tester.widget<Checkbox>(toggle).value, isFalse);
       await tester.tap(toggle);
       await tester.pump();
 
@@ -611,7 +611,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final interactive = switchOf('התקנה רגילה במקום התקנה מהירה');
-      expect(tester.widget<Switch>(interactive).value, isTrue);
+      expect(tester.widget<Checkbox>(interactive).value, isTrue);
       await tester.tap(switchOf('הקובץ הוא התוכנה עצמה'));
       await tester.pump();
       expect(interactive, findsNothing);

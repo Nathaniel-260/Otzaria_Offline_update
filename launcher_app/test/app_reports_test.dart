@@ -564,7 +564,6 @@ void main() {
       Widget page({required bool checking, bool readOnly = false}) =>
           ReportsPage(
             errorReports: null,
-            searchFeedback: null,
             connection: null,
             isUploadingAll: false,
             busy: false,
@@ -606,7 +605,6 @@ void main() {
         tester,
         ReportsPage(
           errorReports: null,
-          searchFeedback: null,
           connection: true,
           isUploadingAll: false,
           busy: false,

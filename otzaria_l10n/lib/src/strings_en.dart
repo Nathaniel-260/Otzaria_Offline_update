@@ -3433,9 +3433,6 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get semanticFeedbackFailed =>
       'Training data transfer did not finish. You can try again; details were saved to the log.';
   @override
-  String get semanticDownloadPrompt =>
-      'Download smart search files for the offline computer too? The files may take several gigabytes. Smart search requires consent in Otzaria to collect training data. Downloading does not change that consent.';
-  @override
   String get semanticConsentRequired =>
       'Smart search files are on the drive. Installing them requires consent to collect training data. You can agree here while Otzaria is closed, or enable consent in Otzaria settings and check again.';
   @override
@@ -4476,6 +4473,7 @@ class _ErrorReports extends ErrorReportsStrings {
   @override
   String uploadPendingUnchecked(int count) =>
       '$count ${_reports(count)} waiting to be uploaded. The network connection has not been checked yet — check the connection to upload';
+  @override
   String get uploadingFeedbackStage =>
       'Sending the smart search improvement data…';
   @override

@@ -8,6 +8,7 @@ import 'package:test/test.dart';
 /// מה שמצוטט במירכאות ואינו תווית בכלי: תפריטים של Windows, של אוצריא ושל
 /// אתרים אחרים — המשתמש מוצא אותם שם, בשמם שם.
 const _external = {
+  'הוצאה בטוחה', // הסרת כונן ב-Windows
   'הפעל כמנהל', // תפריט ההקשר של Windows
   'אפשר במכשיר', // Windows Defender
   'Applications', // macOS

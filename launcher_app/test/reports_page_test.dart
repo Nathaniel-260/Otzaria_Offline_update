@@ -20,7 +20,6 @@ void main() {
   }) =>
       ReportsPage(
         errorReports: null,
-        searchFeedback: null,
         connection: null,
         isUploadingAll: false,
         busy: busy,

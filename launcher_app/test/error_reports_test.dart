@@ -377,296 +377,130 @@ void main() {
     final pages = stringsOf().pages;
     expect(pages.repWaitingTitle(1), startsWith('1 דיווח ממתין'));
     expect(pages.repWaitingTitle(2), startsWith('2 דיווחים ממתינים'));
-    final library = stringsOf().libraryDomain;
-    expect(
-      library.semanticFeedbackUploaded(1, 1),
-      'נשלחה 1 רשומת נתוני אימון; נשארה 1 בכונן',
-    );
-    expect(
-      library.semanticFeedbackUploaded(2, 3),
-      'נשלחו 2 רשומות נתוני אימון; נשארו 3 בכונן',
-    );
-    expect(
-      library.semanticFeedbackCollected(1),
-      'נאספה 1 רשומת נתוני אימון לכונן',
-    );
   });
 
   group('איסוף לכונן מדף הדיווחים', () {
-    /// מה שהגילוי בדף הציג — כברירת מחדל, הכול.
     Future<DriveCollectOutcome> collect(
       ErrorReportsController c, {
-      SearchFeedbackController? feedback,
       bool readOnly = false,
       int disclosedReports = 1,
-      int disclosedSearchRecords = 1,
     }) =>
         collectReportsToDrive(
           c,
           readOnly: readOnly,
           isOtzariaRunning: () async => running,
-          searchFeedback: feedback,
           disclosedReports: disclosedReports,
-          disclosedSearchRecords: disclosedSearchRecords,
         );
 
     List<String> captureSnacks() {
       final messages = <String>[];
-      final previousPrint = debugPrint;
+      final previous = debugPrint;
       debugPrint = (String? message, {int? wrapWidth}) {
         if (message?.startsWith('UiSnack') ?? false) messages.add(message!);
       };
-      addTearDown(() => debugPrint = previousPrint);
+      addTearDown(() => debugPrint = previous);
       return messages;
     }
 
-    // הלחיצה על "איסוף לכונן" היא האישור — בלי "לאסוף?" נוסף.
-    testWidgets('collects at once, without any dialog', (tester) async {
+    testWidgets('collects immediately without a dialog', (tester) async {
       final queue = _QaQueue(2);
       final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => queue,
-      );
+          outbox: outbox, resolveQueue: () async => queue);
       addTearDown(c.dispose);
       await host(tester);
-      final result = await collect(c);
+      expect(await collect(c), DriveCollectOutcome.collected);
       await tester.pump();
-      expect(result, DriveCollectOutcome.collected);
       expect(find.byType(AppDialog), findsNothing);
       expect(queue.collections, 1);
+      expect(outbox.reports, hasLength(2));
       await tester.pump(const Duration(seconds: 7));
     });
 
-    test('empty sources never collect', () async {
+    test('empty reports never collect', () async {
       final c = controller();
       addTearDown(c.dispose);
-      addTearDown(feedback.dispose);
-      expect(await collect(c, feedback: feedback), DriveCollectOutcome.nothing);
-      expect(transport.collections, 0);
+      expect(await collect(c), DriveCollectOutcome.nothing);
+      expect(outbox.reports, isEmpty);
     });
 
-    // הגילוי נבנה מהספירה הקודמת; סוג שהופיע אחריה לא נאסף בלי שורה בדף.
-    for (final stale in ['reports', 'search']) {
-      test('a category the disclosure did not show is not collected ($stale)',
-          () async {
-        final queue = _QaQueue(2);
-        final c = ErrorReportsController(
-          outbox: outbox,
-          resolveQueue: () async => queue,
-        );
-        addTearDown(c.dispose);
-        addTearDown(feedback.dispose);
-        final snacks = captureSnacks();
-        final result = await collect(
-          c,
-          feedback: feedback,
-          disclosedReports: stale == 'reports' ? 0 : 2,
-          disclosedSearchRecords: stale == 'search' ? 0 : 3,
-        );
-        expect(result, DriveCollectOutcome.disclosureStale);
-        // המשתמש יודע שצריך לעיין וללחוץ שוב.
-        expect(
-          snacks.single,
-          contains(stringsOf().errorReports.collectDisclosureRefreshedSnack),
-        );
-        expect(queue.collections, 0);
-        expect(transport.collections, 0);
-        expect(outbox.reports, isEmpty);
+    test('new reports require an updated disclosure before collection',
+        () async {
+      final queue = _QaQueue(2);
+      final c = ErrorReportsController(
+          outbox: outbox, resolveQueue: () async => queue);
+      addTearDown(c.dispose);
+      final messages = captureSnacks();
+      expect(await collect(c, disclosedReports: 0),
+          DriveCollectOutcome.disclosureStale);
+      expect(messages.single, contains(t.collectDisclosureRefreshedSnack));
+      expect(queue.collections, 0);
+      expect(outbox.reports, isEmpty);
+      expect(
+          await collect(c, disclosedReports: 2), DriveCollectOutcome.collected);
+      expect(outbox.reports, hasLength(2));
+    });
 
-        // אחרי שהגילוי התעדכן — הלחיצה הבאה אוספת.
+    for (final partial in [false, true]) {
+      test('the collection summary covers reports only ($partial)', () async {
+        final queue = _QaQueue(2, partial: partial);
+        final c = ErrorReportsController(
+            outbox: outbox, resolveQueue: () async => queue);
+        addTearDown(c.dispose);
+        final messages = captureSnacks();
+        expect(await collect(c), DriveCollectOutcome.collected);
+        expect(queue.pending, partial ? 1 : 0);
+        expect(outbox.reports, hasLength(partial ? 1 : 2));
+        expect(c.isCollecting, isFalse);
+        expect(messages, hasLength(1));
         expect(
-          await collect(
-            c,
-            feedback: feedback,
-            disclosedReports: 2,
-            disclosedSearchRecords: 3,
-          ),
-          DriveCollectOutcome.collected,
-        );
-        expect(outbox.reports, hasLength(2));
-        expect(transport.carried, 3);
+            messages.single,
+            endsWith(partial
+                ? t.collectPartialSnack(
+                    1, stringsOf().errorReportsDomain.someNotCollected)
+                : t.collectedSnack(2)));
       });
     }
 
-    for (final reportFailure in [false, true]) {
-      for (final feedbackFailure in [false, true]) {
-        test(
-            'combined summary preserves partial results ($reportFailure, $feedbackFailure)',
-            () async {
-          final queue = _QaQueue(2, partial: reportFailure);
-          final c = ErrorReportsController(
-            outbox: outbox,
-            resolveQueue: () async => queue,
-          );
-          final transport = _CollectionFeedback()
-            ..failCollection = feedbackFailure;
-          final feedback = SearchFeedbackController(
-            transport: transport,
-            resolveSource: () async => 'source',
-          );
-          addTearDown(c.dispose);
-          addTearDown(feedback.dispose);
-          final messages = captureSnacks();
-          await collect(c, feedback: feedback);
-          expect(queue.pending, reportFailure ? 1 : 0);
-          expect(outbox.reports.length, reportFailure ? 1 : 2);
-          expect(transport.carried, feedbackFailure ? 0 : 3);
-          expect(transport.pendingEvents, feedbackFailure ? 3 : 0);
-          expect(c.isCollecting, isFalse);
-          expect(feedback.isCollecting, isFalse);
-          expect(messages, hasLength(1));
-          expect(
-              messages.single,
-              contains(feedbackFailure
-                  ? stringsOf().libraryDomain.semanticFeedbackFailed
-                  : stringsOf().libraryDomain.semanticFeedbackCollected(3)));
-          expect(
-              messages.single,
-              contains(reportFailure
-                  ? t.collectPartialSnack(
-                      1, stringsOf().errorReportsDomain.someNotCollected)
-                  : t.collectedSnack(2)));
-          if (feedbackFailure) {
-            transport.failCollection = false;
-            await collect(c, feedback: feedback);
-            expect(transport.carried, 3);
-          }
-        });
-      }
-    }
-
-    test('Otzaria reopening between stages preserves feedback for retry',
-        () async {
-      final messages = captureSnacks();
-      final queue = _QaQueue(2, onCollect: () => running = true);
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => queue,
-      );
-      final transport = _CollectionFeedback();
-      final feedback = SearchFeedbackController(
-        transport: transport,
-        resolveSource: () async => 'source',
-      );
-      addTearDown(c.dispose);
-      addTearDown(feedback.dispose);
-      await collect(c, feedback: feedback);
-      expect(messages, hasLength(1));
-      expect(messages.single, contains(t.collectedSnack(2)));
-      expect(messages.single,
-          contains(stringsOf().libraryDomain.semanticFeedbackNotCollected));
-      expect(outbox.reports.length, 2);
-      expect(transport.collections, 0);
-      expect(transport.pendingEvents, 3);
-      running = false;
-      await collect(c, feedback: feedback);
-      expect(transport.carried, 3);
-      expect(queue.collections, 1);
-    });
-
-    test('revoking feedback consent mid-collection preserves its source',
-        () async {
-      var consent = true;
-      final queue = _QaQueue(2, onCollect: () => consent = false);
-      final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => queue,
-      );
-      final transport = _CollectionFeedback();
-      final feedback = SearchFeedbackController(
-        transport: transport,
-        resolveSource: () async => consent ? 'source' : null,
-      );
-      addTearDown(c.dispose);
-      addTearDown(feedback.dispose);
-      await collect(c, feedback: feedback);
-      expect(outbox.reports.length, 2);
-      expect(transport.pendingEvents, 3);
-      expect(transport.carried, 0);
-    });
-
-    test('Otzaria reopening during counting prevents the collection', () async {
-      final messages = captureSnacks();
+    test('reopening Otzaria while counting prevents collection', () async {
       final queue = _QaQueue(2, onCount: () => running = true);
       final c = ErrorReportsController(
-        outbox: outbox,
-        resolveQueue: () async => queue,
-      );
-      final transport = _CollectionFeedback();
-      final feedback = SearchFeedbackController(
-        transport: transport,
-        resolveSource: () async => 'source',
-      );
+          outbox: outbox, resolveQueue: () async => queue);
       addTearDown(c.dispose);
-      addTearDown(feedback.dispose);
-      expect(
-        await collect(c, feedback: feedback),
-        DriveCollectOutcome.otzariaOpen,
-      );
+      final messages = captureSnacks();
+      expect(await collect(c), DriveCollectOutcome.otzariaOpen);
       expect(queue.collections, 0);
-      expect(transport.carried, 0);
       expect(outbox.reports, isEmpty);
       expect(messages.single, contains(t.collectOtzariaOpenSnack));
     });
 
-    for (final reports in [0, 2]) {
-      test('one click collects reports ($reports) and feedback', () async {
-        final c = controller(pending: reports);
-        final transport = _CollectionFeedback();
-        final feedback = SearchFeedbackController(
-          transport: transport,
-          resolveSource: () async => 'source',
-        );
-        addTearDown(c.dispose);
-        addTearDown(feedback.dispose);
-        await collect(c, feedback: feedback, disclosedReports: reports);
-        expect(outbox.reports.length, reports);
-        expect(transport.carried, 3);
-      });
-    }
-
     for (final readOnly in [false, true]) {
-      test('collection preserves consent and read-only guards ($readOnly)',
-          () async {
+      test('collection preserves the read-only guard ($readOnly)', () async {
         final c = controller(pending: 2);
         addTearDown(c.dispose);
-        addTearDown(feedback.dispose);
-        final result = await collect(c, readOnly: readOnly, feedback: feedback);
         expect(
-          result,
-          readOnly
-              ? DriveCollectOutcome.blocked
-              : DriveCollectOutcome.collected,
-        );
-        expect(outbox.reports.length, readOnly ? 0 : 2);
+            await collect(c, readOnly: readOnly),
+            readOnly
+                ? DriveCollectOutcome.blocked
+                : DriveCollectOutcome.collected);
+        expect(outbox.reports, hasLength(readOnly ? 0 : 2));
       });
     }
 
-    // הכפתור נשאר כשאוצריא פתוחה (הספירה אינה מתאפסת) — הלחיצה אומרת למה.
-    test(
-        'Otzaria open: a message, nothing collected; after closing — collected',
+    test('open Otzaria preserves reports for collection after closing',
         () async {
-      final messages = captureSnacks();
       final c = controller(pending: 2);
+      addTearDown(c.dispose);
+      final messages = captureSnacks();
       running = true;
       expect(await collect(c), DriveCollectOutcome.otzariaOpen);
       expect(outbox.reports, isEmpty);
       expect(messages, [contains(t.collectOtzariaOpenSnack)]);
-
       running = false;
       expect(await collect(c), DriveCollectOutcome.collected);
       expect(outbox.reports, hasLength(2));
     });
 
-    test('N>0 → the reports reach the outbox', () async {
-      final c = controller(pending: 3);
-      await collect(c);
-      expect(outbox.reports, hasLength(3));
-      expect(c.outboxCount, 3);
-    });
-
-    // תורי Hive ישנים מוסברים בהודעה בבית — הלחיצה אינה פותחת עליהם דו-שיח.
-    testWidgets('legacy Hive queues: no dialog, and it collects at once',
+    testWidgets('legacy Hive notice does not interrupt collection',
         (tester) async {
       final c = ErrorReportsController(
         outbox: outbox,
@@ -683,25 +517,21 @@ void main() {
     });
   });
 
-  // האיסוף בלי דו-שיח: הגילוי שבדף הוא ההסכמה, ולכן הוא חייב לעמוד ליד הכפתור.
   group('הגילוי על הפרטיות לצד כפתור האיסוף', () {
     final g = stringsOf().guide;
 
     ReportsPage page({
       int reports = 0,
-      int searchRecords = 0,
       bool busy = false,
       bool readOnly = false,
       VoidCallback? onCollect,
     }) =>
         ReportsPage(
           errorReports: null,
-          searchFeedback: null,
           connection: null,
           isUploadingAll: false,
           busy: busy,
           reportsToCollect: reports,
-          searchRecordsToCollect: searchRecords,
           onCollect: onCollect ?? () {},
           onUpload: null,
           readOnly: readOnly,
@@ -735,26 +565,6 @@ void main() {
 
       await tester.tap(button);
       expect(collected, 1);
-    });
-
-    testWidgets('נתוני אימון: שורה נפרדת, ונספרות בנפרד בכותרת', (
-      tester,
-    ) async {
-      await pumpScreen(tester, page(reports: 1, searchRecords: 3));
-      expect(
-        find.text(g.reportsCollectTitle(reports: 1, searchRecords: 3)),
-        findsOneWidget,
-      );
-      expect(inDisclosure(g.reportsDisclosureReports), findsOneWidget);
-      expect(inDisclosure(g.reportsDisclosureSearch), findsOneWidget);
-      expect(inDisclosure(g.reportsDisclosureStorage), findsOneWidget);
-    });
-
-    testWidgets('נתוני אימון בלבד — בלי שורת הדיווחים', (tester) async {
-      await pumpScreen(tester, page(searchRecords: 2));
-      expect(find.byKey(ShellKeys.reportsCollect), findsOneWidget);
-      expect(inDisclosure(g.reportsDisclosureSearch), findsOneWidget);
-      expect(find.text(g.reportsDisclosureReports), findsNothing);
     });
 
     testWidgets('בלי כפתור אין גילוי, ובכונן מוגן אין אף אחד מהם', (
@@ -830,18 +640,13 @@ void main() {
       tempDir.deleteSync(recursive: true);
     });
 
-    /// דף הדיווחים. החיבור — אותו כלל של `onlineState`: בדיקה מקוונת אחת
-    /// שהצליחה מספיקה.
     ReportsPage home(
       ErrorReportsController reports, {
       bool readOnly = false,
       Future<void> Function()? onUpload,
-      int toCollect = 0,
     }) =>
         ReportsPage(
-          readOnly: readOnly,
           errorReports: reports,
-          searchFeedback: feedback,
           connection: connectionOf([
             (otzaria.onlineCheckedAt, otzaria.onlineCheckError),
             (library.onlineCheckedAt, library.onlineCheckError),
@@ -850,37 +655,11 @@ void main() {
           ]),
           isUploadingAll: false,
           busy: false,
-          reportsToCollect: toCollect,
+          reportsToCollect: 0,
           onCollect: () {},
           onUpload: onUpload ?? () async {},
+          readOnly: readOnly,
         );
-
-    // מחשב מקוון עם דיווחים בכונן ועוד באוצריא: שולחים בלי לאסוף קודם.
-    testWidgets('יש מה לאסוף וגם מה לשלוח — שני הכפתורים, השליחה רק כשמחובר',
-        (tester) async {
-      outbox
-        ..add('a')
-        ..add('b');
-      final c = controller();
-      await c.refreshOutbox();
-      var uploads = 0;
-      await pumpScreen(
-        tester,
-        home(c, toCollect: 3, onUpload: () async => uploads++),
-      );
-      expect(find.byKey(ShellKeys.reportsCollect), findsOneWidget);
-      expect(
-        find.text(stringsOf().pages.repSendStoredButton(2)),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(ShellKeys.reportsSend));
-      expect(uploads, 1);
-
-      otzaria.onlineCheckError = 'no network';
-      await pumpScreen(tester, home(c, toCollect: 3));
-      expect(find.byKey(ShellKeys.reportsCollect), findsOneWidget);
-      expect(find.byKey(ShellKeys.reportsSend), findsNothing);
-    });
 
     testWidgets('הכפתור מעלה את הדיווחים בלבד, והסיכום הוא שלהם בלבד',
         (tester) async {
@@ -905,13 +684,8 @@ void main() {
         }),
       );
 
-      expect(sendOffer(5), findsOneWidget);
-      expect(find.text(libraryT.semanticFeedbackUploadAction), findsNothing);
-      expect(find.text(libraryT.semanticFeedbackUploadBody(3)), findsNothing);
-
-      await tester.tap(sendOffer(5));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(libraryT.semanticFeedbackUploadAction));
+      expect(sendOffer(2), findsOneWidget);
+      await tester.tap(sendOffer(2));
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsNothing);
@@ -930,14 +704,14 @@ void main() {
       await c.refreshOutbox();
       otzaria.onlineCheckError = 'no network';
 
-      await pumpScreen(tester, home(c, feedback: feedback));
-      expect(storedOffline(3), findsOneWidget);
-      expect(sendOffer(3), findsNothing);
+      await pumpScreen(tester, home(c));
+      expect(storedOffline(2), findsOneWidget);
+      expect(sendOffer(2), findsNothing);
 
       otzaria.onlineCheckError = null;
-      await pumpScreen(tester, home(c, feedback: feedback));
-      expect(storedOffline(3), findsNothing);
-      expect(sendOffer(3), findsOneWidget);
+      await pumpScreen(tester, home(c));
+      expect(storedOffline(2), findsNothing);
+      expect(sendOffer(2), findsOneWidget);
     });
 
     testWidgets('בלי בדיקה מקוונת מוצלחת אין כפתור', (tester) async {
@@ -949,59 +723,6 @@ void main() {
       expect(storedUnchecked(1), findsOneWidget);
       expect(sendOffer(1), findsNothing);
       expect(storedOffline(1), findsNothing);
-    });
-
-    testWidgets('עצירה בין שלבי ההעלאה משאירה את המשוב בכונן', (tester) async {
-      outbox.add('a');
-      final c = controller();
-      await c.refreshOutbox();
-      final transport = _CountFeedback(carried: 2);
-      final feedback = SearchFeedbackController(
-        transport: transport,
-        resolveSource: () async => null,
-      );
-      addTearDown(feedback.dispose);
-      final gate = Completer<void>();
-      outbox.beforeCount =
-          () => outbox.reports.isEmpty ? gate.future : Future<void>.value();
-      var stopped = false;
-      late BuildContext ctx;
-      await pumpScreen(tester, Builder(builder: (context) {
-        ctx = context;
-        return ReportsPage(
-          errorReports: c,
-          searchFeedback: feedback,
-          connection: true,
-          isUploadingAll: true,
-          busy: false,
-          reportsToCollect: 0,
-          onCollect: () {},
-          onUpload: null,
-          onStop: () => stopped = true,
-        );
-      }));
-      final uploading = uploadAllReports(
-        ctx,
-        errorReports: c,
-        searchFeedback: feedback,
-        isCancelled: () => stopped,
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(
-          find.text(stringsOf().libraryDomain.semanticFeedbackUploadAction));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(c.isUploading, isFalse);
-      expect(feedback.isUploading, isFalse);
-      await tester.tap(find.text(t.uploadStopButton));
-      gate.complete();
-      await tester.pump();
-      final result = await uploading;
-      expect(transport.uploads, 0);
-      expect(transport.carried, 2);
-      expect(result?.severity, ReportsUploadSeverity.info);
-      await tester.pumpWidget(const SizedBox.shrink());
     });
 
     testWidgets('רק בדיקת הלאנצ׳ר הצליחה: אפשר להעלות', (tester) async {
@@ -1016,58 +737,6 @@ void main() {
 
     testWidgets('העלאה שנכשלה: שגיאה אחת, בלי שורות נוספות', (tester) async {
       outbox.add('a');
-      final transport = _CountFeedback(carried: 2, throwOnUpload: true);
-      final feedback = SearchFeedbackController(
-        transport: transport,
-        resolveSource: () async => null,
-      );
-      addTearDown(feedback.dispose);
-      final c = controller();
-      await c.refreshOutbox();
-      await feedback.refreshOutbox();
-      final libraryT = stringsOf().libraryDomain;
-      final printed = <String>[];
-      final originalPrint = debugPrint;
-      debugPrint = (message, {wrapWidth}) => printed.add(message ?? '');
-      late BuildContext ctx;
-      await pumpScreen(
-        tester,
-        Builder(builder: (context) {
-          ctx = context;
-          return home(
-            c,
-            feedback: feedback,
-            onUpload: () async => outcome = await uploadAllReports(
-              ctx,
-              errorReports: c,
-              searchFeedback: feedback,
-            ),
-          );
-        }),
-      );
-      await tester.tap(sendOffer(3));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(libraryT.semanticFeedbackUploadAction));
-      await tester.pumpAndSettle();
-      debugPrint = originalPrint;
-      expect(outcome?.severity, ReportsUploadSeverity.error);
-
-      expect(outbox.reports, isEmpty);
-      expect(printed, [
-        'UiSnack ללא overlay: ${t.uploadSummary(1, 0, 0)}\n'
-            '${libraryT.semanticFeedbackFailed}',
-      ]);
-    });
-
-    testWidgets('דיווחים שנכשלו: המשוב לא עולה, ונשאר בסיכום כממתין',
-        (tester) async {
-      outbox.add('a');
-      final transport = _CountFeedback(carried: 2);
-      final feedback = SearchFeedbackController(
-        transport: transport,
-        resolveSource: () async => null,
-      );
-      addTearDown(feedback.dispose);
       final c = controller(
         client: MockClient((_) async => http.Response('oops', 500)),
       );
@@ -1075,25 +744,8 @@ void main() {
       final printed = <String>[];
       final originalPrint = debugPrint;
       debugPrint = (message, {wrapWidth}) => printed.add(message ?? '');
-      late BuildContext ctx;
-      await pumpScreen(
-        tester,
-        Builder(builder: (context) {
-          ctx = context;
-          return home(
-            c,
-            feedback: feedback,
-            onUpload: () async => outcome = await uploadAllReports(
-              ctx,
-              errorReports: c,
-              searchFeedback: feedback,
-            ),
-          );
-        }),
-      );
-      await tester.tap(sendOffer(3));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(libraryT.semanticFeedbackUploadAction));
+      final ctx = await host(tester);
+      final result = await uploadAllReports(ctx, errorReports: c);
       await tester.pumpAndSettle();
       debugPrint = originalPrint;
 

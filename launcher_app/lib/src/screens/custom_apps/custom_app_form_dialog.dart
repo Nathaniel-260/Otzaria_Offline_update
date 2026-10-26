@@ -485,6 +485,14 @@ class _CustomAppFormDialogState extends State<CustomAppFormDialog> {
                 value: _portableFile,
                 onChanged: (value) => setState(() => _portableFile = value),
               ),
+              if (!_portableFile)
+                FormCheckRow(
+                  label: t.interactiveInstallLabel,
+                  help: t.interactiveInstallHint,
+                  value: _interactiveInstall,
+                  onChanged: (value) =>
+                      setState(() => _interactiveInstall = value),
+                ),
               SectionLabel(t.formStepDetails),
               FormTextField(
                 label: t.nameLabel,

@@ -2190,8 +2190,7 @@ UI for *Otzaria's* reports: a "reports" tile on the home page that appears only 
 there is something to collect or send, and the reports page behind it — "collect from
 Otzaria" (`collectReportsToDrive`: the disclosure above the button is the consent, so
 a category it did not show is not collected — it recounts instead) and **one** upload button
-(`ReportsPage` → `uploadAllReports`, which uploads the reports and the
-smart-search feedback in sequence and reports one summary). `ReportOfferCoordinator`
+(`ReportsPage` → `uploadAllReports`, reports only). `ReportOfferCoordinator`
 still decides *when*, but its `perform` only counts (`recountReportsToCollect`); nothing
 is collected without a click. The upload button appears only while some module's last
 online check succeeded (`onlineState` / `connectionOf`); otherwise only a caption says
