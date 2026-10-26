@@ -407,7 +407,7 @@ class _Task extends TaskStrings {
       : 'Nothing is lost: open books, bookmarks and notes will wait for you exactly where you left them.';
   @override
   String get closeAfterWizardBody =>
-      'The setup wizard opened Otzaria. It needs to be closed to install the Otzaria library.';
+      'The setup wizard opened Otzaria. Close Otzaria to install the Otzaria library.';
   @override
   String get closeOtzariaAndContinue => 'Close Otzaria and continue';
   @override
@@ -505,7 +505,7 @@ class _Task extends TaskStrings {
   }) {
     if (firstInstall) {
       if (library && libraryNote) {
-        return 'Otzaria and its library were installed on this computer, but one thing is left to do — see the Otzaria library row. You can disconnect the drive.';
+        return 'Otzaria and its library were installed on this computer, but one thing is left to do — see the library row. You can disconnect the drive.';
       }
       return library
           ? 'Otzaria and its library are installed on this computer and ready for study. You can disconnect the drive.'

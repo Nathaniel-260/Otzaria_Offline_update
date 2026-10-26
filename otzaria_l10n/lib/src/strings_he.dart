@@ -400,7 +400,7 @@ class _Task extends TaskStrings {
       : 'שום דבר לא הולך לאיבוד: הספרים שפתוחים, הסימניות וההערות יחכו לך בדיוק איפה שהשארת.';
   @override
   String get closeAfterWizardBody =>
-      'אשף ההתקנה פתח את אוצריא. כדי להתקין את ספריית אוצריא צריך לסגור אותה.';
+      'אשף ההתקנה פתח את אוצריא. כדי להתקין את ספריית אוצריא צריך לסגור את אוצריא.';
   @override
   String get closeOtzariaAndContinue => 'סגירת אוצריא והמשך';
   @override
@@ -496,7 +496,7 @@ class _Task extends TaskStrings {
   }) {
     if (firstInstall) {
       if (library && libraryNote) {
-        return 'תוכנת אוצריא וספריית אוצריא הותקנו במחשב הזה, אבל נשאר דבר אחד לעשות — ראה בשורת ספריית אוצריא. אפשר לנתק את הכונן.';
+        return 'תוכנת אוצריא וספריית אוצריא הותקנו במחשב הזה, אבל נשאר דבר אחד לעשות — ראה בשורת הספרייה. אפשר לנתק את הכונן.';
       }
       return library
           ? 'תוכנת אוצריא וספריית אוצריא מותקנות במחשב הזה ומוכנות ללימוד. אפשר לנתק את הכונן.'
@@ -3277,7 +3277,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String libraryLocationNeedsManualSetting(String dbPath) =>
       'ספריית אוצריא הותקנה ב-${_ltr(dbPath)}, אך לא ניתן היה לעדכן את ההגדרות של אוצריא. '
-      'יש לפתוח את אוצריא ולהצביע על התיקייה הזו במסך בחירת מיקום ספריית אוצריא.';
+      'יש לפתוח את אוצריא ולהצביע על התיקייה הזו במסך שבו בוחרים את מיקום הספרייה באוצריא.';
   @override
   String companionsMissingFromMirror(String names) =>
       'חסר בכונן: $names. כנראה ההורדה נקטעה. כדי לקבל אותו, הורד שוב במחשב '
