@@ -202,7 +202,7 @@ class HomePage extends StatelessWidget {
           icon: full
               ? FluentIcons.storage_24_regular
               : FluentIcons.lock_closed_24_regular,
-          tone: IconTileTone.quiet,
+          tone: IconTileTone.error,
         ),
         title: full ? t.bannerTitleDriveFull : t.bannerTitle,
         body: full ? t.bannerSubtitleDriveFull : t.bannerSubtitle,
@@ -1889,16 +1889,24 @@ class _StatusBar extends StatelessWidget {
           key: ShellKeys.connectionLine,
         ),
       if (drive != null)
-        item(
-          FluentIcons.usb_stick_20_regular,
-          [
-            g.drive(drive),
-            if (model.driveFull)
-              g.driveFullSuffix
-            else if (model.readOnly)
-              g.driveReadOnlySuffix,
-          ].join(' · '),
+        Row(
           key: ShellKeys.driveLine,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            item(FluentIcons.usb_stick_20_regular, g.drive(drive)),
+            if (model.readOnly) ...[
+              const SizedBox(width: 8),
+              StatusChip(
+                key: ShellKeys.driveLockedChip,
+                kind: StatusKind.error,
+                icon: model.driveFull
+                    ? FluentIcons.storage_16_regular
+                    : FluentIcons.lock_closed_16_regular,
+                label:
+                    model.driveFull ? g.driveFullSuffix : g.driveReadOnlySuffix,
+              ),
+            ],
+          ],
         ),
       if (checkedAt != null || canCheck)
         Row(

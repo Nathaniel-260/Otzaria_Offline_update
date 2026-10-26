@@ -1232,6 +1232,44 @@ void main() {
       expect(checkNow.left, closeTo(bar.left + 16, 1));
     });
 
+    testWidgets('כונן מוגן: שבב אדום עם מנעול ליד הכונן, ובלי מוגן — אין שבב', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(const GuidanceFacts(readOnly: true)),
+            driveName: 'E:',
+          ),
+        ),
+      );
+      final chip = find.descendant(
+        of: find.byKey(ShellKeys.driveLine),
+        matching: find.byKey(ShellKeys.driveLockedChip),
+      );
+      expect(chip, findsOneWidget);
+      final widget = tester.widget<StatusChip>(chip);
+      expect(widget.kind, StatusKind.error);
+      expect(widget.label, g.driveReadOnlySuffix);
+      expect(widget.icon, FluentIcons.lock_closed_16_regular);
+      expect(
+        tester
+            .widget<IconTile>(
+              find.descendant(
+                of: find.byKey(ShellKeys.readOnlyNotice),
+                matching: find.byType(IconTile),
+              ),
+            )
+            .tone,
+        IconTileTone.error,
+      );
+
+      await pumpScreen(tester, HomePage(model: withLauncher(null)));
+      expect(find.byKey(ShellKeys.driveLine), findsOneWidget);
+      expect(find.byKey(ShellKeys.driveLockedChip), findsNothing);
+    });
+
     testWidgets('"עדכון זמין" בתחילת שורת המצב — מימין בעברית', (
       tester,
     ) async {
