@@ -462,6 +462,54 @@ void main() {
         expect(await peekAndBound(library), 1000 + 450);
       });
 
+      void resize(String name, int size, {String? rename}) =>
+          releases[0]['assets'] = [
+            for (final asset in releases[0]['assets'] as List)
+              if ((asset as Map)['name'] == name)
+                {...asset, 'size': size, 'name': rename ?? name}
+              else
+                asset,
+          ];
+
+      test(
+        'a held, appliable chain that the full DB beats — the full DB',
+        () async {
+          await registered(7);
+          final library = manager(personal: true);
+          heldManifest(library);
+          resize('patch-v7-v8.db.zst', 900 << 20);
+          expect(await peekAndBound(library), 1000 + 450);
+        },
+      );
+
+      test(
+        'by name only, with patches larger than the full DB — the patches',
+        () async {
+          await registered(7);
+          resize('patch-v7-v8.db.zst', 900 << 20);
+          expect(
+            await peekAndBound(manager(personal: true)),
+            2 + (900 << 20) + 450,
+          );
+        },
+      );
+
+      test('a manifest name that is not an edge — never "no chain"', () async {
+        await registered(5);
+        resize('patch-v7-v8.db.zst', 900 << 20);
+        resize(
+          'patch-v7-v8.db.zst.manifest.json',
+          2,
+          rename: 'patch-odd.db.zst.manifest.json',
+        );
+        // לפי השמות לבדם אין שרשרת מ-5, אבל קשת ששמה אינו מוכר עשויה להיות
+        // אחת — ולכן הגדול מבין השניים, לא המסד המלא בלבד.
+        expect(
+          await peekAndBound(manager(personal: true)),
+          2 + (900 << 20) + 2 + 50 + 450,
+        );
+      });
+
       test(
         'no chain from the registered version, even by name — the full DB',
         () async {

@@ -486,10 +486,14 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
     onCloseOtzaria: _session.closeOtzaria,
     onPickLibraryFolder: () =>
         unawaited(pickLibraryInstallDir(context, _session.library)),
-    onRegisterThisComputer: () =>
-        unawaited(capturePersonalVersion(context, _session.library)),
+    onRegisterThisComputer: _registerHere,
     onGrantSemanticConsent: () => unawaited(_session.answerSemanticConsent()),
   );
+
+  void _registerHere() => unawaited(() async {
+        await capturePersonalVersion(context, _session.library);
+        await _session.afterManualRegistration();
+      }());
 
   Widget _home() {
     final s = _session;
@@ -725,7 +729,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
               : (key) => unawaited(s.forgetRegisteredMachine(key)),
           onRegisterHere: s.longTaskRunning || s.otzaria.currentVersion == null
               ? null
-              : () => unawaited(s.registerThisMachine()),
+              : _registerHere,
         ),
       ShellSection.help => HelpPage(
           faq: s.faq,

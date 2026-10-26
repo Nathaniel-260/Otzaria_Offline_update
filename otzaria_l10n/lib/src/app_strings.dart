@@ -823,6 +823,7 @@ abstract class LibraryScreenStrings {
   /// הערה שקטה בבית אחרי שהמחשב הזה נרשם.
   String get personalPreparedHere;
   String get personalPendingNote;
+  String get personalPendingRegisterNote;
   String get personalChipElsewhere;
   String get personalChange;
 

@@ -257,6 +257,60 @@ void main() {
       expect(settings.settings.personalAutoRegisterPending, isTrue);
     });
 
+    test('בלי בדיקה ברשת — הבית מציע "רישום המחשב הזה" ולא מבטיח רישום',
+        () async {
+      await settings.update(pending);
+      final s = await withLibrary(version: 140);
+      s.library.onlineCheckedAt = null;
+      expect(homeViewModelOf(s).personalPendingNeedsClick, isTrue);
+
+      // הלחיצה רושמת, והדגל נמחק כדי שמחשב אחר לא יירשם מעצמו.
+      expect(await s.library.capturePersonalVersion(), isTrue);
+      await s.afterManualRegistration();
+      await settings.pending;
+      expect(settings.settings.personalAutoRegisterPending, isFalse);
+      expect(homeViewModelOf(s).personalPendingNeedsClick, isFalse);
+    });
+
+    test('מחשב מחובר — ההערה מבטיחה את המחשב האחר, בלי כפתור', () async {
+      await settings.update(pending);
+      final s = await withLibrary(version: 140);
+      s.library.onlineCheckError = null;
+      expect(homeViewModelOf(s).personalPending, isTrue);
+      expect(homeViewModelOf(s).personalPendingNeedsClick, isFalse);
+    });
+
+    test('"בדוק עכשיו" שנכשל ברשת — הרישום הממתין רץ ורושם', () async {
+      await settings.update(pending);
+      final db = File(p.join(tempDir.path, 'books', 'seforim.db'))
+        ..parent.createSync(recursive: true);
+      final sql = sqlite3.sqlite3.open(db.path);
+      sql.execute(
+          'CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT)');
+      sql.execute("INSERT INTO schema_meta VALUES ('db_version', '142')");
+      sql.close();
+      final s = _OfflineCheckSession(
+        dataDir: tempDir.path,
+        stateDir: tempDir.path,
+        settings: settings,
+        prompts: prompts,
+        runningLocator: const _NeverRunningLocator(),
+        noticesStore:
+            MemoryNoticesStore(seen: {NoticesSeenStore.errorReportsIntro}),
+      );
+      sessions.add(s);
+      await s.library.setCustomDbPath(db.path);
+      s.otzaria.currentVersion = '0.10.4';
+      expect(homeViewModelOf(s).personalPendingNeedsClick, isTrue);
+
+      await s.checkNow();
+      await settings.pending;
+
+      expect(await store(s).lowestKnownDbVersion(), 142);
+      expect(settings.settings.personalAutoRegisterPending, isFalse);
+      expect(s.preparedForThisMachine, isTrue);
+    });
+
     test('מחשב אחר כבר נרשם — אין רישום, והדגל נמחק', () async {
       await settings.update(pending);
       final s = await withLibrary(version: 140);
@@ -1567,6 +1621,29 @@ class _FakePrompts implements SessionPrompts {
     required void Function(bool active) onActiveChanged,
     required void Function(bool uploading) onUploadingChanged,
   }) async {}
+}
+
+/// "בדוק עכשיו" בלי בדיקות אמיתיות: המקומית לא נוגעת בדבר, והמקוונת נכשלת
+/// כמו במחשב לא מחובר.
+class _OfflineCheckSession extends AppSession {
+  _OfflineCheckSession({
+    required super.dataDir,
+    required super.stateDir,
+    required super.settings,
+    required super.prompts,
+    super.runningLocator,
+    super.noticesStore,
+  });
+
+  @override
+  Future<void> checkAll() async {}
+
+  @override
+  Future<void> checkOnline() async {
+    library
+      ..onlineCheckedAt = DateTime.now()
+      ..onlineCheckError = 'offline';
+  }
 }
 
 /// "ההפעלה נכשלה" — בלי להפעיל את אוצריא האמיתית של מי שמריץ את הבדיקה.

@@ -89,6 +89,7 @@ class HomeViewModel {
     this.personalFloor,
     this.personalPreparedHere = false,
     this.personalPending = false,
+    this.personalPendingNeedsClick = false,
     this.semanticConsent = false,
     this.appTile = TileStatus.upToDate,
     this.libraryTile = TileStatus.upToDate,
@@ -213,6 +214,9 @@ class HomeViewModel {
 
   /// `AppSession.personalRegistrationPending`.
   final bool personalPending;
+
+  /// `AppSession.personalPendingNeedsClick` — הכפתור במקום ההבטחה.
+  final bool personalPendingNeedsClick;
   final bool semanticConsent;
   final TileStatus appTile;
   final TileStatus libraryTile;
@@ -373,6 +377,7 @@ HomeViewModel homeViewModelOf(AppSession s) {
     personalFloor: library.registeredMachines.firstOrNull?.version,
     personalPreparedHere: s.preparedForThisMachine,
     personalPending: s.personalRegistrationPending,
+    personalPendingNeedsClick: s.personalPendingNeedsClick,
     // כשהגיבור כבר מציע את החיפוש החכם, ההודעה הייתה כפולה; בלי אוצריא אין
     // לאן לכתוב את ההסכמה.
     semanticConsent: s.semanticConsentUnanswered &&

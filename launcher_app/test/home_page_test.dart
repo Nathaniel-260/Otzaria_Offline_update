@@ -2710,6 +2710,50 @@ void main() {
       expect(find.textContaining('אינטרנט'), findsNothing);
     });
 
+    testWidgets('בלי בדיקה ברשת — קישור "רישום המחשב הזה" שרושם', (
+      tester,
+    ) async {
+      final calls = <String>[];
+      final base = homeScenario('personalPreparedHere');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: base.guidance,
+            installedVersion: base.installedVersion,
+            personalMode: true,
+            personalPending: true,
+            personalPendingNeedsClick: true,
+          ),
+          actions: HomeActions(
+            onRegisterThisComputer: () => calls.add('register'),
+          ),
+        ),
+      );
+      expect(find.byKey(ShellKeys.personalPendingNote), findsOneWidget);
+      expect(find.text(l.personalPendingRegisterNote), findsOneWidget);
+      expect(find.text(l.personalPendingNote), findsNothing);
+      await tester.tap(find.text(l.personalVersionButton));
+      expect(calls, ['register']);
+    });
+
+    testWidgets('במחשב מחובר — הבטחה למחשב האחר, בלי קישור', (tester) async {
+      final base = homeScenario('personalPreparedHere');
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: base.guidance,
+            installedVersion: base.installedVersion,
+            personalMode: true,
+            personalPending: true,
+          ),
+        ),
+      );
+      expect(find.text(l.personalPendingNote), findsOneWidget);
+      expect(find.text(l.personalVersionButton), findsNothing);
+    });
+
     testWidgets('כונן שהוכן למחשב אחר — האריח אינו שגיאה', (tester) async {
       await pumpScreen(
           tester, HomePage(model: homeScenario('libraryElsewhere')));

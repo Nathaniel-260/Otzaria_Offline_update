@@ -431,7 +431,10 @@ class AppSession extends ChangeNotifier {
       crashCheck = _startReports(reports);
     }
     final online = s.autoCheckUpdates ? checkOnline() : Future<void>.value();
-    _startupOnline = online.catchError((_) {});
+    _startupOnlineDone = false;
+    _startupOnline = online.catchError((_) {}).whenComplete(() {
+      if (isActive) _update(() => _startupOnlineDone = true);
+    });
     unawaited(_askPersonalScopeAfter(crashCheck));
     unawaited(
       Future.wait([_startupLocal.future, _startupOnline])
@@ -612,6 +615,10 @@ class AppSession extends ChangeNotifier {
   final Completer<void> _startupLocal = Completer<void>();
   Future<void> _startupOnline = Future<void>.value();
 
+  /// הבדיקה המקוונת של העלייה הסתיימה (או לא רצה כלל) — עד אז `null` אינו
+  /// "לא ידוע", אלא "עוד לא".
+  bool _startupOnlineDone = true;
+
   /// השאלה נשאלת פעם אחת לכונן (ההגדרה נוסעת איתו). כונן מוגן אינו יכול
   /// לשמור תשובה, ובמצב נעול אסור לשנות הגדרות — בשניהם לא שואלים.
   bool get shouldAskPersonalScope =>
@@ -697,6 +704,16 @@ class AppSession extends ChangeNotifier {
       settings.settings.personalAutoRegisterPending &&
       _library.registeredMachines.isEmpty;
 
+  /// כאן אוצריא מותקנת ולא ידוע אם המחשב מחובר (לא רצה בדיקה ברשת): רישום
+  /// אוטומטי לא יקרה, ולכן הבית מציע את הכפתור במקום הבטחה.
+  bool get personalPendingNeedsClick =>
+      personalRegistrationPending &&
+      !readOnly &&
+      _startupOnlineDone &&
+      !isCheckingOnline &&
+      onlineState(this) == null &&
+      _otzaria.currentVersion != null;
+
   /// "הסרה" בהגדרות. גם מבטלת רישום אוטומטי שממתין — כדי שהסרת המחשב
   /// האחרון לא תרשום מחשב מחדש בהפעלה הבאה.
   Future<void> forgetRegisteredMachine(String machineKey) async {
@@ -704,10 +721,9 @@ class AppSession extends ChangeNotifier {
     await _library.forgetMachine(machineKey);
   }
 
-  /// "רישום המחשב הזה" בהגדרות — לחיצה מפורשת, גם במחשב מחובר.
-  Future<void> registerThisMachine() async {
-    if (readOnly) return;
-    if (await _library.capturePersonalVersion()) await _clearAutoRegister();
+  /// אחרי "רישום המחשב הזה" (לחיצה מפורשת): הרישום האוטומטי כבר לא נחוץ.
+  Future<void> afterManualRegistration() async {
+    if (!await _library.hasNoRegisteredMachine()) await _clearAutoRegister();
   }
 
   bool get _needsElevation =>
@@ -1214,6 +1230,8 @@ class AppSession extends ChangeNotifier {
       _library.forgetDownloadFailures();
       await checkOnline();
     });
+    // "בדוק עכשיו" שנכשל ברשת מוכיח מחשב לא מחובר — גם כשהבדיקה בעלייה כבויה.
+    await registerPendingMachine();
   }
 
   Future<void> _asCheck(Future<void> Function() check) async {

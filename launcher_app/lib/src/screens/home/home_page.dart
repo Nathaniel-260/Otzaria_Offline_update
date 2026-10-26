@@ -1156,7 +1156,17 @@ class _Hero extends StatelessWidget {
           FluentIcons.person_16_regular,
           context.strings.libraryScreen.personalPreparedHere,
         ),
-      if (m.personalPending)
+      if (m.personalPendingNeedsClick)
+        _Note(
+          key: ShellKeys.personalPendingNote,
+          FluentIcons.person_16_regular,
+          context.strings.libraryScreen.personalPendingRegisterNote,
+          link: context.strings.libraryScreen.personalVersionButton,
+          onLink: m.readOnly || m.checkBlocked
+              ? null
+              : actions.onRegisterThisComputer,
+        )
+      else if (m.personalPending)
         _Note(
           key: ShellKeys.personalPendingNote,
           FluentIcons.person_16_regular,

@@ -745,15 +745,17 @@ carrying ~1.5GB to update a machine already at v20 is what users objected to (fo
 post 33695). Four things hold it together:
 
 - **Default off; asked once per drive.** Without the full DB the drive cannot
-  serve a machine that has no Otzaria, and `fullDownloadFallback` is `null`. The
-  first-run question (§5.9) or Settings sets it; `personalModeAsked` travels with
-  the drive, and a drive already in the mode counts as answered.
-- **A routine check never records the version.** `captureLocalDbVersion()` runs
-  on a click, on "only my computer" answered where Otzaria is installed and the
-  online check failed, or once at startup via the drive's one-shot
-  `personalAutoRegisterPending` (`AppSession.registerPendingMachine`, same test,
-  nobody registered; cleared by it or by "remove"; no online check = no register). Else the **online** machine's newer
-  Otzaria would aim the download at v22 while the target sat at v20.
+  serve a machine that has no Otzaria, and `fullDownloadFallback` is `null`.
+  The first-run question (§5.9) or Settings sets it; `personalModeAsked`
+  travels with the drive, and a drive already in the mode counts as answered.
+- **A routine check never records the version.** `captureLocalDbVersion()`
+  runs on a click, on "only my computer" answered where Otzaria is installed
+  and the online check failed, or once via the drive's one-shot
+  `personalAutoRegisterPending` (`AppSession.registerPendingMachine` after the
+  startup check or "check now": same test, nobody registered; cleared by it or
+  by "remove"). With no online check the home offers the button instead. Else
+  the **online** machine's newer Otzaria would aim the download at v22 while
+  the target sat at v20.
 - **One record per machine, and the lowest wins**
   (`LibraryStateStore.knownDbVersions`, keyed by `currentMachineKey()`). Someone who
   clicks on two machines gets a download serving both; `applyUpdate` raises that
@@ -799,7 +801,7 @@ machine; when it loses, the full DB is downloaded and the patches dropped. Hence
 release shipping **only** a full DB is no longer invisible to personal mode (it used
 to be filtered out while the mode reported "up to date"), and the "turn personal
 update off and download again" message now fires only at a real dead end. Its
-home bound (`personalDownloadBytesBound`) counts only the patches only when held,
+home bound (`personalDownloadBytesBound`) is the patches alone only when held,
 appliable manifests prove they win; otherwise the larger of the two routes.
 
 **Only the patches are per-release; `seforim.db.zst` is downloaded once**, from the
@@ -2126,12 +2128,13 @@ but not its channel change (`_setChannel`). Its tile and Settings link both `sel
 it, never stacking it on Settings. Details: `launcher_app/README.md`.
 
 **At startup only two dialogs: the crash prompt and, once per drive, the
-"several computers or only mine" question** (§5.4; maintainer, 2026-10-26: a home
-row went unseen). The question waits for the crash prompt in `DialogQueue` and for
-the startup check (the welcome view is already up); never on a read-only drive or
-with safer mode locked; Esc asks again next launch. Everything else that used to pop
-up is a home row (reports, plugins, custom apps, launcher, elevation); other dialogs
-answer a click (smart-search consent on "update this computer", §5.4).
+"several computers or only mine" question** (§5.4; maintainer, 2026-10-26: a
+home row went unseen). It waits for the crash prompt in `DialogQueue` and for
+the startup check (the welcome view is already up); never on a read-only drive
+or with safer mode locked; Esc asks again next launch. Everything else that
+used to pop up is a home row (reports, plugins, custom apps, launcher,
+elevation); other dialogs answer a click (smart-search consent on "update
+this computer", §5.4).
 
 **"Check now" is `checkAll` then `checkOnline`, and `checkAll` can install.** With
 auto-install on, `_autoInstallIfEnabled` starts an install without a dialog — so the

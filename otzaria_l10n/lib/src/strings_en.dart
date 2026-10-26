@@ -1575,6 +1575,10 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get personalPendingNote =>
       'The computer with Otzaria installed is chosen when you run the tool on it.';
   @override
+  String get personalPendingRegisterNote =>
+      'The drive is not prepared for any computer yet. If this is the '
+      'computer to update from the drive:';
+  @override
   String get personalChipElsewhere => 'Prepared for another computer';
   @override
   String get personalChange => 'Change';

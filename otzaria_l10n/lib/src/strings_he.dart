@@ -1523,6 +1523,9 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get personalPendingNote =>
       'המחשב שבו אוצריא מותקנת ייבחר כשתפעיל את הכלי בו.';
   @override
+  String get personalPendingRegisterNote =>
+      'הכונן עוד לא הוכן לאף מחשב. אם זה המחשב שרוצים לעדכן מהכונן:';
+  @override
   String get personalChipElsewhere => 'הוכן למחשב אחר';
   @override
   String get personalChange => 'שינוי';

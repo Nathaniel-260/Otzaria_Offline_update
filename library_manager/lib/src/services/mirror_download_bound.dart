@@ -288,8 +288,9 @@ int? personalDownloadBytesBound({
     applyTime.fullRouteSeconds(full.size),
     savedDownloadBytes: full.size - route.bytes,
   );
-  if (!fullWins) return patches;
-  return possible.length == sure.length && allNamed ? fullDownload : either;
+  // רק כשכל הקשתות ודאיות, השרשרת שנמדדה היא זו שהייצוא ימדוד.
+  if (possible.length != sure.length || !allNamed) return either;
+  return fullWins ? fullDownload : patches;
 }
 
 /// כמו `_cheapestRoute` של המייצא: זמן ההחלה של השרשרת הזולה וגודלה.
