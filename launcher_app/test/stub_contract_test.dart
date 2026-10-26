@@ -5,10 +5,12 @@
 
 import 'dart:io';
 
+import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/self_update/launcher_install_layout.dart';
 import 'package:launcher_app/src/self_update/launcher_self_installer.dart';
 import 'package:launcher_app/src/services/app_paths.dart';
+import 'package:launcher_app/src/theme/theme_exports.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 
 void main() {
@@ -226,5 +228,43 @@ void main() {
     expect(packagePs1, contains("build\\payload.otz'"));
     expect(stubRc, contains(r'100 RCDATA "build\\payload.otz"'));
     expect(buildStubPs1, contains("'payload.otz'"));
+  });
+
+  test('צבעי חלון ההמתנה הם צבעי ערכת הנושא', () {
+    // הצבעים מועתקים ידנית ל-C; שינוי בערכת הנושא בלי `stub.c` נתפס כאן.
+    String rgb(Color c) {
+      String hex(int shift) =>
+          '0x${((c.toARGB32() >> shift) & 0xFF).toRadixString(16).padLeft(2, '0').toUpperCase()}';
+      return 'RGB(${hex(16)}, ${hex(8)}, ${hex(0)})';
+    }
+
+    final cs = AppThemeData.colorScheme;
+    final expected = {
+      'kPageColor': AppPalette.light.page,
+      'kBorderColor': AppPalette.light.titleBarBorder,
+      'kPrimaryColor': cs.primary,
+      'kTrackColor': cs.secondaryContainer,
+      'kOnSurfaceColor': cs.onSurface,
+      'kOnSurfaceVariantColor': cs.onSurfaceVariant,
+    };
+    expected.forEach((name, color) {
+      expect(stubC, contains('$name = ${rgb(color)};'), reason: name);
+    });
+  });
+
+  test('נתוני משתמש מתיקיית ה-Release אינם נארזים', () {
+    // אחרת חילוץ דורס את ההגדרות והלוגים של המשתמש בשל המפתח.
+    expect(
+        packagePs1, contains("Join-Path \$payloadDir '${AppPaths.dirName}'"));
+  });
+
+  test('ההאטה לצילומי מסך אינה מוגדרת באף בנייה', () {
+    expect(buildStubPs1, isNot(contains('STUB_SLOW_DEMO')));
+    for (final file in Directory('../.github/workflows').listSync()) {
+      if (file is File) {
+        expect(file.readAsStringSync(), isNot(contains('STUB_SLOW_DEMO')),
+            reason: file.path);
+      }
+    }
   });
 }

@@ -1837,9 +1837,13 @@ just launch. Five load-bearing details:
 - The completion guard is the `.ready` marker, not the presence of
   `launcher_app.exe`, so an interrupted extraction is never mistaken for a finished
   one.
-- Its two message boxes (the failure, and "extract me first") are the **only**
-  user-visible strings in this repo outside `otzaria_l10n` — C cannot depend on
-  a Dart package.
+- Its first-run window is hand-painted GDI in the launcher's palette; the colors
+  are **copied by hand** from `AppPalette.light`/the seeded `ColorScheme` into
+  `stub.c` — change one, change both. Debug-only `STUB_SLOW_DEMO` slows it
+  down for screenshots; the shipped build never defines it.
+- Its inline Hebrew strings — the first-run window and its two message boxes
+  (the failure, and "extract me first") — are the **only** user-visible
+  strings in this repo outside `otzaria_l10n`; C cannot depend on a Dart package.
 - **It refuses to run from under `%TEMP%`** (a temp that is a drive root
   does not count; a folder merely named `*.zip` elsewhere is fine)
   (`IsTemporaryLocation`; Dart twin `AppPaths.isTemporaryLocation` →
