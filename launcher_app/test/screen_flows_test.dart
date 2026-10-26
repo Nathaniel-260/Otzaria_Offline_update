@@ -74,7 +74,7 @@ class _FakeLibrary extends LibraryModuleController {
   }
 
   @override
-  Future<void> checkForUpdate() async {
+  Future<void> checkForUpdate({bool fresh = false}) async {
     checks++;
   }
 }

@@ -958,13 +958,13 @@ which differs from the DB's parent when a library folder name is set.
 `OtzariaSettingsWriter.finishSemanticInstall` install and enable the data.
 
 **Smart-search consent is a dialog on "update this computer", once per machine.**
-As a library-page card and a home notice it went unnoticed (maintainer,
-2026-10). `UpdateHereFlow._semanticConsent` asks only with a library stage and
-Otzaria installed; "back" starts and records nothing; an answer goes to
-`NoticesSeenStore.semanticConsentAnswered` (per host, in `stateFilesDir`). The
-consent is written after `_ensureClosed`, then rechecked. Answered → the home is
-quiet (`semanticConsentUnanswered`); Settings only enables — Otzaria's `revoke()`
-also purges its queue. Not behind safer mode: no launcher setting changes.
+As a home notice it went unnoticed (maintainer, 2026-10). Unanswered smart
+search alone is a library "here" item (`semanticOnlyHere`), else it could never
+ask; `UpdateHereFlow.run` asks with Otzaria installed, "back" records nothing,
+an answer (or a server-blocked key) goes to `NoticesSeenStore` in
+`stateFilesDir`. Consent is written after `_ensureClosed`, then
+`checkForUpdate(fresh: true)`. Settings only enables: Otzaria's `revoke()` also
+purges its queue. Not behind safer mode: no launcher setting changes.
 
 **The offline machine picks the fastest route it has, and that route can be the full
 database.** `OfflineLibraryUpdatePlanner` used to take the delta chain whenever it reached

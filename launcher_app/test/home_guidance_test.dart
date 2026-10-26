@@ -399,6 +399,24 @@ void main() {
         GuidancePrimary.updateHere,
         here: [_library],
       ),
+      // גם אחרי עדכון לבד: הוא מחיל רק "עדכון", והחלון נפתח רק בלחיצה.
+      _case(
+        'רק החיפוש החכם מחכה לתשובה — "עדכון המחשב הזה" על הספרייה',
+        const GuidanceFacts(online: false, semanticConsentRequired: true),
+        GuidancePrimary.updateHere,
+        here: [_library],
+      ),
+      _case(
+        'הסכמה חסרה בלי אוצריא מותקנת — אין לאן לכתוב, לא בגיבור',
+        const GuidanceFacts(
+          online: false,
+          otzariaInstalled: false,
+          otzariaStatus: AppStatusFact.needsDownload,
+          semanticConsentRequired: true,
+        ),
+        GuidancePrimary.upToDate,
+        secondary: GuidanceSecondary.offlineHint,
+      ),
     ];
     _runCases(cases);
   });
@@ -823,8 +841,13 @@ void main() {
         library(LibraryStatusFact.upToDate, applying: true),
         TileStatus.working,
       );
+      // רק החיפוש החכם מחכה לתשובה: כמו הגיבור, "עדכון המחשב הזה".
       expect(
         library(LibraryStatusFact.upToDate, consent: true),
+        TileStatus.updateHere,
+      );
+      expect(
+        library(LibraryStatusFact.error, consent: true),
         TileStatus.needsConsent,
       );
       expect(
@@ -906,7 +929,11 @@ void main() {
       expect(
         deriveTileStatus(
           _library,
-          const GuidanceFacts(semanticConsentRequired: true),
+          const GuidanceFacts(
+            semanticConsentRequired: true,
+            otzariaInstalled: false,
+            libraryStatus: LibraryStatusFact.needsDownload,
+          ),
           download: const [_library],
         ),
         TileStatus.needsConsent,

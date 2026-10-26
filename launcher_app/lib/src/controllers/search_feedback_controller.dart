@@ -9,6 +9,14 @@ import 'dispose_guard.dart';
 
 /// מצב ההסכמה במחשב הזה: ביטול מפורש שונה ממחשב שבו היא אינה ידועה.
 enum SearchFeedbackConsent { granted, revoked, unknown }
+/// איך נגמרה כתיבת ההסכמה לחיפוש החכם.
+enum ConsentWrite {
+  granted,
+
+  /// השרת חסם את המפתח של המחשב הזה; הסכמה חדשה לא תעזור.
+  blocked,
+  failed,
+}
 
 class SearchFeedbackController extends ChangeNotifier
     with DisposeGuard, SilentAfterDispose {
@@ -17,10 +25,9 @@ class SearchFeedbackController extends ChangeNotifier
   SearchFeedbackController({
     required this.transport,
     required this.resolveSource,
-    Future<bool> Function()? grantConsent,
+    Future<ConsentWrite> Function()? grantConsent,
     Future<SearchFeedbackConsent> Function()? consentState,
-  })  : _grantConsent = grantConsent,
-        _consentState = consentState;
+  }) : _grantConsent = grantConsent, _consentState = consentState;
 
   factory SearchFeedbackController.forDrive({
     required String dataDir,
@@ -93,16 +100,19 @@ class SearchFeedbackController extends ChangeNotifier
       },
       grantConsent: () async {
         final location = await locate(fresh: true);
-        if (location == null) return false;
-        if (!await transport.resumeAfterConsent(
-          p.join(location.root, 'search_feedback'),
-        )) {
-          return false;
+        if (location == null) return ConsentWrite.failed;
+        final source = p.join(location.root, 'search_feedback');
+        if (!await transport.resumeAfterConsent(source)) {
+          return await transport.blockedByServer(source)
+              ? ConsentWrite.blocked
+              : ConsentWrite.failed;
         }
-        if (await isRunning(fresh: true)) return false;
-        return const OtzariaSettingsWriter().grantSearchFeedbackConsent(
+        if (await isRunning(fresh: true)) return ConsentWrite.failed;
+        return await const OtzariaSettingsWriter().grantSearchFeedbackConsent(
           dataRootPath: location.root,
-        );
+        )
+            ? ConsentWrite.granted
+            : ConsentWrite.failed;
       },
     );
   }
@@ -113,7 +123,7 @@ class SearchFeedbackController extends ChangeNotifier
 
   final SearchFeedbackTransport transport;
   final Future<String?> Function() resolveSource;
-  final Future<bool> Function()? _grantConsent;
+  final Future<ConsentWrite> Function()? _grantConsent;
   final Future<SearchFeedbackConsent> Function()? _consentState;
   bool isCollecting = false;
   bool isUploading = false;
@@ -121,13 +131,13 @@ class SearchFeedbackController extends ChangeNotifier
   Future<Duration?>? _run;
   bool _stopRequested = false;
 
-  Future<bool> grantConsent() async {
-    if (isDisposed || isCollecting) return false;
+  Future<ConsentWrite> grantConsent() async {
+    if (isDisposed || isCollecting || isUploading) return ConsentWrite.failed;
     try {
-      return await _grantConsent?.call() ?? false;
+      return await _grantConsent?.call() ?? ConsentWrite.failed;
     } catch (error) {
       AppLogger.maybeInstance?.error('כתיבת הסכמת החיפוש נכשלה', error);
-      return false;
+      return ConsentWrite.failed;
     }
   }
 

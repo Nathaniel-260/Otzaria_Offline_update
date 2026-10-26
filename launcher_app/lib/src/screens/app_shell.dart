@@ -481,7 +481,7 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
         unawaited(pickLibraryInstallDir(context, _session.library)),
     onRegisterThisComputer: () =>
         unawaited(capturePersonalVersion(context, _session.library)),
-    onGrantSemanticConsent: () => unawaited(_session.grantSemanticConsent()),
+    onGrantSemanticConsent: () => unawaited(_session.answerSemanticConsent()),
   );
 
   Widget _home() {

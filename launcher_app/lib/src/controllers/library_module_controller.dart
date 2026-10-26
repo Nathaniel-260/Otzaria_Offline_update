@@ -729,7 +729,18 @@ class LibraryModuleController extends ChangeNotifier
         .join(', ');
   }
 
-  Future<void> checkForUpdate() {
+  /// [fresh] — בדיקה שמתחילה אחרי הקריאה: בדיקה שכבר רצה לא ראתה את מה
+  /// שנכתב זה עתה (למשל ההסכמה לחיפוש החכם).
+  Future<void> checkForUpdate({bool fresh = false}) async {
+    if (fresh) {
+      try {
+        await _checkInFlight;
+      } catch (_) {}
+    }
+    return _joinOrStartCheck();
+  }
+
+  Future<void> _joinOrStartCheck() {
     if (_applying) return Future.value();
     final inFlight = _checkInFlight;
     if (inFlight != null) return inFlight;

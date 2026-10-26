@@ -24,7 +24,9 @@ import 'package:launcher_app/src/shell/home_guidance_session.dart';
 import 'package:launcher_app/src/shell/session_prompts.dart';
 import 'package:launcher_app/src/shell/shell_tasks.dart';
 import 'package:library_manager/library_manager.dart' show CompanionAsset;
+import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
+import 'package:path/path.dart' as p;
 
 import 'test_support.dart';
 
@@ -621,16 +623,104 @@ void main() {
         expect(s.semanticConsentUnanswered, isTrue);
       });
 
-      test('כונן לקריאה בלבד — אותו חלון: התשובה נשמרת במחשב', () async {
-        final notices = MemoryNoticesStore();
-        final s = session(readOnly: true, notices: notices);
+      test('כונן לקריאה בלבד — אותו חלון, והתשובה ב-stateFilesDir', () async {
+        // כמו AppPaths בכונן מוגן: המצב במחשב, הכונן (dataDir) נשאר כמו שהוא.
+        final drive = Directory(p.join(tempDir.path, 'drive'))..createSync();
+        final machine = Directory(p.join(tempDir.path, 'machine'))
+          ..createSync();
+        final s = AppSession(
+          dataDir: drive.path,
+          stateDir: machine.path,
+          settings: settings,
+          prompts: prompts,
+          readOnly: true,
+          runningLocator: const _NeverRunningLocator(),
+          otzariaLauncher: const _FailingLauncher(),
+        );
+        sessions.add(s);
         s.otzaria.currentVersion = '0.9.90';
         s.library
           ..status = LibraryModuleStatus.updateAvailable
           ..semanticPending = true;
         await s.updateHere(const [GuidanceItem.library]);
         expect(prompts.calls, contains('askSemantic'));
-        expect(notices.marked, [answered]);
+
+        final file = File(p.join(s.stateFilesDir, 'notices_seen.json'));
+        expect(p.isWithin(machine.path, file.path), isTrue);
+        expect(await file.readAsString(), contains(answered));
+        expect(
+            await NoticesSeenStore(s.stateFilesDir).hasSeen(answered), isTrue);
+        expect(
+          drive.listSync(recursive: true).whereType<File>().map(
+                (f) => p.basename(f.path),
+              ),
+          isNot(contains('notices_seen.json')),
+        );
+        await waitFor(() => s.tasks.current?.isFinished ?? true);
+      });
+
+      group('רק החיפוש החכם בכונן', () {
+        AppSession semanticOnly(MemoryNoticesStore notices) {
+          final s = session(notices: notices);
+          s.otzaria
+            ..currentVersion = '0.9.90'
+            ..status = OtzariaModuleStatus.upToDate;
+          s.library
+            ..status = LibraryModuleStatus.upToDate
+            ..semanticPending = true;
+          s.plugins.status = PluginsModuleStatus.ready;
+          return s;
+        }
+
+        test('הגיבור מציע "עדכון המחשב הזה" עם החיפוש החכם, בלי הודעה כפולה',
+            () {
+          final s = semanticOnly(MemoryNoticesStore());
+          final m = homeViewModelOf(s);
+          expect(m.guidance.primary, GuidancePrimary.updateHere);
+          expect(m.guidance.hereItems, [GuidanceItem.library]);
+          expect(
+            m.driveCompanionNames,
+            AppL10n.strings.libraryDomain.companionSemanticName,
+          );
+          expect(m.semanticConsent, isFalse);
+          expect(m.libraryTile, TileStatus.updateHere);
+          expect(prompts.calls, isNot(contains('askSemantic')));
+        });
+
+        test('"המשך בלי" מהגיבור — בלי משימה, והבית שקט', () async {
+          final notices = MemoryNoticesStore();
+          final s = semanticOnly(notices);
+          await s.updateHere(homeViewModelOf(s).guidance.hereItems);
+          expect(prompts.calls, ['askSemantic']);
+          expect(notices.marked, [answered]);
+          expect(s.tasks.hasTask, isFalse);
+          final m = homeViewModelOf(s);
+          expect(m.guidance.hereItems, isEmpty);
+          expect(m.semanticConsent, isFalse);
+          expect(m.libraryTile, TileStatus.upToDate);
+        });
+
+        test('הכפתור שבהודעה פותח את אותו חלון', () async {
+          final notices = MemoryNoticesStore();
+          final s = semanticOnly(notices);
+          await s.answerSemanticConsent();
+          expect(prompts.calls, ['askSemantic']);
+          expect(notices.marked, [answered]);
+        });
+
+        test('עדכון לבד: בלי חלון, והגיבור עדיין מציע אחריו', () async {
+          await settings.update(
+            settings.settings.copyWith(autoInstall: true),
+          );
+          final s = semanticOnly(MemoryNoticesStore());
+          // ההתקנה האוטומטית מחילה רק "עדכון"; החיפוש החכם אינו כזה בלי הסכמה.
+          expect(s.library.status, LibraryModuleStatus.upToDate);
+          expect(prompts.calls, isNot(contains('askSemantic')));
+          expect(
+            homeViewModelOf(s).guidance.primary,
+            GuidancePrimary.updateHere,
+          );
+        });
       });
     });
 

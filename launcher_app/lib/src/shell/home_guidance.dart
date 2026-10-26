@@ -149,6 +149,9 @@ class GuidanceFacts {
   final bool libraryApplyActive;
   final LibraryStatusFact libraryStatus;
   final bool libraryFreshInstall;
+
+  /// חיפוש חכם בכונן מחכה להסכמה, והחלון עליו עוד לא נענה (לא הסכמה חסרה
+  /// סתם — אחרי תשובה הבית שקט).
   final bool semanticConsentRequired;
   final bool pluginsLoading;
 
@@ -280,9 +283,18 @@ List<GuidanceItem> updateHereStages({
 List<GuidanceItem> _hereItems(GuidanceFacts f) => updateHereStages(
       firstInstall: !f.otzariaInstalled,
       app: f.otzariaStatus == AppStatusFact.updateAvailable,
-      library: f.libraryStatus == LibraryStatusFact.updateAvailable,
+      library: f.libraryStatus == LibraryStatusFact.updateAvailable ||
+          semanticOnlyHere(f),
       plugins: f.pluginUpdatesOnDrive > 0,
     );
+
+/// הספרייה מעודכנת, ורק החיפוש החכם מחכה לתשובה: "עדכון המחשב הזה" הוא
+/// שמציג את החלון, ובלעדיו ההסכמה הייתה רק הודעה שלא שמים לב אליה.
+bool semanticOnlyHere(GuidanceFacts f) =>
+    f.otzariaInstalled &&
+    f.semanticConsentRequired &&
+    f.libraryStatus == LibraryStatusFact.upToDate &&
+    !f.libraryApplyActive;
 
 /// מה יש ברשת שעוד אינו בכונן, בלי להתחשב בבחירה בהגדרות.
 List<GuidanceItem> _onlineItems(GuidanceFacts f) => [
@@ -522,6 +534,7 @@ TileStatus _localTileStatus(GuidanceItem item, GuidanceFacts f) =>
           LibraryStatusFact.updateAvailable => f.libraryFreshInstall
               ? TileStatus.installHere
               : TileStatus.updateHere,
+          _ when semanticOnlyHere(f) => TileStatus.updateHere,
           _ when f.semanticConsentRequired => TileStatus.needsConsent,
           LibraryStatusFact.idle => TileStatus.unknown,
           LibraryStatusFact.checking => TileStatus.checking,

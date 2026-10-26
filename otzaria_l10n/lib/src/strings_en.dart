@@ -3393,7 +3393,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get semanticConsentTitle => 'Help improve the engine';
   @override
   String get semanticConsentTerms =>
-      'This is experimental search, and your searches help improve it. Using it requires consent to send usage data: search terms, displayed results and their rankings, passages opened or rated (like / dislike) and time spent reading them, plus the app and operating system versions. Content from personal books is not sent. Recognized email addresses and file paths are masked in search text, but other personal details may still be sent. Do not include personal details in search text. You can revoke consent at any time in settings; revoking it disables this search mode.';
+      'This is experimental search, and your searches help improve it. Using it requires consent to send usage data: search terms, displayed results and their rankings, passages opened or rated (like / dislike) and time spent reading them, plus the app and operating system versions. Content from personal books is not sent. Recognized email addresses and file paths are masked in search text, but other personal details may still be sent. Do not include personal details in search text. You can revoke consent at any time in Otzaria settings; revoking it disables this search mode.';
   @override
   String get semanticConsentText =>
       'This is experimental search, and your searches help improve it. Using it requires consent to send usage data: search terms, displayed results and their rankings, passages opened or rated (like / dislike) and time spent reading them, plus the app and operating system versions. Content from personal books is not sent. Recognized email addresses and file paths are masked in search text, but other personal details may still be sent. Do not include personal details in search text. You can revoke consent at any time in settings; revoking it disables this search mode.\n\nConfirming enables consent in Otzaria settings. From then on, the app collects the data onto the drive and sends it to Otzaria whenever there is an internet connection, automatically and without notifications. The data, including search terms, is stored on the drive unencrypted until it is sent, together with the anonymous key that signs it.';
@@ -3406,8 +3406,12 @@ class _LibraryDomain extends LibraryDomainStrings {
       'install it now, together with the update.';
   @override
   String get semanticAskLater =>
-      'You will not be asked again on this computer. You can change this in '
-      'the settings of this tool.';
+      'You will not be asked again on this computer. You can enable it later '
+      'in the settings of this tool; revoking is done in Otzaria settings.';
+  @override
+  String get semanticConsentBlocked =>
+      "Otzaria's server has blocked training data from this computer, so smart "
+      'search cannot be enabled here.';
   @override
   String get semanticAskApprove => 'Agree and install smart search';
   @override

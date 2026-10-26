@@ -136,6 +136,9 @@ class LibraryModulePort
       _library.status == LibraryModuleStatus.updateAvailable;
 
   @override
+  bool get semanticAwaitsConsent => _library.semanticConsentRequired;
+
+  @override
   Future<void> update() => _library.update();
 
   @override

@@ -683,16 +683,23 @@ class AppSession extends ChangeNotifier {
     await _writeSemanticConsent();
   }
 
-  /// בכשל — הודעה, והעדכון שמסביב ממשיך בלי החיפוש החכם.
+  /// בכשל — הודעה, והעדכון שמסביב ממשיך בלי החיפוש החכם. מפתח שהשרת חסם
+  /// אינו נפתח בהסכמה חדשה, ולכן גם הוא תשובה: לא שואלים עליו שוב.
   Future<void> _writeSemanticConsent() async {
     final t = AppL10n.strings.libraryDomain;
     try {
-      if (!await _searchFeedback.grantConsent()) {
-        UiSnack.showError(t.semanticConsentRequired);
-        return;
+      switch (await _searchFeedback.grantConsent()) {
+        case ConsentWrite.failed:
+          UiSnack.showError(t.semanticConsentRequired);
+          return;
+        case ConsentWrite.blocked:
+          UiSnack.showError(t.semanticConsentBlocked);
+          await _recordSemanticConsentAnswer();
+          return;
+        case ConsentWrite.granted:
+          await _recordSemanticConsentAnswer();
+          await _library.checkForUpdate(fresh: true);
       }
-      await _recordSemanticConsentAnswer();
-      await _library.checkForUpdate();
     } catch (error, stack) {
       AppLogger.instance.error('כתיבת ההסכמה לחיפוש החכם נכשלה', error, stack);
       UiSnack.showError(t.semanticFeedbackFailed);
@@ -893,6 +900,16 @@ class AppSession extends ChangeNotifier {
       reinstallApp: reinstallApp,
       fullLibrary: fullLibrary,
     );
+  }
+
+  /// הכפתור שבהודעה בבית: אותו חלון ואותה זרימה כמו "עדכון המחשב הזה";
+  /// כשאין זרימה (אוצריא לא מותקנת) — האישור הרגיל.
+  Future<void> answerSemanticConsent() async {
+    if (tasks.isRunning || exitPending || !isActive) return;
+    if (await _updateHere.run(const [GuidanceItem.library]) || !isActive) {
+      return;
+    }
+    await grantSemanticConsent();
   }
 
   Future<void> retryUpdateHere() async {

@@ -491,6 +491,7 @@ void main() {
     final transport = SearchFeedbackTransport(destination);
     addTearDown(transport.close);
     expect(await transport.resumeAfterConsent(source), false);
+    expect(await transport.blockedByServer(source), true);
     expect(await transport.collect(source, mayCollect: () async => true), 0);
     expect(await transport.pending(source), 1);
   });
@@ -506,6 +507,7 @@ void main() {
     addTearDown(transport.close);
     expect(await transport.collect(source, mayCollect: () async => true), 0);
     expect(await transport.resumeAfterConsent(source), false);
+    expect(await transport.blockedByServer(source), true);
     expect(await transport.pending(source), 1);
     expect(
         (await SearchFeedbackIdentityStore(

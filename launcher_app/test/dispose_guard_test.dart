@@ -71,15 +71,15 @@ void main() {
         },
         grantConsent: () async {
           consents++;
-          return true;
+          return ConsentWrite.granted;
         },
       );
       var notified = 0;
       c.addListener(() => notified++);
       c.dispose();
 
-      expect(await c.grantConsent(), isFalse);
-      expect(await c.pendingToCollect(), 0);
+      expect(await c.grantConsent(), ConsentWrite.failed);
+      expect(await c.pendingToOffer(), 0);
       expect(await c.synchronize(), isNull);
       expect(await c.collect(), 0);
       expect(await c.upload(), isNull);

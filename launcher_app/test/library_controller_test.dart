@@ -1256,6 +1256,20 @@ void main() {
       expect(manager.applies, 1);
     });
 
+    // אחרי כתיבת ההסכמה: בדיקה שכבר רצה לא ראתה אותה.
+    test('בדיקה "טרייה" אינה מצטרפת לבדיקה שכבר רצה', () async {
+      final gate = manager.checkGate = Completer<void>();
+      final older = controller.checkForUpdate();
+      final joined = controller.checkForUpdate();
+      final fresh = controller.checkForUpdate(fresh: true);
+
+      // setUp בדק פעם אחת; המצטרפת אינה בדיקה, והטרייה כן.
+      manager.checkGate = null;
+      gate.complete();
+      await Future.wait([older, joined, fresh]);
+      expect(manager.checks, 3);
+    });
+
     test('החלה שהמתינה לבדיקה שנכשלה משחררת את המסך', () async {
       final checkGate = manager.checkGate = Completer<void>();
       manager.checkError = StateError('drive');

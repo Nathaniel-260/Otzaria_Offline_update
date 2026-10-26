@@ -363,6 +363,11 @@ void main() {
     }
 
     await open();
+    // Enter אינו הסכמה לשליחת נתונים: החלון נשאר, ושום תשובה לא חזרה.
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byKey(ShellKeys.semanticAskDialog), findsOneWidget);
+    expect(answers, isEmpty);
     expect(find.text(t.semanticConsentTerms), findsOneWidget);
     expect(find.textContaining('אינטרנט'), findsNothing);
     // ב-760×560 הקישור מתחת לנוסח, והחלון גולל.

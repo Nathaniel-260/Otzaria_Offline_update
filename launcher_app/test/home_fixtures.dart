@@ -37,6 +37,7 @@ const homeScenarios = [
   'downloadV32',
   'syncOff',
   'taskPluginsSync',
+  'semanticOnly',
 ];
 
 final _checkedAt = DateTime(2026, 10, 23, 23, 14);
@@ -74,6 +75,7 @@ HomeViewModel _model(
   bool libraryNotFound = false,
   String? libraryElsewhereFrom,
   bool semanticConsent = false,
+  String? driveCompanionNames,
   HomeTask? task,
 }) {
   final guidance = deriveHomeGuidance(f);
@@ -98,6 +100,7 @@ HomeViewModel _model(
             : 146,
     libraryFreshInstall: installed == null,
     driveLibraryVersion: 146,
+    driveCompanionNames: driveCompanionNames,
     onlineLibraryVersion: onlineLibrary,
     onlineLibraryLatest:
         checked(GuidanceItem.library) ? onlineLibrary ?? 146 : null,
@@ -417,6 +420,13 @@ HomeViewModel homeScenario(String name) => switch (name) {
           installed: '0.10.4',
           appError: 'לא הצלחנו לקרוא את התיקייה שבכונן\n'
               'FileSystemException: Access is denied',
+        ),
+      // הספרייה מעודכנת, ורק החיפוש החכם מחכה לתשובה — בגיבור, בלי הודעה.
+      'semanticOnly' => _model(
+          const GuidanceFacts(online: false, semanticConsentRequired: true),
+          installed: '0.10.4',
+          driveCompanionNames:
+              AppL10n.strings.libraryDomain.companionSemanticName,
         ),
       // יש מה להתקין, ובספרייה קבצים חסרים והסכמה לחיפוש חכם.
       'libraryNotices' => _model(

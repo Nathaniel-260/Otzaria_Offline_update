@@ -44,6 +44,9 @@ abstract interface class UpdateHereLibrary {
   bool get hasUpdateAvailable;
   int? get targetVersion;
 
+  /// חיפוש חכם בכונן מחכה להסכמה — אינו "עדכון" עד שהיא נכתבת.
+  bool get semanticAwaitsConsent;
+
   /// הכשל, אחרי [LibraryApplyResult.failed].
   String? get errorMessage;
 
@@ -114,11 +117,13 @@ class UpdateHereFlow {
   ShellTasks get _tasks => host.tasks;
 
   /// השלבים לפי מה שבאמת יש להתקין מתוך [items], בסדר ההרצה.
-  /// [reinstallApp] — גם אותה גרסה; [fullLibrary] — הספרייה המלאה שבכונן.
+  /// [reinstallApp] — גם אותה גרסה; [fullLibrary] — הספרייה המלאה שבכונן;
+  /// [semantic] — הספרייה נכללת גם רק בשביל החלון על החיפוש החכם.
   List<GuidanceItem> stagesFor(
     List<GuidanceItem> items, {
     bool reinstallApp = false,
     bool fullLibrary = false,
+    bool semantic = false,
   }) {
     if (!app.isInstalled) {
       return [
@@ -131,7 +136,9 @@ class UpdateHereFlow {
     }
     return [
       if (items.contains(GuidanceItem.library) &&
-          (fullLibrary ? library.canApplyFull : library.hasUpdateAvailable))
+          (fullLibrary
+              ? library.canApplyFull
+              : library.hasUpdateAvailable || semantic))
         GuidanceItem.library,
       if (items.contains(GuidanceItem.app) && _canInstallApp(reinstallApp))
         GuidanceItem.app,
@@ -151,25 +158,42 @@ class UpdateHereFlow {
     bool reinstallApp = false,
     bool fullLibrary = false,
   }) async {
-    final stages = stagesFor(
-      items,
-      reinstallApp: reinstallApp,
-      fullLibrary: fullLibrary,
-    );
+    // ההסכמה נכתבת להגדרות של אוצריא, ולכן רק כשהיא מותקנת.
+    final asks = app.isInstalled &&
+        items.contains(GuidanceItem.library) &&
+        library.semanticAwaitsConsent &&
+        await host.semanticConsentUnanswered();
+    if (!host.isActive) return true;
+    List<GuidanceItem> stagesNow({required bool semantic}) => stagesFor(
+          items,
+          reinstallApp: reinstallApp,
+          fullLibrary: fullLibrary,
+          semantic: semantic,
+        );
+    var stages = stagesNow(semantic: asks);
     if (stages.isEmpty) return false;
-    final grantConsent = await _semanticConsent(stages);
-    if (grantConsent == null || !host.isActive || _tasks.isRunning) {
-      return true;
+    var grantConsent = false;
+    if (asks) {
+      final approve = await host.askSemanticConsent();
+      if (approve == null || !host.isActive || _tasks.isRunning) return true;
+      if (approve) {
+        grantConsent = true;
+      } else {
+        await host.declineSemanticConsent();
+        stages = stagesNow(semantic: false);
+        if (stages.isEmpty || !host.isActive) return true;
+      }
     }
     final hasApp = stages.contains(GuidanceItem.app);
-    final hasLibrary = stages.contains(GuidanceItem.library);
+    final libraryUpdate = stages.contains(GuidanceItem.library) &&
+        (fullLibrary || library.hasUpdateAvailable);
     final id = _tasks.startUpdateHere(
       stages,
       firstInstall: !app.isInstalled,
       appVersion: hasApp ? app.versionToInstall : null,
-      libraryVersion: hasLibrary ? library.targetVersion : null,
+      libraryVersion: libraryUpdate ? library.targetVersion : null,
       libraryMinutes:
-          hasLibrary ? library.applyEstimate(full: fullLibrary) : null,
+          libraryUpdate ? library.applyEstimate(full: fullLibrary) : null,
       account: hasApp && app.elevatedAsOtherUser ? app.adminAccount : null,
       pluginNames: stages.contains(GuidanceItem.plugins)
           ? plugins.deliverableUpdates
@@ -209,21 +233,6 @@ class UpdateHereFlow {
       reinstallApp: request.reinstallApp,
       fullLibrary: request.fullLibrary,
     );
-  }
-
-  /// חלון אחד במחשב, רק כשיש מה להחיל בספרייה ואוצריא מותקנת (ההסכמה נכתבת
-  /// להגדרות שלה). `true` — ההסכמה תיכתב בשלב הספרייה; `null` — "חזרה".
-  Future<bool?> _semanticConsent(List<GuidanceItem> stages) async {
-    if (!app.isInstalled ||
-        !stages.contains(GuidanceItem.library) ||
-        !await host.semanticConsentUnanswered() ||
-        !host.isActive) {
-      return false;
-    }
-    final approve = await host.askSemanticConsent();
-    if (approve == null || !host.isActive) return null;
-    if (!approve) await host.declineSemanticConsent();
-    return approve;
   }
 
   Future<void> _run(
@@ -323,7 +332,15 @@ class UpdateHereFlow {
     } else {
       final closed = await _ensureClosed(ranAny: ranAny);
       if (closed != true) return closed;
-      if (grantConsent) await host.grantSemanticConsent();
+      if (grantConsent) {
+        await host.grantSemanticConsent();
+        if (!host.isActive) return false;
+        // הכתיבה נכשלה והחיפוש החכם היה כל מה שיש — אין מה להחיל.
+        if (!full && !library.hasUpdateAvailable) {
+          _tasks.stageFinished(GuidanceItem.library, StageOutcome.skipped);
+          return true;
+        }
+      }
     }
     if (!host.isActive) return false;
     _tasks.stageRunning(GuidanceItem.library);

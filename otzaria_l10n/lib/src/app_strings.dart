@@ -1782,6 +1782,9 @@ abstract class LibraryDomainStrings {
   String get semanticAskLater;
   String get semanticAskApprove;
   String get semanticAskDecline;
+
+  /// השרת חסם את המפתח של המחשב הזה — הסכמה חדשה לא תעזור.
+  String get semanticConsentBlocked;
   String get semanticFeedbackFailed;
   String companionChecking(String name);
   String companionDownloading(String name);
