@@ -684,10 +684,10 @@ void main() {
       expect(find.text(t.doneBody), findsNothing);
     });
 
-    testWidgets('בלי שאלת "אפשר לשנות בדף הספרייה", ועם הגילוי על ההסכמה',
+    testWidgets('בלי שאלת "אפשר לשנות בדף ספריית אוצריא", ועם הגילוי על ההסכמה',
         (tester) async {
       await show(tester, 'semantic');
-      expect(find.textContaining('בדף הספרייה'), findsNothing);
+      expect(find.textContaining('בדף ספריית אוצריא'), findsNothing);
       expect(find.text(t.semanticYesBody), findsOneWidget);
       expect(t.semanticYesBody, contains('נתוני אימון'));
     });

@@ -126,7 +126,7 @@ final Map<String, PageScenario> pageScenarios = {
           ..targetVersion = 31
           ..canRetryWithFullDownload = true
           ..lastDownloadedAt = DateTime(2026, 10, 18)
-          ..errorMessage = 'העדכון נכשל: קובץ העדכון אינו מתאים לספרייה';
+          ..errorMessage = 'העדכון נכשל: קובץ העדכון אינו מתאים לספריית אוצריא';
       }),
   // המצב האישי קודם למצב: ה-setter שלו מריץ בדיקה כשהמצב אינו idle.
   'library_elsewhere': (d, s) => _library(d, (c) {

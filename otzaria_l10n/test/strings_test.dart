@@ -21,7 +21,7 @@ void main() {
     const en = EnglishStrings();
     expect(
       he.guide.syncOffOnlyNote(app: false, library: true, plugins: false),
-      'באתר יש גרסה חדשה של הספרייה, אבל ההורדה שלה כבויה בהגדרות.',
+      'באתר יש גרסה חדשה של ספריית אוצריא, אבל ההורדה שלה כבויה בהגדרות.',
     );
     expect(
       he.guide.syncOffOnlyNote(app: false, library: false, plugins: true),
@@ -34,7 +34,7 @@ void main() {
         plugins: false,
         libraryFilesOnly: true,
       ),
-      'באתר יש קבצים חדשים לספרייה, אבל ההורדה שלהם כבויה בהגדרות.',
+      'באתר יש קבצים חדשים לספריית אוצריא, אבל ההורדה שלהם כבויה בהגדרות.',
     );
     expect(
       en.guide.syncOffOnlyNote(
@@ -43,16 +43,16 @@ void main() {
         plugins: false,
         libraryFilesOnly: true,
       ),
-      'There are new library files online, but their download is turned off '
+      'There are new Otzaria library files online, but their download is turned off '
       'in the settings.',
     );
     expect(
       he.guide.syncOffOnlyNote(app: true, library: true, plugins: true),
-      'באתר יש חדש בתוכנה, בספרייה ובתוספים, אבל ההורדה שלהם כבויה בהגדרות.',
+      'באתר יש חדש בתוכנה, בספריית אוצריא ובתוספים, אבל ההורדה שלהם כבויה בהגדרות.',
     );
     expect(
       en.guide.syncOffOnlyNote(app: true, library: true, plugins: false),
-      'There is something new online for the program and the library, but '
+      'There is something new online for the program and the Otzaria library, but '
       'their download is turned off in the settings.',
     );
   });

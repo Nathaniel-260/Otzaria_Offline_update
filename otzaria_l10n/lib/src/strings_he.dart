@@ -190,14 +190,14 @@ class _Home extends HomeStrings {
   @override
   String get downloadingApp => 'מוריד את תוכנת אוצריא…';
   @override
-  String get downloadingLibrary => 'מוריד את הספרייה…';
+  String get downloadingLibrary => 'מוריד את ספריית אוצריא…';
   @override
   String get downloadingPlugins => 'מוריד את התוספים…';
   @override
   String get downloadStarting => 'מתחיל הורדה…';
 
   @override
-  String get libraryApplyActive => 'עדכון ספרייה פעיל';
+  String get libraryApplyActive => 'עדכון ספריית אוצריא פעיל';
 }
 
 class _Task extends TaskStrings {
@@ -242,13 +242,13 @@ class _Task extends TaskStrings {
   @override
   String get componentApp => 'תוכנת אוצריא';
   @override
-  String get componentLibrary => 'הספרייה';
+  String get componentLibrary => 'ספריית אוצריא';
   @override
   String get componentPlugins => 'תוספים';
   @override
   String get stepApp => 'תוכנת אוצריא';
   @override
-  String get stepLibrary => 'הספרייה';
+  String get stepLibrary => 'ספריית אוצריא';
   @override
   String get stepPlugins => 'התוספים';
   @override
@@ -400,7 +400,7 @@ class _Task extends TaskStrings {
       : 'שום דבר לא הולך לאיבוד: הספרים שפתוחים, הסימניות וההערות יחכו לך בדיוק איפה שהשארת.';
   @override
   String get closeAfterWizardBody =>
-      'אשף ההתקנה פתח את אוצריא. כדי להתקין את הספרייה צריך לסגור אותה.';
+      'אשף ההתקנה פתח את אוצריא. כדי להתקין את ספריית אוצריא צריך לסגור אותה.';
   @override
   String get closeOtzariaAndContinue => 'סגירת אוצריא והמשך';
   @override
@@ -410,9 +410,9 @@ class _Task extends TaskStrings {
   @override
   String get updatingApp => 'מעדכן את תוכנת אוצריא';
   @override
-  String get installingLibrary => 'מתקין את הספרייה';
+  String get installingLibrary => 'מתקין את ספריית אוצריא';
   @override
-  String get updatingLibrary => 'מעדכן את הספרייה';
+  String get updatingLibrary => 'מעדכן את ספריית אוצריא';
   @override
   String get sendingPlugins => 'שולח את התוספים לאוצריא';
   @override
@@ -444,7 +444,7 @@ class _Task extends TaskStrings {
   @override
   String get stopWaiting => 'הפסק להמתין';
   @override
-  String get libraryFull => 'הספרייה המלאה';
+  String get libraryFull => 'ספריית אוצריא המלאה';
   @override
   String libraryVersion(int version) => 'גרסה $version';
   @override
@@ -496,22 +496,23 @@ class _Task extends TaskStrings {
   }) {
     if (firstInstall) {
       if (library && libraryNote) {
-        return 'אוצריא והספרייה הותקנו במחשב הזה, אבל נשאר דבר אחד לעשות — ראה בשורת הספרייה. אפשר לנתק את הכונן.';
+        return 'תוכנת אוצריא וספריית אוצריא הותקנו במחשב הזה, אבל נשאר דבר אחד לעשות — ראה בשורת ספריית אוצריא. אפשר לנתק את הכונן.';
       }
       return library
-          ? 'אוצריא והספרייה מותקנות במחשב הזה ומוכנות ללימוד. אפשר לנתק את הכונן.'
+          ? 'תוכנת אוצריא וספריית אוצריא מותקנות במחשב הזה ומוכנות ללימוד. אפשר לנתק את הכונן.'
           : 'אוצריא מותקנת במחשב הזה. אפשר לנתק את הכונן.';
     }
     final done = app && library
-        ? 'התוכנה והספרייה עודכנו.'
+        ? 'התוכנה וספריית אוצריא עודכנו.'
         : app
             ? 'תוכנת אוצריא עודכנה.'
             : library
-                ? 'הספרייה עודכנה.'
+                ? 'ספריית אוצריא עודכנה.'
                 : null;
     return [
       if (done != null) done,
-      if (library && libraryNote) 'נשאר דבר אחד לעשות — ראה בשורת הספרייה.',
+      if (library && libraryNote)
+        'נשאר דבר אחד לעשות — ראה בשורת ספריית אוצריא.',
       if (plugins) 'התוספים מחכים לאישור שלך באוצריא.',
       'אפשר לנתק את הכונן.',
     ].join(' ');
@@ -523,9 +524,9 @@ class _Task extends TaskStrings {
   String stoppedWaitingBody(
           {required bool firstInstall, required bool libraryDone}) =>
       firstInstall
-          ? 'אם האשף עדיין פתוח, סיים בו. אחר כך בדוק בבית שאוצריא הותקנה, ומשם אפשר להתקין גם את הספרייה.'
+          ? 'אם האשף עדיין פתוח, סיים בו. אחר כך בדוק בבית שאוצריא הותקנה, ומשם אפשר להתקין גם את ספריית אוצריא.'
           : libraryDone
-              ? 'הספרייה עודכנה. סיים את ההתקנה בחלון האשף, ובדוק בבית שאוצריא עודכנה. אל תנתק את הכונן עד שהאשף יסתיים.'
+              ? 'ספריית אוצריא עודכנה. סיים את ההתקנה בחלון האשף, ובדוק בבית שאוצריא עודכנה. אל תנתק את הכונן עד שהאשף יסתיים.'
               : 'סיים את ההתקנה בחלון האשף, ובדוק בבית שאוצריא עודכנה. אל תנתק את הכונן עד שהאשף יסתיים.';
   @override
   String get wizardStillOpenTitle => 'אשף ההתקנה עדיין פתוח';
@@ -549,7 +550,7 @@ class _Task extends TaskStrings {
       firstInstall
           ? 'אשף ההתקנה נסגר לפני הסוף, ואוצריא לא הותקנה. אפשר לנסות שוב בכל עת.'
           : libraryDone
-              ? 'אשף ההתקנה נסגר לפני הסוף. אוצריא נשארה בגרסה הקודמת ועובדת כרגיל. הספרייה שכבר עודכנה נשארת מעודכנת.'
+              ? 'אשף ההתקנה נסגר לפני הסוף. אוצריא נשארה בגרסה הקודמת ועובדת כרגיל. ספריית אוצריא שכבר עודכנה נשארת מעודכנת.'
               : 'אשף ההתקנה נסגר לפני הסוף. אוצריא נשארה בגרסה הקודמת ועובדת כרגיל.';
   @override
   String get stoppedTitle => 'העדכון נעצר';
@@ -557,9 +558,9 @@ class _Task extends TaskStrings {
   String get stoppedBody =>
       'אוצריא נשארה פתוחה, ולכן שאר העדכון לא הותקן. מה שכבר הותקן נשאר.';
   @override
-  String get libraryFailedTitle => 'עדכון הספרייה נכשל';
+  String get libraryFailedTitle => 'עדכון ספריית אוצריא נכשל';
   @override
-  String get libraryInstallFailedTitle => 'התקנת הספרייה נכשלה';
+  String get libraryInstallFailedTitle => 'התקנת ספריית אוצריא נכשלה';
   @override
   String get appFailedTitle => 'התקנת אוצריא נכשלה';
   @override
@@ -588,7 +589,7 @@ class _Task extends TaskStrings {
       'אין לכלי הרשאה להתקין את אוצריא במחשב הזה.';
   @override
   String get permissionLibraryBody =>
-      'אין לכלי הרשאה לשנות את התיקייה שבה נמצאת הספרייה.';
+      'אין לכלי הרשאה לשנות את התיקייה שבה נמצאת ספריית אוצריא.';
   @override
   String get elevateTitle => 'הפעלה מחדש כמנהל';
   @override
@@ -597,7 +598,7 @@ class _Task extends TaskStrings {
   @override
   String get elevateButton => 'הפעלה מחדש כמנהל';
   @override
-  String get toLibraryPage => 'לדף הספרייה';
+  String get toLibraryPage => 'לדף ספריית אוצריא';
   @override
   String get toPluginsPage => 'לדף התוספים';
   @override
@@ -666,11 +667,11 @@ class _Pages extends PageStrings {
   String get libSemanticSection => 'חיפוש חכם';
   @override
   String libAdvancedSummary({required bool reindex}) => reindex
-      ? 'מיקום הספרייה, עדכון אינדקס החיפוש, הספרייה המלאה, עדכון למחשב מסוים '
+      ? 'מיקום ספריית אוצריא, עדכון אינדקס החיפוש, הספרייה המלאה, עדכון למחשב מסוים '
           'והתיקייה שבכונן'
-      : 'מיקום הספרייה, הספרייה המלאה, עדכון למחשב מסוים והתיקייה שבכונן';
+      : 'מיקום ספריית אוצריא, הספרייה המלאה, עדכון למחשב מסוים והתיקייה שבכונן';
   @override
-  String get libMissingFilesTitle => 'חלק מקובצי הספרייה לא הגיעו לכונן';
+  String get libMissingFilesTitle => 'חלק מקובצי ספריית אוצריא לא הגיעו לכונן';
   @override
   String libChipCompanions(String names) => 'בכונן: $names';
   @override
@@ -680,27 +681,27 @@ class _Pages extends PageStrings {
   @override
   String get libNotInstalled => 'לא מותקנת';
   @override
-  String get libInstallButton => 'התקנת הספרייה';
+  String get libInstallButton => 'התקנת ספריית אוצריא';
   @override
-  String get libInstallWithAppButton => 'התקנת אוצריא והספרייה';
+  String get libInstallWithAppButton => 'התקנת התוכנה וספריית אוצריא';
   @override
   String get libInstallWithAppNote =>
-      'אוצריא עוד לא מותקנת במחשב הזה. קודם תותקן התוכנה, ואחריה הספרייה.';
+      'אוצריא עוד לא מותקנת במחשב הזה. קודם תותקן התוכנה, ואחריה ספריית אוצריא.';
   @override
   String get libInstallNeedsApp =>
-      'אוצריא לא מותקנת במחשב הזה, ובכונן אין את התוכנה. כדי להתקין את הספרייה, הורד קודם את התוכנה במחשב עם אינטרנט.';
+      'אוצריא לא מותקנת במחשב הזה, ובכונן אין את התוכנה. כדי להתקין את ספריית אוצריא, הורד קודם את התוכנה במחשב עם אינטרנט.';
   @override
   String get libUpdateNeedsApp =>
-      'אוצריא לא מותקנת במחשב הזה. התקן אותה קודם מהבית, ואז אפשר יהיה להתקין כאן את הספרייה.';
+      'אוצריא לא מותקנת במחשב הזה. התקן אותה קודם מהבית, ואז אפשר יהיה להתקין כאן את ספריית אוצריא.';
   @override
-  String get libUpdateButton => 'עדכון הספרייה';
+  String get libUpdateButton => 'עדכון ספריית אוצריא';
   @override
-  String get libNotFoundTitle => 'לא מצאנו את הספרייה במחשב הזה';
+  String get libNotFoundTitle => 'לא מצאנו את ספריית אוצריא במחשב הזה';
   @override
   String get libNotFoundBody =>
-      'אוצריא מותקנת, אבל הספרייה שלה לא נמצאת במקום הרגיל. אם העברת אותה, בחר איפה היא עכשיו.';
+      'תוכנת אוצריא מותקנת, אבל הספרייה לא נמצאת במקום הרגיל. אם העברת אותה, בחר איפה היא עכשיו.';
   @override
-  String get libPickFolderButton => 'בחירת מיקום הספרייה';
+  String get libPickFolderButton => 'בחירת מיקום ספריית אוצריא';
   @override
   String get libSemanticTitle => 'חיפוש לפי משמעות';
   @override
@@ -718,26 +719,28 @@ class _Pages extends PageStrings {
   String get libSemanticActiveBody =>
       'ההסכמה פעילה. אפשר לבטל אותה בהגדרות של אוצריא.';
   @override
-  String get libLocationTitle => 'מיקום הספרייה במחשב הזה';
+  String get libLocationTitle => 'מיקום ספריית אוצריא במחשב הזה';
   @override
   String get libLocationNone => 'עוד לא נבחר מיקום';
   @override
-  String get libFullTitle => 'הספרייה המלאה במקום עדכון';
+  String get libFullTitle => 'ספריית אוצריא המלאה במקום עדכון';
   @override
   String libFullBody(String size) =>
-      'העדכון הרגיל נכשל. אפשר להתקין במקומו את הספרייה המלאה שבכונן ($size). זה לוקח יותר זמן, ולא צריך אינטרנט.';
+      'העדכון הרגיל נכשל. אפשר להתקין במקומו את ספריית אוצריא המלאה שבכונן ($size). זה לוקח יותר זמן, ולא צריך אינטרנט.';
   @override
   String get libFullBodyNoSize =>
-      'העדכון הרגיל נכשל. אפשר להתקין במקומו את הספרייה המלאה שבכונן. זה לוקח יותר זמן, ולא צריך אינטרנט.';
+      'העדכון הרגיל נכשל. אפשר להתקין במקומו את ספריית אוצריא המלאה שבכונן. זה לוקח יותר זמן, ולא צריך אינטרנט.';
   @override
   String libFullMeta({String? size, int? lowMinutes, int? highMinutes}) => [
-        size == null ? 'הספרייה המלאה שבכונן' : 'הספרייה המלאה שבכונן: $size',
+        size == null
+            ? 'ספריית אוצריא המלאה שבכונן'
+            : 'ספריית אוצריא המלאה שבכונן: $size',
         if (lowMinutes != null && highMinutes != null)
           'צפוי ${_minutesRange(lowMinutes, highMinutes)}',
       ].join(' · ');
   @override
   String get libFullUnavailable =>
-      'אפשרי רק אחרי שעדכון רגיל נכשל, כשבכונן יש ספרייה מלאה.';
+      'אפשרי רק אחרי שעדכון רגיל נכשל, כשבכונן יש ספריית אוצריא מלאה.';
   @override
   String get libPersonalTitle => 'הכנת עדכון למחשב מסוים';
   @override
@@ -873,7 +876,7 @@ class _Guide extends GuidanceStrings {
   String get installHereTitle => 'אוצריא מוכנה להתקנה במחשב הזה';
   @override
   String get installHereBody =>
-      'התוכנה והספרייה כבר בכונן. תוספים מתקינים אחר כך, מדף התוספים.';
+      'התוכנה וספריית אוצריא כבר בכונן. תוספים מתקינים אחר כך, מדף התוספים.';
   @override
   String get installHereButton => 'התקנת אוצריא במחשב הזה';
   @override
@@ -905,7 +908,7 @@ class _Guide extends GuidanceStrings {
   }) {
     final off = [
       if (app) 'התוכנה',
-      if (library) 'הספרייה',
+      if (library) 'ספריית אוצריא',
       if (plugins) 'התוספים',
     ];
     if (off.isEmpty) return noSyncSelectionNote;
@@ -929,7 +932,7 @@ class _Guide extends GuidanceStrings {
   }) {
     final off = [
       if (app) 'בתוכנה',
-      if (library) 'בספרייה',
+      if (library) 'בספריית אוצריא',
       if (plugins) 'בתוספים',
     ];
     if (off.length > 1) {
@@ -943,10 +946,10 @@ class _Guide extends GuidanceStrings {
       return 'באתר יש גרסה חדשה של התוכנה, אבל ההורדה שלה כבויה בהגדרות.';
     }
     if (library && libraryFilesOnly) {
-      return 'באתר יש קבצים חדשים לספרייה, אבל ההורדה שלהם כבויה בהגדרות.';
+      return 'באתר יש קבצים חדשים לספריית אוצריא, אבל ההורדה שלהם כבויה בהגדרות.';
     }
     if (library) {
-      return 'באתר יש גרסה חדשה של הספרייה, אבל ההורדה שלה כבויה בהגדרות.';
+      return 'באתר יש גרסה חדשה של ספריית אוצריא, אבל ההורדה שלה כבויה בהגדרות.';
     }
     return noSyncSelectionNote;
   }
@@ -960,7 +963,7 @@ class _Guide extends GuidanceStrings {
   String get chooseInSettingsLink => 'לבחירה בהגדרות';
   @override
   String get libraryRetryNote =>
-      'ההורדה הקודמת של הספרייה לא הושלמה. הורדה חוזרת תמשיך ממה שכבר ירד.';
+      'ההורדה הקודמת של ספריית אוצריא לא הושלמה. הורדה חוזרת תמשיך ממה שכבר ירד.';
   @override
   String get semanticOfferNote => 'חיפוש חכם זמין להורדה';
   @override
@@ -991,14 +994,14 @@ class _Guide extends GuidanceStrings {
   String get upToDateTitle => 'הכול מעודכן במחשב הזה';
   @override
   String upToDateBody(String? version) => version == null
-      ? 'אוצריא, הספרייה והתוספים מעודכנים.'
-      : 'אוצריא ${_ltr(version)}, הספרייה והתוספים מעודכנים.';
+      ? 'תוכנת אוצריא, ספריית אוצריא והתוספים מעודכנים.'
+      : 'תוכנת אוצריא ${_ltr(version)}, ספריית אוצריא והתוספים מעודכנים.';
   @override
   String get driveInstalledTitle => 'כל מה שבכונן כבר מותקן כאן';
   @override
   String driveInstalledBody(String? version) => version == null
-      ? 'אוצריא, הספרייה והתוספים מותקנים.'
-      : 'אוצריא ${_ltr(version)}, הספרייה והתוספים מותקנים.';
+      ? 'תוכנת אוצריא, ספריית אוצריא והתוספים מותקנים.'
+      : 'תוכנת אוצריא ${_ltr(version)}, ספריית אוצריא והתוספים מותקנים.';
   @override
   String get othersPendingTitle => 'יש עוד עדכונים';
   @override
@@ -1022,7 +1025,7 @@ class _Guide extends GuidanceStrings {
     String names(bool app, bool library, bool plugins) {
       final all = [
         if (app) 'תוכנת אוצריא',
-        if (library) 'הספרייה',
+        if (library) 'ספריית אוצריא',
         if (plugins) 'התוספים',
       ];
       if (all.length < 2) return all.join();
@@ -1071,11 +1074,11 @@ class _Guide extends GuidanceStrings {
   @override
   String get attentionAppTitle => 'משהו בתוכנת אוצריא צריך בדיקה';
   @override
-  String get attentionLibraryTitle => 'משהו בספרייה צריך בדיקה';
+  String get attentionLibraryTitle => 'משהו בספריית אוצריא צריך בדיקה';
   @override
   String get attentionBody => 'בדף שלה מוסבר מה קרה ומה אפשר לעשות.';
   @override
-  String get attentionLibraryButton => 'לדף הספרייה';
+  String get attentionLibraryButton => 'לדף ספריית אוצריא';
   @override
   String get taskDownloadingTitle => 'מוריד את העדכונים לכונן';
   @override
@@ -1084,7 +1087,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get taskInstallingAppTitle => 'מתקין את אוצריא';
   @override
-  String get taskUpdatingLibraryTitle => 'מעדכן את הספרייה';
+  String get taskUpdatingLibraryTitle => 'מעדכן את ספריית אוצריא';
   @override
   String get taskBusyTitle => 'פעולה רצה כרגע';
   @override
@@ -1115,7 +1118,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get itemLibraryUpdate => 'עדכון';
   @override
-  String get itemLibraryFull => 'הספרייה המלאה';
+  String get itemLibraryFull => 'ספריית אוצריא המלאה';
   @override
   String itemPluginUpdates(int count) =>
       count == 1 ? '1 עדכון תוסף' : '$count עדכוני תוספים';
@@ -1139,7 +1142,7 @@ class _Guide extends GuidanceStrings {
   }) {
     final plus = [
       if (plusApp) 'התוכנה',
-      if (plusLibrary) 'הספרייה',
+      if (plusLibrary) 'ספריית אוצריא',
       if (plusPlugins) 'התוספים',
     ];
     if (plus.isEmpty) return 'סה״כ עד $size';
@@ -1197,7 +1200,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get tileApp => 'תוכנת אוצריא';
   @override
-  String get tileLibrary => 'הספרייה';
+  String get tileLibrary => 'ספריית אוצריא';
   @override
   String get tilePlugins => 'תוספים';
   @override
@@ -1411,16 +1414,17 @@ class _LibraryScreen extends LibraryScreenStrings {
   const _LibraryScreen();
 
   @override
-  String get pickDbButton => 'בחירת קובץ הספרייה';
+  String get pickDbButton => 'בחירת קובץ ספריית אוצריא';
   @override
   String get pickDbDialogTitle => 'בחירת קובץ seforim.db';
   @override
-  String get dbPathUpdatedSnack => 'מיקום הספרייה עודכן';
+  String get dbPathUpdatedSnack => 'מיקום ספריית אוצריא עודכן';
 
   @override
   String get pickInstallDirButton => 'בחירת תיקייה';
   @override
-  String get pickInstallDirDialogTitle => 'בחירת התיקייה שאליה תותקן הספרייה';
+  String get pickInstallDirDialogTitle =>
+      'בחירת התיקייה שאליה תותקן ספריית אוצריא';
   @override
   String get installDirUpdatedSnack => 'מיקום ההתקנה עודכן';
   @override
@@ -1430,14 +1434,14 @@ class _LibraryScreen extends LibraryScreenStrings {
       'המיקום שנבחר:\n${_ltr(dbPath)}\n\n'
       'זה אינו מיקום ברירת המחדל של אוצריא, ולכן היא לא תמצא שם את הספרים '
       'בעצמה. אחרי ההתקנה יש לפתוח את אוצריא, ובהגדרות שלה לבחור את מיקום '
-      'הספרייה — התיקייה הזו. להמשיך עם המיקום הזה?';
+      'ספריית אוצריא — התיקייה הזו. להמשיך עם המיקום הזה?';
   @override
   String get customLocationConfirm => 'המשך עם המיקום שנבחר';
 
   @override
-  String get updatingProgress => 'מעדכן את הספרייה…';
+  String get updatingProgress => 'מעדכן את ספריית אוצריא…';
   @override
-  String get changesTitle => 'מה חדש בספרייה';
+  String get changesTitle => 'מה חדש בספריית אוצריא';
   @override
   String changesPendingSubtitle(String version) =>
       'העדכון מוסיף ומתקן ספרים עד גרסה ${_ltr(version)}.';
@@ -1457,7 +1461,7 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get reindexTitle => 'עדכון אינדקס החיפוש';
   @override
   String get reindexPendingSubtitle =>
-      'הספרייה עודכנה מכאן, ולכן החיפוש בספרים שהשתנו עדיין מחזיר את התוכן הישן. '
+      'ספריית אוצריא עודכנה מכאן, ולכן החיפוש בספרים שהשתנו עדיין מחזיר את התוכן הישן. '
       'בלחיצה אחת אוצריא תתקן את זה.';
   @override
   String get reindexButton => 'בנייה מחדש';
@@ -1477,7 +1481,7 @@ class _LibraryScreen extends LibraryScreenStrings {
       'לא הצלחנו למסור את הבקשה לאוצריא ($error)';
 
   @override
-  String get fullDownloadInsteadButton => 'התקנת הספרייה המלאה';
+  String get fullDownloadInsteadButton => 'התקנת ספריית אוצריא המלאה';
 
   @override
   String get mirrorEmpty =>
@@ -1485,7 +1489,8 @@ class _LibraryScreen extends LibraryScreenStrings {
   @override
   String get mirrorUnreadable => 'לא ניתן לקרוא';
   @override
-  String get mirrorNotChecked => 'לא נבדקה: לא ניתן היה לקרוא את הספרייה במחשב';
+  String get mirrorNotChecked =>
+      'לא נבדקה: לא ניתן היה לקרוא את ספריית אוצריא במחשב';
   @override
   String mirrorHasVersion(String version) => 'מכילה גרסה ${_ltr(version)}';
   @override
@@ -1505,7 +1510,7 @@ class _LibraryScreen extends LibraryScreenStrings {
       'המחשב נרשם, בגרסה ${_ltr(version)}';
   @override
   String get personalVersionNotFoundSnack =>
-      'לא נמצאה במחשב הזה ספרייה לקרוא ממנה את הגרסה';
+      'לא נמצאה במחשב הזה ספריית אוצריא לקרוא ממנה את הגרסה';
   @override
   String get personalOtherMachineTitle => 'העדכון הוכן למחשב אחר';
   @override
@@ -1513,7 +1518,7 @@ class _LibraryScreen extends LibraryScreenStrings {
       'העדכון שבכונן הוכן למחשב שנרשם, מגרסה ${_ltr(version)}. המחשב הזה לא '
       'נרשם, ולכן אין כאן מה להתקין עליו. ההורדה עצמה הצליחה, והעדכון שמור '
       'בכונן. אפשר לרשום גם את המחשב הזה, או לכבות את "הכנת עדכון למחשב '
-      'מסוים" בהגדרות כדי לחזור להורדת הספרייה המלאה.';
+      'מסוים" בהגדרות כדי לחזור להורדת ספריית אוצריא המלאה.';
   @override
   String get personalOtherMachineCaptureButton => 'רישום גם של המחשב הזה';
   @override
@@ -1522,10 +1527,10 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get downloadNoteTitle => 'ההורדה האחרונה';
   @override
   String downloadNotePersonal(String version) =>
-      'הכנת עדכון למחשב מסוים — קובצי עדכון מגרסה ${_ltr(version)} ומעלה, בלי הספרייה המלאה';
+      'הכנת עדכון למחשב מסוים — קובצי עדכון מגרסה ${_ltr(version)} ומעלה, בלי ספריית אוצריא המלאה';
   @override
   String get downloadNotePersonalUnknownVersion =>
-      'הכנת עדכון למחשב מסוים מופעלת, אבל לא זוהתה גרסת הספרייה במחשב — ירדה הספרייה המלאה. '
+      'הכנת עדכון למחשב מסוים מופעלת, אבל לא זוהתה גרסת ספריית אוצריא במחשב — ירדה הספרייה המלאה. '
       'פתח את הכלי פעם אחת במחשב שבו אוצריא מותקנת.';
   @override
   String get downloadNotePersonalMirrorRepaired =>
@@ -1589,11 +1594,12 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get syncTargetApp => 'תוכנת אוצריא';
   @override
-  String get syncTargetLibrary => 'הספרייה';
+  String get syncTargetLibrary => 'ספריית אוצריא';
   @override
   String get syncTargetPlugins => 'תוספים';
   @override
-  String get syncLibraryLockedSubtitle => 'הספרייה נקבעת לפי המחשב שנרשם.';
+  String get syncLibraryLockedSubtitle =>
+      'ספריית אוצריא נקבעת לפי המחשב שנרשם.';
   @override
   String get semanticDownloadTitle => 'חיפוש חכם';
   @override
@@ -1630,7 +1636,7 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get personalModeDialogContent =>
       'מעכשיו יירד לכונן רק מה שחסר למחשב שתרשום. למחשבים אחרים העדכון '
-      'הזה לא יתאים, עד שתכבה את האפשרות. הספרייה המלאה שבכונן תימחק בהורדה הבאה.';
+      'הזה לא יתאים, עד שתכבה את האפשרות. ספריית אוצריא המלאה שבכונן תימחק בהורדה הבאה.';
   @override
   String get personalModeDialogConfirm => 'הפעלה';
 
@@ -2201,9 +2207,9 @@ class _Faq extends FaqStrings {
   String get qWhatIsThis => 'מה עושים עם התוכנה הזאת?';
   @override
   String get aWhatIsThis =>
-      'בפתיחת התוכנה יופיעו במרכז המסך אריחים, ביניהם תוכנת אוצריא והספרייה. '
+      'בפתיחת התוכנה יופיעו במרכז המסך אריחים, ביניהם תוכנת אוצריא וספריית אוצריא. '
       'כשיש בכונן עדכון, יופיע על האריח הכיתוב "יש עדכון בכונן". מעדכנים קודם '
-      'את התוכנה, ורק אחר כך את הספרייה.';
+      'את התוכנה, ורק אחר כך את ספריית אוצריא.';
   @override
   String get qOfflineFlow => 'המחשב שלי אינו מחובר לאינטרנט — איך אעדכן אותו?';
   @override
@@ -2232,12 +2238,12 @@ class _Faq extends FaqStrings {
       'בהורדות קודמות — הוא מוחק רק את החלק שהיה באמצע.';
   @override
   String get qDownloadTooBig =>
-      'ההורדה גדולה מאוד, ואני רק רוצה לעדכן את הספרייה שיש לי';
+      'ההורדה גדולה מאוד, ואני רק רוצה לעדכן את ספריית אוצריא שיש לי';
   @override
   String get aDownloadTooBig =>
       'בהגדרות יש אפשרות "הכנת עדכון למחשב מסוים". כשהיא מופעלת מורידים רק '
-      'את ההשלמות מהגרסה שיש אצלך ומעלה, במקום את הספרייה המלאה — נפח קטן '
-      'בהרבה. לפני ההורדה לחץ בדף "הספרייה", תחת "מתקדם", על "רישום המחשב '
+      'את ההשלמות מהגרסה שיש אצלך ומעלה, במקום את ספריית אוצריא המלאה — נפח קטן '
+      'בהרבה. לפני ההורדה לחץ בדף "ספריית אוצריא", תחת "מתקדם", על "רישום המחשב '
       'הזה", אחרת התוכנה אינה יודעת מאיפה להתחיל. חשוב לדעת: כונן כזה אינו יכול '
       'לשמש להתקנה במחשב שאין בו אוצריא, ולכן מי שמעדכן כמה מחשבים כדאי לו '
       'להשאיר את ההגדרה כבויה.';
@@ -2264,11 +2270,11 @@ class _Faq extends FaqStrings {
       'לבד. הפתרון פשוט: להפעיל את אוצריא בזמן שתוכנת העדכונים פתוחה — היא '
       'תזהה אותה מעצמה, ומאותו רגע תזכור את המקום.';
   @override
-  String get qDbNotFound => 'כתוב שהספרייה לא נמצאה, אבל יש לי ספרייה';
+  String get qDbNotFound => 'כתוב שספריית אוצריא לא נמצאה, אבל היא קיימת אצלי';
   @override
   String get aDbNotFound =>
       'גם הספרייה אינה מזוהה כשהיא יושבת במקום שאינו ברירת המחדל. בדף '
-      '"הספרייה", תחת "מתקדם", בוחרים את המקום ידנית. אם אינך יודע איפה היא, אוצריא '
+      '"ספריית אוצריא", תחת "מתקדם", בוחרים את המקום ידנית. אם אינך יודע איפה היא, אוצריא '
       'עצמה תגיד לך: היכנס אליה להגדרות, ושם בלשונית "ספרייה" לחץ על '
       '"העתק נתיב".';
   @override
@@ -2281,11 +2287,11 @@ class _Faq extends FaqStrings {
       'אוצריא ולהתקין מחדש את החבילה המלאה.';
   @override
   String get qSearchMissesNewBooks =>
-      'עדכנתי את הספרייה, אבל החיפוש באוצריא אינו מוצא את הספרים החדשים';
+      'עדכנתי את ספריית אוצריא, אבל החיפוש באוצריא אינו מוצא את הספרים החדשים';
   @override
   String get aSearchMissesNewBooks =>
       'החיפוש באוצריא נעזר באינדקס חיפוש שנבנה מראש, והאינדקס אינו מתעדכן מעצמו אחרי '
-      'שהספרים הוחלפו. מיד לאחר עדכון ספרייה התוכנה מציעה לבקש מאוצריא לעדכן '
+      'שהספרים הוחלפו. מיד לאחר עדכון של ספריית אוצריא, התוכנה מציעה לבקש מאוצריא לעדכן '
       'את אינדקס החיפוש — כדאי לאשר. מי שדחה את ההצעה יקבל אותה שוב בהפעלה '
       'הבאה של אוצריא.';
 
@@ -2404,7 +2410,7 @@ class _SetupError extends SetupErrorStrings {
   String get title => 'התוכנה נמצאת במקום שאינו מתאים';
   @override
   String get explanation =>
-      'התוכנה שומרת את כל הנתונים — הספרייה, התוספים וגרסת אוצריא — בתיקייה '
+      'התוכנה שומרת את כל הנתונים — ספריית אוצריא, התוספים וגרסת אוצריא — בתיקייה '
       'שצמודה לה, כדי שהכול יישמר יחד בכונן. התיקייה הנוכחית חסומה לכתיבה '
       '(בגלל הרשאות, או כי הכונן מוגן מפני כתיבה), ועדיין אין בה עדכונים '
       'שאפשר להתקין מהם, ולכן אין לאן לשמור.';
@@ -2496,7 +2502,7 @@ class _Elevation extends ElevationStrings {
   String get macHint =>
       'נראה שאין הרשאת כתיבה לתיקייה. ב-macOS אפשר לנסות שלושה דברים: '
       'להתקין את אוצריא אל "Applications" שבתיקיית הבית (~/Applications) '
-      'במקום אל /Applications של כל המחשב; לבחור לספרייה מיקום בתוך תיקיית '
+      'במקום אל /Applications של כל המחשב; לבחור לספריית אוצריא מיקום בתוך תיקיית '
       'הבית; או לתת לתוכנה גישה מלאה לדיסק בהגדרות המערכת ← פרטיות ואבטחה '
       '← גישה מלאה לדיסק, ואז לפתוח אותה מחדש.';
   @override
@@ -2695,27 +2701,27 @@ class _LibraryDomain extends LibraryDomainStrings {
 
   @override
   String get interruptedUpdateFound =>
-      'נמצא עדכון ספרייה שלא הושלם — יש לבדוק שהספרייה תקינה';
+      'נמצא עדכון של ספריית אוצריא שלא הושלם — יש לבדוק שהיא תקינה';
 
   @override
   String get exportLoadingReleases => 'טוען את רשימת הגרסאות מהאתר';
   @override
-  String get exportNoReleases => 'לא נמצאו עדכוני ספרייה להורדה.';
+  String get exportNoReleases => 'לא נמצאו עדכונים של ספריית אוצריא להורדה.';
   @override
   String exportPersonalFrom(int localVersion) =>
-      'הכנת עדכון למחשב מסוים: מוריד קובצי עדכון מגרסה $localVersion ומעלה, בלי הספרייה המלאה';
+      'הכנת עדכון למחשב מסוים: מוריד קובצי עדכון מגרסה $localVersion ומעלה, בלי ספריית אוצריא המלאה';
   @override
   String exportPersonalUpToDate(int localVersion) =>
       'אין גרסה חדשה מ-$localVersion — לא הורד דבר';
   @override
   String get exportPersonalVersionUnknown =>
-      'לא זוהתה גרסת הספרייה במחשב — מוריד את הספרייה המלאה';
+      'לא זוהתה גרסת ספריית אוצריא במחשב — מוריד את הספרייה המלאה';
   @override
   String get exportPersonalMirrorDamaged =>
       'עדכוני הספרייה שבתיקייה פגומים — מוריד את המסד המלא';
   @override
   String exportReusingFullDb(int version, String tag) =>
-      'הספרייה המלאה שכבר בכונן (גרסה $version, ${_ltr(tag)}) נשמרת — אפשר לעדכן '
+      'ספריית אוצריא המלאה שכבר בכונן (גרסה $version, ${_ltr(tag)}) נשמרת — אפשר לעדכן '
       'אותה לגרסה האחרונה בקובצי עדכון, ולכן אין צורך להוריד אותה שוב';
   @override
   String exportDownloading(String tag, String asset) =>
@@ -2728,7 +2734,7 @@ class _LibraryDomain extends LibraryDomainStrings {
       'מרכיב ${_ltr(tag)} / ${_ltr(asset)} מחלקיו — $percent%';
   @override
   String exportSplitFullDbSkipped(String tag, String detail) =>
-      'הספרייה המלאה של ${_ltr(tag)} פורסמה בחלקים, אבל רשימת החלקים פגומה או אינה '
+      'ספריית אוצריא המלאה של ${_ltr(tag)} פורסמה בחלקים, אבל רשימת החלקים פגומה או אינה '
       'תואמת להם — ולכן היא לא ירדה ($detail)';
   @override
   String exportSplitPartCorrupted(String asset, String parts) =>
@@ -2764,7 +2770,7 @@ class _LibraryDomain extends LibraryDomainStrings {
     String file,
     int schemaVersion,
   ) =>
-      'קובץ העדכון $file של ${_ltr(tag)} בנוי במבנה ספרייה $schemaVersion, שהכלי '
+      'קובץ העדכון $file של ${_ltr(tag)} בנוי במבנה $schemaVersion של ספריית אוצריא, שהכלי '
       'אינו יודע להתקין, ולכן הוא אינו מועתק לכונן';
   @override
   String exportSkippingUnsupportedPatchFormat(
@@ -2776,7 +2782,7 @@ class _LibraryDomain extends LibraryDomainStrings {
       'אינו יודע להתקין, ולכן הוא אינו מועתק לכונן';
   @override
   String exportFullDbRequiredBySchema(int schemaVersion, int latestVersion) =>
-      'גרסה $latestVersion בנויה במבנה ספרייה חדש ($schemaVersion): '
+      'גרסה $latestVersion של ספריית אוצריא בנויה במבנה חדש ($schemaVersion): '
       'מוריד את הספרייה המלאה במקום קובצי העדכון';
   @override
   String exportFullDbRequiredByPatchFormat(
@@ -2784,15 +2790,15 @@ class _LibraryDomain extends LibraryDomainStrings {
     int latestVersion,
   ) =>
       'קובצי העדכון של גרסה $latestVersion בנויים במבנה חדש '
-      '($patchFormatVersion): מוריד את הספרייה המלאה במקומם';
+      '($patchFormatVersion): מוריד את ספריית אוצריא המלאה במקומם';
   @override
   String exportFullDbSchemaUnsupported(String tag, int schemaVersion) =>
-      'הספרייה המלאה של ${_ltr(tag)} פורסמה רק במבנה $schemaVersion, שגרסה זו של '
+      'ספריית אוצריא המלאה של ${_ltr(tag)} פורסמה רק במבנה $schemaVersion, שגרסה זו של '
       'הכלי אינה יודעת להתקין — היא לא ירדה, והמחשב שאין בו אינטרנט יציג '
       'שצריך לעדכן את הכלי';
   @override
   String exportSkippingPatchesFullDbWins(int fileCount, int fullDbVersion) =>
-      'מדלג על $fileCount קובצי עדכון: הספרייה המלאה (גרסה $fullDbVersion) חדשה '
+      'מדלג על $fileCount קובצי עדכון: ספריית אוצריא המלאה (גרסה $fullDbVersion) חדשה '
       'יותר ממה שהם מגיעים אליו, ולכן אין בהם צורך';
   @override
   String exportFullDbInsteadOfSlowPatches(
@@ -2801,27 +2807,27 @@ class _LibraryDomain extends LibraryDomainStrings {
     int fullDbMinutes,
     int toVersion,
   ) =>
-      'העדכון לגרסה $toVersion שינה את הספרייה כולה: התקנת קובצי העדכון שלו '
+      'העדכון לגרסה $toVersion שינה את ספריית אוצריא כולה: התקנת קובצי העדכון שלו '
       'תארך כ-$patchMinutes דקות במחשב שמתעדכן, לעומת כ-$fullDbMinutes דקות '
       'להחלפת הספרייה המלאה. מדלג על $fileCount הקבצים האלה ומוריד את הספרייה '
       'המלאה במקומם';
   @override
   String exportPersonalNeedsFullDb(int fromVersion, int latestVersion) =>
       'אין קובצי עדכון שמעבירים את גרסה $fromVersion לגרסה '
-      '$latestVersion, ולכן מוריד את הספרייה המלאה — אף ש"הכנת עדכון למחשב מסוים" בדרך '
+      '$latestVersion, ולכן מוריד את ספריית אוצריא המלאה — אף ש"הכנת עדכון למחשב מסוים" בדרך '
       'כלל מדלגת עליה';
   @override
   String exportPersonalNoFullDbEither(int fromVersion, int latestVersion) =>
       'אין קובצי עדכון מגרסה $fromVersion לגרסה $latestVersion, וגם '
-      'אין ספרייה מלאה בגרסה האחרונה. כבה את "הכנת עדכון למחשב מסוים" בהגדרות והורד '
+      'אין ספריית אוצריא מלאה בגרסה האחרונה. כבה את "הכנת עדכון למחשב מסוים" בהגדרות והורד '
       'שוב.';
 
   @override
   String get planLocalVersionUnknown =>
-      'גרסת הספרייה שבמחשב אינה ידועה (חסר schema_meta.db_version)';
+      'גרסת ספריית אוצריא שבמחשב אינה ידועה (חסר schema_meta.db_version)';
   @override
   String planContentChangedWithoutVersionBump(String releaseTag) =>
-      'תוכן הספרייה עודכן ב-${_ltr(releaseTag)} בלי שמספר הגרסה השתנה';
+      'תוכן ספריית אוצריא עודכן ב-${_ltr(releaseTag)} בלי שמספר הגרסה השתנה';
   @override
   String planNoDeltaRoute(int localVersion, int latestVersion) =>
       'אין רצף קובצי עדכון מגרסה $localVersion לגרסה $latestVersion';
@@ -2832,25 +2838,26 @@ class _LibraryDomain extends LibraryDomainStrings {
     int fullDbMinutes,
   ) =>
       'התקנת $stepCount קובצי העדכון תארך כ-$patchMinutes דקות, לעומת כ-'
-      '$fullDbMinutes דקות להחלפת הספרייה המלאה — ולכן הספרייה המלאה מוחלפת';
+      '$fullDbMinutes דקות להחלפת ספריית אוצריא המלאה — ולכן היא מוחלפת';
   @override
-  String planNoFullDbEither(String reason) => '$reason, ואין ספרייה מלאה זמינה';
+  String planNoFullDbEither(String reason) =>
+      '$reason, ואין ספריית אוצריא מלאה זמינה';
   @override
   String planPatchSchemaTooNew(int schemaVersion, int latestVersion) =>
-      'הגרסה האחרונה של הספרייה ($latestVersion) בנויה במבנה '
+      'הגרסה האחרונה של ספריית אוצריא ($latestVersion) בנויה במבנה '
       '$schemaVersion, שגרסה זו של הכלי אינה יודעת להתקין בקובצי עדכון';
   @override
   String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion) =>
-      'גרסת הספרייה $latestVersion דורשת גרסה חדשה יותר של אוצריא: הגרסה '
+      'גרסת ספריית אוצריא $latestVersion דורשת גרסה חדשה יותר של אוצריא: הגרסה '
       'המותקנת יודעת לקרוא ספרייה עד מבנה $readableSchema בלבד. יש לעדכן קודם את '
       'אוצריא, ואחר כך את הספרייה.';
   @override
   String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion) =>
-      'הספרייה תעודכן עד גרסה $reachedVersion. גרסה $latestVersion דורשת '
+      'ספריית אוצריא תעודכן עד גרסה $reachedVersion. גרסה $latestVersion דורשת '
       'גרסה חדשה יותר של אוצריא — אחרי עדכון אוצריא אפשר להמשיך.';
   @override
   String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion) =>
-      'בכונן יש את אוצריא ${_ltr(otzariaVersion)}, שקוראת את הספרייה החדשה: יש לעדכן '
+      'בכונן יש את אוצריא ${_ltr(otzariaVersion)}, שקוראת את ספריית אוצריא החדשה: יש לעדכן '
       'קודם את אוצריא, ואחר כך את הספרייה.';
   @override
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion) =>
@@ -2862,13 +2869,13 @@ class _LibraryDomain extends LibraryDomainStrings {
     int localVersion,
     int latestVersion,
   ) =>
-      'הספרייה המלאה הזמינה מגיעה רק לגרסה $reachableVersion, שאינה חדשה '
+      'ספריית אוצריא המלאה הזמינה מגיעה רק לגרסה $reachableVersion, שאינה חדשה '
       'מהגרסה שכבר מותקנת ($localVersion) — התקנתו תחליף את הספרייה בגרסה '
       'ישנה יותר במקום לעדכן אותה לגרסה $latestVersion. לכן העדכון לא בוצע: '
-      'נדרשת ספרייה מלאה חדשה יותר, או גרסה חדשה יותר של הכלי.';
+      'נדרשת ספריית אוצריא מלאה חדשה יותר, או גרסה חדשה יותר של הכלי.';
   @override
   String planNewSchemaNeedsFullDb(int latestVersion, int schemaVersion) =>
-      'גרסה $latestVersion עברה למבנה ספרייה חדש ($schemaVersion), ולכן '
+      'גרסה $latestVersion של ספריית אוצריא עברה למבנה חדש ($schemaVersion), ולכן '
       'הספרייה כולה יורדת מחדש במקום קובצי עדכון';
   @override
   String planPartialDeltaSchemaStop(
@@ -2877,8 +2884,8 @@ class _LibraryDomain extends LibraryDomainStrings {
     int schemaVersion,
   ) =>
       'העדכון מגיע לגרסה $reachedVersion. גרסה $latestVersion עברה למבנה '
-      'ספרייה חדש ($schemaVersion) שאין אליו קובצי עדכון — כדי להגיע '
-      'אליה נדרשת ספרייה מלאה חדשה.';
+      'חדש ($schemaVersion) שאין אליו קובצי עדכון — כדי להגיע '
+      'אליה נדרשת ספריית אוצריא מלאה חדשה.';
   @override
   String planPartialDeltaFormatStop(
     int reachedVersion,
@@ -2887,7 +2894,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   ) =>
       'העדכון מגיע לגרסה $reachedVersion. קובצי העדכון של גרסה $latestVersion '
       'בנויים במבנה $patchFormatVersion שהכלי אינו יודע להתקין — כדי '
-      'להגיע אליה נדרשת ספרייה מלאה חדשה.';
+      'להגיע אליה נדרשת ספריית אוצריא מלאה חדשה.';
 
   @override
   String mirrorManifestMissing(String fileName, String mirrorDir) =>
@@ -2919,18 +2926,18 @@ class _LibraryDomain extends LibraryDomainStrings {
       'הורדה של המסד המלא';
   @override
   String localVersionMismatch(int? localVersion, int expected) =>
-      'גרסת הספרייה שבמחשב ($localVersion) אינה מתאימה לקובץ העדכון (נדרשת $expected)';
+      'גרסת ספריית אוצריא שבמחשב ($localVersion) אינה מתאימה לקובץ העדכון (נדרשת $expected)';
   @override
   String localSchemaMismatch(int localSchema, int expected) =>
-      'מבנה הספרייה שבמחשב ($localSchema) אינו מתאים לקובץ העדכון (נדרש $expected)';
+      'מבנה ספריית אוצריא שבמחשב ($localSchema) אינו מתאים לקובץ העדכון (נדרש $expected)';
   @override
   String get contentHashMismatchNeedsFullDownload =>
-      'הספרייה שבמחשב שונה מהצפוי, ולכן קובץ העדכון לא מתאים לה '
+      'ספריית אוצריא שבמחשב שונה מהצפוי, ולכן קובץ העדכון לא מתאים לה '
       '(fromContentHash). נדרשת הורדה של הספרייה המלאה.';
   @override
   String patchUniqueConflictNeedsFullDownload(String table, String detail) =>
-      'קובץ העדכון אינו מתאים לספרייה שבמחשב: התנגשות ערך ייחודי בטבלה "$table". '
-      'העדכון בוטל והספרייה לא השתנתה. נדרשת הורדה מלאה של הספרייה. '
+      'קובץ העדכון אינו מתאים לספריית אוצריא שבמחשב: התנגשות ערך ייחודי בטבלה "$table". '
+      'העדכון בוטל והספרייה לא השתנתה. נדרשת הורדה מלאה שלה. '
       '($detail)';
   @override
   String foreignKeyViolationsGrew(int before, int after) =>
@@ -2987,7 +2994,7 @@ class _LibraryDomain extends LibraryDomainStrings {
       'מחיקת קובץ חלקי לפני ניסיון חוזר נכשלה — לא ניתן להמשיך בהורדה';
   @override
   String fullDbSizeMismatch(int downloaded, int expected) =>
-      'גודל הספרייה שהורדה ($downloaded) אינו תואם לצפוי ($expected)';
+      'גודל ספריית אוצריא שהורדה ($downloaded) אינו תואם לצפוי ($expected)';
   @override
   String get fullDbHashMismatch =>
       'הקובץ שהורד נפגם (sha256 אינו תואם) ונמחק — יש להוריד שוב. אם זה '
@@ -3061,29 +3068,29 @@ class _LibraryDomain extends LibraryDomainStrings {
       'שגיאה בהורדת רשימת החלקים ($name): $statusCode';
   @override
   String get interruptedUpdateWithoutBackup =>
-      'נמצא עדכון ספרייה שלא הושלם ואין לו גיבוי — יש לבדוק שהספרייה תקינה';
+      'נמצא עדכון של ספריית אוצריא שלא הושלם ואין לו גיבוי — יש לבדוק שהיא תקינה';
   @override
   String get interruptedUpdateRestored =>
-      'נמצא עדכון ספרייה שנקטע — הספרייה שוחזרה מהגיבוי';
+      'נמצא עדכון של ספריית אוצריא שנקטע — הספרייה שוחזרה מהגיבוי';
   @override
   String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema) =>
-      'הספרייה עברה למבנה $schemaVersion, '
+      'ספריית אוצריא עברה למבנה $schemaVersion, '
       'חדש מזה שהכלי מכיר ($supportedSchema) — צריך לעדכן את הכלי';
   @override
   String planSchemaBarrierNeedsFullDownload(int schemaVersion) =>
-      'הספרייה עברה למבנה $schemaVersion; המעבר מחייב הורדה של הספרייה המלאה';
+      'ספריית אוצריא עברה למבנה $schemaVersion; המעבר מחייב הורדה של הספרייה המלאה';
   @override
   String planDeltaNeedsAppUpdate(
     int latestVersion,
     int supportedSchema,
     int supportedPatchFormat,
   ) =>
-      'העדכון לגרסה $latestVersion דורש מבנה ספרייה או קובצי עדכון '
-      'חדשים ממה שהכלי מכיר (ספרייה $supportedSchema, '
+      'העדכון לגרסה $latestVersion דורש מבנה של ספריית אוצריא או קובצי עדכון '
+      'חדשים ממה שהכלי מכיר (מבנה $supportedSchema, '
       'קובצי עדכון $supportedPatchFormat) — צריך לעדכן את הכלי';
   @override
   String planHeavyDelta(String deltaSize, String localDbSize) =>
-      'קובצי העדכון גדולים ($deltaSize) ביחס לספרייה שבמחשב '
+      'קובצי העדכון גדולים ($deltaSize) ביחס לספריית אוצריא שבמחשב '
       '($localDbSize), והתקנתם עלולה להימשך זמן רב';
   @override
   String tableHashMismatch(String tables) =>
@@ -3104,7 +3111,7 @@ class _LibraryDomain extends LibraryDomainStrings {
 
   @override
   String get mirrorMissing =>
-      'עדיין לא ירדו עדכוני ספרייה לתיקייה שבכונן. הורד עדכונים לכונן במחשב עם אינטרנט, מדף הבית.';
+      'עדיין לא ירדו עדכונים של ספריית אוצריא לתיקייה שבכונן. הורד עדכונים לכונן במחשב עם אינטרנט, מדף הבית.';
   @override
   String get mirrorDamaged =>
       'עדכוני הספרייה שבתיקייה המקומית פגומים ולא ניתן לקרוא אותם — בדרך כלל '
@@ -3113,10 +3120,10 @@ class _LibraryDomain extends LibraryDomainStrings {
       'אותו.';
   @override
   String interruptedUpdateCorruptDb(String detail) =>
-      '$detail — בבדיקה נמצא שהספרייה פגומה, ולכן יש להחליף אותה '
+      '$detail — בבדיקה נמצא שספריית אוצריא פגומה, ולכן יש להחליף אותה '
       'בספרייה המלאה.';
   @override
-  String get interruptedUpdateDefaultDetail => 'עדכון ספרייה שנקטע';
+  String get interruptedUpdateDefaultDetail => 'עדכון של ספריית אוצריא שנקטע';
   @override
   String get blockedNeedsManualAction => 'מצב חסום — נדרשת פעולה ידנית';
   @override
@@ -3127,53 +3134,53 @@ class _LibraryDomain extends LibraryDomainStrings {
       'לא נמצא URL להורדת ${_ltr(fileName)}';
   @override
   String get fullDbAssetMissingFromPlan =>
-      'בתוכנית העדכון חסר קובץ הספרייה המלאה';
+      'בתוכנית העדכון חסר קובץ ספריית אוצריא המלאה';
   @override
   String get fullDbExtractionFailed =>
-      'חילוץ הספרייה המלאה נכשל, או שהתקבל קובץ ריק';
+      'חילוץ ספריית אוצריא המלאה נכשל, או שהתקבל קובץ ריק';
   @override
   String get fullDbNeedsNativeZstd =>
-      'חילוץ הספרייה המלאה דורש רכיב (zstd) שאינו זמין במחשב הזה';
+      'חילוץ ספריית אוצריא המלאה דורש רכיב (zstd) שאינו זמין במחשב הזה';
   @override
   String get patchNeedsNativeZstd =>
       'חילוץ קובץ העדכון דורש רכיב (zstd) שאינו זמין במחשב הזה';
   @override
   String versionMismatchAfterWrite(int? actual, int? expected) =>
-      'אחרי כתיבת הספרייה המלאה, הגרסה שנקראה ($actual) לא תואמת ליעד '
+      'אחרי כתיבת ספריית אוצריא המלאה, הגרסה שנקראה ($actual) לא תואמת ליעד '
       '($expected) — בוצע שחזור.';
   @override
   String get updateCancelled => 'העדכון בוטל';
   @override
   String notEnoughDiskSpace(String dir, String needed, String free) =>
       'אין מספיק מקום פנוי ב-${_ltr(dir)}: נדרשים $needed ופנויים $free. פנה מקום '
-      'בכונן הזה ונסה שוב, או בחר מיקום אחר לספרייה.';
+      'בכונן הזה ונסה שוב, או בחר מיקום אחר לספריית אוצריא.';
   @override
   String fileTooLargeForVolume(String dir) =>
       'הכונן שבו נמצא ${_ltr(dir)} מפורמט ב-FAT32, שאינו יכול להכיל קבצים גדולים '
-      'מ-\u20664\u00a0GB\u2069, והספרייה גדולה מזה. בחר לספרייה מיקום בכונן NTFS או exFAT.';
+      'מ-\u20664\u00a0GB\u2069, וספריית אוצריא גדולה מזה. בחר לה מיקום בכונן NTFS או exFAT.';
   @override
   String installDirNotWritable(String dir, String detail) =>
-      'לא ניתן ליצור את התיקייה ${_ltr(dir)} ($detail). בחר מיקום אחר לספרייה דרך '
-      '"בחירת מיקום ידנית" בדף הספרייה.';
+      'לא ניתן ליצור את התיקייה ${_ltr(dir)} ($detail). בחר מיקום אחר לספריית אוצריא דרך '
+      '"בחירת מיקום ידנית" בדף ספריית אוצריא.';
   @override
   String mirrorNotEnoughDiskSpace(String dir, String needed, String free) =>
       'אין מספיק מקום פנוי ב-${_ltr(dir)} להורדה: נדרשים $needed ופנויים $free. '
       'פנה מקום בכונן ונסה שוב — מה שכבר ירד נשמר.';
   @override
   String get otzariaIsRunning =>
-      'אוצריא פתוחה כרגע — יש לסגור אותה לפני עדכון הספרייה, כדי למנוע נעילת '
+      'אוצריא פתוחה כרגע — יש לסגור אותה לפני עדכון ספריית אוצריא, כדי למנוע נעילת '
       'קובץ.';
   @override
   String get localDbLocked =>
-      'לא ניתן לקרוא את גרסת הספרייה שבמחשב כי קובץ הספרייה נעול, כנראה מפני '
+      'לא ניתן לקרוא את גרסת ספריית אוצריא שבמחשב כי קובץ הספרייה נעול, כנראה מפני '
       'שאוצריא פתוחה. יש לסגור את אוצריא ולבדוק שוב.';
   @override
   String get localDbInterruptedWrite =>
-      'לא ניתן לקרוא את גרסת הספרייה שבמחשב: קובץ הספרייה נשאר באמצע כתיבה שנקטעה. '
+      'לא ניתן לקרוא את גרסת ספריית אוצריא שבמחשב: קובץ הספרייה נשאר באמצע כתיבה שנקטעה. '
       'יש לפתוח את אוצריא ולסגור אותה, ואז לבדוק שוב.';
   @override
   String get localDbReadOnlyLocation =>
-      'לא ניתן לקרוא את גרסת הספרייה שבמחשב, כי התיקייה שלה מוגנת מפני '
+      'לא ניתן לקרוא את גרסת ספריית אוצריא שבמחשב, כי התיקייה שלה מוגנת מפני '
       'כתיבה. יש לאפשר כתיבה לתיקייה ולבדוק שוב.';
   @override
   String get zstdContextCreationFailed => 'יצירת הקשר החילוץ (DCtx) נכשלה';
@@ -3187,7 +3194,7 @@ class _LibraryDomain extends LibraryDomainStrings {
 
   @override
   String dbIntegrityCheckFailed(String result) =>
-      'בדיקת התקינות של הספרייה שהורדה נכשלה: $result';
+      'בדיקת התקינות של ספריית אוצריא שהורדה נכשלה: $result';
 
   @override
   String get companionTalmudName => 'תלמוד בבלי';
@@ -3198,7 +3205,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get companionSemanticName => 'החיפוש החכם';
   @override
-  String get libraryChangesNotesName => 'רשימת "מה חדש בספרייה"';
+  String get libraryChangesNotesName => 'רשימת "מה חדש בספריית אוצריא"';
   @override
   String get semanticDownloading => 'מוריד את קובצי החיפוש החכם';
   @override
@@ -3268,12 +3275,12 @@ class _LibraryDomain extends LibraryDomainStrings {
       'ההתקנה של $name הסתיימה אך הפריט עדיין מסומן כלא מעודכן';
   @override
   String companionsInstallFailed(String names) =>
-      'הספרייה עודכנה, אך התקנת הקבצים הנלווים ($names) נכשלה — ולכן ההצעה לעדכן '
-      'את הספרייה תחזור.';
+      'ספריית אוצריא עודכנה, אך התקנת הקבצים הנלווים ($names) נכשלה — ולכן ההצעה לעדכן '
+      'את ספריית אוצריא תחזור.';
   @override
   String libraryLocationNeedsManualSetting(String dbPath) =>
-      'הספרייה הותקנה ב-${_ltr(dbPath)}, אך לא ניתן היה לעדכן את ההגדרות של אוצריא. '
-      'יש לפתוח את אוצריא ולהצביע על התיקייה הזו במסך בחירת מיקום הספרייה.';
+      'ספריית אוצריא הותקנה ב-${_ltr(dbPath)}, אך לא ניתן היה לעדכן את ההגדרות של אוצריא. '
+      'יש לפתוח את אוצריא ולהצביע על התיקייה הזו במסך בחירת מיקום ספריית אוצריא.';
   @override
   String companionsMissingFromMirror(String names) =>
       'חסר בכונן: $names. כנראה ההורדה נקטעה. כדי לקבל אותו, הורד שוב במחשב '
@@ -3286,18 +3293,18 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String applyDownloadingPatch(String step) => 'מוריד עדכון$step…';
   @override
-  String applyApplyingPatch(String step) => 'מעדכן את הספרייה$step…';
+  String applyApplyingPatch(String step) => 'מעדכן את ספריית אוצריא$step…';
   @override
   String applyPatchStage(String stage, String step) {
     switch (stage) {
       case 'preflight':
         return 'בודק תאימות$step…';
       case 'verifyFromHash':
-        return 'מאמת את הספרייה הקיימת$step…';
+        return 'מאמת את ספריית אוצריא הקיימת$step…';
       case 'attach':
         return 'פותח את קובץ העדכון$step…';
       case 'migrations':
-        return 'מעדכן את מבנה הספרייה$step…';
+        return 'מעדכן את מבנה ספריית אוצריא$step…';
       case 'upserts':
         return 'כותב את השינויים$step…';
       case 'deletes':
@@ -3314,25 +3321,25 @@ class _LibraryDomain extends LibraryDomainStrings {
   }
 
   @override
-  String get applyDownloadingFullDb => 'מוריד את הספרייה המלאה…';
+  String get applyDownloadingFullDb => 'מוריד את ספריית אוצריא המלאה…';
   @override
-  String get applyDecompressingFullDb => 'מחלץ את הספרייה…';
+  String get applyDecompressingFullDb => 'מחלץ את ספריית אוצריא…';
   @override
   String get applyDecompressingAndVerifyingFullDb =>
-      'מחלץ את הספרייה ומאמת את חתימתה…';
+      'מחלץ את ספריית אוצריא ומאמת את חתימתה…';
   @override
-  String get applyWritingFullDb => 'כותב את הספרייה…';
+  String get applyWritingFullDb => 'כותב את ספריית אוצריא…';
   @override
   String get applyVerifying => 'מוודא תקינות…';
   @override
   String applyVerifyStage(String stage) {
     switch (stage) {
       case 'sourceHash':
-        return 'מאמת את חתימת קובץ הספרייה…';
+        return 'מאמת את חתימת קובץ ספריית אוצריא…';
       case 'dbIntegrity':
-        return 'בודק את שלמות הספרייה שחולצה (סריקה מלאה, עשוי לקחת דקות)…';
+        return 'בודק את שלמות ספריית אוצריא שחולצה (סריקה מלאה, עשוי לקחת דקות)…';
       case 'dbVersion':
-        return 'מאמת את גרסת הספרייה שחולצה…';
+        return 'מאמת את גרסת ספריית אוצריא שחולצה…';
       default:
         return applyVerifying;
     }

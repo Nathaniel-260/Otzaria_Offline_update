@@ -191,14 +191,14 @@ class _Home extends HomeStrings {
   @override
   String get downloadingApp => 'Downloading the Otzaria Program…';
   @override
-  String get downloadingLibrary => 'Downloading the Library…';
+  String get downloadingLibrary => 'Downloading the Otzaria library…';
   @override
   String get downloadingPlugins => 'Downloading the Plugins…';
   @override
   String get downloadStarting => 'Starting the download…';
 
   @override
-  String get libraryApplyActive => 'Library update in progress';
+  String get libraryApplyActive => 'Otzaria library update in progress';
 }
 
 class _Task extends TaskStrings {
@@ -243,13 +243,13 @@ class _Task extends TaskStrings {
   @override
   String get componentApp => 'Otzaria app';
   @override
-  String get componentLibrary => 'The library';
+  String get componentLibrary => 'The Otzaria library';
   @override
   String get componentPlugins => 'Plugins';
   @override
   String get stepApp => 'the Otzaria app';
   @override
-  String get stepLibrary => 'the library';
+  String get stepLibrary => 'the Otzaria library';
   @override
   String get stepPlugins => 'the plugins';
   @override
@@ -407,7 +407,7 @@ class _Task extends TaskStrings {
       : 'Nothing is lost: open books, bookmarks and notes will wait for you exactly where you left them.';
   @override
   String get closeAfterWizardBody =>
-      'The setup wizard opened Otzaria. It needs to be closed to install the library.';
+      'The setup wizard opened Otzaria. It needs to be closed to install the Otzaria library.';
   @override
   String get closeOtzariaAndContinue => 'Close Otzaria and continue';
   @override
@@ -417,9 +417,9 @@ class _Task extends TaskStrings {
   @override
   String get updatingApp => 'Updating the Otzaria app';
   @override
-  String get installingLibrary => 'Installing the library';
+  String get installingLibrary => 'Installing the Otzaria library';
   @override
-  String get updatingLibrary => 'Updating the library';
+  String get updatingLibrary => 'Updating the Otzaria library';
   @override
   String get sendingPlugins => 'Sending the plugins to Otzaria';
   @override
@@ -452,7 +452,7 @@ class _Task extends TaskStrings {
   @override
   String get stopWaiting => 'Stop waiting';
   @override
-  String get libraryFull => 'The full library';
+  String get libraryFull => 'The full Otzaria library';
   @override
   String libraryVersion(int version) => 'Version $version';
   @override
@@ -505,23 +505,23 @@ class _Task extends TaskStrings {
   }) {
     if (firstInstall) {
       if (library && libraryNote) {
-        return 'Otzaria and the library were installed on this computer, but one thing is left to do — see the library row. You can disconnect the drive.';
+        return 'Otzaria and its library were installed on this computer, but one thing is left to do — see the Otzaria library row. You can disconnect the drive.';
       }
       return library
-          ? 'Otzaria and the library are installed on this computer and ready for study. You can disconnect the drive.'
+          ? 'Otzaria and its library are installed on this computer and ready for study. You can disconnect the drive.'
           : 'Otzaria is installed on this computer. You can disconnect the drive.';
     }
     final done = app && library
-        ? 'The app and the library were updated.'
+        ? 'The app and the Otzaria library were updated.'
         : app
             ? 'The Otzaria app was updated.'
             : library
-                ? 'The library was updated.'
+                ? 'The Otzaria library was updated.'
                 : null;
     return [
       if (done != null) done,
       if (library && libraryNote)
-        'One thing is left to do — see the library row.',
+        'One thing is left to do — see the Otzaria library row.',
       if (plugins) 'The plugins are waiting for your approval in Otzaria.',
       'You can disconnect the drive.',
     ].join(' ');
@@ -533,9 +533,9 @@ class _Task extends TaskStrings {
   String stoppedWaitingBody(
           {required bool firstInstall, required bool libraryDone}) =>
       firstInstall
-          ? 'If the wizard is still open, finish it. Then check on the home page that Otzaria was installed; you can install the library from there too.'
+          ? 'If the wizard is still open, finish it. Then check on the home page that Otzaria was installed; you can install the Otzaria library from there too.'
           : libraryDone
-              ? 'The library was updated. Finish the installation in the wizard window, and check on the home page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.'
+              ? 'The Otzaria library was updated. Finish the installation in the wizard window, and check on the home page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.'
               : 'Finish the installation in the wizard window, and check on the home page that Otzaria was updated. Do not disconnect the drive until the wizard finishes.';
   @override
   String get wizardStillOpenTitle => 'The setup wizard is still open';
@@ -559,7 +559,7 @@ class _Task extends TaskStrings {
       firstInstall
           ? 'The setup wizard was closed before the end, and Otzaria was not installed. You can try again any time.'
           : libraryDone
-              ? 'The setup wizard was closed before the end. Otzaria stayed on the previous version and works as usual. The library that was already updated stays updated.'
+              ? 'The setup wizard was closed before the end. Otzaria stayed on the previous version and works as usual. The Otzaria library that was already updated stays updated.'
               : 'The setup wizard was closed before the end. Otzaria stayed on the previous version and works as usual.';
   @override
   String get stoppedTitle => 'The update stopped';
@@ -567,9 +567,10 @@ class _Task extends TaskStrings {
   String get stoppedBody =>
       'Otzaria stayed open, so the rest of the update was not installed. What was already installed stays.';
   @override
-  String get libraryFailedTitle => 'The library update failed';
+  String get libraryFailedTitle => 'The Otzaria library update failed';
   @override
-  String get libraryInstallFailedTitle => 'Installing the library failed';
+  String get libraryInstallFailedTitle =>
+      'Installing the Otzaria library failed';
   @override
   String get appFailedTitle => 'Installing Otzaria failed';
   @override
@@ -599,7 +600,7 @@ class _Task extends TaskStrings {
       'This tool is not allowed to install Otzaria on this computer.';
   @override
   String get permissionLibraryBody =>
-      'This tool is not allowed to change the folder that holds the library.';
+      'This tool is not allowed to change the folder that holds the Otzaria library.';
   @override
   String get elevateTitle => 'Restart as administrator';
   @override
@@ -608,7 +609,7 @@ class _Task extends TaskStrings {
   @override
   String get elevateButton => 'Restart as administrator';
   @override
-  String get toLibraryPage => 'To the library page';
+  String get toLibraryPage => 'To the Otzaria library page';
   @override
   String get toPluginsPage => 'To the plugins page';
   @override
@@ -679,13 +680,13 @@ class _Pages extends PageStrings {
   String get libSemanticSection => 'Smart search';
   @override
   String libAdvancedSummary({required bool reindex}) => reindex
-      ? 'Library location, rebuilding search, the full library, an update for '
+      ? 'Otzaria library location, rebuilding search, the full library, an update for '
           'a specific computer and the drive folder'
-      : 'Library location, the full library, an update for a specific '
+      : 'Otzaria library location, the full library, an update for a specific '
           'computer and the drive folder';
   @override
   String get libMissingFilesTitle =>
-      'Some library files did not reach the drive';
+      'Some Otzaria library files did not reach the drive';
   @override
   String libChipCompanions(String names) => 'On the drive: $names';
   @override
@@ -696,28 +697,28 @@ class _Pages extends PageStrings {
   @override
   String get libNotInstalled => 'Not installed';
   @override
-  String get libInstallButton => 'Install the library';
+  String get libInstallButton => 'Install the Otzaria library';
   @override
-  String get libInstallWithAppButton => 'Install Otzaria and the library';
+  String get libInstallWithAppButton => 'Install Otzaria and its library';
   @override
   String get libInstallWithAppNote =>
-      'Otzaria is not installed on this computer yet. The program installs first, then the library.';
+      'Otzaria is not installed on this computer yet. The program installs first, then the Otzaria library.';
   @override
   String get libInstallNeedsApp =>
-      'Otzaria is not installed on this computer, and the program is not on the drive. To install the library, first download the program on a computer with internet.';
+      'Otzaria is not installed on this computer, and the program is not on the drive. To install the Otzaria library, first download the program on a computer with internet.';
   @override
   String get libUpdateNeedsApp =>
-      'Otzaria is not installed on this computer. Install it first from the home page, and then the library can be installed here.';
+      'Otzaria is not installed on this computer. Install it first from the home page, and then the Otzaria library can be installed here.';
   @override
-  String get libUpdateButton => 'Update the library';
+  String get libUpdateButton => 'Update the Otzaria library';
   @override
   String get libNotFoundTitle =>
-      'We could not find the library on this computer';
+      'We could not find the Otzaria library on this computer';
   @override
   String get libNotFoundBody =>
-      'Otzaria is installed, but its library is not in the usual place. If you moved it, choose where it is now.';
+      'Otzaria is installed, but the Otzaria library is not in the usual place. If you moved it, choose where it is now.';
   @override
-  String get libPickFolderButton => 'Choose the library location';
+  String get libPickFolderButton => 'Choose the Otzaria library location';
   @override
   String get libSemanticTitle => 'Search by meaning';
   @override
@@ -737,22 +738,22 @@ class _Pages extends PageStrings {
   String get libSemanticActiveBody =>
       'Consent is on. You can withdraw it in the Otzaria settings.';
   @override
-  String get libLocationTitle => 'Library location on this computer';
+  String get libLocationTitle => 'Otzaria library location on this computer';
   @override
   String get libLocationNone => 'No location chosen yet';
   @override
-  String get libFullTitle => 'The full library instead of an update';
+  String get libFullTitle => 'The full Otzaria library instead of an update';
   @override
   String libFullBody(String size) =>
-      'The regular update failed. You can install the full library from the drive instead ($size). It takes longer, and needs no internet.';
+      'The regular update failed. You can install the full Otzaria library from the drive instead ($size). It takes longer, and needs no internet.';
   @override
   String get libFullBodyNoSize =>
-      'The regular update failed. You can install the full library from the drive instead. It takes longer, and needs no internet.';
+      'The regular update failed. You can install the full Otzaria library from the drive instead. It takes longer, and needs no internet.';
   @override
   String libFullMeta({String? size, int? lowMinutes, int? highMinutes}) => [
         size == null
-            ? 'The full library on the drive'
-            : 'The full library on the drive: $size',
+            ? 'The full Otzaria library on the drive'
+            : 'The full Otzaria library on the drive: $size',
         if (lowMinutes != null && highMinutes != null)
           _minutesRange(lowMinutes, highMinutes),
       ].join(' · ');
@@ -904,7 +905,7 @@ class _Guide extends GuidanceStrings {
   String get installHereTitle => 'Otzaria is ready to install on this computer';
   @override
   String get installHereBody =>
-      'The program and the library are already on the drive. Plugins are '
+      'The program and the Otzaria library are already on the drive. Plugins are '
       'installed later, from the plugins page.';
   @override
   String get installHereButton => 'Install Otzaria on this computer';
@@ -939,7 +940,7 @@ class _Guide extends GuidanceStrings {
   }) {
     final off = [
       if (app) 'the program',
-      if (library) 'the library',
+      if (library) 'the Otzaria library',
       if (plugins) 'the plugins',
     ];
     if (off.isEmpty) return noSyncSelectionNote;
@@ -962,7 +963,7 @@ class _Guide extends GuidanceStrings {
   }) {
     final off = [
       if (app) 'the program',
-      if (library) 'the library',
+      if (library) 'the Otzaria library',
       if (plugins) 'the plugins',
     ];
     if (off.length > 1) {
@@ -977,7 +978,7 @@ class _Guide extends GuidanceStrings {
     }
     if (off.isEmpty) return noSyncSelectionNote;
     if (library && libraryFilesOnly) {
-      return 'There are new library files online, but their download is '
+      return 'There are new Otzaria library files online, but their download is '
           'turned off in the settings.';
     }
     return 'There is a new version of ${off.single} online, but its download '
@@ -1028,15 +1029,15 @@ class _Guide extends GuidanceStrings {
   String get upToDateTitle => 'Everything is up to date on this computer';
   @override
   String upToDateBody(String? version) => version == null
-      ? 'Otzaria, the library and the plugins are up to date.'
-      : 'Otzaria $version, the library and the plugins are up to date.';
+      ? 'Otzaria, its library and the plugins are up to date.'
+      : 'Otzaria $version, its library and the plugins are up to date.';
   @override
   String get driveInstalledTitle =>
       'Everything on the drive is already installed here';
   @override
   String driveInstalledBody(String? version) => version == null
-      ? 'Otzaria, the library and the plugins are installed.'
-      : 'Otzaria $version, the library and the plugins are installed.';
+      ? 'Otzaria, its library and the plugins are installed.'
+      : 'Otzaria $version, its library and the plugins are installed.';
   @override
   String get othersPendingTitle => 'There are more updates';
   @override
@@ -1060,7 +1061,7 @@ class _Guide extends GuidanceStrings {
   }) {
     List<String> names(bool app, bool library, bool plugins) => [
           if (app) 'the Otzaria program',
-          if (library) 'the library',
+          if (library) 'the Otzaria library',
           if (plugins) 'the plugins',
         ];
     String join(List<String> all) => all.length < 2
@@ -1110,11 +1111,12 @@ class _Guide extends GuidanceStrings {
   String get attentionAppTitle =>
       'Something in the Otzaria program needs a look';
   @override
-  String get attentionLibraryTitle => 'Something in the library needs a look';
+  String get attentionLibraryTitle =>
+      'Something in the Otzaria library needs a look';
   @override
   String get attentionBody => 'Its page explains what happened and what to do.';
   @override
-  String get attentionLibraryButton => 'To the library page';
+  String get attentionLibraryButton => 'To the Otzaria library page';
   @override
   String get taskDownloadingTitle => 'Downloading updates to the drive';
   @override
@@ -1123,7 +1125,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get taskInstallingAppTitle => 'Installing Otzaria';
   @override
-  String get taskUpdatingLibraryTitle => 'Updating the library';
+  String get taskUpdatingLibraryTitle => 'Updating the Otzaria library';
   @override
   String get taskBusyTitle => 'A task is running';
   @override
@@ -1158,7 +1160,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get itemLibraryUpdate => 'Update';
   @override
-  String get itemLibraryFull => 'The full library';
+  String get itemLibraryFull => 'The full Otzaria library';
   @override
   String itemPluginUpdates(int count) =>
       count == 1 ? '1 plugin update' : '$count plugin updates';
@@ -1182,7 +1184,7 @@ class _Guide extends GuidanceStrings {
   }) {
     final plus = [
       if (plusApp) 'the program',
-      if (plusLibrary) 'the library',
+      if (plusLibrary) 'the Otzaria library',
       if (plusPlugins) 'the plugins',
     ];
     if (plus.isEmpty) return 'Total up to $size';
@@ -1242,7 +1244,7 @@ class _Guide extends GuidanceStrings {
   @override
   String get tileApp => 'Otzaria program';
   @override
-  String get tileLibrary => 'Library';
+  String get tileLibrary => 'Otzaria library';
   @override
   String get tilePlugins => 'Plugins';
   @override
@@ -1459,17 +1461,17 @@ class _LibraryScreen extends LibraryScreenStrings {
   const _LibraryScreen();
 
   @override
-  String get pickDbButton => 'Choose the library file';
+  String get pickDbButton => 'Choose the Otzaria library file';
   @override
   String get pickDbDialogTitle => 'Choose the seforim.db file';
   @override
-  String get dbPathUpdatedSnack => 'The library location was updated';
+  String get dbPathUpdatedSnack => 'The Otzaria library location was updated';
 
   @override
   String get pickInstallDirButton => 'Choose folder';
   @override
   String get pickInstallDirDialogTitle =>
-      'Choose the folder the library will be installed to';
+      'Choose the folder the Otzaria library will be installed to';
   @override
   String get installDirUpdatedSnack => 'The install location was updated';
   @override
@@ -1483,9 +1485,9 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get customLocationConfirm => 'Continue with this location';
 
   @override
-  String get updatingProgress => 'Updating the library…';
+  String get updatingProgress => 'Updating the Otzaria library…';
   @override
-  String get changesTitle => "What's new in the library";
+  String get changesTitle => "What's new in the Otzaria library";
   @override
   String changesPendingSubtitle(String version) =>
       'The update adds and fixes books up to version $version.';
@@ -1529,7 +1531,7 @@ class _LibraryScreen extends LibraryScreenStrings {
       'The request could not be handed to Otzaria ($error)';
 
   @override
-  String get fullDownloadInsteadButton => 'Install the full library';
+  String get fullDownloadInsteadButton => 'Install the full Otzaria library';
 
   @override
   String get mirrorEmpty =>
@@ -1538,7 +1540,7 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get mirrorUnreadable => 'Cannot be read';
   @override
   String get mirrorNotChecked =>
-      'Not checked: the library on this computer could not be read';
+      'Not checked: the Otzaria library on this computer could not be read';
   @override
   String mirrorHasVersion(String version) => 'Contains version $version';
   @override
@@ -1559,7 +1561,7 @@ class _LibraryScreen extends LibraryScreenStrings {
       'This computer was registered, at version $version';
   @override
   String get personalVersionNotFoundSnack =>
-      'No library was found on this computer to read the version from';
+      'No Otzaria library was found on this computer to read the version from';
   @override
   String get personalOtherMachineTitle =>
       'The update was prepared for another computer';
@@ -1570,7 +1572,7 @@ class _LibraryScreen extends LibraryScreenStrings {
       'nothing here to install on it — the download itself succeeded and '
       'travels with the drive. You can register this computer too, or turn '
       'off "Prepare an update for a specific computer" in settings to go back '
-      'to downloading the full library.';
+      'to downloading the full Otzaria library.';
   @override
   String get personalOtherMachineCaptureButton => 'Register this computer too';
   @override
@@ -1580,10 +1582,10 @@ class _LibraryScreen extends LibraryScreenStrings {
   @override
   String downloadNotePersonal(String version) =>
       'Prepare an update for a specific computer — update files from version $version '
-      'onwards, without the full library';
+      'onwards, without the full Otzaria library';
   @override
   String get downloadNotePersonalUnknownVersion =>
-      '"Prepare an update for a specific computer" is on, but the library version on this '
+      '"Prepare an update for a specific computer" is on, but the Otzaria library version on this '
       'computer was not detected — the full library was downloaded. Run this program once on the computer '
       'where Otzaria is installed.';
   @override
@@ -1651,12 +1653,12 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get syncTargetApp => 'Otzaria';
   @override
-  String get syncTargetLibrary => 'Library';
+  String get syncTargetLibrary => 'Otzaria library';
   @override
   String get syncTargetPlugins => 'Plugins';
   @override
   String get syncLibraryLockedSubtitle =>
-      'The library follows the registered computer.';
+      'The Otzaria library follows the registered computer.';
   @override
   String get semanticDownloadTitle => 'Smart search';
   @override
@@ -1696,7 +1698,7 @@ class _Settings extends SettingsScreenStrings {
   String get personalModeDialogContent =>
       'From now on the drive downloads only what the computer you register is '
       'missing. On other computers this update will not fit until you turn this '
-      'off. The full library on the drive is deleted on the next download.';
+      'off. The full Otzaria library on the drive is deleted on the next download.';
   @override
   String get personalModeDialogConfirm => 'Turn on';
 
@@ -2327,14 +2329,14 @@ class _Faq extends FaqStrings {
       'part that was in progress.';
   @override
   String get qDownloadTooBig =>
-      'The download is enormous and I only want to update the library I '
+      'The download is enormous and I only want to update the Otzaria library I '
       'already have';
   @override
   String get aDownloadTooBig =>
       'Settings has a "Prepare an update for a specific computer" option. With '
       'it on, only the steps from your own version upwards are fetched instead '
-      'of the whole library — far less data. Before downloading, press '
-      '"Register this computer" on the Library page, under Advanced, otherwise '
+      'of the whole Otzaria library — far less data. Before downloading, press '
+      '"Register this computer" on the Otzaria library page, under Advanced, otherwise '
       'the program does not know where to start from. One caveat: such a drive '
       'cannot install Otzaria on a computer that has none, so if you update '
       'several computers, leave the option off.';
@@ -2368,8 +2370,8 @@ class _Faq extends FaqStrings {
   String get qDbNotFound => 'It says no database was found, but I have books';
   @override
   String get aDbNotFound =>
-      'The library is likewise not detected when it sits somewhere other than '
-      'the default. On the Library page, under Advanced, pick the location manually. If '
+      'The Otzaria library is likewise not detected when it sits somewhere other than '
+      'the default. On the Otzaria library page, under Advanced, pick the location manually. If '
       'you do not know where it is, Otzaria will tell you: open its settings, '
       'and under the Library tab press "copy path".';
   @override
@@ -2383,7 +2385,7 @@ class _Faq extends FaqStrings {
       'package again.';
   @override
   String get qSearchMissesNewBooks =>
-      'I updated the library, but the search in Otzaria does not find the new '
+      'I updated the Otzaria library, but the search in Otzaria does not find the new '
       'books';
   @override
   String get aSearchMissesNewBooks =>
@@ -2515,7 +2517,7 @@ class _SetupError extends SetupErrorStrings {
   String get title => 'This program is in the wrong place';
   @override
   String get explanation =>
-      'The launcher keeps all of its data — the library, the plugins and the '
+      'The launcher keeps all of its data — the Otzaria library, the plugins and the '
       'Otzaria program itself — in a folder right next to it, so everything '
       'travels together on the drive. The current folder is blocked for '
       'writing — permissions, or a write-protected drive — and carries no '
@@ -2839,13 +2841,13 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String exportPersonalFrom(int localVersion) =>
       'Prepare an update for a specific computer: downloading update files from version '
-      '$localVersion onwards, without the full library';
+      '$localVersion onwards, without the full Otzaria library';
   @override
   String exportPersonalUpToDate(int localVersion) =>
       'Nothing newer than $localVersion — nothing was downloaded';
   @override
   String get exportPersonalVersionUnknown =>
-      'The library version on this computer was not detected — downloading the full library';
+      'The Otzaria library version on this computer was not detected — downloading the full library';
   @override
   String get exportPersonalMirrorDamaged =>
       'The library updates in the folder are damaged — downloading the full '
@@ -2998,16 +3000,16 @@ class _LibraryDomain extends LibraryDomainStrings {
       'know how to apply through update files';
   @override
   String planOtzariaTooOldForLibrary(int readableSchema, int latestVersion) =>
-      'Library release $latestVersion needs a newer Otzaria: the installed '
+      'Otzaria library release $latestVersion needs a newer Otzaria: the installed '
       'version reads databases up to schema $readableSchema only. Update '
       'Otzaria first, then the library.';
   @override
   String planStopsBeforeOtzariaSchema(int reachedVersion, int latestVersion) =>
-      'The library will be updated to release $reachedVersion. Release '
+      'The Otzaria library will be updated to release $reachedVersion. Release '
       '$latestVersion needs a newer Otzaria — update Otzaria to continue.';
   @override
   String libraryNeedsOtzariaUpdateFromDrive(String otzariaVersion) =>
-      'The drive carries Otzaria $otzariaVersion, which reads the new library: '
+      'The drive carries Otzaria $otzariaVersion, which reads the new Otzaria library: '
       'update Otzaria first, then the library.';
   @override
   String planPatchFormatTooNew(int patchFormatVersion, int latestVersion) =>
@@ -3022,7 +3024,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   ) =>
       'The full database available for download only reaches version '
       '$reachableVersion, which is not newer than the version already '
-      'installed ($localVersion) — installing it would replace the library '
+      'installed ($localVersion) — installing it would replace the Otzaria library '
       'with an older version instead of updating it to version '
       '$latestVersion. The update was therefore not performed: a newer full '
       'database, or a newer version of the software, is needed.';
@@ -3094,7 +3096,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   String patchUniqueConflictNeedsFullDownload(String table, String detail) =>
       'This patch does not fit the database on this computer: a unique-value '
       'conflict in table "$table". The incremental update was cancelled and '
-      'the database was left untouched. A full download of the library is '
+      'the database was left untouched. A full download of the Otzaria library is '
       'required. ($detail)';
   @override
   String foreignKeyViolationsGrew(int before, int after) =>
@@ -3244,11 +3246,11 @@ class _LibraryDomain extends LibraryDomainStrings {
       'backup';
   @override
   String planSchemaNeedsAppUpdate(int schemaVersion, int supportedSchema) =>
-      'The library moved to DB schema $schemaVersion, newer than supported '
+      'The Otzaria library moved to DB schema $schemaVersion, newer than supported '
       '(DB $supportedSchema) — an app update is required';
   @override
   String planSchemaBarrierNeedsFullDownload(int schemaVersion) =>
-      'The library moved to DB schema $schemaVersion; the change requires a '
+      'The Otzaria library moved to DB schema $schemaVersion; the change requires a '
       'full download';
   @override
   String planDeltaNeedsAppUpdate(
@@ -3287,7 +3289,7 @@ class _LibraryDomain extends LibraryDomainStrings {
 
   @override
   String get mirrorMissing =>
-      'No library updates have been downloaded to the drive yet. Download updates to the drive on a computer with internet, from the home page.';
+      'No Otzaria library updates have been downloaded to the drive yet. Download updates to the drive on a computer with internet, from the home page.';
   @override
   String get mirrorDamaged =>
       'The library updates in the local folder are damaged and cannot be '
@@ -3334,12 +3336,12 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String fileTooLargeForVolume(String dir) =>
       'The drive holding $dir is formatted as FAT32, which cannot store files '
-      'larger than 4 GB, and the library database is larger than that. Choose '
+      'larger than 4 GB, and the Otzaria library database is larger than that. Choose '
       'a location for the database on an NTFS or exFAT drive.';
   @override
   String installDirNotWritable(String dir, String detail) =>
       'The folder $dir could not be created ($detail). Choose another location '
-      'for the database through "Choose location manually" on the library '
+      'for the database through "Choose location manually" on the Otzaria library '
       'screen.';
   @override
   String mirrorNotEnoughDiskSpace(String dir, String needed, String free) =>
@@ -3352,17 +3354,17 @@ class _LibraryDomain extends LibraryDomainStrings {
       'the file is not locked.';
   @override
   String get localDbLocked =>
-      'Could not read the local library version because the database is '
+      'Could not read the local Otzaria library version because the database is '
       'locked, probably because Otzaria is open. Close Otzaria and check '
       'again.';
   @override
   String get localDbInterruptedWrite =>
-      'Could not read the local library version: the database was left in '
+      'Could not read the local Otzaria library version: the database was left in '
       'the middle of an interrupted write. Open and close Otzaria, then '
       'check again.';
   @override
   String get localDbReadOnlyLocation =>
-      'Could not read the local library version because its folder is '
+      'Could not read the local Otzaria library version because its folder is '
       'write-protected. Allow writing to the folder and check again.';
   @override
   String get zstdContextCreationFailed =>
@@ -3389,7 +3391,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String get companionSemanticName => 'Smart search';
   @override
-  String get libraryChangesNotesName => "The library's what's-new list";
+  String get libraryChangesNotesName => "The Otzaria library's what's-new list";
   @override
   String get semanticDownloading => 'Downloading smart search files';
   @override
@@ -3462,10 +3464,10 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String companionsInstallFailed(String names) =>
       'The database was updated, but installing the companion files ($names) '
-      'failed — so the library update will keep being offered.';
+      'failed — so the Otzaria library update will keep being offered.';
   @override
   String libraryLocationNeedsManualSetting(String dbPath) =>
-      'The library was installed in $dbPath, but Otzaria\'s settings could '
+      'The Otzaria library was installed in $dbPath, but Otzaria\'s settings could '
       'not be updated. Open Otzaria and point it at this folder in the '
       'library location screen.';
   @override
@@ -3482,7 +3484,8 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String applyDownloadingPatch(String step) => 'Downloading the update$step…';
   @override
-  String applyApplyingPatch(String step) => 'Updating the library$step…';
+  String applyApplyingPatch(String step) =>
+      'Updating the Otzaria library$step…';
   @override
   String applyPatchStage(String stage, String step) {
     switch (stage) {
@@ -3510,14 +3513,14 @@ class _LibraryDomain extends LibraryDomainStrings {
   }
 
   @override
-  String get applyDownloadingFullDb => 'Downloading the full library…';
+  String get applyDownloadingFullDb => 'Downloading the full Otzaria library…';
   @override
-  String get applyDecompressingFullDb => 'Extracting the library…';
+  String get applyDecompressingFullDb => 'Extracting the Otzaria library…';
   @override
   String get applyDecompressingAndVerifyingFullDb =>
       'Extracting the database and verifying its checksum…';
   @override
-  String get applyWritingFullDb => 'Writing the library…';
+  String get applyWritingFullDb => 'Writing the Otzaria library…';
   @override
   String get applyVerifying => 'Verifying…';
   @override

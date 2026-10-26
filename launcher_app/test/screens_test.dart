@@ -1685,7 +1685,7 @@ void main() {
     expect(find.text(t.personalModeDialogContent), findsOneWidget);
     expect(
       t.personalModeDialogContent,
-      contains('הספרייה המלאה שבכונן תימחק בהורדה הבאה'),
+      contains('ספריית אוצריא המלאה שבכונן תימחק בהורדה הבאה'),
     );
     expect(find.textContaining('גרסת המסד'), findsNothing);
     expect(find.textContaining('מגה'), findsNothing);

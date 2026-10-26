@@ -384,7 +384,9 @@ Hebrew is the source, English a free translation of it.
   ("שליחה", "פתיחת התיקייה", "פתיחת אוצריא"), except "נסה שוב" and "בדוק שוב".
 - **Hebrew addresses the user in masculine singular, as Otzaria does** ("לחץ", "בחר",
   "שלך"); impersonal forms ("יש ל…", "אפשר ל…") are fine. The search index is
-  "אינדקס החיפוש", Otzaria's own term.
+  "אינדקס החיפוש", Otzaria's own term. The library is "ספריית אוצריא" ("the
+  Otzaria library") in every title, label and first mention (maintainer,
+  2026-10-26); a later "הספרייה" in the same text is fine.
 - **Counts go through `plural(count, one:, two:, many:)`**, never `'$n דקות'`: the
   singular is spelled out ("תוסף אחד") and so is the Hebrew dual ("שתי דקות"). Such a
   field is listed in `_spelledOne` / `_spelledTwoInHebrew` in
