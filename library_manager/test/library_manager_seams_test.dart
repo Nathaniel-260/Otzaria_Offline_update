@@ -359,77 +359,6 @@ void main() {
       },
     );
 
-    group('personal mode — the export choice, or no number', () {
-      Future<void> registered(int version) => LibraryStateStore(
-        p.join(temporary.path, 'drive', LibraryStateStore.fileName),
-      ).recordKnownDbVersion('OFFLINE|me', version);
-
-      test(
-        'the chain from the registered version, without the full DB',
-        () async {
-          await registered(7);
-          expect(await peekAndBound(manager(personal: true)), 2 + 100 + 450);
-          await registered(6);
-          expect(
-            await peekAndBound(manager(personal: true)),
-            2 + 100 + 2 + 50 + 450,
-          );
-        },
-      );
-
-      test('no chain from the registered version — the full DB', () async {
-        await registered(5);
-        expect(await peekAndBound(manager(personal: true)), 1000 + 450);
-      });
-
-      test('a chain far slower than the full DB — the full DB', () async {
-        releases[0]['assets'] = [
-          for (final asset in releases[0]['assets'] as List)
-            if ((asset as Map)['name'] == 'patch-v7-v8.db.zst')
-              {...asset, 'size': 900 << 20}
-            else
-              asset,
-        ];
-        await registered(7);
-        expect(await peekAndBound(manager(personal: true)), 1000 + 450);
-      });
-
-      test('patch files not known by name — no number', () async {
-        releases[0]['assets'] = [
-          for (final asset in releases[0]['assets'] as List)
-            if ((asset as Map)['name'] == 'patch-v7-v8.db.zst')
-              {...asset, 'name': 'patch-v7-v8.db.zst.part1'}
-            else
-              asset,
-        ];
-        await registered(7);
-        expect(await peekAndBound(manager(personal: true)), isNull);
-      });
-
-      test(
-        'nothing newer than the registered version — only companions',
-        () async {
-          await registered(8);
-          expect(await peekAndBound(manager(personal: true)), 450);
-        },
-      );
-
-      test('computed without network or writes to the drive', () async {
-        await registered(7);
-        final library = manager(personal: true);
-        await peekAndBound(library);
-        final drive = Directory(p.join(temporary.path, 'drive'));
-        final before = drive.listSync(recursive: true).length;
-        final again = await http.runWithClient(
-          library.peekedDownloadBytesBound,
-          () => MockClient((request) async => fail('network: ${request.url}')),
-        );
-        expect(again, 2 + 100 + 450);
-        expect(drive.listSync(recursive: true).length, before);
-        expect(Directory(library.mirrorDir).existsSync(), isFalse);
-      });
-    });
-
     const mib = 1 << 20;
 
     String manifestJson(
@@ -473,6 +402,95 @@ void main() {
         file.writeAsBytesSync(List.filled(content as int, 0));
       }
     }
+
+    group('personal mode — the export choice, never below it', () {
+      Future<void> registered(int version) => LibraryStateStore(
+        p.join(temporary.path, 'drive', LibraryStateStore.fileName),
+      ).recordKnownDbVersion('OFFLINE|me', version);
+
+      // manifest שבכונן ותקף — רק הוא מוכיח שהקשת תיבנה.
+      void heldManifest(LibraryManager library) {
+        final body = manifestJson(7, 8);
+        putOnDrive(
+          library,
+          'v8-20261011',
+          'patch-v7-v8.db.zst.manifest.json',
+          body,
+        );
+        releases[0]['assets'] = [
+          for (final asset in releases[0]['assets'] as List)
+            if ((asset as Map)['name'] == 'patch-v7-v8.db.zst.manifest.json')
+              {...asset, 'size': utf8.encode(body).length}
+            else
+              asset,
+        ];
+      }
+
+      test(
+        'new manifests only by name — the larger of the two routes',
+        () async {
+          await registered(7);
+          expect(await peekAndBound(manager(personal: true)), 1000 + 450);
+        },
+      );
+
+      test('a held, appliable chain that wins — only its patches', () async {
+        await registered(7);
+        final library = manager(personal: true);
+        heldManifest(library);
+        // ה-manifest כבר בכונן: יורד רק קובץ העדכון.
+        expect(await peekAndBound(library), 100 + 450);
+      });
+
+      test('a held manifest marked fullRebase is not a route', () async {
+        await registered(7);
+        final library = manager(personal: true);
+        final body = manifestJson(7, 8, fullRebase: true);
+        putOnDrive(
+          library,
+          'v8-20261011',
+          'patch-v7-v8.db.zst.manifest.json',
+          body,
+        );
+        releases[0]['assets'] = [
+          for (final asset in releases[0]['assets'] as List)
+            if ((asset as Map)['name'] == 'patch-v7-v8.db.zst.manifest.json')
+              {...asset, 'size': utf8.encode(body).length}
+            else
+              asset,
+        ];
+        expect(await peekAndBound(library), 1000 + 450);
+      });
+
+      test(
+        'no chain from the registered version, even by name — the full DB',
+        () async {
+          await registered(5);
+          expect(await peekAndBound(manager(personal: true)), 1000 + 450);
+        },
+      );
+
+      test('nothing newer — no number, never 0 (a damaged mirror is rebuilt '
+          'in full)', () async {
+        await registered(8);
+        expect(await peekAndBound(manager(personal: true)), isNull);
+      });
+
+      test('computed without network or writes to the drive', () async {
+        await registered(7);
+        final library = manager(personal: true);
+        await peekAndBound(library);
+        final drive = Directory(p.join(temporary.path, 'drive'));
+        final before = drive.listSync(recursive: true).length;
+        final again = await http.runWithClient(
+          library.peekedDownloadBytesBound,
+          () => MockClient((request) async => fail('network: ${request.url}')),
+        );
+        expect(again, 1000 + 450);
+        expect(drive.listSync(recursive: true).length, before);
+        expect(Directory(library.mirrorDir).existsSync(), isFalse);
+      });
+    });
 
     test('a patch slower to apply than the whole DB is not counted, nor the '
         'dead end it leaves', () async {

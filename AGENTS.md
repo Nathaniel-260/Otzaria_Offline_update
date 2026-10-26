@@ -749,10 +749,10 @@ post 33695). Four things hold it together:
   first-run question (§5.9) or Settings sets it; `personalModeAsked` travels with
   the drive, and a drive already in the mode counts as answered.
 - **A routine check never records the version.** `captureLocalDbVersion()` runs
-  on a click, on "only my computer" answered on a not-connected machine with
-  Otzaria, or once at startup via the drive's one-shot `personalAutoRegisterPending`
-  (`AppSession.registerPendingMachine`: not connected, Otzaria installed, nobody
-  registered; cleared by it or by "remove"). Else the **online** machine's newer
+  on a click, on "only my computer" answered where Otzaria is installed and the
+  online check failed, or once at startup via the drive's one-shot
+  `personalAutoRegisterPending` (`AppSession.registerPendingMachine`, same test,
+  nobody registered; cleared by it or by "remove"; no online check = no register). Else the **online** machine's newer
   Otzaria would aim the download at v22 while the target sat at v20.
 - **One record per machine, and the lowest wins**
   (`LibraryStateStore.knownDbVersions`, keyed by `currentMachineKey()`). Someone who
@@ -799,8 +799,8 @@ machine; when it loses, the full DB is downloaded and the patches dropped. Hence
 release shipping **only** a full DB is no longer invisible to personal mode (it used
 to be filtered out while the mode reported "up to date"), and the "turn personal
 update off and download again" message now fires only at a real dead end. Its
-home bound (`personalDownloadBytesBound`) gives a number only when names alone
-prove which way it goes.
+home bound (`personalDownloadBytesBound`) counts only the patches only when held,
+appliable manifests prove they win; otherwise the larger of the two routes.
 
 **Only the patches are per-release; `seforim.db.zst` is downloaded once**, from the
 highest version carrying one — the only full-DB asset `OfflineLibraryUpdateDiscovery` ever

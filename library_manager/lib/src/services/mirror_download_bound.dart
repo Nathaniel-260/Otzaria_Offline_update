@@ -190,9 +190,8 @@ Map<int, int> _maxReach(List<_Edge> edges) {
   return reach;
 }
 
-/// חסם עליון ל-`export(fromVersion:)` (מצב אישי) משמות וגדלים, בלי רשת ובלי
-/// כתיבה. הייצוא בוחר בין קובצי העדכון מ-[fromVersion] לבין המסד המלא בלבד;
-/// `null` כשאי אפשר לדעת מראש לאיזה מהם — אחרת היה מוצג 90MB ויורד 1.5GB.
+/// חסם עליון ל-`export(fromVersion:)` (מצב אישי) בלי רשת ובלי כתיבה: קובצי
+/// העדכון או המסד המלא, ו-max של שניהם כשאי אפשר להכריע מה הייצוא יבחר.
 int? personalDownloadBytesBound({
   required List<LibraryRelease> eligible,
   required List<LibraryRelease> relevant,
@@ -236,14 +235,18 @@ int? personalDownloadBytesBound({
       if (asset.name.startsWith('patch-')) patches += missing(release, asset);
     }
   }
+  // "אין חדש" עשוי להיות מראה פגומה שהייצוא בונה מחדש במלואה — לא 0.
   if (relevant.isEmpty) {
-    return full == null || latest <= fromVersion ? 0 : fullDownload;
+    return full == null || latest <= fromVersion ? null : fullDownload;
   }
   if (full == null) return patches;
+  final either = patches > fullDownload ? patches : fullDownload;
 
-  // קשת אפשרית — כל מה שעשוי להיבנות; ודאית — שקבציה ידועים בשמם.
+  // ודאית — רק קשת שה-manifest שלה בכונן ותקף: את השאר הייצוא עשוי לפסול
+  // לפי התוכן (fullRebase, סכמה, פורמט, דחיסה).
   final possible = <({int from, int to, int bytes})>[];
   final sure = <({int from, int to, int bytes})>[];
+  var allNamed = true;
   for (final release in relevant) {
     for (final manifestAsset in release.deltaManifestAssets) {
       final manifest = heldManifest(release, manifestAsset);
@@ -262,42 +265,31 @@ int? personalDownloadBytesBound({
         continue;
       }
       final match = _edgeName.firstMatch(manifestAsset.name);
-      if (match == null) return null;
-      final base = manifestAsset.name.substring(
-        0,
-        manifestAsset.name.length - '.manifest.json'.length,
-      );
-      final files = release.assets
-          .where(
-            (a) =>
-                !a.isDeltaManifest &&
-                (a.name == base || a.name.startsWith('$base.')),
-          )
-          .toList();
-      final edge = (
+      if (match == null) {
+        allNamed = false;
+        continue;
+      }
+      possible.add((
         from: int.parse(match.group(1)!),
         to: int.parse(match.group(2)!),
-        bytes: [manifestAsset, ...files].fold(0, (n, a) => n + a.size),
-      );
-      possible.add(edge);
-      if (files.length == 1 && files.single.name == base) sure.add(edge);
+        bytes: 0,
+      ));
     }
   }
 
   // אין שרשרת גם בהנחה שכל קשת תקפה — ודאי שיורד המסד המלא.
-  if (_cheapest(possible, fromVersion, latest, applyTime) == null) {
+  if (allNamed && _cheapest(possible, fromVersion, latest, applyTime) == null) {
     return fullDownload;
   }
   final route = _cheapest(sure, fromVersion, latest, applyTime);
-  if (route == null) return null;
+  if (route == null) return either;
   final fullWins = applyTime.isOutOfRange(
     route.seconds,
     applyTime.fullRouteSeconds(full.size),
     savedDownloadBytes: full.size - route.bytes,
   );
   if (!fullWins) return patches;
-  // קשת שאינה ודאית עשויה לתת שרשרת זולה יותר שבה קובצי העדכון גוברים.
-  return possible.length == sure.length ? fullDownload : null;
+  return possible.length == sure.length && allNamed ? fullDownload : either;
 }
 
 /// כמו `_cheapestRoute` של המייצא: זמן ההחלה של השרשרת הזולה וגודלה.

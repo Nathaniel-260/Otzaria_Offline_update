@@ -734,10 +734,8 @@ class LibraryManager {
     return latest?.version;
   }
 
-  /// חסם עליון ל-[downloadToMirror] (בלי חיפוש חכם) מההצצות האחרונות, בלי רשת
-  /// ובלי כתיבה — ראו [mirrorDownloadBytesBound] ו-[personalDownloadBytesBound].
-  /// `null` אחרי הצצה שנכשלה, במסד מפוצל, כשמסד מלא ישן בכונן עשוי להיבחר,
-  /// ובמצב אישי כשאי אפשר לדעת מראש אם הייצוא יבחר בספרייה המלאה.
+  /// חסם עליון ל-[downloadToMirror] (בלי חיפוש חכם) מההצצות, בלי רשת ובלי כתיבה —
+  /// [mirrorDownloadBytesBound] או [personalDownloadBytesBound]; `null` = אין חסם.
   Future<int?> peekedDownloadBytesBound() async {
     final releases = _peekedReleases;
     final companions = _companionsMirror.peekedPendingBytes;

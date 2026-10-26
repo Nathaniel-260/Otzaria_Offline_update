@@ -631,10 +631,11 @@ class AppSession extends ChangeNotifier {
     await choosePersonalScope(personal: answer, fromQuestion: true);
   }
 
-  bool get _connected => onlineState(this) == true;
+  /// בדיקה ברשת רצה ונכשלה. בלי בדיקה (`null`) לא ידוע — ולא רושמים.
+  bool get _provenOffline => onlineState(this) == false;
 
-  /// התשובה לשאלה, וגם הבחירה בהגדרות. "רק המחשב שלי" רושם מיד רק מחשב לא
-  /// מחובר שאוצריא מותקנת בו; אחרת נרשם המחשב כזה הראשון שהכלי ירוץ בו.
+  /// התשובה לשאלה וגם הבחירה בהגדרות. "רק המחשב שלי" רושם מיד רק מחשב שהוכח
+  /// לא מחובר ואוצריא מותקנת בו; אחרת נדלק הדגל לרישום במחשב כזה.
   Future<void> choosePersonalScope({
     required bool personal,
     bool fromQuestion = false,
@@ -647,7 +648,7 @@ class AppSession extends ChangeNotifier {
     await _startupOnline;
     if (!isActive) return;
     var registered = false;
-    if (personal && !readOnly && !_connected) {
+    if (personal && !readOnly && _provenOffline) {
       if (_otzaria.currentVersion == null) await _otzaria.ensureChecked();
       if (!isActive) return;
       registered = _otzaria.currentVersion != null &&
@@ -666,15 +667,14 @@ class AppSession extends ChangeNotifier {
     if (registered && isActive) _update(() => _preparedHere = true);
   }
 
-  /// "רק המחשב שלי" נבחר במחשב שלא נרשם: אחרי הבדיקות של העלייה, המחשב הלא
-  /// מחובר הראשון שאוצריא מותקנת בו נרשם — פעם אחת, לפי הדגל שנוסע בכונן.
-  /// זה אירוע של העלייה ולא של הבדיקה: בדיקה לעולם אינה רושמת (§5.4).
+  /// אירוע של העלייה, לא של הבדיקה (§5.4): לפי הדגל שבכונן, פעם אחת, נרשם
+  /// המחשב הראשון שאוצריא מותקנת בו ושהבדיקה ברשת בו נכשלה.
   @visibleForTesting
   Future<void> registerPendingMachine() async {
     final s = settings.settings;
     if (!isActive || readOnly) return;
     if (!s.personalUpdateMode || !s.personalAutoRegisterPending) return;
-    if (_connected || _otzaria.currentVersion == null) return;
+    if (!_provenOffline || _otzaria.currentVersion == null) return;
     if (!await _library.hasNoRegisteredMachine()) {
       await _clearAutoRegister();
       return;

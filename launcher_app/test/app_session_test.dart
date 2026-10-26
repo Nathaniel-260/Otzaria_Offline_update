@@ -194,6 +194,10 @@ void main() {
       final s = session();
       await s.library.setCustomDbPath(db.path);
       s.otzaria.currentVersion = '0.10.4';
+      // הבדיקה ברשת רצה ונכשלה — המחשב הלא מחובר.
+      s.library
+        ..onlineCheckedAt = DateTime.now()
+        ..onlineCheckError = 'offline';
       return s;
     }
 
@@ -235,11 +239,22 @@ void main() {
     test('מחשב מחובר אינו נרשם מעצמו, והדגל נשאר', () async {
       await settings.update(pending);
       final s = await withLibrary(version: 140);
-      s.library.onlineCheckedAt = DateTime.now();
+      s.library.onlineCheckError = null;
       await s.registerPendingMachine();
       expect(await store(s).lowestKnownDbVersion(), isNull);
       expect(settings.settings.personalAutoRegisterPending, isTrue);
       expect(homeViewModelOf(s).personalPending, isTrue);
+    });
+
+    test('בלי בדיקה ברשת (למשל בדיקה בעלייה כבויה) — לא נרשם, הדגל נשאר',
+        () async {
+      await settings.update(pending);
+      final s = await withLibrary(version: 140);
+      s.library.onlineCheckedAt = null;
+      await s.registerPendingMachine();
+      await s.choosePersonalScope(personal: true);
+      expect(await store(s).lowestKnownDbVersion(), isNull);
+      expect(settings.settings.personalAutoRegisterPending, isTrue);
     });
 
     test('מחשב אחר כבר נרשם — אין רישום, והדגל נמחק', () async {
@@ -278,7 +293,7 @@ void main() {
 
     test('"רק המחשב שלי" במחשב מחובר — לא נרשם, וממתין למחשב אחר', () async {
       final s = await withLibrary(version: 141);
-      s.library.onlineCheckedAt = DateTime.now();
+      s.library.onlineCheckError = null;
       await s.choosePersonalScope(personal: true);
       expect(await store(s).lowestKnownDbVersion(), isNull);
       expect(settings.settings.personalAutoRegisterPending, isTrue);
