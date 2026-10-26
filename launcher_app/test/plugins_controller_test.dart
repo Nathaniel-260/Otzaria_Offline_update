@@ -297,6 +297,25 @@ void main() {
     });
   });
 
+  test('a failed installed-plugin scan still refreshes app compatibility',
+      () async {
+    final c = PluginsModuleController(
+      mirrorRootDir: p.join(tempDir.path, 'mirror'),
+      otzariaLaunchPath: () async =>
+          throw const FileSystemException('unreadable'),
+      installedAppVersion: () async => '0.9.97',
+    )
+      ..status = PluginsModuleStatus.ready
+      ..appVersion = '0.9.96'
+      ..installed = {'known': '1.0.0'};
+    addTearDown(c.dispose);
+
+    await c.refreshInstalled();
+
+    expect(c.appVersion, '0.9.97');
+    expect(c.installed, {'known': '1.0.0'});
+  });
+
   group('סינון', () {
     setUp(() async {
       await saveCatalog(
@@ -317,6 +336,45 @@ void main() {
       await controller.load();
       // ההתקנה האמיתית של המכונה המריצה לא אמורה להשפיע על התוצאה.
       controller.installed = const {};
+    });
+
+    test('search reuses catalog normalization across queries and filters', () {
+      final entry = _SearchPlugin('a', 'תיאור ארוך');
+      controller.plugins = [entry];
+      controller.setSearch('לא נמצא');
+      expect(controller.filtered, isEmpty);
+      final reads = entry.descriptionReads;
+      expect(reads, greaterThan(0));
+
+      controller.setSearch('עדיין לא נמצא');
+      expect(controller.filtered, isEmpty);
+      controller.setSortMode(PluginSortMode.newest);
+      expect(controller.filtered, isEmpty);
+      controller.setStatusFilter(PluginStatusFilter.stable);
+      expect(controller.filtered, isEmpty);
+      expect(entry.descriptionReads, reads);
+
+      final changed = _SearchPlugin('a', 'התיאור החדש');
+      expect(changed, entry);
+      controller.plugins = [changed];
+      controller.setSearch('החדש');
+      expect(controller.filtered, [changed]);
+      expect(changed.descriptionReads, greaterThan(0));
+      controller.setSearch('ארוך');
+      expect(controller.filtered, isEmpty);
+    });
+
+    test('equal catalog identities keep separate search fields', () {
+      final first = _SearchPlugin('a', 'תיאור ראשון');
+      final second = _SearchPlugin('a', 'תיאור שני');
+      expect(first, second);
+      controller.plugins = [first, second];
+      controller.setSearch('שני');
+      expect(controller.filtered.single, same(second));
+      controller.setSearch('ראשון');
+      expect(controller.filtered.single, same(first));
+      controller.setSearch('לוח תיאור');
+      expect(controller.filtered, isEmpty);
     });
 
     test('בלי סינון — הכול, כולל בטא וניסיוני', () {
@@ -1725,3 +1783,37 @@ List<int> _le32(int value) => [
       (value >> 16) & 0xff,
       (value >> 24) & 0xff,
     ];
+
+class _SearchPlugin extends StorePlugin {
+  _SearchPlugin(String id, this.text)
+      : super(
+          id: id,
+          name: 'לוח',
+          shortDescription: '',
+          description: '',
+          version: '1.0.0',
+          status: 'stable',
+          author: '',
+          updatedAt: '',
+          originalDate: '',
+          compatibleWith: '',
+          maxAppVersion: '',
+          requiresNetwork: false,
+          tags: const [],
+          homepage: '',
+          downloadCount: 0,
+          supportsDirectInstall: false,
+          isFeatured: false,
+          remoteDownloadUrl: '',
+        );
+
+  final String text;
+  final _descriptionReads = [0];
+  int get descriptionReads => _descriptionReads.single;
+
+  @override
+  String get description {
+    _descriptionReads[0]++;
+    return text;
+  }
+}

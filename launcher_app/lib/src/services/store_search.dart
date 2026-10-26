@@ -23,9 +23,12 @@ bool _isIgnored(int code) =>
     code == 0x05F4; // ״
 
 /// הטקסט המנורמל, ולכל תו בו — המיקום שלו בטקסט המקורי.
-({String text, List<int> origin}) _normalize(String value) {
+({String text, List<int>? origin}) _normalize(
+  String value, {
+  bool mapOrigin = false,
+}) {
   final out = StringBuffer();
-  final origin = <int>[];
+  final origin = mapOrigin ? <int>[] : null;
   for (var i = 0; i < value.length; i++) {
     final code = value.codeUnitAt(i);
     if (_isIgnored(code)) continue;
@@ -33,28 +36,35 @@ bool _isIgnored(int code) =>
     final lower = String.fromCharCode(mapped).toLowerCase();
     out.write(lower);
     // יש אותיות שב-lowercase נעשות שני תווים (İ) — מיקום לכל תו שנכתב.
-    for (var k = 0; k < lower.length; k++) {
-      origin.add(i);
+    if (origin != null) {
+      for (var k = 0; k < lower.length; k++) {
+        origin.add(i);
+      }
     }
   }
   return (text: out.toString(), origin: origin);
 }
 
 /// השאילתה כפי שמשווים אותה — ריקה כשאין בה אלא רווחים.
-String normalizeStoreQuery(String query) => _normalize(query.trim()).text;
+String normalizeStoreQuery(String query) => normalizeStoreText(query.trim());
+
+/// תוכן לסינון: בלי מפת המיקומים שנחוצה רק להדגשה.
+String normalizeStoreText(String text) => _normalize(text).text;
 
 /// האם [text] מכיל את [normalizedQuery] (שכבר עבר [normalizeStoreQuery]).
 bool storeTextMatches(String text, String normalizedQuery) =>
-    normalizedQuery.isEmpty || _normalize(text).text.contains(normalizedQuery);
+    normalizedQuery.isEmpty ||
+    normalizeStoreText(text).contains(normalizedQuery);
 
 /// הטווח שיש להדגיש ב-[text] — במיקומי הטקסט המקורי — או `null`.
 ({int start, int end})? storeMatchRange(String text, String query) {
   final q = normalizeStoreQuery(query);
   if (q.isEmpty) return null;
-  final normalized = _normalize(text);
+  final normalized = _normalize(text, mapOrigin: true);
   final at = normalized.text.indexOf(q);
   if (at < 0) return null;
-  final start = normalized.origin[at];
-  final end = normalized.origin[at + q.length - 1] + 1;
+  final origin = normalized.origin!;
+  final start = origin[at];
+  final end = origin[at + q.length - 1] + 1;
   return (start: start, end: end);
 }

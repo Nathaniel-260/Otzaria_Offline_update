@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,8 @@ import 'package:launcher_app/src/controllers/shell_module_ports.dart';
 import 'package:launcher_app/src/flows/update_here_flow.dart';
 import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
+import 'package:launcher_app/src/shell/home_guidance.dart';
+import 'package:launcher_app/src/shell/shell_tasks.dart';
 import 'package:library_manager/library_manager.dart' show CompanionAsset;
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -43,6 +46,103 @@ void main() {
     AppLogger.resetForTest();
     await deleteTempDir(tempDir);
   });
+
+  for (final installedPlugin in ['1.0.0', '1.5.0']) {
+    test(
+        'app update selects the newly compatible plugin build '
+        '(installed $installedPlugin)', () async {
+      final app = _UpdatedApp(tempDir.path)
+        ..currentVersion = '0.9.96'
+        ..latestVersion = '0.9.97'
+        ..status = OtzariaModuleStatus.updateAvailable;
+      final store = _DeliveredPlugins(tempDir.path, app)
+        ..appVersion = '0.9.96'
+        ..status = PluginsModuleStatus.ready
+        ..plugins = [_versionedPlugin()]
+        ..installed = {'test': installedPlugin};
+      final host = _UpdateHost();
+      addTearDown(app.dispose);
+      addTearDown(store.dispose);
+      addTearDown(host.tasks.dispose);
+      final flow = UpdateHereFlow(
+        app: OtzariaModulePort(app),
+        library: LibraryModulePort(library),
+        plugins: PluginsModulePort(store),
+        host: host,
+      );
+
+      await flow.run(const [GuidanceItem.app, GuidanceItem.plugins]);
+
+      expect(app.currentVersion, '0.9.97');
+      expect(store.delivered, ['2.0.0']);
+      expect((host.tasks.current! as UpdateHereTask).outcomes,
+          containsPair(GuidanceItem.plugins, StageOutcome.done));
+    });
+  }
+
+  test('app-only install refreshes dependent state without installing it',
+      () async {
+    final app = _UpdatedApp(tempDir.path)
+      ..currentVersion = '0.9.96'
+      ..latestVersion = '0.9.97'
+      ..status = OtzariaModuleStatus.updateAvailable;
+    final store = _DeliveredPlugins(tempDir.path, app)
+      ..appVersion = '0.9.96'
+      ..status = PluginsModuleStatus.ready
+      ..plugins = [_versionedPlugin()]
+      ..installed = {'test': '1.5.0'};
+    final dependentLibrary = _RecheckedLibrary(tempDir.path)
+      ..status = LibraryModuleStatus.error;
+    final host = _UpdateHost();
+    addTearDown(app.dispose);
+    addTearDown(store.dispose);
+    addTearDown(dependentLibrary.dispose);
+    addTearDown(host.tasks.dispose);
+    final refreshed = Completer<void>();
+    var finished = false;
+    final flow = UpdateHereFlow(
+      app: OtzariaModulePort(app, onInstalled: () async {
+        await refreshed.future;
+        await dependentLibrary.checkForUpdate(fresh: true);
+        await store.refreshAppVersion();
+      }),
+      library: LibraryModulePort(dependentLibrary),
+      plugins: PluginsModulePort(store),
+      host: host,
+    );
+    final run =
+        flow.run(const [GuidanceItem.app]).whenComplete(() => finished = true);
+    await pumpEventQueue();
+    expect(finished, isFalse);
+    refreshed.complete();
+    await run;
+
+    expect(store.appVersion, '0.9.97');
+    expect(store.deliverableUpdates, hasLength(1));
+    expect(dependentLibrary.status, LibraryModuleStatus.updateAvailable);
+    expect(dependentLibrary.freshChecks, 1);
+    expect(dependentLibrary.lastApplyCompleted, isFalse);
+    expect(store.delivered, isEmpty);
+    expect((host.tasks.current! as UpdateHereTask).stages, [GuidanceItem.app]);
+  });
+
+  for (final result in [
+    OtzariaInstallResult.cancelled,
+    OtzariaInstallResult.wizardStillOpen,
+    OtzariaInstallResult.failed,
+  ]) {
+    test('unsuccessful app install does not refresh dependents ($result)',
+        () async {
+      final app = _UpdatedApp(tempDir.path)..result = result;
+      addTearDown(app.dispose);
+      var refreshed = false;
+      final port =
+          OtzariaModulePort(app, onInstalled: () async => refreshed = true);
+      expect(
+          await port.installWithWizard(), isNot(AppInstallOutcome.installed));
+      expect(refreshed, isFalse);
+    });
+  }
 
   test('the app port installs only an installed app with an update', () {
     final port = OtzariaModulePort(otzaria);
@@ -227,5 +327,97 @@ class _AppliedLibrary extends LibraryModuleController {
     lastApplyCompleted = true;
     errorMessage = applyNote = null;
     after(this);
+  }
+}
+
+class _UpdatedApp extends OtzariaModuleController {
+  _UpdatedApp(String dir) : super(dataDir: dir);
+
+  OtzariaInstallResult result = OtzariaInstallResult.installed;
+
+  @override
+  Future<void> install({bool useWizard = true}) async {
+    if (result == OtzariaInstallResult.installed) {
+      currentVersion = '0.9.97';
+      status = OtzariaModuleStatus.upToDate;
+    }
+    lastInstallResult = result;
+  }
+}
+
+class _DeliveredPlugins extends PluginsModuleController {
+  _DeliveredPlugins(String dir, _UpdatedApp app)
+      : super(
+            mirrorRootDir: dir,
+            installedAppVersion: () async => app.currentVersion);
+
+  final delivered = <String>[];
+
+  @override
+  Future<PluginInstallResult> directInstall(StorePlugin plugin) async {
+    delivered.add(versionOf(plugin));
+    return const PluginInstallResult.ok();
+  }
+}
+
+class _UpdateHost implements UpdateHereHost {
+  @override
+  final tasks = ShellTasks();
+
+  @override
+  bool get isActive => true;
+
+  @override
+  Future<bool> isOtzariaRunning() async => false;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('unexpected update call: ${invocation.memberName}');
+}
+
+StorePlugin _versionedPlugin() => StorePlugin.fromApi(const {
+      'id': 'test',
+      'name': 'test',
+      'version': '2.0.0',
+      'compatibleWith': '0.9.97',
+      'supportsDirectInstall': true,
+      'versions': [
+        {
+          'version': '2.0.0',
+          'compatibleWith': '0.9.97',
+          'supportsDirectInstall': true,
+          'downloadUrl': '/new',
+          'isLatest': true,
+        },
+        {
+          'version': '1.5.0',
+          'compatibleWith': '0.9.95',
+          'supportsDirectInstall': true,
+          'downloadUrl': '/old',
+        },
+      ],
+    }, 'https://otzaria.org')
+        .copyWith(
+      manifestId: 'test',
+      localFiles: {
+        for (final v in ['2.0.0', '1.5.0'])
+          v: PluginLocalFile(
+            relativePath: 'files/$v.otzplugin',
+            fileName: '$v.otzplugin',
+            ext: '.otzplugin',
+            size: 1,
+          ),
+      },
+    );
+
+class _RecheckedLibrary extends LibraryModuleController {
+  _RecheckedLibrary(String dir) : super(dataDir: dir);
+
+  int freshChecks = 0;
+
+  @override
+  Future<void> checkForUpdate({bool fresh = false}) async {
+    if (fresh) freshChecks++;
+    status = LibraryModuleStatus.updateAvailable;
   }
 }

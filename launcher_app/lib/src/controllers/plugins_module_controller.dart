@@ -133,6 +133,7 @@ class PluginsModuleController extends ChangeNotifier
   List<StorePlugin> get plugins => _plugins;
   set plugins(List<StorePlugin> value) {
     _plugins = value;
+    _searchTexts.clear();
     _invalidateDerived();
   }
 
@@ -353,18 +354,26 @@ class PluginsModuleController extends ChangeNotifier
 
   Future<void> refreshInstalled() => _installedScan.run();
 
+  Future<void> refreshAppVersion() async {
+    final resolve = installedAppVersion;
+    if (resolve == null) return;
+    final version = await resolve();
+    if (isDisposed || version == appVersion) return;
+    appVersion = version;
+    _invalidateDerived();
+    notifyListeners();
+  }
+
   Future<void> _refreshInstalled() async {
     await _loading;
     if (status != PluginsModuleStatus.ready) return;
 
     try {
+      await refreshAppVersion();
       final scanned = await _manager.scanInstalled();
-      final version = await installedAppVersion?.call();
       if (!mapEquals(installed, scanned.versions) ||
           !setEquals(_disabled, scanned.disabled) ||
-          !setEquals(_development, scanned.development) ||
-          version != appVersion) {
-        appVersion = version;
+          !setEquals(_development, scanned.development)) {
         _applyInstalledState(scanned);
         _invalidateDerived();
         notifyListeners();
@@ -993,13 +1002,22 @@ class PluginsModuleController extends ChangeNotifier
         PluginInstallFilter.notInstalled => installedVersionOf(plugin) == null,
       };
 
-  /// אותם שדות שהחיפוש באתר מדרג: שם, תקציר, תיאור, מפתח ותגיות.
-  static bool _matchesQuery(StorePlugin plugin, String query) =>
-      storeTextMatches(plugin.name, query) ||
-      storeTextMatches(plugin.shortDescription, query) ||
-      storeTextMatches(plugin.description, query) ||
-      storeTextMatches(plugin.author, query) ||
-      plugin.tags.any((tag) => storeTextMatches(tag, query));
+  final Map<StorePlugin, List<String>> _searchTexts = Map.identity();
+
+  bool _matchesQuery(StorePlugin plugin, String query) => _searchTexts
+      .putIfAbsent(
+          plugin,
+          () => [
+                for (final text in [
+                  plugin.name,
+                  plugin.shortDescription,
+                  plugin.description,
+                  plugin.author,
+                  ...plugin.tags,
+                ])
+                  normalizeStoreText(text),
+              ])
+      .any((text) => text.contains(query));
 
   /// הרשימה המוצגת: חיפוש, קטגוריה, מותקנים, יציבות ותגית — יחד.
   List<StorePlugin> get filtered => _filtered ??= () {

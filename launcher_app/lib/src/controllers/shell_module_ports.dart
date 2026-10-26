@@ -19,9 +19,10 @@ import 'plugins_module_controller.dart';
 
 class OtzariaModulePort
     implements AppMirrorModule, AutoInstallApp, UpdateHereApp {
-  OtzariaModulePort(this._otzaria);
+  OtzariaModulePort(this._otzaria, {this.onInstalled});
 
   final OtzariaModuleController _otzaria;
+  final Future<void> Function()? onInstalled;
 
   @override
   bool get hasStaleFullPackage => _otzaria.hasStaleFullPackage;
@@ -78,6 +79,9 @@ class OtzariaModulePort
   Future<AppInstallOutcome> installWithWizard() async {
     _otzaria.lastInstallResult = null;
     await _otzaria.install();
+    if (_otzaria.lastInstallResult == OtzariaInstallResult.installed) {
+      await onInstalled?.call();
+    }
     return switch (_otzaria.lastInstallResult) {
       OtzariaInstallResult.installed => AppInstallOutcome.installed,
       OtzariaInstallResult.cancelled => AppInstallOutcome.cancelled,
@@ -218,7 +222,7 @@ class PluginsModulePort implements PluginsMirrorModule, UpdateHerePlugins {
 
   @override
   Future<void> deliver(void Function(List<PluginDelivery> rows) onRow) async {
-    // אחרי שלב התוכנה הרשימה עשויה להשתנות (canDirectInstall תלוי בגרסה).
+    await _plugins.refreshAppVersion();
     final targets = _plugins.deliverableUpdates;
     final states = {
       for (final plugin in targets) plugin.id: PluginDeliveryState.waiting,

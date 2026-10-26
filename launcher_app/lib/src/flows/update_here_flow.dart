@@ -135,16 +135,17 @@ class UpdateHereFlow {
           GuidanceItem.library,
       ];
     }
+    final installsApp =
+        items.contains(GuidanceItem.app) && _canInstallApp(reinstallApp);
     return [
       if (items.contains(GuidanceItem.library) &&
           (fullLibrary
               ? library.canApplyFull
               : library.hasUpdateAvailable || semantic))
         GuidanceItem.library,
-      if (items.contains(GuidanceItem.app) && _canInstallApp(reinstallApp))
-        GuidanceItem.app,
+      if (installsApp) GuidanceItem.app,
       if (items.contains(GuidanceItem.plugins) &&
-          plugins.deliverableUpdates.isNotEmpty)
+          (plugins.deliverableUpdates.isNotEmpty || installsApp))
         GuidanceItem.plugins,
     ];
   }

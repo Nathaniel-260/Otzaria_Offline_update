@@ -304,7 +304,19 @@ class AppSession extends ChangeNotifier {
   Timer? _runningPoll;
   Future<void>? _runningWatch;
 
-  late final OtzariaModulePort _otzariaPort = OtzariaModulePort(_otzaria);
+  late final OtzariaModulePort _otzariaPort = OtzariaModulePort(
+    _otzaria,
+    onInstalled: _refreshAfterAppInstall,
+  );
+
+  Future<void> _refreshAfterAppInstall() async {
+    if (!isActive) return;
+    await Future.wait([
+      _library.checkForUpdate(fresh: true),
+      _plugins.refreshInstalled(),
+    ]);
+  }
+
   late final LibraryModulePort _libraryPort = LibraryModulePort(_library);
   late final PluginsModulePort _pluginsPort = PluginsModulePort(_plugins);
 
