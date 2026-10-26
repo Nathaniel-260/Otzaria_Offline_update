@@ -18,6 +18,7 @@ import '../widgets/widgets_exports.dart';
 import 'app_report/app_reports_settings_card.dart';
 import 'custom_apps/custom_apps_settings_card.dart';
 import 'home/home_view_model.dart' show launcherLineOf, LauncherLineKind;
+import 'home/personal_scope_dialog.dart' show confirmPersonalModeDialog;
 import 'store_kit/store_visuals.dart' show StoreFilterChip;
 
 /// אין כאן בכוונה הגדרות רשת (הזמן הקצוב בלקוחות), נתיבים (צמודים לקובץ
@@ -46,6 +47,7 @@ class SettingsScreen extends StatelessWidget {
     this.personalMachines = const [],
     this.onChoosePersonal,
     this.onRemoveMachine,
+    this.onRegisterHere,
   });
 
   final SettingsController controller;
@@ -103,6 +105,9 @@ class SettingsScreen extends StatelessWidget {
 
   /// `null` בזמן משימה ארוכה.
   final void Function(String machineKey)? onRemoveMachine;
+
+  /// "רישום המחשב הזה" כשהוא לא ברשימה. `null` — בלי הכפתור.
+  final VoidCallback? onRegisterHere;
 
   AppSettings get _s => controller.settings;
 
@@ -515,39 +520,66 @@ class SettingsScreen extends StatelessWidget {
       size: _tile,
       tone: _quiet,
     );
-    if (machines.isEmpty) {
-      return RowsCard(
-        children: [
-          AppRow(leading: icon, title: t.personalMachinesNone),
-        ],
-      );
-    }
-    final floor = machines.first.version;
+    final floor = machines.isEmpty ? null : machines.first.version;
+    final here = machines.any((m) => m.isThisMachine);
     return RowsCard(
       children: [
+        if (machines.isEmpty)
+          AppRow(leading: icon, title: t.personalMachinesNone),
         for (final machine in machines)
           AppRow(
             leading: icon,
             title: machine.isThisMachine
                 ? t.personalMachineThis
-                : machine.name ?? t.personalMachineUnnamed,
-            subtitle: [
-              if (machine.isThisMachine && machine.name != null) machine.name!,
-              machines.length > 1 && machine.version == floor
-                  ? t.personalMachineFloor('${machine.version}')
-                  : t.personalMachineVersion('${machine.version}'),
-            ].join(' · '),
+                : machine.name == null
+                    ? t.personalMachineUnnamed
+                    : t.personalMachineName(machine.name!),
+            subtitle: machines.length > 1 && machine.version == floor
+                ? t.personalMachineFloor('${machine.version}')
+                : machine.isThisMachine && machine.name != null
+                    ? t.personalMachineThisSubtitle(
+                        machine.name!,
+                        '${machine.version}',
+                      )
+                    : t.personalMachineVersion('${machine.version}'),
             trailing: ActionButton.ghost(
               key: ShellKeys.personalMachineRemove(machine.key),
               text: t.personalMachineRemove,
-              onPressed: switch (onRemoveMachine) {
-                final remove? => () => remove(machine.key),
-                null => null,
-              },
+              onPressed: readOnly || onRemoveMachine == null
+                  ? null
+                  : () => unawaited(_confirmRemove(context, machine)),
             ),
           ),
+        if (!here && onRegisterHere != null)
+          AppRow(
+            leading: icon,
+            title: t.personalMachineNotHere,
+            trailing: ActionButton.neutral(
+              key: ShellKeys.settingsPersonalRegisterHere,
+              text: context.strings.libraryScreen.personalVersionButton,
+              onPressed: readOnly ? null : onRegisterHere,
+            ),
+          ),
+        if (readOnly) AppRow(title: t.personalMachinesReadOnly),
       ],
     );
+  }
+
+  /// ההסרה משנה מאיזו גרסה מורידים, ולכן באישור; למחשב הזה — בנוסח משלו.
+  Future<void> _confirmRemove(
+    BuildContext context,
+    RegisteredMachine machine,
+  ) async {
+    final t = context.strings.settings;
+    final approved = await showWarningDialog(
+      context: context,
+      title: t.personalRemoveTitle,
+      content: machine.isThisMachine
+          ? t.personalRemoveThisBody
+          : t.personalRemoveBody,
+      confirmText: t.personalMachineRemove,
+    );
+    if (approved) onRemoveMachine?.call(machine.key);
   }
 
   /// "רק המחשב שלי" דורש אישור באזהרה: הספרייה המלאה שבכונן נמחקת בהורדה
@@ -557,16 +589,7 @@ class SettingsScreen extends StatelessWidget {
     required bool personal,
   }) async {
     if (personal == _s.personalUpdateMode) return;
-    if (personal) {
-      final t = context.strings.settings;
-      final approved = await showWarningDialog(
-        context: context,
-        title: t.personalModeDialogTitle,
-        content: t.personalModeDialogContent,
-        confirmText: t.personalModeDialogConfirm,
-      );
-      if (!approved) return;
-    }
+    if (personal && !await confirmPersonalModeDialog(context)) return;
     final choose = onChoosePersonal;
     if (choose != null) return choose(personal);
     await _set(

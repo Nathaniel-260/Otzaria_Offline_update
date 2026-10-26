@@ -88,6 +88,7 @@ class HomeViewModel {
     this.personalMachines = 0,
     this.personalFloor,
     this.personalPreparedHere = false,
+    this.personalPending = false,
     this.semanticConsent = false,
     this.appTile = TileStatus.upToDate,
     this.libraryTile = TileStatus.upToDate,
@@ -209,6 +210,9 @@ class HomeViewModel {
 
   /// `AppSession.preparedForThisMachine`.
   final bool personalPreparedHere;
+
+  /// `AppSession.personalRegistrationPending`.
+  final bool personalPending;
   final bool semanticConsent;
   final TileStatus appTile;
   final TileStatus libraryTile;
@@ -368,6 +372,7 @@ HomeViewModel homeViewModelOf(AppSession s) {
     personalMachines: library.registeredMachines.length,
     personalFloor: library.registeredMachines.firstOrNull?.version,
     personalPreparedHere: s.preparedForThisMachine,
+    personalPending: s.personalRegistrationPending,
     // כשהגיבור כבר מציע את החיפוש החכם, ההודעה הייתה כפולה; בלי אוצריא אין
     // לאן לכתוב את ההסכמה.
     semanticConsent: s.semanticConsentUnanswered &&

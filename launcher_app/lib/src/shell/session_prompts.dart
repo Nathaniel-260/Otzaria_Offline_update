@@ -37,6 +37,9 @@ abstract interface class SessionPrompts {
   /// "מחשבים מרובים או רק המחשב שלי": `true` רק המחשב שלי, `null` בלי תשובה.
   Future<bool?> askPersonalScope();
 
+  /// האזהרה של "רק המחשב שלי" כשבכונן ספרייה מלאה — כמו בהגדרות.
+  Future<bool> confirmPersonalMode();
+
   Future<void> uploadReports({
     required bool Function() isCancelled,
     required void Function(bool active) onActiveChanged,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:error_reports_manager/error_reports_manager.dart';
@@ -199,47 +200,134 @@ void main() {
     LibraryStateStore store(AppSession s) =>
         LibraryStateStore.inDir(s.stateFilesDir);
 
-    test('מצב אישי ואף מחשב לא נרשם — המחשב הזה נרשם, והבית אומר זאת',
+    const pending = AppSettings(
+      autoCheckUpdates: false,
+      personalUpdateMode: true,
+      personalModeAsked: true,
+      personalAutoRegisterPending: true,
+    );
+
+    test('ממתין לרישום — המחשב הלא מחובר הראשון עם אוצריא נרשם, פעם אחת',
+        () async {
+      await settings.update(pending);
+      final s = await withLibrary(version: 140);
+      await s.registerPendingMachine();
+      await settings.pending;
+      expect(await store(s).lowestKnownDbVersion(), 140);
+      expect(await store(s).hasOwnKnownDbVersion(), isTrue);
+      expect(s.preparedForThisMachine, isTrue);
+      expect(homeViewModelOf(s).personalPreparedHere, isTrue);
+      expect(settings.settings.personalAutoRegisterPending, isFalse);
+    });
+
+    test('בלי הדגל — בדיקה ועלייה אינן רושמות (גם אחרי שהרשומות פגו)',
         () async {
       await settings.update(
         const AppSettings(autoCheckUpdates: false, personalUpdateMode: true),
       );
       final s = await withLibrary(version: 140);
-      await s.registerIfUnclaimed();
-      expect(await store(s).lowestKnownDbVersion(), 140);
-      expect(await store(s).hasOwnKnownDbVersion(), isTrue);
-      expect(s.preparedForThisMachine, isTrue);
-      expect(homeViewModelOf(s).personalPreparedHere, isTrue);
-    });
-
-    test('מחשב אחר כבר נרשם — אין רישום אוטומטי', () async {
-      await settings.update(
-        const AppSettings(autoCheckUpdates: false, personalUpdateMode: true),
-      );
-      final s = await withLibrary(version: 140);
-      await store(s).recordKnownDbVersion('OTHER|me', 145);
-      await s.registerIfUnclaimed();
-      expect(await store(s).hasOwnKnownDbVersion(), isFalse);
-      expect(await store(s).lowestKnownDbVersion(), 145);
+      await s.registerPendingMachine();
+      await s.library.checkForUpdate();
+      expect(await store(s).lowestKnownDbVersion(), isNull);
       expect(s.preparedForThisMachine, isFalse);
     });
 
-    test('מחשבים מרובים — אין רישום אוטומטי', () async {
+    test('מחשב מחובר אינו נרשם מעצמו, והדגל נשאר', () async {
+      await settings.update(pending);
       final s = await withLibrary(version: 140);
-      await s.registerIfUnclaimed();
+      s.library.onlineCheckedAt = DateTime.now();
+      await s.registerPendingMachine();
       expect(await store(s).lowestKnownDbVersion(), isNull);
+      expect(settings.settings.personalAutoRegisterPending, isTrue);
+      expect(homeViewModelOf(s).personalPending, isTrue);
     });
 
-    test('"רק המחשב שלי" במחשב שאוצריא מותקנת בו רושם אותו מיד', () async {
+    test('מחשב אחר כבר נרשם — אין רישום, והדגל נמחק', () async {
+      await settings.update(pending);
+      final s = await withLibrary(version: 140);
+      await store(s).recordKnownDbVersion('OTHER|me', 145);
+      await s.registerPendingMachine();
+      await settings.pending;
+      expect(await store(s).hasOwnKnownDbVersion(), isFalse);
+      expect(settings.settings.personalAutoRegisterPending, isFalse);
+    });
+
+    test('הסרת המחשב האחרון אינה רושמת אותו מחדש', () async {
+      await settings.update(pending);
+      final s = await withLibrary(version: 140);
+      s.library.personalUpdateMode = true;
+      await s.registerPendingMachine();
+      final key = await LibraryStateStore.currentMachineKey();
+      await s.forgetRegisteredMachine(key);
+      await settings.pending;
+      expect(await store(s).lowestKnownDbVersion(), isNull);
+
+      await s.registerPendingMachine();
+      expect(await store(s).lowestKnownDbVersion(), isNull);
+      expect(settings.settings.personalAutoRegisterPending, isFalse);
+    });
+
+    test('"רק המחשב שלי" במחשב לא מחובר עם אוצריא — נרשם מיד', () async {
       final s = await withLibrary(version: 141);
       await s.choosePersonalScope(personal: true);
       expect(settings.settings.personalUpdateMode, isTrue);
+      expect(settings.settings.personalAutoRegisterPending, isFalse);
       expect(await store(s).lowestKnownDbVersion(), 141);
       expect(s.preparedForThisMachine, isTrue);
     });
 
-    test('הסרת מחשב מזיזה את גרסת ההתחלה', () async {
+    test('"רק המחשב שלי" במחשב מחובר — לא נרשם, וממתין למחשב אחר', () async {
+      final s = await withLibrary(version: 141);
+      s.library.onlineCheckedAt = DateTime.now();
+      await s.choosePersonalScope(personal: true);
+      expect(await store(s).lowestKnownDbVersion(), isNull);
+      expect(settings.settings.personalAutoRegisterPending, isTrue);
+      expect(s.preparedForThisMachine, isFalse);
+    });
+
+    test('"רק המחשב שלי" בשאלה, כשבכונן ספרייה מלאה — קודם האזהרה', () async {
       final s = session();
+      final full = File(
+        p.join(s.library.mirrorDir, 'assets', 'v8-1', 'seforim.db.zst'),
+      )
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(List.filled(64, 1));
+      File(p.join(s.library.mirrorDir, 'releases.json')).writeAsStringSync(
+        jsonEncode({
+          'releases': [
+            {
+              'tag': 'v8-1',
+              'assets': [
+                {
+                  'name': 'seforim.db.zst',
+                  'downloadUrl': 'assets/v8-1/seforim.db.zst',
+                  'size': full.lengthSync(),
+                },
+              ],
+            },
+          ],
+        }),
+      );
+      prompts.personalModeConfirm = false;
+      await s.choosePersonalScope(personal: true, fromQuestion: true);
+      expect(prompts.personalModeConfirms, 1);
+      expect(settings.settings.personalModeAsked, isFalse);
+
+      prompts.personalModeConfirm = true;
+      await s.choosePersonalScope(personal: true, fromQuestion: true);
+      expect(settings.settings.personalUpdateMode, isTrue);
+
+      // בהגדרות האזהרה כבר נשאלה — אין שנייה.
+      await s.choosePersonalScope(personal: true);
+      expect(prompts.personalModeConfirms, 2);
+    });
+
+    test('הסרת מחשב מזיזה את גרסת ההתחלה', () async {
+      await settings.update(
+        const AppSettings(autoCheckUpdates: false, personalUpdateMode: true),
+      );
+      final s = session();
+      s.library.personalUpdateMode = true;
       await store(s).recordKnownDbVersion('A|me', 140, name: 'A');
       await store(s).recordKnownDbVersion('B|me', 145, name: 'B');
       await s.library.refreshRegisteredMachines();
@@ -1443,6 +1531,14 @@ class _FakePrompts implements SessionPrompts {
 
   int personalAsks = 0;
   bool? personalAnswer;
+  int personalModeConfirms = 0;
+  bool personalModeConfirm = true;
+
+  @override
+  Future<bool> confirmPersonalMode() async {
+    personalModeConfirms++;
+    return personalModeConfirm;
+  }
 
   @override
   Future<bool?> askPersonalScope() async {

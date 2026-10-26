@@ -748,12 +748,12 @@ post 33695). Four things hold it together:
   serve a machine that has no Otzaria, and `fullDownloadFallback` is `null`. The
   first-run question (§5.9) or Settings sets it; `personalModeAsked` travels with
   the drive, and a drive already in the mode counts as answered.
-- **The version is never read by a routine check.** `captureLocalDbVersion()`
-  runs on a click, on the answer "only my computer" with Otzaria installed here,
-  or — only while no machine is registered — on the first machine with Otzaria
-  that runs the tool (`AppSession.registerIfUnclaimed`, maintainer 2026-10-26: the
-  answer is often given on the online PC). Otherwise the **online** machine's
-  own newer Otzaria would aim the download at v22 while the target sat at v20.
+- **A routine check never records the version.** `captureLocalDbVersion()` runs
+  on a click, on "only my computer" answered on a not-connected machine with
+  Otzaria, or once at startup via the drive's one-shot `personalAutoRegisterPending`
+  (`AppSession.registerPendingMachine`: not connected, Otzaria installed, nobody
+  registered; cleared by it or by "remove"). Else the **online** machine's newer
+  Otzaria would aim the download at v22 while the target sat at v20.
 - **One record per machine, and the lowest wins**
   (`LibraryStateStore.knownDbVersions`, keyed by `currentMachineKey()`). Someone who
   clicks on two machines gets a download serving both; `applyUpdate` raises that
@@ -798,9 +798,9 @@ chain, every step of it**, instead of the per-edge verdict a mirror hands an unk
 machine; when it loses, the full DB is downloaded and the patches dropped. Hence a
 release shipping **only** a full DB is no longer invisible to personal mode (it used
 to be filtered out while the mode reported "up to date"), and the "turn personal
-update off and download again" message now fires only at a real dead end. The
-home's size in this mode comes only from that decision
-(`probeMirrorDownloadBytes`), or no number is shown.
+update off and download again" message now fires only at a real dead end. Its
+home bound (`personalDownloadBytesBound`) gives a number only when names alone
+prove which way it goes.
 
 **Only the patches are per-release; `seforim.db.zst` is downloaded once**, from the
 highest version carrying one — the only full-DB asset `OfflineLibraryUpdateDiscovery` ever
@@ -2125,19 +2125,13 @@ advanced" (`OtzariaAdvancedPage`: reinstall and install folder act on this machi
 but not its channel change (`_setChannel`). Its tile and Settings link both `select`
 it, never stacking it on Settings. Details: `launcher_app/README.md`.
 
-**No dialog at startup except the crash prompt — and one exception.** The
-"several computers or only mine" question (§5.4) pops once per drive, after the
-first frame and queued behind the crash prompt in `DialogQueue`; it is skipped on a
-read-only drive or when safer mode is locked, and Esc asks again next launch
-(maintainer decision, 2026-10-26: a home row went unseen). Everything else is a
-row on the home page: the reports explainer, legacy report queues, the skipped
-auto-install, new plugins and updates, pending custom apps (marked seen only while
-their page is shown — `TickerMode`), a newer launcher ("עדכון זמין" in the status
-bar, also when only on the drive), "restart as administrator" and reports in
-Otzaria. Only the crash prompt stays a `DialogQueue` dialog; other dialogs answer a
-click just made (smart-search consent asks on "update this computer", §5.4, never on
-launch). Collecting reports has none: the disclosure sits above "Collect to
-the drive".
+**At startup only two dialogs: the crash prompt and, once per drive, the
+"several computers or only mine" question** (§5.4; maintainer, 2026-10-26: a home
+row went unseen). The question waits for the crash prompt in `DialogQueue` and for
+the startup check (the welcome view is already up); never on a read-only drive or
+with safer mode locked; Esc asks again next launch. Everything else that used to pop
+up is a home row (reports, plugins, custom apps, launcher, elevation); other dialogs
+answer a click (smart-search consent on "update this computer", §5.4).
 
 **"Check now" is `checkAll` then `checkOnline`, and `checkAll` can install.** With
 auto-install on, `_autoInstallIfEnabled` starts an install without a dialog — so the

@@ -351,6 +351,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
   Future<bool?> askPersonalScope() => showPersonalScopeDialog(context);
 
   @override
+  Future<bool> confirmPersonalMode() => confirmPersonalModeDialog(context);
+
+  @override
   Future<void> uploadReports({
     required bool Function() isCancelled,
     required void Function(bool active) onActiveChanged,
@@ -720,6 +723,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onRemoveMachine: s.longTaskRunning
               ? null
               : (key) => unawaited(s.forgetRegisteredMachine(key)),
+          onRegisterHere: s.longTaskRunning || s.otzaria.currentVersion == null
+              ? null
+              : () => unawaited(s.registerThisMachine()),
         ),
       ShellSection.help => HelpPage(
           faq: s.faq,

@@ -98,6 +98,10 @@ class AppSettings {
   /// הכונן, ולכן היא נשאלת פעם אחת לכונן ולא לכל מחשב.
   final bool personalModeAsked;
 
+  /// "רק המחשב שלי" נבחר במחשב שלא נרשם: המחשב הלא מחובר הראשון שבו אוצריא
+  /// מותקנת יירשם. חד-פעמי — נמחק ברישום הזה או בהסרה ידנית.
+  final bool personalAutoRegisterPending;
+
   final SemanticDownloadPreference semanticDownload;
 
   // ── התקנה אוטומטית מהתיקייה המקומית ─────────────────────────────────────
@@ -144,6 +148,7 @@ class AppSettings {
     this.syncPlugins = true,
     this.personalUpdateMode = false,
     this.personalModeAsked = false,
+    this.personalAutoRegisterPending = false,
     this.semanticDownload = SemanticDownloadPreference.ask,
     this.autoInstall = false,
     this.preferAppPrerelease = false,
@@ -183,6 +188,7 @@ class AppSettings {
     bool? syncPlugins,
     bool? personalUpdateMode,
     bool? personalModeAsked,
+    bool? personalAutoRegisterPending,
     SemanticDownloadPreference? semanticDownload,
     bool? autoInstall,
     bool? preferAppPrerelease,
@@ -200,6 +206,8 @@ class AppSettings {
       syncPlugins: syncPlugins ?? this.syncPlugins,
       personalUpdateMode: personalUpdateMode ?? this.personalUpdateMode,
       personalModeAsked: personalModeAsked ?? this.personalModeAsked,
+      personalAutoRegisterPending:
+          personalAutoRegisterPending ?? this.personalAutoRegisterPending,
       semanticDownload: semanticDownload ?? this.semanticDownload,
       autoInstall: autoInstall ?? this.autoInstall,
       preferAppPrerelease: preferAppPrerelease ?? this.preferAppPrerelease,
@@ -227,6 +235,7 @@ class AppSettings {
           'plugins': syncPlugins,
           'personalMode': personalUpdateMode,
           'personalAsked': personalModeAsked,
+          'personalAutoRegister': personalAutoRegisterPending,
           'semantic': semanticDownload.code,
         },
         'ui': {
@@ -314,6 +323,7 @@ class AppSettings {
       personalUpdateMode: personalMode,
       // כונן שכבר הפעיל עדכון אישי ענה על השאלה, גם לפני שהיא הייתה.
       personalModeAsked: flag(sync, 'personalAsked', personalMode),
+      personalAutoRegisterPending: flag(sync, 'personalAutoRegister', false),
       semanticDownload: SemanticDownloadPreference.fromCode(sync['semantic']),
       autoInstall: merged(
         'install',

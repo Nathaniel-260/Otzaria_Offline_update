@@ -105,6 +105,9 @@ abstract final class ShellKeys {
   static const settingsPersonalMultiple =
       ValueKey('settings.personal.multiple');
   static const settingsPersonalMine = ValueKey('settings.personal.mine');
+  static const settingsPersonalRegisterHere =
+      ValueKey('settings.personal.registerHere');
+  static const personalPendingNote = ValueKey('home.personal.pending');
 
   /// "הסרה" של מחשב שנרשם, לפי המפתח שלו בקובץ ה-state.
   static ValueKey<String> personalMachineRemove(String machineKey) =>

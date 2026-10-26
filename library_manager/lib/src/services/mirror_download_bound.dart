@@ -189,3 +189,144 @@ Map<int, int> _maxReach(List<_Edge> edges) {
   }
   return reach;
 }
+
+/// חסם עליון ל-`export(fromVersion:)` (מצב אישי) משמות וגדלים, בלי רשת ובלי
+/// כתיבה. הייצוא בוחר בין קובצי העדכון מ-[fromVersion] לבין המסד המלא בלבד;
+/// `null` כשאי אפשר לדעת מראש לאיזה מהם — אחרת היה מוצג 90MB ויורד 1.5GB.
+int? personalDownloadBytesBound({
+  required List<LibraryRelease> eligible,
+  required List<LibraryRelease> relevant,
+  required int fromVersion,
+  required int supportedDbSchemaVersion,
+  required ApplyTimeEstimate applyTime,
+  required bool Function(LibraryRelease release, ReleaseAsset asset) complete,
+  required DeltaManifest? Function(LibraryRelease release, ReleaseAsset asset)
+  heldManifest,
+}) {
+  int missing(LibraryRelease release, ReleaseAsset asset) =>
+      complete(release, asset) || asset.size <= 0 ? 0 : asset.size;
+  ReleaseAsset? fullOf(LibraryRelease release) =>
+      release.fullDbAssetFor(maxSchemaVersion: supportedDbSchemaVersion);
+
+  var latest = 0;
+  for (final release in eligible) {
+    final version = LibraryUpdateDiscovery.releaseVersionOf(release);
+    if (version > latest) latest = version;
+  }
+  LibraryRelease? carrier;
+  var carrierVersion = -1;
+  for (final release in eligible) {
+    if (fullOf(release) == null) continue;
+    final version = LibraryUpdateDiscovery.releaseVersionOf(release);
+    if (version > carrierVersion) {
+      (carrier, carrierVersion) = (release, version);
+    }
+  }
+  // כמו `_newestFullDbCarrier` של המייצא: רק מסד מלא שמגיע לבדו ל-latest.
+  if (carrierVersion < latest) carrier = null;
+  final full = carrier == null ? null : fullOf(carrier)!;
+  if (full != null && (full.isSplitFullDbManifest || full.size <= 0)) {
+    return null;
+  }
+  final fullDownload = full == null ? 0 : missing(carrier!, full);
+
+  var patches = 0;
+  for (final release in relevant) {
+    for (final asset in release.assets) {
+      if (asset.name.startsWith('patch-')) patches += missing(release, asset);
+    }
+  }
+  if (relevant.isEmpty) {
+    return full == null || latest <= fromVersion ? 0 : fullDownload;
+  }
+  if (full == null) return patches;
+
+  // קשת אפשרית — כל מה שעשוי להיבנות; ודאית — שקבציה ידועים בשמם.
+  final possible = <({int from, int to, int bytes})>[];
+  final sure = <({int from, int to, int bytes})>[];
+  for (final release in relevant) {
+    for (final manifestAsset in release.deltaManifestAssets) {
+      final manifest = heldManifest(release, manifestAsset);
+      if (manifest != null) {
+        if (!_appliable(manifest)) continue;
+        final names = {for (final f in manifest.patchFiles) f.file};
+        final files = release.assets.where((a) => names.contains(a.name));
+        if (files.length < names.length) continue;
+        final edge = (
+          from: manifest.fromVersion,
+          to: manifest.toVersion,
+          bytes: [manifestAsset, ...files].fold(0, (n, a) => n + a.size),
+        );
+        possible.add(edge);
+        sure.add(edge);
+        continue;
+      }
+      final match = _edgeName.firstMatch(manifestAsset.name);
+      if (match == null) return null;
+      final base = manifestAsset.name.substring(
+        0,
+        manifestAsset.name.length - '.manifest.json'.length,
+      );
+      final files = release.assets
+          .where(
+            (a) =>
+                !a.isDeltaManifest &&
+                (a.name == base || a.name.startsWith('$base.')),
+          )
+          .toList();
+      final edge = (
+        from: int.parse(match.group(1)!),
+        to: int.parse(match.group(2)!),
+        bytes: [manifestAsset, ...files].fold(0, (n, a) => n + a.size),
+      );
+      possible.add(edge);
+      if (files.length == 1 && files.single.name == base) sure.add(edge);
+    }
+  }
+
+  // אין שרשרת גם בהנחה שכל קשת תקפה — ודאי שיורד המסד המלא.
+  if (_cheapest(possible, fromVersion, latest, applyTime) == null) {
+    return fullDownload;
+  }
+  final route = _cheapest(sure, fromVersion, latest, applyTime);
+  if (route == null) return null;
+  final fullWins = applyTime.isOutOfRange(
+    route.seconds,
+    applyTime.fullRouteSeconds(full.size),
+    savedDownloadBytes: full.size - route.bytes,
+  );
+  if (!fullWins) return patches;
+  // קשת שאינה ודאית עשויה לתת שרשרת זולה יותר שבה קובצי העדכון גוברים.
+  return possible.length == sure.length ? fullDownload : null;
+}
+
+/// כמו `_cheapestRoute` של המייצא: זמן ההחלה של השרשרת הזולה וגודלה.
+({double seconds, int bytes})? _cheapest(
+  List<({int from, int to, int bytes})> edges,
+  int from,
+  int to,
+  ApplyTimeEstimate applyTime,
+) {
+  final best = <int, ({double seconds, int bytes})>{
+    from: (seconds: 0, bytes: 0),
+  };
+  final starts = edges.map((e) => e.from).toSet().toList()..sort();
+  for (final version in starts) {
+    final base = best[version];
+    if (base == null) continue;
+    for (final edge in edges) {
+      if (edge.from != version || edge.to <= edge.from) continue;
+      final cost = base.seconds + applyTime.intermediateStepSeconds(edge.bytes);
+      final known = best[edge.to];
+      if (known == null || cost < known.seconds) {
+        best[edge.to] = (seconds: cost, bytes: base.bytes + edge.bytes);
+      }
+    }
+  }
+  final total = best[to];
+  if (total == null || to == from) return total;
+  return (
+    seconds: total.seconds + applyTime.chainStartExtraSeconds,
+    bytes: total.bytes,
+  );
+}

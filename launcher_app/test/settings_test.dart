@@ -84,6 +84,7 @@ void main() {
         'plugins',
         'personalMode',
         'personalAsked',
+        'personalAutoRegister',
         'semantic',
         'ui',
         'language',

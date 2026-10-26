@@ -735,27 +735,31 @@ class LibraryManager {
   }
 
   /// חסם עליון ל-[downloadToMirror] (בלי חיפוש חכם) מההצצות האחרונות, בלי רשת
-  /// — ראו [mirrorDownloadBytesBound]. `null` אחרי הצצה שנכשלה, במצב אישי,
-  /// במסד מפוצל, וכשמסד מלא ישן בכונן עשוי להיבחר במקום החדש.
+  /// ובלי כתיבה — ראו [mirrorDownloadBytesBound] ו-[personalDownloadBytesBound].
+  /// `null` אחרי הצצה שנכשלה, במסד מפוצל, כשמסד מלא ישן בכונן עשוי להיבחר,
+  /// ובמצב אישי כשאי אפשר לדעת מראש אם הייצוא יבחר בספרייה המלאה.
   Future<int?> peekedDownloadBytesBound() async {
     final releases = _peekedReleases;
     final companions = _companionsMirror.peekedPendingBytes;
-    if (releases == null || companions == null || personalUpdateMode) {
-      return null;
-    }
+    if (releases == null || companions == null) return null;
+    final fromVersion = personalUpdateMode
+        ? await recordedPersonalDbVersion()
+        : null;
     final exporter = LibraryMirrorExporter(
       supportedDbSchemaVersion: kSupportedDbSchemaVersion,
       client: _cloudClient,
     );
+    final List<LibraryRelease> eligible;
     final List<LibraryRelease> relevant;
     final ApplyTimeEstimate applyTime;
     try {
-      relevant = exporter.recentReleases(
-        LibraryUpdateDiscovery.eligibleReleases(
-          releases,
-          allowPrerelease: allowPrerelease,
-        ),
+      eligible = LibraryUpdateDiscovery.eligibleReleases(
+        releases,
+        allowPrerelease: allowPrerelease,
       );
+      relevant = fromVersion == null
+          ? exporter.recentReleases(eligible)
+          : exporter.personalReleases(eligible, fromVersion);
       applyTime = exporter.applyTime;
     } finally {
       exporter.dispose();
@@ -763,7 +767,17 @@ class LibraryManager {
 
     final held = <(String, String)>{};
     final manifests = <(String, String), DeltaManifest>{};
-    for (final release in relevant) {
+    // במצב אישי גם נשא המסד המלא, שאינו בין ה-releases של קובצי העדכון.
+    final scanned = {
+      ...relevant,
+      if (fromVersion != null)
+        ...eligible.where(
+          (r) =>
+              r.fullDbAssetFor(maxSchemaVersion: kSupportedDbSchemaVersion) !=
+              null,
+        ),
+    };
+    for (final release in scanned) {
       for (final asset in release.assets) {
         // מסד מפוצל נשמר בשם הארכיון המורכב, וגודלו רק במניפסט שברשת: קיומו
         // מספיק כדי שהמייצא עשוי לבחור בו.
@@ -791,6 +805,18 @@ class LibraryManager {
         }
       }
     }
+    if (fromVersion != null) {
+      final bytes = personalDownloadBytesBound(
+        eligible: eligible,
+        relevant: relevant,
+        fromVersion: fromVersion,
+        supportedDbSchemaVersion: kSupportedDbSchemaVersion,
+        applyTime: applyTime,
+        complete: (release, asset) => held.contains((release.tag, asset.name)),
+        heldManifest: (release, asset) => manifests[(release.tag, asset.name)],
+      );
+      return bytes == null ? null : bytes + companions;
+    }
     final bytes = mirrorDownloadBytesBound(
       relevant: relevant,
       supportedDbSchemaVersion: kSupportedDbSchemaVersion,
@@ -799,6 +825,29 @@ class LibraryManager {
       heldManifest: (release, asset) => manifests[(release.tag, asset.name)],
     );
     return bytes == null ? null : bytes + companions;
+  }
+
+  /// בכונן יש ספרייה מלאה — שהייצוא האישי הבא ימחק. קריאה בלבד.
+  Future<bool> mirrorHoldsFullDb() async {
+    try {
+      if (!await hasMirror) return false;
+      final releases = await LocalMirrorLibraryReleaseClient(
+        mirrorDir: mirrorDir,
+      ).fetchReleases();
+      for (final release in releases) {
+        final full = release.fullDbAssetFor(
+          maxSchemaVersion: kSupportedDbSchemaVersion,
+        );
+        if (full == null) continue;
+        final name = full.isSplitFullDbManifest
+            ? full.splitArchiveName!
+            : full.name;
+        if (await File(_mirrorAssetPath(release.tag, name)).exists()) {
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
   }
 
   /// הנתיב שבו [LibraryMirrorExporter] שומר נכס — כמו `_safeDirName` שלו.

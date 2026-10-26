@@ -822,6 +822,7 @@ abstract class LibraryScreenStrings {
 
   /// הערה שקטה בבית אחרי שהמחשב הזה נרשם.
   String get personalPreparedHere;
+  String get personalPendingNote;
   String get personalChipElsewhere;
   String get personalChange;
 
@@ -909,6 +910,13 @@ abstract class SettingsScreenStrings {
   String personalMachineFloor(String version);
   String get personalMachineRemove;
   String get personalMachinesNone;
+  String personalMachineName(String machineName);
+  String personalMachineThisSubtitle(String machineName, String version);
+  String get personalMachineNotHere;
+  String get personalMachinesReadOnly;
+  String get personalRemoveTitle;
+  String get personalRemoveBody;
+  String get personalRemoveThisBody;
 
   // ── מתקדם ──
   String get faqEditTitle;

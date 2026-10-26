@@ -445,6 +445,35 @@ void main() {
       });
     }
 
+    test('במצב אישי הבדיקה ברשת אינה מריצה את הייצוא — רק החסם', () async {
+      controller.dispose();
+      final manager = _DownloadManager(tempDir.path, const {})..bound = 77;
+      controller = LibraryModuleController(
+        dataDir: tempDir.path,
+        manager: manager,
+      )..personalUpdateMode = true;
+
+      await controller.checkOnline();
+      controller.personalUpdateMode = false;
+      controller.personalUpdateMode = true;
+      await Future<void>.delayed(Duration.zero);
+
+      expect(manager.probes, 0);
+      expect(controller.onlineDownloadBytesBound, 77);
+    });
+
+    test('חישוב שמסתיים אחרי dispose אינו נוגע בקונטרולר', () async {
+      final manager = _DownloadManager(tempDir.path, const {});
+      final c = LibraryModuleController(
+        dataDir: tempDir.path,
+        manager: manager,
+      );
+      await c.checkOnline();
+      c.personalUpdateMode = true;
+      c.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+
     test('מראה פגומה שתוקנה במצב אישי נאמרת בהערת ההורדה', () async {
       controller.dispose();
       controller = LibraryModuleController(
@@ -1469,6 +1498,16 @@ class _DownloadManager extends LibraryManager {
   Future<int?> peekedDownloadBytesBound() async {
     boundAsked++;
     return bound;
+  }
+
+  var probes = 0;
+
+  @override
+  Future<int?> probeMirrorDownloadBytes({
+    Duration timeout = const Duration(seconds: 45),
+  }) async {
+    probes++;
+    return 1;
   }
 
   @override

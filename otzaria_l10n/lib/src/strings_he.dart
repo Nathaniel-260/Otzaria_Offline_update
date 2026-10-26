@@ -1520,6 +1520,9 @@ class _LibraryScreen extends LibraryScreenStrings {
   @override
   String get personalPreparedHere => 'הכונן הוכן למחשב הזה';
   @override
+  String get personalPendingNote =>
+      'המחשב שבו אוצריא מותקנת ייבחר כשתפעיל את הכלי בו.';
+  @override
   String get personalChipElsewhere => 'הוכן למחשב אחר';
   @override
   String get personalChange => 'שינוי';
@@ -1654,7 +1657,25 @@ class _Settings extends SettingsScreenStrings {
   String get personalMachineRemove => 'הסרה';
   @override
   String get personalMachinesNone =>
-      'אף מחשב עוד לא נרשם. המחשב הראשון שבו מותקנת אוצריא יירשם כשהכלי ייפתח בו.';
+      'אף מחשב עוד לא נרשם. המחשב שבו אוצריא מותקנת ייבחר כשתפעיל את הכלי בו.';
+  @override
+  String personalMachineName(String machineName) => _ltr(machineName);
+  @override
+  String personalMachineThisSubtitle(String machineName, String version) =>
+      '${_ltr(machineName)} · גרסה ${_ltr(version)}';
+  @override
+  String get personalMachineNotHere => 'המחשב הזה לא נרשם';
+  @override
+  String get personalMachinesReadOnly =>
+      'הכונן מוגן מפני כתיבה, ולכן אי אפשר לשנות בו את רשימת המחשבים.';
+  @override
+  String get personalRemoveTitle => 'להסיר את המחשב מהרשימה?';
+  @override
+  String get personalRemoveBody =>
+      'ההורדה הבאה כבר לא תביא את מה שחסר לו. אפשר לרשום אותו שוב בכל עת.';
+  @override
+  String get personalRemoveThisBody =>
+      'המחשב הזה לא יתעדכן עוד מהכונן, עד שיירשם שוב.';
 
   @override
   String get faqEditTitle => 'עריכת השאלות הנפוצות';

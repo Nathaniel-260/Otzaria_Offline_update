@@ -336,21 +336,98 @@ void main() {
       expect(await peekAndBound(library), 2 + 100 + 2 + 50 + 450);
     });
 
-    test('no bound without a successful peek, in personal mode, or for a '
-        'split full DB', () async {
-      expect(await manager().peekedDownloadBytesBound(), isNull);
+    test(
+      'no bound without a successful peek, or for a split full DB',
+      () async {
+        expect(await manager().peekedDownloadBytesBound(), isNull);
 
-      companionsDown = true;
-      expect(await peekAndBound(manager()), isNull);
-      companionsDown = false;
+        companionsDown = true;
+        expect(await peekAndBound(manager()), isNull);
+        companionsDown = false;
 
-      expect(await peekAndBound(manager(personal: true)), isNull);
+        // מצב אישי בלי מחשב רשום מוריד כמו הרגיל — אותו חסם.
+        expect(
+          await peekAndBound(manager(personal: true)),
+          2 + 100 + 1000 + 2 + 50 + 450,
+        );
 
-      releases.insert(
-        0,
-        release('v9-20261011', {'seforim.db.zst.manifest.json': 3}),
+        releases.insert(
+          0,
+          release('v9-20261011', {'seforim.db.zst.manifest.json': 3}),
+        );
+        expect(await peekAndBound(manager()), isNull);
+      },
+    );
+
+    group('personal mode — the export choice, or no number', () {
+      Future<void> registered(int version) => LibraryStateStore(
+        p.join(temporary.path, 'drive', LibraryStateStore.fileName),
+      ).recordKnownDbVersion('OFFLINE|me', version);
+
+      test(
+        'the chain from the registered version, without the full DB',
+        () async {
+          await registered(7);
+          expect(await peekAndBound(manager(personal: true)), 2 + 100 + 450);
+          await registered(6);
+          expect(
+            await peekAndBound(manager(personal: true)),
+            2 + 100 + 2 + 50 + 450,
+          );
+        },
       );
-      expect(await peekAndBound(manager()), isNull);
+
+      test('no chain from the registered version — the full DB', () async {
+        await registered(5);
+        expect(await peekAndBound(manager(personal: true)), 1000 + 450);
+      });
+
+      test('a chain far slower than the full DB — the full DB', () async {
+        releases[0]['assets'] = [
+          for (final asset in releases[0]['assets'] as List)
+            if ((asset as Map)['name'] == 'patch-v7-v8.db.zst')
+              {...asset, 'size': 900 << 20}
+            else
+              asset,
+        ];
+        await registered(7);
+        expect(await peekAndBound(manager(personal: true)), 1000 + 450);
+      });
+
+      test('patch files not known by name — no number', () async {
+        releases[0]['assets'] = [
+          for (final asset in releases[0]['assets'] as List)
+            if ((asset as Map)['name'] == 'patch-v7-v8.db.zst')
+              {...asset, 'name': 'patch-v7-v8.db.zst.part1'}
+            else
+              asset,
+        ];
+        await registered(7);
+        expect(await peekAndBound(manager(personal: true)), isNull);
+      });
+
+      test(
+        'nothing newer than the registered version — only companions',
+        () async {
+          await registered(8);
+          expect(await peekAndBound(manager(personal: true)), 450);
+        },
+      );
+
+      test('computed without network or writes to the drive', () async {
+        await registered(7);
+        final library = manager(personal: true);
+        await peekAndBound(library);
+        final drive = Directory(p.join(temporary.path, 'drive'));
+        final before = drive.listSync(recursive: true).length;
+        final again = await http.runWithClient(
+          library.peekedDownloadBytesBound,
+          () => MockClient((request) async => fail('network: ${request.url}')),
+        );
+        expect(again, 2 + 100 + 450);
+        expect(drive.listSync(recursive: true).length, before);
+        expect(Directory(library.mirrorDir).existsSync(), isFalse);
+      });
     });
 
     const mib = 1 << 20;

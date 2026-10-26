@@ -93,6 +93,7 @@ class LibraryModuleController extends ChangeNotifier
     if (_manager.personalUpdateMode == value) return;
     _manager.personalUpdateMode = value;
     _refreshDownloadSize();
+    if (!value) registeredMachines = const [];
     if (status == LibraryModuleStatus.idle || _applying) return;
     unawaited(checkForUpdate());
   }
@@ -313,16 +314,27 @@ class LibraryModuleController extends ChangeNotifier
   /// המחשבים שנרשמו לעדכון אישי, מהגרסה הנמוכה. נקרא בכל בדיקה.
   List<RegisteredMachine> registeredMachines = const [];
 
-  /// גם בלי בדיקה: ההגדרות מציגות את הרשימה כשהבדיקה בעלייה כבויה.
+  /// גם בלי בדיקה: ההגדרות מציגות את הרשימה כשהבדיקה בעלייה כבויה. רק במצב
+  /// אישי — זיהוי המחשב מריץ תהליך ב-macOS, וכבוי אין למי להציג את הרשימה.
   Future<void> refreshRegisteredMachines() async {
-    try {
-      registeredMachines = await _manager.registeredMachines();
-    } catch (e) {
-      AppLogger.instance.info('קריאת המחשבים שנרשמו נכשלה: $e');
-      return;
-    }
+    registeredMachines = await _loadRegisteredMachines();
     if (!isDisposed) notifyListeners();
   }
+
+  Future<List<RegisteredMachine>> _loadRegisteredMachines() async {
+    if (!personalUpdateMode) return const [];
+    try {
+      return await _manager.registeredMachines();
+    } catch (e) {
+      if (!isDisposed) {
+        AppLogger.maybeInstance?.info('קריאת המחשבים שנרשמו נכשלה: $e');
+      }
+      return const [];
+    }
+  }
+
+  /// בכונן ספרייה מלאה שתימחק בהורדה הבאה במצב אישי — לאזהרה שלפני הבחירה.
+  Future<bool> mirrorHoldsFullDb() => _manager.mirrorHoldsFullDb();
 
   /// אף מחשב לא נרשם — נקרא מקובץ ה-state, לא מהבדיקה האחרונה.
   Future<bool> hasNoRegisteredMachine() async =>
@@ -341,22 +353,20 @@ class LibraryModuleController extends ChangeNotifier
 
   int _sizeRun = 0;
 
-  /// גודל ההורדה לפי המצב והרישום הנוכחיים. במצב אישי רק המייצא עצמו יודע
-  /// כמה יירד (הוא עשוי לבחור בספרייה המלאה), ולכן בלי תשובה ממנו אין מספר.
+  /// מחשב את החסם מחדש אחרי שינוי מצב או רישום — מההצצה האחרונה בלבד, בלי
+  /// רשת ובלי כתיבה לכונן (`peekedDownloadBytesBound`).
   void _refreshDownloadSize() {
     final run = ++_sizeRun;
     onlineDownloadBytesBound = null;
     if (onlineCheckedAt == null || onlineLibraryProofError != null) return;
-    if (personalUpdateMode && !hasOnlineLibraryUpdate) return;
-    if (downloadStatus == MirrorDownloadStatus.downloading) return;
     unawaited(() async {
       int? bytes;
       try {
-        bytes = personalUpdateMode
-            ? await _manager.probeMirrorDownloadBytes()
-            : await _manager.peekedDownloadBytesBound();
+        bytes = await _manager.peekedDownloadBytesBound();
       } catch (e) {
-        AppLogger.instance.info('חישוב גודל ההורדה של הספרייה לא הצליח: $e');
+        if (isDisposed) return;
+        AppLogger.maybeInstance
+            ?.info('חישוב גודל ההורדה של הספרייה לא הצליח: $e');
       }
       if (run != _sizeRun || isDisposed) return;
       onlineDownloadBytesBound = bytes;
@@ -606,12 +616,8 @@ class LibraryModuleController extends ChangeNotifier
     semanticChecked = checkedSemantic;
     onlineSemanticBytes = semanticBytes;
     onlineCheckedAt = DateTime.now();
-    if (personalUpdateMode) {
-      _refreshDownloadSize();
-    } else {
-      _sizeRun++;
-      onlineDownloadBytesBound = bound;
-    }
+    _sizeRun++;
+    onlineDownloadBytesBound = bound;
     notifyListeners();
   }
 
@@ -826,7 +832,7 @@ class LibraryModuleController extends ChangeNotifier
     // "אין מסלול" במחשב שאינו אחד מהם אינו תקלה אלא מראה של מישהו אחר.
     personalTargetIsThisMachine =
         !personalUpdateMode || await _manager.isRegisteredForPersonalUpdate();
-    registeredMachines = await _manager.registeredMachines();
+    registeredMachines = await _loadRegisteredMachines();
 
     // **לא `_lastCheck`.** הוא נכתב רק בנתיב ההצלחה, ובמסלולי החריגה הוא
     // מחזיק את התוצאה של הריצה הקודמת — שורת אבחון שקוראת ממנו משקרת.

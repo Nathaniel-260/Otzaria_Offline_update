@@ -1156,6 +1156,12 @@ class _Hero extends StatelessWidget {
           FluentIcons.person_16_regular,
           context.strings.libraryScreen.personalPreparedHere,
         ),
+      if (m.personalPending)
+        _Note(
+          key: ShellKeys.personalPendingNote,
+          FluentIcons.person_16_regular,
+          context.strings.libraryScreen.personalPendingNote,
+        ),
     ];
     if (failedShown && m.failedDownloads != null) return prepared;
     return [

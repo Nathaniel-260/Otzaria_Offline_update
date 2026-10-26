@@ -1572,6 +1572,9 @@ class _LibraryScreen extends LibraryScreenStrings {
   @override
   String get personalPreparedHere => 'The drive is prepared for this computer';
   @override
+  String get personalPendingNote =>
+      'The computer with Otzaria installed is chosen when you run the tool on it.';
+  @override
   String get personalChipElsewhere => 'Prepared for another computer';
   @override
   String get personalChange => 'Change';
@@ -1717,8 +1720,28 @@ class _Settings extends SettingsScreenStrings {
   String get personalMachineRemove => 'Remove';
   @override
   String get personalMachinesNone =>
-      'No computer is registered yet. The first computer with Otzaria '
-      'installed is registered when the tool opens on it.';
+      'No computer is registered yet. The computer with Otzaria installed is '
+      'chosen when you run the tool on it.';
+  @override
+  String personalMachineName(String machineName) => machineName;
+  @override
+  String personalMachineThisSubtitle(String machineName, String version) =>
+      '$machineName · version $version';
+  @override
+  String get personalMachineNotHere => 'This computer is not registered';
+  @override
+  String get personalMachinesReadOnly =>
+      'The drive is write-protected, so its list of computers cannot change.';
+  @override
+  String get personalRemoveTitle => 'Remove this computer from the list?';
+  @override
+  String get personalRemoveBody =>
+      'The next download will no longer bring what it is missing. You can '
+      'register it again at any time.';
+  @override
+  String get personalRemoveThisBody =>
+      'This computer will no longer update from the drive until it is '
+      'registered again.';
 
   @override
   String get faqEditTitle => 'Edit the common questions';

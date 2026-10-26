@@ -135,6 +135,8 @@ const _selectorArgs = {
 };
 const _noHebrewLettersInHebrew = {
   'common.emptyValue',
+  // שם המחשב כפי שהוא, רק מבודד בכיוון.
+  'settings.personalMachineName',
   // יחידות הגודל לטיניות גם בעברית, כמו במוקאפ — רק מבודדות בכיוון.
   'units.kilobytes',
   'units.megabytes',

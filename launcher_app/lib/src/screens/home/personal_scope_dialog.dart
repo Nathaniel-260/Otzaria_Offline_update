@@ -78,3 +78,15 @@ class _PersonalScopeDialogState extends State<_PersonalScopeDialog> {
     );
   }
 }
+
+/// "רק המחשב שלי" כשבכונן ספרייה מלאה: היא תימחק בהורדה הבאה. אזהרה — הביטול
+/// הוא הבחירה הבטוחה. אותו דו-שיח בשאלה של ההפעלה הראשונה ובהגדרות.
+Future<bool> confirmPersonalModeDialog(BuildContext context) {
+  final t = context.strings.settings;
+  return showWarningDialog(
+    context: context,
+    title: t.personalModeDialogTitle,
+    content: t.personalModeDialogContent,
+    confirmText: t.personalModeDialogConfirm,
+  );
+}

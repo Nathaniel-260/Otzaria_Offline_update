@@ -1209,23 +1209,85 @@ void main() {
       expect(chosen, [true]);
 
       await tester.runAsync(
-        () => settings.update(const AppSettings(personalUpdateMode: true)),
+        () => settings.update(
+          const AppSettings(
+            personalUpdateMode: true,
+            languagePreference: AppLanguagePreference.hebrew,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       expect(find.text(t.personalMachineThis), findsOneWidget);
-      expect(find.text('YOSEF-LAPTOP'), findsOneWidget);
+      expect(find.text(t.personalMachineName('YOSEF-LAPTOP')), findsOneWidget);
       expect(
           find.textContaining(t.personalMachineFloor('145')), findsOneWidget);
       final remove = find.byKey(ShellKeys.personalMachineRemove('a|me'));
       await tester.ensureVisible(remove);
       await tester.tap(remove);
+      await tester.pumpAndSettle();
+      // באישור: ביטול אינו מסיר.
+      expect(find.text(t.personalRemoveTitle), findsOneWidget);
+      expect(find.text(t.personalRemoveBody), findsOneWidget);
+      await tester.tap(find.text(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+      expect(removed, isEmpty);
+      await tester.tap(remove);
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text(t.personalMachineRemove),
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(removed, ['a|me']);
+
+      // המחשב הזה — בנוסח משלו.
+      final removeHere = find.byKey(ShellKeys.personalMachineRemove('b|me'));
+      await tester.ensureVisible(removeHere);
+      await tester.tap(removeHere);
+      await tester.pumpAndSettle();
+      expect(find.text(t.personalRemoveThisBody), findsOneWidget);
+      await tester.tap(find.text(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
 
       // חזרה ל"מחשבים מרובים" — בלי אזהרה.
       await tester.tap(find.byKey(ShellKeys.settingsPersonalMultiple));
       await tester.pumpAndSettle();
       expect(find.text(t.personalModeDialogTitle), findsNothing);
       expect(chosen, [true, false]);
+    });
+
+    testWidgets('כונן מוגן — "הסרה" ו"רישום" מושבתים, עם הסבר', (
+      tester,
+    ) async {
+      await tester.runAsync(
+        () => settings.update(const AppSettings(personalUpdateMode: true)),
+      );
+      await pumpScreen(
+        tester,
+        SettingsScreen(
+          controller: settings,
+          onOpenLog: () {},
+          launcherVersion: launcherVersion,
+          readOnly: true,
+          personalMachines: [machine('a|me', 145, name: 'YOSEF-LAPTOP')],
+          onRemoveMachine: (_) {},
+          onRegisterHere: () {},
+        ),
+      );
+      final t = stringsOf().settings;
+      expect(find.text(t.personalMachinesReadOnly), findsOneWidget);
+      final remove = tester.widget<ActionButton>(
+        find.byKey(ShellKeys.personalMachineRemove('a|me')),
+      );
+      expect(remove.onPressed, isNull);
+      final register = tester.widget<ActionButton>(
+        find.byKey(ShellKeys.settingsPersonalRegisterHere),
+      );
+      expect(register.onPressed, isNull);
+      // השם מבודד בכיוון (LTR בתוך עברית).
+      expect(find.text(t.personalMachineName('YOSEF-LAPTOP')), findsOneWidget);
     });
 
     testWidgets('בלי מחשבים רשומים — הסבר, ובלי תפקיד מוזרק נשמרת ההגדרה', (

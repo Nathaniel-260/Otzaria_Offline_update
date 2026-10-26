@@ -210,6 +210,75 @@ void main() {
     expect(maxOpen, 1);
   });
 
+  testWidgets('שאלת "מחשבים מרובים" ממתינה לשאלת הקריסה, ולא נערמת עליה',
+      (tester) async {
+    useViewSize(tester, const Size(1400, 1000));
+    final logs = p.join(tempDir.path, 'logs');
+    Directory(logs).createSync(recursive: true);
+    final start = DateTime.now().subtract(const Duration(hours: 1));
+    File(p.join(logs, UncleanExitDetector.lockFileName)).writeAsStringSync(
+      jsonEncode({
+        'pid': 999999,
+        'version': '0.24',
+        'startedAt': start.toUtc().toIso8601String(),
+        'host': UncleanExitDetector.localHost(),
+      }),
+    );
+    File(p.join(logs, 'launcher.log')).writeAsStringSync(
+      '${start.add(const Duration(minutes: 1)).toIso8601String()} [ERROR] '
+      '${LauncherLogFormat.uncaughtMessage(LauncherLogFormat.zoneError, StateError('x'))}\n',
+    );
+    await tester.runAsync(
+      () => settings.update(
+        settings.settings.copyWith(
+          crashReportMode: AppCrashReportMode.ask,
+          personalModeAsked: false,
+        ),
+      ),
+    );
+    final reports = controller(_CountingService(), logs: logs);
+    var maxOpen = 0;
+    var sawCrash = false;
+    var sawQuestion = false;
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        shell(
+          reports,
+          MemoryNoticesStore(seen: {NoticesSeenStore.errorReportsIntro}),
+          navigator: navigatorKey,
+        ),
+      );
+      for (var i = 0; i < 120 && !sawQuestion; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pump();
+        final open = find.byType(Dialog).evaluate().length;
+        if (open > maxOpen) maxOpen = open;
+        final crashOpen = find.byType(CrashPromptDialog).evaluate().isNotEmpty;
+        final question =
+            find.byKey(ShellKeys.personalAskDialog).evaluate().isNotEmpty;
+        if (crashOpen) {
+          sawCrash = true;
+          expect(question, isFalse);
+          navigatorKey.currentState!.pop();
+        }
+        if (question) {
+          expect(sawCrash, isTrue);
+          sawQuestion = true;
+          navigatorKey.currentState!.pop();
+        }
+      }
+      for (var i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pump();
+      }
+    });
+    expect(sawCrash, isTrue);
+    expect(sawQuestion, isTrue);
+    expect(maxOpen, 1);
+    // בלי תשובה — נשאלת שוב בהפעלה הבאה.
+    expect(settings.settings.personalModeAsked, isFalse);
+  });
+
   testWidgets('"לשלוח תמיד": בלי דו-שיח, והודעה שקטה שהדיווח נשלח',
       (tester) async {
     useViewSize(tester, const Size(1400, 1000));

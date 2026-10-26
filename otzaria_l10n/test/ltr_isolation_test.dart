@@ -10,7 +10,7 @@ import 'package:test/test.dart';
 final _ltrParam = RegExp(
   r'^(version|\w+Version|stable|prerelease|installed|onDrive|needs|here|'
   r'tag|tagName|releaseTag|path|\w+Path|dir|\w+Dir|letter|fileName|exeName|'
-  r'asset|url)$',
+  r'asset|url|machineName)$',
 );
 
 final _header = RegExp(r'^  (?:String|Future<String>)\s+(\w+)\(');

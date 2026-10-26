@@ -45,6 +45,7 @@ import '../settings/settings_controller.dart';
 import '../widgets/ui_snack.dart';
 import 'download_failure.dart';
 import 'home_guidance.dart' show FoundNothing, GuidanceItem;
+import 'home_guidance_session.dart' show onlineState;
 import 'session_prompts.dart';
 import 'shell_tasks.dart';
 
@@ -406,19 +407,19 @@ class AppSession extends ChangeNotifier {
 
     unawaited(_plugins.load());
     unawaited(_customApps.load());
-    unawaited(_library.refreshRegisteredMachines());
     if (s.autoCheckUpdates) {
-      unawaited(_asCheck(checkAll));
+      _startupLocal.complete(_asCheck(checkAll).catchError((_) {}));
     } else {
       unawaited(refreshProcessState());
       unawaited(_launcherFlow.checkMirror());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!isActive) return;
-        unawaited(_asCheck(() async {
+        final local = _asCheck(() async {
           await _otzaria.ensureChecked();
-          await registerIfUnclaimed();
           _markChecked();
-        }).then((_) {
+        });
+        _startupLocal.complete(local.catchError((_) {}));
+        unawaited(local.then((_) {
           _requestFeedbackSync();
           return _offers.request();
         }));
@@ -429,10 +430,13 @@ class AppSession extends ChangeNotifier {
       reports.stateProvider = _reportState;
       crashCheck = _startReports(reports);
     }
+    final online = s.autoCheckUpdates ? checkOnline() : Future<void>.value();
+    _startupOnline = online.catchError((_) {});
     unawaited(_askPersonalScopeAfter(crashCheck));
-    if (s.autoCheckUpdates) {
-      unawaited(checkOnline());
-    }
+    unawaited(
+      Future.wait([_startupLocal.future, _startupOnline])
+          .then((_) => registerPendingMachine()),
+    );
     LauncherCrashSession.closeGuard = confirmClose;
   }
 
@@ -603,58 +607,108 @@ class AppSession extends ChangeNotifier {
   bool get preparedForThisMachine => _preparedHere;
   bool _preparedHere = false;
 
+  /// הבדיקות של העלייה: המקומית (הבית כבר במצבו, גם מסך הפתיחה), והמקוונת —
+  /// שקובעת אם זה המחשב המחובר.
+  final Completer<void> _startupLocal = Completer<void>();
+  Future<void> _startupOnline = Future<void>.value();
+
   /// השאלה נשאלת פעם אחת לכונן (ההגדרה נוסעת איתו). כונן מוגן אינו יכול
   /// לשמור תשובה, ובמצב נעול אסור לשנות הגדרות — בשניהם לא שואלים.
   bool get shouldAskPersonalScope =>
       !readOnly && !settings.settings.personalModeAsked && !saferMode.isLocked;
 
-  /// אחרי הפריים הראשון ואחרי שאלת הקריסה, באותו תור דיאלוגים. סגירה בלי
-  /// תשובה אינה נשמרת, ולכן השאלה חוזרת בהפעלה הבאה.
-  Future<void> _askPersonalScopeAfter(Future<void> before) async {
+  /// אחרי שאלת הקריסה ואחרי שהבית התייצב (מסך הפתיחה כבר מוצג), באותו תור
+  /// דיאלוגים. סגירה בלי תשובה אינה נשמרת, ולכן השאלה חוזרת בהפעלה הבאה.
+  Future<void> _askPersonalScopeAfter(Future<void> crashCheck) async {
     try {
-      await before;
+      await crashCheck;
     } catch (_) {}
     await _firstFrame.future;
+    await _startupLocal.future;
     if (!isActive || !shouldAskPersonalScope) return;
     final answer = await prompts.runDialog(prompts.askPersonalScope);
     if (answer == null || !isActive || !shouldAskPersonalScope) return;
-    await choosePersonalScope(personal: answer);
+    await choosePersonalScope(personal: answer, fromQuestion: true);
   }
 
-  /// התשובה לשאלה, וגם הבחירה בהגדרות. "רק המחשב שלי" רושם את המחשב הזה
-  /// כשאוצריא מותקנת בו; אחרת נרשם המחשב הראשון שבו היא מותקנת.
-  Future<void> choosePersonalScope({required bool personal}) async {
+  bool get _connected => onlineState(this) == true;
+
+  /// התשובה לשאלה, וגם הבחירה בהגדרות. "רק המחשב שלי" רושם מיד רק מחשב לא
+  /// מחובר שאוצריא מותקנת בו; אחרת נרשם המחשב כזה הראשון שהכלי ירוץ בו.
+  Future<void> choosePersonalScope({
+    required bool personal,
+    bool fromQuestion = false,
+  }) async {
+    // בהגדרות האזהרה כבר נשאלה לפני הבחירה.
+    if (personal && fromQuestion && await _library.mirrorHoldsFullDb()) {
+      final approved = await prompts.runDialog(prompts.confirmPersonalMode);
+      if (approved != true || !isActive) return;
+    }
+    await _startupOnline;
+    if (!isActive) return;
+    var registered = false;
+    if (personal && !readOnly && !_connected) {
+      if (_otzaria.currentVersion == null) await _otzaria.ensureChecked();
+      if (!isActive) return;
+      registered = _otzaria.currentVersion != null &&
+          await _library.capturePersonalVersion();
+    }
+    if (!isActive) return;
+    final pending =
+        personal && !registered && await _library.hasNoRegisteredMachine();
     await settings.update(
       settings.settings.copyWith(
         personalUpdateMode: personal,
         personalModeAsked: true,
+        personalAutoRegisterPending: pending,
       ),
     );
-    if (personal) await _registerHereIfOtzariaInstalled();
+    if (registered && isActive) _update(() => _preparedHere = true);
   }
 
-  Future<void> _registerHereIfOtzariaInstalled() async {
-    if (readOnly || !isActive) return;
-    if (_otzaria.currentVersion == null) await _otzaria.ensureChecked();
-    if (!isActive || _otzaria.currentVersion == null) return;
-    if (await _library.capturePersonalVersion() && isActive) {
-      _update(() => _preparedHere = true);
-    }
-  }
-
-  /// "רק המחשב שלי" נבחר במחשב בלי אוצריא: המחשב הראשון שבו היא מותקנת
-  /// והכלי רץ בו נרשם, כל עוד אף מחשב לא נרשם.
+  /// "רק המחשב שלי" נבחר במחשב שלא נרשם: אחרי הבדיקות של העלייה, המחשב הלא
+  /// מחובר הראשון שאוצריא מותקנת בו נרשם — פעם אחת, לפי הדגל שנוסע בכונן.
+  /// זה אירוע של העלייה ולא של הבדיקה: בדיקה לעולם אינה רושמת (§5.4).
   @visibleForTesting
-  Future<void> registerIfUnclaimed() async {
-    if (readOnly || !settings.settings.personalUpdateMode) return;
-    if (_otzaria.currentVersion == null) return;
-    if (!await _library.hasNoRegisteredMachine() || !isActive) return;
-    await _registerHereIfOtzariaInstalled();
+  Future<void> registerPendingMachine() async {
+    final s = settings.settings;
+    if (!isActive || readOnly) return;
+    if (!s.personalUpdateMode || !s.personalAutoRegisterPending) return;
+    if (_connected || _otzaria.currentVersion == null) return;
+    if (!await _library.hasNoRegisteredMachine()) {
+      await _clearAutoRegister();
+      return;
+    }
+    if (!await _library.capturePersonalVersion() || !isActive) return;
+    await _clearAutoRegister();
+    _update(() => _preparedHere = true);
   }
 
-  /// "הסרה" בקבוצה שבהגדרות.
-  Future<void> forgetRegisteredMachine(String machineKey) =>
-      _library.forgetMachine(machineKey);
+  Future<void> _clearAutoRegister() async {
+    if (!isActive || !settings.settings.personalAutoRegisterPending) return;
+    await settings.update(
+      settings.settings.copyWith(personalAutoRegisterPending: false),
+    );
+  }
+
+  /// הבית מסביר שהבחירה ממתינה למחשב שאוצריא מותקנת בו.
+  bool get personalRegistrationPending =>
+      settings.settings.personalUpdateMode &&
+      settings.settings.personalAutoRegisterPending &&
+      _library.registeredMachines.isEmpty;
+
+  /// "הסרה" בהגדרות. גם מבטלת רישום אוטומטי שממתין — כדי שהסרת המחשב
+  /// האחרון לא תרשום מחשב מחדש בהפעלה הבאה.
+  Future<void> forgetRegisteredMachine(String machineKey) async {
+    await _clearAutoRegister();
+    await _library.forgetMachine(machineKey);
+  }
+
+  /// "רישום המחשב הזה" בהגדרות — לחיצה מפורשת, גם במחשב מחובר.
+  Future<void> registerThisMachine() async {
+    if (readOnly) return;
+    if (await _library.capturePersonalVersion()) await _clearAutoRegister();
+  }
 
   bool get _needsElevation =>
       _library.needsElevation ||
@@ -729,7 +783,12 @@ class AppSession extends ChangeNotifier {
     }
     _appliedSettings = s;
     _otzaria.preferPrerelease = s.preferAppPrerelease;
-    _library.personalUpdateMode = s.personalUpdateMode;
+    if (s.personalUpdateMode && !_library.personalUpdateMode) {
+      _library.personalUpdateMode = true;
+      unawaited(_library.refreshRegisteredMachines());
+    } else {
+      _library.personalUpdateMode = s.personalUpdateMode;
+    }
     _library.semanticPreference = s.semanticDownload;
   }
 
@@ -762,8 +821,6 @@ class AppSession extends ChangeNotifier {
     unawaited(_plugins.refreshInstalled());
 
     await _library.checkForUpdate();
-    if (!isActive) return;
-    await registerIfUnclaimed();
     if (!isActive) return;
     await _autoInstallIfEnabled();
     if (!isActive) return;
