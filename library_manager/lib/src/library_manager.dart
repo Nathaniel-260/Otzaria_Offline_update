@@ -503,6 +503,8 @@ class LibraryManager {
   Future<int?> probeMirrorDownloadBytes({
     Duration timeout = const Duration(seconds: 45),
   }) async {
+    // שתי בדיקות במקביל מתחרות על אותה מראה; השאלה החדשה גוברת.
+    _sizeProbe?.stop();
     var stopped = false;
     int? exportBytes;
     Future<int?> run() async {
@@ -652,6 +654,13 @@ class LibraryManager {
 
   Future<bool> isRegisteredForPersonalUpdate() =>
       _stateStore.hasOwnKnownDbVersion();
+
+  /// המחשבים שנרשמו ושרשומתם בתוקף, מהגרסה הנמוכה — נקודת ההתחלה.
+  Future<List<RegisteredMachine>> registeredMachines() =>
+      _stateStore.liveRegisteredMachines();
+
+  Future<void> forgetRegisteredMachine(String machineKey) =>
+      _stateStore.forgetKnownDbVersion(machineKey);
 
   Future<int?> captureLocalDbVersion() async {
     final path = await currentDbPath();

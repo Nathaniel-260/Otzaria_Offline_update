@@ -73,7 +73,8 @@ void main() {
     tempDir = Directory.systemTemp.createTempSync('app_reports_shell');
     await AppLogger.init(tempDir.path);
     settings = SettingsController(dataDir: tempDir.path);
-    await settings.update(const AppSettings(autoCheckUpdates: false));
+    await settings.update(
+        const AppSettings(personalModeAsked: true, autoCheckUpdates: false));
   });
 
   tearDown(() async {

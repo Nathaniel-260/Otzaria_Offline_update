@@ -680,18 +680,14 @@ class _Pages extends PageStrings {
   String get libSemanticSection => 'Smart search';
   @override
   String libAdvancedSummary({required bool reindex}) => reindex
-      ? 'Otzaria library location, rebuilding search, the full library, an update for '
-          'a specific computer and the drive folder'
-      : 'Otzaria library location, the full library, an update for a specific '
-          'computer and the drive folder';
+      ? 'Otzaria library location, rebuilding search, the full library and '
+          'the drive folder'
+      : 'Otzaria library location, the full library and the drive folder';
   @override
   String get libMissingFilesTitle =>
       'Some Otzaria library files did not reach the drive';
   @override
   String libChipCompanions(String names) => 'On the drive: $names';
-  @override
-  String get libChipOtherMachine =>
-      'The drive was prepared for another computer';
   @override
   String libVersion(int version) => 'Version $version';
   @override
@@ -760,14 +756,6 @@ class _Pages extends PageStrings {
   @override
   String get libFullUnavailable =>
       'Possible only after a regular update failed, when the drive has a full library.';
-  @override
-  String get libPersonalTitle => 'Prepare an update for a specific computer';
-  @override
-  String get libPersonalOn => 'On';
-  @override
-  String get libPersonalOff => 'Off';
-  @override
-  String get libPersonalSettingsNote => 'Turned on and off in the settings';
   @override
   String get libPersonalReadOnly =>
       'The drive is write-protected, so this computer cannot be registered on it.';
@@ -1546,15 +1534,6 @@ class _LibraryScreen extends LibraryScreenStrings {
   @override
   String get mirrorPresent => 'Present';
   @override
-  String get personalVersionTitle => 'The registered computer';
-  @override
-  String personalVersionRecorded(String version) =>
-      'Version $version recorded — the download will start from it';
-  @override
-  String get personalVersionMissing =>
-      'No version recorded yet. Press here on the computer where your Otzaria '
-      'is installed, before downloading';
-  @override
   String get personalVersionButton => 'Register this computer';
   @override
   String personalVersionCapturedSnack(String version) =>
@@ -1564,37 +1543,65 @@ class _LibraryScreen extends LibraryScreenStrings {
       'No Otzaria library was found on this computer to read the version from';
   @override
   String get personalOtherMachineTitle =>
-      'The update was prepared for another computer';
+      'The drive was prepared for another computer';
   @override
   String personalOtherMachineSubtitle(String version) =>
-      'The update on the drive was prepared for the registered computer, '
-      'from version $version. This computer was not registered, so there is '
-      'nothing here to install on it — the download itself succeeded and '
-      'travels with the drive. You can register this computer too, or turn '
-      'off "Prepare an update for a specific computer" in settings to go back '
-      'to downloading the full Otzaria library.';
-  @override
-  String get personalOtherMachineCaptureButton => 'Register this computer too';
+      'The Otzaria library on the drive fits only the registered computer, '
+      'from version $version. This computer is not registered, so there is no '
+      'library update for it here.';
   @override
   String get personalOtherMachineSettingsButton => 'To settings';
   @override
-  String get downloadNoteTitle => 'The last download';
+  String get personalAskTitle =>
+      'Do you want to update several computers, or only your own?';
   @override
-  String downloadNotePersonal(String version) =>
-      'Prepare an update for a specific computer — update files from version $version '
-      'onwards, without the full Otzaria library';
+  String get personalAskMultiple => 'Several computers';
   @override
-  String get downloadNotePersonalUnknownVersion =>
-      '"Prepare an update for a specific computer" is on, but the Otzaria library version on this '
-      'computer was not detected — the full library was downloaded. Run this program once on the computer '
-      'where Otzaria is installed.';
+  String get personalAskMultipleBody =>
+      'The drive keeps everything any computer may need, including the full '
+      'Otzaria library.';
   @override
-  String get downloadNotePersonalMirrorRepaired =>
-      'Personal update is on, but the library updates in the folder were '
-      'damaged — the folder was rebuilt with the full database.';
+  String get personalAskMine => 'Only my computer';
   @override
-  String downloadNotePersonalUpToDate(String version) =>
-      'Prepare an update for a specific computer — version $version is the latest, nothing to download';
+  String get personalAskMineBody =>
+      'Only what your computer is missing is downloaded, so the download is '
+      'much smaller. Other computers will not update from the drive.';
+  @override
+  String get personalAskLater =>
+      'You can change this at any time in the settings.';
+  @override
+  String get personalPreparedHere => 'The drive is prepared for this computer';
+  @override
+  String get personalChipElsewhere => 'Prepared for another computer';
+  @override
+  String get personalChange => 'Change';
+  @override
+  String personalCardThis(String version) =>
+      'The drive is prepared for this computer, from version $version.';
+  @override
+  String personalCardThisAndOthers(int others, String version) =>
+      'The drive is prepared for this computer and '
+      '${plural(others, one: 'one more', two: '$others more', many: '$others more')}, '
+      'from version $version.';
+  @override
+  String personalCardOthers(int count, String version) =>
+      'The drive is prepared for '
+      '${plural(count, one: 'one registered computer', two: '$count registered computers', many: '$count registered computers')}, '
+      'from version $version.';
+  @override
+  String get personalCardNone =>
+      'No computer is registered yet, so the full Otzaria library is '
+      'downloaded.';
+  @override
+  String personalDownloadItem(int count, String version) => 'only what '
+      '${plural(count, one: 'the registered computer is', two: 'the $count registered computers are', many: 'the $count registered computers are')} '
+      'missing, from version $version';
+  @override
+  String get personalDownloadItemNone =>
+      'the full Otzaria library, no computer registered yet';
+  @override
+  String personalDownloadNote(int count) => 'The drive is prepared for '
+      '${plural(count, one: 'one registered computer', two: '$count registered computers', many: '$count registered computers')}.';
 }
 
 class _Settings extends SettingsScreenStrings {
@@ -1611,7 +1618,7 @@ class _Settings extends SettingsScreenStrings {
   String get groupAbout => 'About';
   @override
   String get advancedSummary =>
-      'Password lock, preparing an update for a specific computer, common questions, log and reset';
+      'Password lock, common questions, log and reset';
 
   @override
   String get languageTitle => 'Language';
@@ -1685,22 +1692,33 @@ class _Settings extends SettingsScreenStrings {
   String get semanticConsentRowEnable => 'Enable smart search';
 
   @override
-  String get personalModeTitle => 'Prepare an update for a specific computer';
-  @override
-  String get personalModeSubtitle =>
-      'The tool remembers what one computer has installed and downloads only what it is missing.';
-  @override
-  String get personalModeRegisterLink => 'Register the computer';
-  @override
   String get personalModeDialogTitle =>
-      'Turn on preparing an update for a specific computer?';
+      'Download only what your computer is missing?';
   @override
   String get personalModeDialogContent =>
-      'From now on the drive downloads only what the computer you register is '
-      'missing. On other computers this update will not fit until you turn this '
-      'off. The full Otzaria library on the drive is deleted on the next download.';
+      'From now on the drive gets only what the registered computers are '
+      'missing. A computer that is not registered will not update from the '
+      'drive, and the full Otzaria library on the drive is deleted on the next '
+      'download.';
   @override
   String get personalModeDialogConfirm => 'Turn on';
+  @override
+  String get personalGroupTitle => 'Which computer the Otzaria library is for';
+  @override
+  String get personalMachineThis => 'This computer';
+  @override
+  String get personalMachineUnnamed => 'A registered computer';
+  @override
+  String personalMachineVersion(String version) => 'Version $version';
+  @override
+  String personalMachineFloor(String version) =>
+      'Version $version · the download starts from it, as it is the lowest';
+  @override
+  String get personalMachineRemove => 'Remove';
+  @override
+  String get personalMachinesNone =>
+      'No computer is registered yet. The first computer with Otzaria '
+      'installed is registered when the tool opens on it.';
 
   @override
   String get faqEditTitle => 'Edit the common questions';
@@ -2333,11 +2351,11 @@ class _Faq extends FaqStrings {
       'already have';
   @override
   String get aDownloadTooBig =>
-      'Settings has a "Prepare an update for a specific computer" option. With '
-      'it on, only the steps from your own version upwards are fetched instead '
-      'of the whole Otzaria library — far less data. Before downloading, press '
-      '"Register this computer" on the Otzaria library page, under Advanced, otherwise '
-      'the program does not know where to start from. One caveat: such a drive '
+      'In the settings, under "Which computer the Otzaria library is for", '
+      'choose "Only my computer". From then on only the steps from your own '
+      'version upwards are fetched instead of the whole Otzaria library — far '
+      'less data. Your computer registers itself the first time the tool opens '
+      'on it. One caveat: such a drive '
       'cannot install Otzaria on a computer that has none, so if you update '
       'several computers, leave the option off.';
   @override
@@ -2843,7 +2861,7 @@ class _LibraryDomain extends LibraryDomainStrings {
       'No releases with database updates were found to download.';
   @override
   String exportPersonalFrom(int localVersion) =>
-      'Prepare an update for a specific computer: downloading update files from version '
+      'Only my computer: downloading update files from version '
       '$localVersion onwards, without the full Otzaria library';
   @override
   String exportPersonalUpToDate(int localVersion) =>
@@ -2964,13 +2982,13 @@ class _LibraryDomain extends LibraryDomainStrings {
   String exportPersonalNeedsFullDb(int fromVersion, int latestVersion) =>
       'There is no chain of update files that can carry version $fromVersion '
       'to version $latestVersion, so the full database is being downloaded — '
-      'even though preparing an update for a specific computer normally skips it';
+      'even though downloading only for your computer normally skips it';
 
   @override
   String exportPersonalNoFullDbEither(int fromVersion, int latestVersion) =>
       'There is no chain of update files from version $fromVersion to '
       'version $latestVersion, and no full database for the latest version '
-      'either. Turn off "Prepare an update for a specific computer" in the settings and download '
+      'either. Choose "Several computers" in the settings and download '
       'again.';
 
   @override

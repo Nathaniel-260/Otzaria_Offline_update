@@ -92,6 +92,7 @@ class LibraryModuleController extends ChangeNotifier
   set personalUpdateMode(bool value) {
     if (_manager.personalUpdateMode == value) return;
     _manager.personalUpdateMode = value;
+    _refreshDownloadSize();
     if (status == LibraryModuleStatus.idle || _applying) return;
     unawaited(checkForUpdate());
   }
@@ -309,6 +310,60 @@ class LibraryModuleController extends ChangeNotifier
     notifyProgress();
   }
 
+  /// המחשבים שנרשמו לעדכון אישי, מהגרסה הנמוכה. נקרא בכל בדיקה.
+  List<RegisteredMachine> registeredMachines = const [];
+
+  /// גם בלי בדיקה: ההגדרות מציגות את הרשימה כשהבדיקה בעלייה כבויה.
+  Future<void> refreshRegisteredMachines() async {
+    try {
+      registeredMachines = await _manager.registeredMachines();
+    } catch (e) {
+      AppLogger.instance.info('קריאת המחשבים שנרשמו נכשלה: $e');
+      return;
+    }
+    if (!isDisposed) notifyListeners();
+  }
+
+  /// אף מחשב לא נרשם — נקרא מקובץ ה-state, לא מהבדיקה האחרונה.
+  Future<bool> hasNoRegisteredMachine() async =>
+      await _manager.recordedPersonalDbVersion() == null;
+
+  /// "הסרה" בהגדרות: המחשב כבר אינו קובע מאיזו גרסה מורידים.
+  Future<void> forgetMachine(String machineKey) async {
+    try {
+      await _manager.forgetRegisteredMachine(machineKey);
+    } catch (e, st) {
+      AppLogger.instance.error('הסרת מחשב שנרשם נכשלה', e, st);
+    }
+    _refreshDownloadSize();
+    await checkForUpdate(fresh: true);
+  }
+
+  int _sizeRun = 0;
+
+  /// גודל ההורדה לפי המצב והרישום הנוכחיים. במצב אישי רק המייצא עצמו יודע
+  /// כמה יירד (הוא עשוי לבחור בספרייה המלאה), ולכן בלי תשובה ממנו אין מספר.
+  void _refreshDownloadSize() {
+    final run = ++_sizeRun;
+    onlineDownloadBytesBound = null;
+    if (onlineCheckedAt == null || onlineLibraryProofError != null) return;
+    if (personalUpdateMode && !hasOnlineLibraryUpdate) return;
+    if (downloadStatus == MirrorDownloadStatus.downloading) return;
+    unawaited(() async {
+      int? bytes;
+      try {
+        bytes = personalUpdateMode
+            ? await _manager.probeMirrorDownloadBytes()
+            : await _manager.peekedDownloadBytesBound();
+      } catch (e) {
+        AppLogger.instance.info('חישוב גודל ההורדה של הספרייה לא הצליח: $e');
+      }
+      if (run != _sizeRun || isDisposed) return;
+      onlineDownloadBytesBound = bytes;
+      notifyListeners();
+    }());
+  }
+
   /// האם המחשב הזה נרשם כיעד לעדכון אישי. `true` גם כשהמצב כבוי, כי אז
   /// כל מחשב הוא יעד לגיטימי. ראו [LibraryModuleStatus.personalTargetElsewhere].
   bool personalTargetIsThisMachine = true;
@@ -458,6 +513,7 @@ class LibraryModuleController extends ChangeNotifier
     onlineSemanticPending = answers.semanticPending;
     onlineSemanticCheckError = answers.semanticCheckError;
     semanticChecked = answers.semanticChecked;
+    _sizeRun++;
     onlineDownloadBytesBound = answers.downloadBytesBound;
     onlineSemanticBytes = answers.semanticBytes;
     notifyListeners();
@@ -549,8 +605,13 @@ class LibraryModuleController extends ChangeNotifier
     onlineSemanticCheckError = semanticError;
     semanticChecked = checkedSemantic;
     onlineSemanticBytes = semanticBytes;
-    onlineDownloadBytesBound = bound;
     onlineCheckedAt = DateTime.now();
+    if (personalUpdateMode) {
+      _refreshDownloadSize();
+    } else {
+      _sizeRun++;
+      onlineDownloadBytesBound = bound;
+    }
     notifyListeners();
   }
 
@@ -656,6 +717,7 @@ class LibraryModuleController extends ChangeNotifier
       final version = await _manager.captureLocalDbVersion();
       if (version == null) return false;
       personalFromVersion = version;
+      _refreshDownloadSize();
       // בדיקה מחדש ולא רק notify: המחשב הזה הפך זה עתה ליעד, ו-
       // [LibraryModuleStatus.personalTargetElsewhere] שהוצג לו כבר אינו נכון.
       await checkForUpdate();
@@ -764,6 +826,7 @@ class LibraryModuleController extends ChangeNotifier
     // "אין מסלול" במחשב שאינו אחד מהם אינו תקלה אלא מראה של מישהו אחר.
     personalTargetIsThisMachine =
         !personalUpdateMode || await _manager.isRegisteredForPersonalUpdate();
+    registeredMachines = await _manager.registeredMachines();
 
     // **לא `_lastCheck`.** הוא נכתב רק בנתיב ההצלחה, ובמסלולי החריגה הוא
     // מחזיק את התוצאה של הריצה הקודמת — שורת אבחון שקוראת ממנו משקרת.

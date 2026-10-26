@@ -138,6 +138,19 @@ final Map<String, PageScenario> pageScenarios = {
           ..targetVersion = 31
           ..lastDownloadedAt = DateTime(2026, 10, 18);
       }),
+  // "רק המחשב שלי": המחשב הזה ועוד אחד נרשמו — שורה אחת בכרטיס.
+  'library_personal': (d, s) => _library(d, (c) {
+        c
+          ..personalUpdateMode = true
+          ..status = LibraryModuleStatus.updateAvailable
+          ..localVersion = 145
+          ..targetVersion = 147
+          ..lastDownloadedAt = DateTime(2026, 10, 18)
+          ..registeredMachines = const [
+            RegisteredMachine(key: 'a', version: 145, isThisMachine: true),
+            RegisteredMachine(key: 'b', version: 146, isThisMachine: false),
+          ];
+      }),
   // אוצריא לא מותקנת, והתוכנה בכונן — התקנה מלאה, והדף אומר זאת מראש.
   'library_withapp': (d, s) => _library(
         d,

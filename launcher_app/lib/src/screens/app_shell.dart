@@ -45,6 +45,7 @@ import 'help/help_page.dart';
 import 'home/home_page.dart';
 import 'home/home_progress.dart';
 import 'home/home_view_model.dart';
+import 'home/personal_scope_dialog.dart';
 import 'home/semantic_consent_dialog.dart';
 import 'home/whats_new_dialog.dart';
 import 'launcher/launcher_update_page.dart';
@@ -345,6 +346,9 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
       confirmText: t.reindexDialogConfirm,
     );
   }
+
+  @override
+  Future<bool?> askPersonalScope() => showPersonalScopeDialog(context);
 
   @override
   Future<void> uploadReports({
@@ -699,7 +703,6 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           launcherUpdate: s.launcherUpdate,
           onOpenLauncherUpdate: () => unawaited(_goTo(ShellSection.launcher)),
           onEditFaq: () => unawaited(_editFaq()),
-          onOpenLibrary: () => unawaited(_goTo(ShellSection.library)),
           // `select` ולא מעל ההגדרות: הדף אינו נעול, ו"חזרה" ממנו מובילה לבית.
           onOpenOtzariaAdvanced: () => unawaited(_goTo(ShellSection.otzaria)),
           otzariaChannelChoice: s.otzaria.hasChannelChoice,
@@ -711,6 +714,12 @@ class _AppShellState extends State<AppShell> implements SessionPrompts {
           onEnableSemanticSearch: s.longTaskRunning
               ? null
               : () => unawaited(s.grantSemanticConsent()),
+          personalMachines: s.library.registeredMachines,
+          onChoosePersonal: (personal) =>
+              s.choosePersonalScope(personal: personal),
+          onRemoveMachine: s.longTaskRunning
+              ? null
+              : (key) => unawaited(s.forgetRegisteredMachine(key)),
         ),
       ShellSection.help => HelpPage(
           faq: s.faq,

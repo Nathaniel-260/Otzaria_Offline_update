@@ -1079,15 +1079,16 @@ void main() {
         lessThan(top(stringsOf().pages.advancedTitle)));
     expect(top(stringsOf().pages.advancedTitle), lessThan(top(t.groupAbout)));
     expect(find.text(t.aboutTitle(launcherVersion)), findsOneWidget);
-    // מתקדם מקופל: הנעילה, העדכון למחשב מסוים, היומן והאיפוס אינם שם.
+    // הקבוצה של "בשביל איזה מחשב" ראשית, מיד אחרי כללי.
+    expect(find.text(t.personalGroupTitle), findsOneWidget);
+    expect(top(t.syncTargetsTitle), lessThan(top(t.personalGroupTitle)));
+    // מתקדם מקופל: הנעילה, היומן והאיפוס אינם שם.
     expect(find.text(stringsOf().saferMode.lockTitle), findsNothing);
-    expect(find.text(t.personalModeTitle), findsNothing);
     expect(find.text(t.resetTitle), findsNothing);
 
     await openAdvanced(tester);
     await tester.pumpAndSettle();
     expect(find.text(stringsOf().saferMode.lockTitle), findsOneWidget);
-    expect(find.text(t.personalModeTitle), findsOneWidget);
     expect(find.text(t.logTitle), findsOneWidget);
     expect(find.text(t.resetTitle), findsOneWidget);
 
@@ -1158,31 +1159,97 @@ void main() {
     expect(faqEdit, 1);
   });
 
-  testWidgets('עדכון למחשב מסוים פעיל — קישור לרישום המחשב בדף הספרייה', (
-    tester,
-  ) async {
-    var library = 0;
-    await tester.runAsync(
-      () => settings.update(const AppSettings(personalUpdateMode: true)),
-    );
-    await pumpScreen(
-      tester,
-      SettingsScreen(
-        controller: settings,
-        onOpenLog: () {},
-        launcherVersion: launcherVersion,
-        onOpenLibrary: () => library++,
-      ),
-    );
-    await openAdvanced(tester);
-    await tester.pumpAndSettle();
+  group('בשביל איזה מחשב מורידים — הקבוצה בהגדרות', () {
+    RegisteredMachine machine(String key, int version,
+            {String? name, bool here = false}) =>
+        RegisteredMachine(
+          key: key,
+          version: version,
+          name: name,
+          isThisMachine: here,
+        );
 
-    final link = find.text(stringsOf().settings.personalModeRegisterLink);
-    await tester.ensureVisible(link);
-    await tester.tap(link);
-    expect(library, 1);
-    // הלחיצה על הקישור אינה מכבה את המצב.
-    expect(settings.settings.personalUpdateMode, isTrue);
+    testWidgets('שתי אפשרויות, ורשימת המחשבים רק ב"רק המחשב שלי"', (
+      tester,
+    ) async {
+      final removed = <String>[];
+      final chosen = <bool>[];
+      await pumpScreen(
+        tester,
+        SettingsScreen(
+          controller: settings,
+          onOpenLog: () {},
+          launcherVersion: launcherVersion,
+          personalMachines: [
+            machine('a|me', 145, name: 'YOSEF-LAPTOP'),
+            machine('b|me', 146, name: 'BEIT-MIDRASH', here: true),
+          ],
+          onChoosePersonal: (personal) async => chosen.add(personal),
+          onRemoveMachine: removed.add,
+        ),
+      );
+      final l = stringsOf().libraryScreen;
+      final t = stringsOf().settings;
+      expect(find.text(l.personalAskMultiple), findsOneWidget);
+      expect(find.text(l.personalAskMine), findsOneWidget);
+      expect(find.text(t.personalMachineThis), findsNothing);
+
+      // הבחירה פותחת את האזהרה; ביטול משאיר את המצב.
+      await tester.tap(find.byKey(ShellKeys.settingsPersonalMine));
+      await tester.pumpAndSettle();
+      expect(find.text(t.personalModeDialogTitle), findsOneWidget);
+      await tester.tap(find.text(stringsOf().common.cancel));
+      await tester.pumpAndSettle();
+      expect(chosen, isEmpty);
+
+      await tester.tap(find.byKey(ShellKeys.settingsPersonalMine));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(t.personalModeDialogConfirm));
+      await tester.pumpAndSettle();
+      expect(chosen, [true]);
+
+      await tester.runAsync(
+        () => settings.update(const AppSettings(personalUpdateMode: true)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(t.personalMachineThis), findsOneWidget);
+      expect(find.text('YOSEF-LAPTOP'), findsOneWidget);
+      expect(
+          find.textContaining(t.personalMachineFloor('145')), findsOneWidget);
+      final remove = find.byKey(ShellKeys.personalMachineRemove('a|me'));
+      await tester.ensureVisible(remove);
+      await tester.tap(remove);
+      expect(removed, ['a|me']);
+
+      // חזרה ל"מחשבים מרובים" — בלי אזהרה.
+      await tester.tap(find.byKey(ShellKeys.settingsPersonalMultiple));
+      await tester.pumpAndSettle();
+      expect(find.text(t.personalModeDialogTitle), findsNothing);
+      expect(chosen, [true, false]);
+    });
+
+    testWidgets('בלי מחשבים רשומים — הסבר, ובלי תפקיד מוזרק נשמרת ההגדרה', (
+      tester,
+    ) async {
+      await tester.runAsync(
+        () => settings.update(const AppSettings(personalUpdateMode: true)),
+      );
+      await pumpScreen(
+        tester,
+        SettingsScreen(
+          controller: settings,
+          onOpenLog: () {},
+          launcherVersion: launcherVersion,
+        ),
+      );
+      final t = stringsOf().settings;
+      expect(find.text(t.personalMachinesNone), findsOneWidget);
+      await tester.tap(find.byKey(ShellKeys.settingsPersonalMultiple));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(settings.settings.personalUpdateMode, isFalse);
+      expect(settings.settings.personalModeAsked, isTrue);
+    });
   });
 
   testWidgets('מסך ההגדרות באנגלית — הכול מתורגם והכיוון מתהפך', (
@@ -1270,7 +1337,13 @@ void main() {
     // הבורר פותח דו-שיח של כרטיסי אפשרות; בחירה סוגרת אותו.
     await tester.tap(find.text(t.languageSystem));
     await tester.pumpAndSettle();
-    expect(find.byType(OptionCard), findsNWidgets(3));
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(OptionCard),
+      ),
+      findsNWidgets(3),
+    );
     // בדו-שיח "כמו במחשב" אומר לאיזו שפה הוא מתורגם בפועל.
     final systemOption = t.languageSystemAs(
       AppLanguagePreference.system.resolve().isRtl
@@ -1280,7 +1353,7 @@ void main() {
     expect(find.text(systemOption), findsOneWidget);
     await tester.tap(find.text('English').last);
     await tester.pumpAndSettle();
-    expect(find.byType(OptionCard), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
 
     expect(settings.settings.languagePreference, AppLanguagePreference.english);
     expect(settings.settings.language, AppLanguage.english);
@@ -1601,11 +1674,10 @@ void main() {
     expect(inSource(t.mirrorUnreadable), findsNothing);
   });
 
-  // מצב "עדכון אישי": האריח שמאפשר לרשום את הגרסה מופיע רק במצב הזה, כי הוא
-  // הדרך **היחידה** שגרסה נרשמת — התוכנה אינה קוראת אותה מעצמה.
-  testWidgets('אריח גרסת המסד האישית מופיע רק במצב עדכון אישי', (tester) async {
+  // "רק המחשב שלי": שורה אחת בכרטיס הראשי במקום שלוש שורות ב"מתקדם".
+  testWidgets('דף הספרייה — למי הכונן מוכן, בשורה אחת בכרטיס', (tester) async {
     final t = stringsOf().libraryScreen;
-
+    var settingsOpened = 0;
     Widget screen() => LibraryScreen(
           library: library,
           otzariaIsRunning: false,
@@ -1613,54 +1685,34 @@ void main() {
           isDownloading: false,
           onProcessStateChanged: () async => false,
           onRequestReindex: () async {},
-          onGoToSettings: () {},
+          onGoToSettings: () => settingsOpened++,
         );
 
     await pumpScreen(tester, screen());
-    await openAdvanced(tester);
-    expect(find.text(t.personalVersionTitle), findsNothing);
+    expect(find.byKey(ShellKeys.libraryPersonal), findsNothing);
 
     library.personalUpdateMode = true;
     await pumpScreen(tester, screen());
-    await openAdvanced(tester);
+    expect(find.text(t.personalCardNone), findsOneWidget);
 
-    expect(find.text(t.personalVersionTitle), findsOneWidget);
-    // טרם נרשמה גרסה — המסך אומר במפורש איפה יש ללחוץ.
-    expect(find.textContaining(t.personalVersionMissing), findsOneWidget);
-    expect(find.text(t.personalVersionButton), findsOneWidget);
-
-    library.personalFromVersion = 20;
+    library.registeredMachines = const [
+      RegisteredMachine(key: 'a', version: 145, isThisMachine: true),
+      RegisteredMachine(key: 'b', version: 147, isThisMachine: false),
+    ];
     await pumpScreen(tester, screen());
+    expect(find.text(t.personalCardThisAndOthers(1, '145')), findsOneWidget);
+    await tester.tap(find.text(t.personalChange));
+    expect(settingsOpened, 1);
+
+    library.registeredMachines = const [
+      RegisteredMachine(key: 'b', version: 147, isThisMachine: false),
+    ];
+    await pumpScreen(tester, screen());
+    expect(find.text(t.personalCardOthers(1, '147')), findsOneWidget);
+
+    // אין עוד שורות של עדכון אישי ב"מתקדם".
     await openAdvanced(tester);
-    expect(
-      find.textContaining(t.personalVersionRecorded('20')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('מצב אישי בלי גרסה רשומה מדווח שירד המסד המלא', (tester) async {
-    library.personalUpdateMode = true;
-    library.personalDownloadNote = LibraryPersonalDownloadNote.versionUnknown;
-    library.lastDownloadedAt = DateTime(2026, 8, 12);
-
-    await pumpScreen(
-      tester,
-      LibraryScreen(
-        library: library,
-        otzariaIsRunning: false,
-        onCloseOtzaria: () async => true,
-        isDownloading: false,
-        onProcessStateChanged: () async => false,
-        onRequestReindex: () async {},
-        onGoToSettings: () {},
-      ),
-    );
-    await openAdvanced(tester);
-
-    expect(
-      find.text(stringsOf().libraryScreen.downloadNotePersonalUnknownVersion),
-      findsOneWidget,
-    );
+    expect(find.text(t.personalVersionButton), findsNothing);
   });
 
   testWidgets('הפעלת עדכון אישי דורשת אישור באזהרה', (tester) async {
@@ -1675,9 +1727,7 @@ void main() {
       ),
     );
 
-    await openAdvanced(tester);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(t.personalModeTitle));
+    await tester.tap(find.byKey(ShellKeys.settingsPersonalMine));
     await tester.pumpAndSettle();
 
     expect(find.text(t.personalModeDialogTitle), findsOneWidget);
@@ -1699,12 +1749,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(settings.settings.personalUpdateMode, isFalse);
 
-    await tester.tap(find.text(t.personalModeTitle));
+    await tester.tap(find.byKey(ShellKeys.settingsPersonalMine));
     await tester.pumpAndSettle();
     await tester.tap(find.text(t.personalModeDialogConfirm));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pumpAndSettle();
 
     expect(settings.settings.personalUpdateMode, isTrue);
+    expect(settings.settings.personalModeAsked, isTrue);
   });
 
   testWidgets('מסך הספרייה מציג התקדמות בזמן עדכון וחוסם פעולות', (
@@ -2034,7 +2086,6 @@ void main() {
   });
 
   testWidgets('דף הספרייה: כל שורות המתקדם נגישות', (tester) async {
-    final p = stringsOf().pages;
     library
       ..status = LibraryModuleStatus.upToDate
       ..dbPath = r'C:\otzaria\books\seforim.db'
@@ -2062,7 +2113,6 @@ void main() {
       ShellKeys.libraryLocation,
       ShellKeys.libraryReindex,
       ShellKeys.libraryFull,
-      ShellKeys.libraryPersonal,
       ShellKeys.librarySource,
     ]) {
       expect(find.byKey(key), findsOneWidget, reason: '$key');
@@ -2082,17 +2132,9 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text(stringsOf().libraryScreen.personalVersionTitle),
-        findsOneWidget);
-    // "עדכון למחשב מסוים" מופעל בהגדרות — השורה מובילה לשם.
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(ShellKeys.libraryPersonal),
-        matching: find.byType(ActionButton),
-      ),
-    );
+    // "רק המחשב שלי" — שורה בכרטיס, לא ב"מתקדם"; "שינוי" מוביל להגדרות.
+    await tester.tap(find.text(stringsOf().libraryScreen.personalChange));
     expect(settingsOpened, 1);
-    expect(find.textContaining(p.libPersonalOn), findsWidgets);
   });
 
   testWidgets('הספרייה לא נמצאה — בחירת מיקום או קובץ, בלי שום עדכון', (
@@ -2115,9 +2157,11 @@ void main() {
   testWidgets('כונן מוגן: רישום המחשב לעדכון אישי מושבת, עם הסבר', (
     tester,
   ) async {
-    library.personalUpdateMode = true;
+    library
+      ..personalUpdateMode = true
+      ..status = LibraryModuleStatus.personalTargetElsewhere
+      ..personalFromVersion = 145;
     await pumpScreen(tester, libraryPage(readOnly: true));
-    await openAdvanced(tester);
 
     expect(
       find.textContaining(stringsOf().pages.libPersonalReadOnly),

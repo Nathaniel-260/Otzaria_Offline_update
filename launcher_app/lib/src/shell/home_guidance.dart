@@ -100,6 +100,9 @@ enum TileStatus {
   nothingOnDrive,
   attention,
 
+  /// הכונן הוכן ב"רק המחשב שלי" למחשב אחר — מצב תקין, לא תקלה.
+  preparedElsewhere,
+
   /// באתר יש חדש שההורדה לכונן תביא — כמו "מה ייכלל" בגיבור.
   onlineAvailable,
 
@@ -508,6 +511,7 @@ TileStatus deriveTileStatus(
     TileStatus.working ||
     TileStatus.checking ||
     TileStatus.attention ||
+    TileStatus.preparedElsewhere ||
     TileStatus.needsConsent =>
       local,
     _ => TileStatus.onlineAvailable,
@@ -541,9 +545,10 @@ TileStatus _localTileStatus(GuidanceItem item, GuidanceFacts f) =>
           LibraryStatusFact.upToDate => TileStatus.upToDate,
           LibraryStatusFact.needsDownload => TileStatus.nothingOnDrive,
           LibraryStatusFact.error ||
-          LibraryStatusFact.needsManualPath ||
-          LibraryStatusFact.personalTargetElsewhere =>
+          LibraryStatusFact.needsManualPath =>
             TileStatus.attention,
+          LibraryStatusFact.personalTargetElsewhere =>
+            TileStatus.preparedElsewhere,
         },
       GuidanceItem.plugins => f.pluginsLoading
           ? TileStatus.checking

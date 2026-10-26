@@ -390,7 +390,6 @@ abstract class PageStrings {
   String libAdvancedSummary({required bool reindex});
   String get libMissingFilesTitle;
   String libChipCompanions(String names);
-  String get libChipOtherMachine;
   String libVersion(int version);
   String get libNotInstalled;
   String get libInstallButton;
@@ -417,10 +416,6 @@ abstract class PageStrings {
   /// הגודל והאומדן של הספרייה המלאה, ליד הכפתור שמתקין אותה.
   String libFullMeta({String? size, int? lowMinutes, int? highMinutes});
   String get libFullUnavailable;
-  String get libPersonalTitle;
-  String get libPersonalOn;
-  String get libPersonalOff;
-  String get libPersonalSettingsNote;
   String get libPersonalReadOnly;
   String get libSourceTitle;
   String get repDescription;
@@ -807,11 +802,6 @@ abstract class LibraryScreenStrings {
   String mirrorHasVersion(String version);
   String get mirrorPresent;
 
-  /// מצב "עדכון אישי": נקודת המוצא להורדה נרשמת רק בלחיצה כאן, ובמחשב שבו
-  /// אוצריא של המשתמש מותקנת.
-  String get personalVersionTitle;
-  String personalVersionRecorded(String version);
-  String get personalVersionMissing;
   String get personalVersionButton;
   String personalVersionCapturedSnack(String version);
   String get personalVersionNotFoundSnack;
@@ -820,16 +810,31 @@ abstract class LibraryScreenStrings {
   /// ואין לו מה להתקין מהתיקייה הזו.
   String get personalOtherMachineTitle;
   String personalOtherMachineSubtitle(String version);
-  String get personalOtherMachineCaptureButton;
   String get personalOtherMachineSettingsButton;
 
-  /// מה ההורדה האחרונה הביאה בפועל — קיים כדי שמצב "עדכון אישי" לא יהיה
-  /// שקוף: משתמש שהפעיל אותו ולא זוהתה לו גרסה קיבל בכל זאת מסד מלא.
-  String get downloadNoteTitle;
-  String downloadNotePersonal(String version);
-  String get downloadNotePersonalUnknownVersion;
-  String get downloadNotePersonalMirrorRepaired;
-  String downloadNotePersonalUpToDate(String version);
+  /// השאלה בהפעלה הראשונה של כונן: למי מורידים את ספריית אוצריא.
+  String get personalAskTitle;
+  String get personalAskMultiple;
+  String get personalAskMultipleBody;
+  String get personalAskMine;
+  String get personalAskMineBody;
+  String get personalAskLater;
+
+  /// הערה שקטה בבית אחרי שהמחשב הזה נרשם.
+  String get personalPreparedHere;
+  String get personalChipElsewhere;
+  String get personalChange;
+
+  /// השורה בכרטיס של דף הספרייה, כשמורידים רק את מה שחסר.
+  String personalCardThis(String version);
+  String personalCardThisAndOthers(int others, String version);
+  String personalCardOthers(int count, String version);
+  String get personalCardNone;
+
+  /// שורת ספריית אוצריא ברשימת ההורדה, וההערה שמתחת לכפתורים.
+  String personalDownloadItem(int count, String version);
+  String get personalDownloadItemNone;
+  String personalDownloadNote(int count);
 }
 
 // ── מסך ההגדרות ───────────────────────────────────────────────────────────────
@@ -892,16 +897,18 @@ abstract class SettingsScreenStrings {
   String get semanticConsentRowOff;
   String get semanticConsentRowEnable;
 
-  // ── עדכון למחשב מסוים ──
-  /// רק קובצי העדכון מהגרסה המותקנת — הכונן אינו משמש עוד למחשבים אחרים.
-  String get personalModeTitle;
-  String get personalModeSubtitle;
+  // ── בשביל איזה מחשב מורידים ──
 
-  /// קישור לדף הספרייה, שבו מזהים את גרסת המסד של המחשב.
-  String get personalModeRegisterLink;
   String get personalModeDialogTitle;
   String get personalModeDialogContent;
   String get personalModeDialogConfirm;
+  String get personalGroupTitle;
+  String get personalMachineThis;
+  String get personalMachineUnnamed;
+  String personalMachineVersion(String version);
+  String personalMachineFloor(String version);
+  String get personalMachineRemove;
+  String get personalMachinesNone;
 
   // ── מתקדם ──
   String get faqEditTitle;

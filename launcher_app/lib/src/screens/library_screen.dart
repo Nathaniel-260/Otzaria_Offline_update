@@ -48,7 +48,7 @@ class LibraryScreen extends StatelessWidget {
   /// עוברת דרך קובץ ההרצה של אוצריא, שמודול האפליקציה מכיר.
   final Future<void> Function() onRequestReindex;
 
-  /// "עדכון למחשב מסוים" מופעל ומכובה בהגדרות.
+  /// "שינוי" ליד היעד של ההורדה — הקבוצה בהגדרות.
   final VoidCallback onGoToSettings;
   final Future<void> Function()? onGrantSemanticConsent;
 
@@ -144,13 +144,16 @@ class LibraryScreen extends StatelessWidget {
             tone: IconTileTone.quiet,
           ),
           title: s.personalOtherMachineTitle,
-          body: s.personalOtherMachineSubtitle(
-            c.personalFromVersion?.toString() ??
-                context.strings.common.unknownValue,
-          ),
+          body: [
+            s.personalOtherMachineSubtitle(
+              c.personalFromVersion?.toString() ??
+                  context.strings.common.unknownValue,
+            ),
+            if (readOnly) t.libPersonalReadOnly,
+          ].join(' '),
           actions: [
             ActionButton.neutral(
-              text: s.personalOtherMachineCaptureButton,
+              text: s.personalVersionButton,
               onPressed: _isBusy || readOnly
                   ? null
                   : () => capturePersonalVersion(context, library),
@@ -215,7 +218,7 @@ class LibraryScreen extends StatelessWidget {
         ),
       LibraryModuleStatus.personalTargetElsewhere => (
           StatusKind.needsAction,
-          t.libChipOtherMachine,
+          context.strings.libraryScreen.personalChipElsewhere,
         ),
     };
     return StatusChip(kind: kind, label: label);
@@ -291,6 +294,7 @@ class LibraryScreen extends StatelessWidget {
         // הורדה של מסד שלם במקום קובצי עדכון היא הפרש של שלוש סדרי גודל,
         // ולכן הסיבה נאמרת ולא נשארת בלוג בלבד.
         if (c.updateRouteNote case final note?) Text(note, style: sub),
+        if (c.personalUpdateMode) _personalRow(context, sub),
         if (canUpdate && withApp)
           Text(
             key: ShellKeys.libraryInstallNote,
@@ -526,49 +530,6 @@ class LibraryScreen extends StatelessWidget {
           ),
         ),
         AppRow(
-          key: ShellKeys.libraryPersonal,
-          title: t.libPersonalTitle,
-          subtitle: [
-            c.personalUpdateMode ? t.libPersonalOn : t.libPersonalOff,
-            t.libPersonalSettingsNote,
-          ].join(' · '),
-          trailing: ActionButton.ghost(
-            text: s.personalOtherMachineSettingsButton,
-            onPressed: onGoToSettings,
-          ),
-        ),
-        // רק במצב אישי: זו נקודת המוצא של ההורדה, והיא נרשמת אך ורק כאן.
-        if (c.personalUpdateMode)
-          AppRow(
-            title: s.personalVersionTitle,
-            subtitle: [
-              c.personalFromVersion != null
-                  ? s.personalVersionRecorded('${c.personalFromVersion}')
-                  : s.personalVersionMissing,
-              if (readOnly) t.libPersonalReadOnly,
-            ].join('\n'),
-            trailing: ActionButton.neutral(
-              text: s.personalVersionButton,
-              onPressed: _isBusy || readOnly
-                  ? null
-                  : () => capturePersonalVersion(context, library),
-            ),
-          ),
-        if (c.personalUpdateMode && c.personalDownloadNote != null)
-          AppRow(
-            title: s.downloadNoteTitle,
-            subtitle: switch (c.personalDownloadNote!) {
-              LibraryPersonalDownloadNote.fromRecordedVersion =>
-                s.downloadNotePersonal('${c.personalFromVersion}'),
-              LibraryPersonalDownloadNote.versionUnknown =>
-                s.downloadNotePersonalUnknownVersion,
-              LibraryPersonalDownloadNote.mirrorRepaired =>
-                s.downloadNotePersonalMirrorRepaired,
-              LibraryPersonalDownloadNote.upToDate =>
-                s.downloadNotePersonalUpToDate('${c.personalFromVersion}'),
-            },
-          ),
-        AppRow(
           key: ShellKeys.librarySource,
           title: t.libSourceTitle,
           subtitle: [
@@ -579,6 +540,31 @@ class LibraryScreen extends StatelessWidget {
           below: PathText(c.mirrorDir),
           trailing: CopyPathButton(path: c.mirrorDir),
         ),
+      ],
+    );
+  }
+
+  /// למי הכונן מוכן, בשורה אחת בכרטיס — רק כשמורידים רק את מה שחסר.
+  Widget _personalRow(BuildContext context, TextStyle style) {
+    final s = context.strings.libraryScreen;
+    final machines = library.registeredMachines;
+    final floor = machines.isEmpty ? null : '${machines.first.version}';
+    final here = machines.any((m) => m.isThisMachine);
+    final others = machines.where((m) => !m.isThisMachine).length;
+    final text = switch (floor) {
+      null => s.personalCardNone,
+      final v when here && others > 0 => s.personalCardThisAndOthers(others, v),
+      final v when here => s.personalCardThis(v),
+      final v => s.personalCardOthers(machines.length, v),
+    };
+    return Row(
+      key: ShellKeys.libraryPersonal,
+      children: [
+        Icon(FluentIcons.person_16_regular, size: 16, color: style.color),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: style)),
+        const SizedBox(width: 8),
+        TextLink(text: s.personalChange, onTap: onGoToSettings, style: style),
       ],
     );
   }

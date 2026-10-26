@@ -34,6 +34,9 @@ abstract interface class SessionPrompts {
 
   Future<bool> confirmLibraryReindex();
 
+  /// "מחשבים מרובים או רק המחשב שלי": `true` רק המחשב שלי, `null` בלי תשובה.
+  Future<bool?> askPersonalScope();
+
   Future<void> uploadReports({
     required bool Function() isCancelled,
     required void Function(bool active) onActiveChanged,

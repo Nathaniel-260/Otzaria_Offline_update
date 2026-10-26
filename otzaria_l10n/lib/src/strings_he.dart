@@ -667,15 +667,13 @@ class _Pages extends PageStrings {
   String get libSemanticSection => 'חיפוש חכם';
   @override
   String libAdvancedSummary({required bool reindex}) => reindex
-      ? 'מיקום ספריית אוצריא, עדכון אינדקס החיפוש, הספרייה המלאה, עדכון למחשב מסוים '
-          'והתיקייה שבכונן'
-      : 'מיקום ספריית אוצריא, הספרייה המלאה, עדכון למחשב מסוים והתיקייה שבכונן';
+      ? 'מיקום ספריית אוצריא, עדכון אינדקס החיפוש, הספרייה המלאה והתיקייה '
+          'שבכונן'
+      : 'מיקום ספריית אוצריא, הספרייה המלאה והתיקייה שבכונן';
   @override
   String get libMissingFilesTitle => 'חלק מקובצי ספריית אוצריא לא הגיעו לכונן';
   @override
   String libChipCompanions(String names) => 'בכונן: $names';
-  @override
-  String get libChipOtherMachine => 'הכונן הוכן למחשב אחר';
   @override
   String libVersion(int version) => 'גרסה $version';
   @override
@@ -741,14 +739,6 @@ class _Pages extends PageStrings {
   @override
   String get libFullUnavailable =>
       'אפשרי רק אחרי שעדכון רגיל נכשל, כשבכונן יש ספריית אוצריא מלאה.';
-  @override
-  String get libPersonalTitle => 'הכנת עדכון למחשב מסוים';
-  @override
-  String get libPersonalOn => 'פעיל';
-  @override
-  String get libPersonalOff => 'כבוי';
-  @override
-  String get libPersonalSettingsNote => 'מפעילים ומכבים בהגדרות';
   @override
   String get libPersonalReadOnly =>
       'הכונן מוגן מפני כתיבה, ולכן אי אפשר לרשום אליו את המחשב הזה.';
@@ -1496,14 +1486,6 @@ class _LibraryScreen extends LibraryScreenStrings {
   @override
   String get mirrorPresent => 'קיימת';
   @override
-  String get personalVersionTitle => 'המחשב שנרשם';
-  @override
-  String personalVersionRecorded(String version) =>
-      'נרשמה גרסה ${_ltr(version)} — ההורדה תביא את מה שנוסף אחריה';
-  @override
-  String get personalVersionMissing =>
-      'עוד לא נרשמה גרסה. לפני ההורדה, לחץ כאן במחשב שבו מותקנת אוצריא שתעדכן';
-  @override
   String get personalVersionButton => 'רישום המחשב הזה';
   @override
   String personalVersionCapturedSnack(String version) =>
@@ -1512,33 +1494,59 @@ class _LibraryScreen extends LibraryScreenStrings {
   String get personalVersionNotFoundSnack =>
       'לא נמצאה במחשב הזה ספריית אוצריא לקרוא ממנה את הגרסה';
   @override
-  String get personalOtherMachineTitle => 'העדכון הוכן למחשב אחר';
+  String get personalOtherMachineTitle => 'הכונן הוכן למחשב אחר';
   @override
   String personalOtherMachineSubtitle(String version) =>
-      'העדכון שבכונן הוכן למחשב שנרשם, מגרסה ${_ltr(version)}. המחשב הזה לא '
-      'נרשם, ולכן אין כאן מה להתקין עליו. ההורדה עצמה הצליחה, והעדכון שמור '
-      'בכונן. אפשר לרשום גם את המחשב הזה, או לכבות את "הכנת עדכון למחשב '
-      'מסוים" בהגדרות כדי לחזור להורדת ספריית אוצריא המלאה.';
-  @override
-  String get personalOtherMachineCaptureButton => 'רישום גם של המחשב הזה';
+      'ספריית אוצריא שבכונן מתאימה רק למחשב שנרשם, מגרסה ${_ltr(version)}. '
+      'המחשב הזה לא נרשם, ולכן אין לו כאן עדכון של הספרייה.';
   @override
   String get personalOtherMachineSettingsButton => 'להגדרות';
   @override
-  String get downloadNoteTitle => 'ההורדה האחרונה';
+  String get personalAskTitle =>
+      'האם אתה מעוניין לעדכן מחשבים מרובים, או רק את המחשב שלך?';
   @override
-  String downloadNotePersonal(String version) =>
-      'הכנת עדכון למחשב מסוים — קובצי עדכון מגרסה ${_ltr(version)} ומעלה, בלי ספריית אוצריא המלאה';
+  String get personalAskMultiple => 'מחשבים מרובים';
   @override
-  String get downloadNotePersonalUnknownVersion =>
-      'הכנת עדכון למחשב מסוים מופעלת, אבל לא זוהתה גרסת ספריית אוצריא במחשב — ירדה הספרייה המלאה. '
-      'פתח את הכלי פעם אחת במחשב שבו אוצריא מותקנת.';
+  String get personalAskMultipleBody =>
+      'הכונן יחזיק כל מה שמחשב כלשהו עשוי לצטרך, כולל ספריית אוצריא המלאה.';
   @override
-  String get downloadNotePersonalMirrorRepaired =>
-      'עדכון אישי מופעל, אך עדכוני הספרייה שבתיקייה היו פגומים — התיקייה '
-      'נבנתה מחדש עם המסד המלא.';
+  String get personalAskMine => 'רק המחשב שלי';
   @override
-  String downloadNotePersonalUpToDate(String version) =>
-      'הכנת עדכון למחשב מסוים — גרסה ${_ltr(version)} היא האחרונה, אין מה להוריד';
+  String get personalAskMineBody =>
+      'יירד רק מה שחסר למחשב שלך, ולכן ההורדה קטנה בהרבה. מחשב אחר לא יתעדכן '
+      'מהכונן.';
+  @override
+  String get personalAskLater => 'אפשר לשנות את הבחירה בכל עת בהגדרות.';
+  @override
+  String get personalPreparedHere => 'הכונן הוכן למחשב הזה';
+  @override
+  String get personalChipElsewhere => 'הוכן למחשב אחר';
+  @override
+  String get personalChange => 'שינוי';
+  @override
+  String personalCardThis(String version) =>
+      'הכונן הוכן למחשב הזה, מגרסה ${_ltr(version)}.';
+  @override
+  String personalCardThisAndOthers(int others, String version) =>
+      'הכונן הוכן למחשב הזה ולעוד ${plural(others, one: 'מחשב אחד', two: 'שני מחשבים', many: '$others מחשבים')}, '
+      'מגרסה ${_ltr(version)}.';
+  @override
+  String personalCardOthers(int count, String version) =>
+      'הכונן הוכן ל${plural(count, one: 'מחשב אחד שנרשם', two: 'שני מחשבים שנרשמו', many: '-$count מחשבים שנרשמו')}, '
+      'מגרסה ${_ltr(version)}.';
+  @override
+  String get personalCardNone =>
+      'אף מחשב עוד לא נרשם, ולכן תרד ספריית אוצריא המלאה.';
+  @override
+  String personalDownloadItem(int count, String version) =>
+      'רק מה שחסר ${plural(count, one: 'למחשב שנרשם', two: 'לשני המחשבים שנרשמו', many: 'ל-$count המחשבים שנרשמו')}, '
+      'מגרסה ${_ltr(version)}';
+  @override
+  String get personalDownloadItemNone =>
+      'ספריית אוצריא המלאה, אף מחשב עוד לא נרשם';
+  @override
+  String personalDownloadNote(int count) =>
+      'הכונן מוכן ל${plural(count, one: 'מחשב אחד שנרשם', two: 'שני מחשבים שנרשמו', many: '-$count מחשבים שנרשמו')}.';
 }
 
 class _Settings extends SettingsScreenStrings {
@@ -1554,8 +1562,7 @@ class _Settings extends SettingsScreenStrings {
   @override
   String get groupAbout => 'אודות';
   @override
-  String get advancedSummary =>
-      'נעילה בסיסמה, עדכון למחשב מסוים, שאלות נפוצות, יומן ואיפוס';
+  String get advancedSummary => 'נעילה בסיסמה, שאלות נפוצות, יומן ואיפוס';
 
   @override
   String get languageTitle => 'שפה';
@@ -1625,20 +1632,29 @@ class _Settings extends SettingsScreenStrings {
   String get semanticConsentRowEnable => 'הפעלת החיפוש החכם';
 
   @override
-  String get personalModeTitle => 'הכנת עדכון למחשב מסוים';
-  @override
-  String get personalModeSubtitle =>
-      'הכלי זוכר מה מותקן במחשב אחד ומוריד רק את מה שחסר לו.';
-  @override
-  String get personalModeRegisterLink => 'לרישום המחשב';
-  @override
-  String get personalModeDialogTitle => 'להפעיל הכנת עדכון למחשב מסוים?';
+  String get personalModeDialogTitle => 'להוריד רק מה שחסר למחשב שלך?';
   @override
   String get personalModeDialogContent =>
-      'מעכשיו יירד לכונן רק מה שחסר למחשב שתרשום. למחשבים אחרים העדכון '
-      'הזה לא יתאים, עד שתכבה את האפשרות. ספריית אוצריא המלאה שבכונן תימחק בהורדה הבאה.';
+      'מעכשיו יירד לכונן רק מה שחסר למחשבים שנרשמו. מחשב שלא נרשם לא יתעדכן '
+      'מהכונן, וספריית אוצריא המלאה שבכונן תימחק בהורדה הבאה.';
   @override
   String get personalModeDialogConfirm => 'הפעלה';
+  @override
+  String get personalGroupTitle => 'בשביל איזה מחשב מורידים את ספריית אוצריא';
+  @override
+  String get personalMachineThis => 'המחשב הזה';
+  @override
+  String get personalMachineUnnamed => 'מחשב שנרשם';
+  @override
+  String personalMachineVersion(String version) => 'גרסה ${_ltr(version)}';
+  @override
+  String personalMachineFloor(String version) =>
+      'גרסה ${_ltr(version)} · ההורדה מתחילה ממנה, כי היא הנמוכה';
+  @override
+  String get personalMachineRemove => 'הסרה';
+  @override
+  String get personalMachinesNone =>
+      'אף מחשב עוד לא נרשם. המחשב הראשון שבו מותקנת אוצריא יירשם כשהכלי ייפתח בו.';
 
   @override
   String get faqEditTitle => 'עריכת השאלות הנפוצות';
@@ -2241,12 +2257,11 @@ class _Faq extends FaqStrings {
       'ההורדה גדולה מאוד, ואני רק רוצה לעדכן את ספריית אוצריא שיש לי';
   @override
   String get aDownloadTooBig =>
-      'בהגדרות יש אפשרות "הכנת עדכון למחשב מסוים". כשהיא מופעלת מורידים רק '
-      'את ההשלמות מהגרסה שיש אצלך ומעלה, במקום את ספריית אוצריא המלאה — נפח קטן '
-      'בהרבה. לפני ההורדה לחץ בדף "ספריית אוצריא", תחת "מתקדם", על "רישום המחשב '
-      'הזה", אחרת התוכנה אינה יודעת מאיפה להתחיל. חשוב לדעת: כונן כזה אינו יכול '
-      'לשמש להתקנה במחשב שאין בו אוצריא, ולכן מי שמעדכן כמה מחשבים כדאי לו '
-      'להשאיר את ההגדרה כבויה.';
+      'בהגדרות, בקבוצה "בשביל איזה מחשב מורידים את ספריית אוצריא", בחר "רק '
+      'המחשב שלי". מעכשיו מורידים רק את ההשלמות מהגרסה שיש אצלך ומעלה, במקום את '
+      'ספריית אוצריא המלאה — נפח קטן בהרבה. המחשב שלך נרשם מעצמו בפעם הראשונה '
+      'שהכלי נפתח בו. חשוב לדעת: כונן כזה אינו יכול לשמש להתקנה במחשב שאין בו '
+      'אוצריא, ולכן מי שמעדכן כמה מחשבים יבחר "מחשבים מרובים".';
   @override
   String get qOtzariaOpen => 'כתוב שאוצריא פתוחה ואי אפשר לעדכן';
   @override
@@ -2712,7 +2727,7 @@ class _LibraryDomain extends LibraryDomainStrings {
   String get exportNoReleases => 'לא נמצאו עדכונים של ספריית אוצריא להורדה.';
   @override
   String exportPersonalFrom(int localVersion) =>
-      'הכנת עדכון למחשב מסוים: מוריד קובצי עדכון מגרסה $localVersion ומעלה, בלי ספריית אוצריא המלאה';
+      'רק המחשב שלי: מוריד קובצי עדכון מגרסה $localVersion ומעלה, בלי ספריית אוצריא המלאה';
   @override
   String exportPersonalUpToDate(int localVersion) =>
       'אין גרסה חדשה מ-$localVersion — לא הורד דבר';
@@ -2817,12 +2832,12 @@ class _LibraryDomain extends LibraryDomainStrings {
   @override
   String exportPersonalNeedsFullDb(int fromVersion, int latestVersion) =>
       'אין קובצי עדכון שמעבירים את גרסה $fromVersion לגרסה '
-      '$latestVersion, ולכן מוריד את ספריית אוצריא המלאה — אף ש"הכנת עדכון למחשב מסוים" בדרך '
-      'כלל מדלגת עליה';
+      '$latestVersion, ולכן מוריד את ספריית אוצריא המלאה — אף שבדרך כלל היא אינה '
+      'יורדת כשמורידים רק בשביל המחשב שלך';
   @override
   String exportPersonalNoFullDbEither(int fromVersion, int latestVersion) =>
       'אין קובצי עדכון מגרסה $fromVersion לגרסה $latestVersion, וגם '
-      'אין ספריית אוצריא מלאה בגרסה האחרונה. כבה את "הכנת עדכון למחשב מסוים" בהגדרות והורד '
+      'אין ספריית אוצריא מלאה בגרסה האחרונה. בחר "מחשבים מרובים" בהגדרות והורד '
       'שוב.';
 
   @override

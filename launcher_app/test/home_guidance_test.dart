@@ -869,10 +869,14 @@ void main() {
       for (final s in [
         LibraryStatusFact.error,
         LibraryStatusFact.needsManualPath,
-        LibraryStatusFact.personalTargetElsewhere,
       ]) {
         expect(library(s), TileStatus.attention, reason: s.name);
       }
+      // כונן שהוכן למחשב אחר אינו תקלה.
+      expect(
+        library(LibraryStatusFact.personalTargetElsewhere),
+        TileStatus.preparedElsewhere,
+      );
     });
 
     test('תוספים', () {

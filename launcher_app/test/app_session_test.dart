@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:error_reports_manager/error_reports_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launcher_app/src/app_report/launcher_crash_session.dart';
 import 'package:launcher_app/src/controllers/app_reports_controller.dart';
@@ -18,16 +19,19 @@ import 'package:launcher_app/src/services/app_logger.dart';
 import 'package:launcher_app/src/services/notices_seen_store.dart';
 import 'package:launcher_app/src/services/sleep_inhibitor.dart';
 import 'package:launcher_app/src/settings/app_settings.dart';
+import 'package:launcher_app/src/settings/safer_mode.dart';
 import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/app_session.dart';
 import 'package:launcher_app/src/shell/home_guidance.dart';
 import 'package:launcher_app/src/shell/home_guidance_session.dart';
 import 'package:launcher_app/src/shell/session_prompts.dart';
 import 'package:launcher_app/src/shell/shell_tasks.dart';
-import 'package:library_manager/library_manager.dart' show CompanionAsset;
+import 'package:library_manager/library_manager.dart'
+    show CompanionAsset, LibraryStateStore;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite3;
 
 import 'test_support.dart';
 
@@ -88,6 +92,164 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
   }
+
+  group('השאלה "מחשבים מרובים או רק המחשב שלי"', () {
+    // בלי פריים השאלה אינה יוצאת — היא מחכה לפריים הראשון, כמו באפליקציה.
+    void frame() => WidgetsBinding.instance
+      ..handleBeginFrame(null)
+      ..handleDrawFrame();
+
+    Future<void> settled(AppSession s) async {
+      frame();
+      await waitFor(
+        () =>
+            prompts.personalAsks > 0 &&
+            s.plugins.status != PluginsModuleStatus.loading,
+      );
+    }
+
+    test('נשאלת בהפעלה הראשונה; סגירה בלי תשובה — שוב בהפעלה הבאה', () async {
+      final first = session()..start();
+      await settled(first);
+      expect(prompts.personalAsks, 1);
+      expect(settings.settings.personalModeAsked, isFalse);
+
+      final second = session()..start();
+      frame();
+      await waitFor(() => prompts.personalAsks > 1);
+      expect(prompts.personalAsks, 2);
+      await waitFor(() => second.plugins.status != PluginsModuleStatus.loading);
+    });
+
+    for (final mine in [true, false]) {
+      test('תשובה (רק שלי: $mine) נשמרת, ולא נשאלת שוב', () async {
+        prompts.personalAnswer = mine;
+        final s = session()..start();
+        await settled(s);
+        await waitFor(() => settings.settings.personalModeAsked);
+        await settings.pending;
+        expect(settings.settings.personalUpdateMode, mine);
+        expect(settings.settings.personalModeAsked, isTrue);
+        // בלי אוצריא במחשב הזה — אין רישום עכשיו.
+        expect(s.preparedForThisMachine, isFalse);
+
+        final again = session()..start();
+        frame();
+        await waitFor(
+            () => again.plugins.status != PluginsModuleStatus.loading);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        expect(prompts.personalAsks, 1);
+      });
+    }
+
+    test('בכונן מוגן מפני כתיבה אינה נשאלת', () async {
+      final s = session(readOnly: true)..start();
+      frame();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(prompts.personalAsks, 0);
+      expect(s.shouldAskPersonalScope, isFalse);
+    });
+
+    test('כשההגדרות נעולות בסיסמה אינה נשאלת', () async {
+      await settings.update(
+        AppSettings(
+          autoCheckUpdates: false,
+          saferModeEnabled: true,
+          saferModePassword: SaferModePassword.encode('1234'),
+        ),
+      );
+      final s = session()..start();
+      frame();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(prompts.personalAsks, 0);
+    });
+
+    test('כונן שעדכון אישי כבר פעיל בו אינו נשאל', () async {
+      await settings.update(
+        AppSettings.fromJson({
+          'sync': {'personalMode': true},
+          'automation': {'checkUpdates': false},
+        }),
+      );
+      final s = session()..start();
+      frame();
+      await waitFor(() => s.plugins.status != PluginsModuleStatus.loading);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(prompts.personalAsks, 0);
+    });
+  });
+
+  group('רישום אוטומטי במחשב הראשון שבו אוצריא מותקנת', () {
+    Future<AppSession> withLibrary({required int version}) async {
+      final db = File(p.join(tempDir.path, 'books', 'seforim.db'))
+        ..parent.createSync(recursive: true);
+      final sql = sqlite3.sqlite3.open(db.path);
+      sql.execute(
+          'CREATE TABLE schema_meta (key TEXT PRIMARY KEY, value TEXT)');
+      sql.execute("INSERT INTO schema_meta VALUES ('db_version', '$version')");
+      sql.close();
+      final s = session();
+      await s.library.setCustomDbPath(db.path);
+      s.otzaria.currentVersion = '0.10.4';
+      return s;
+    }
+
+    LibraryStateStore store(AppSession s) =>
+        LibraryStateStore.inDir(s.stateFilesDir);
+
+    test('מצב אישי ואף מחשב לא נרשם — המחשב הזה נרשם, והבית אומר זאת',
+        () async {
+      await settings.update(
+        const AppSettings(autoCheckUpdates: false, personalUpdateMode: true),
+      );
+      final s = await withLibrary(version: 140);
+      await s.registerIfUnclaimed();
+      expect(await store(s).lowestKnownDbVersion(), 140);
+      expect(await store(s).hasOwnKnownDbVersion(), isTrue);
+      expect(s.preparedForThisMachine, isTrue);
+      expect(homeViewModelOf(s).personalPreparedHere, isTrue);
+    });
+
+    test('מחשב אחר כבר נרשם — אין רישום אוטומטי', () async {
+      await settings.update(
+        const AppSettings(autoCheckUpdates: false, personalUpdateMode: true),
+      );
+      final s = await withLibrary(version: 140);
+      await store(s).recordKnownDbVersion('OTHER|me', 145);
+      await s.registerIfUnclaimed();
+      expect(await store(s).hasOwnKnownDbVersion(), isFalse);
+      expect(await store(s).lowestKnownDbVersion(), 145);
+      expect(s.preparedForThisMachine, isFalse);
+    });
+
+    test('מחשבים מרובים — אין רישום אוטומטי', () async {
+      final s = await withLibrary(version: 140);
+      await s.registerIfUnclaimed();
+      expect(await store(s).lowestKnownDbVersion(), isNull);
+    });
+
+    test('"רק המחשב שלי" במחשב שאוצריא מותקנת בו רושם אותו מיד', () async {
+      final s = await withLibrary(version: 141);
+      await s.choosePersonalScope(personal: true);
+      expect(settings.settings.personalUpdateMode, isTrue);
+      expect(await store(s).lowestKnownDbVersion(), 141);
+      expect(s.preparedForThisMachine, isTrue);
+    });
+
+    test('הסרת מחשב מזיזה את גרסת ההתחלה', () async {
+      final s = session();
+      await store(s).recordKnownDbVersion('A|me', 140, name: 'A');
+      await store(s).recordKnownDbVersion('B|me', 145, name: 'B');
+      await s.library.refreshRegisteredMachines();
+      expect(s.library.registeredMachines.map((m) => m.key), ['A|me', 'B|me']);
+
+      await s.forgetRegisteredMachine('A|me');
+      expect(await store(s).lowestKnownDbVersion(), 145);
+      expect(s.library.registeredMachines.map((m) => m.key), ['B|me']);
+    });
+  });
 
   group('הודעות הבית במקום דיאלוגים בעלייה', () {
     test('ההסבר על הדיווחים: הודעה עד "הבנתי", ורק אז נרשם', () async {
@@ -1278,6 +1440,15 @@ class _FakePrompts implements SessionPrompts {
 
   @override
   Future<bool> confirmLibraryReindex() async => false;
+
+  int personalAsks = 0;
+  bool? personalAnswer;
+
+  @override
+  Future<bool?> askPersonalScope() async {
+    personalAsks++;
+    return personalAnswer;
+  }
 
   @override
   Future<void> uploadReports({

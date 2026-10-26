@@ -34,6 +34,10 @@ const homeScenarios = [
   'libraryNotices',
   'libraryNotFound',
   'libraryElsewhere',
+  'personalOnline',
+  'personalOnlineNoSize',
+  'personalNoneRegistered',
+  'personalPreparedHere',
   'downloadV32',
   'syncOff',
   'taskPluginsSync',
@@ -77,6 +81,10 @@ HomeViewModel _model(
   bool semanticConsent = false,
   String? driveCompanionNames,
   HomeTask? task,
+  bool personalMode = false,
+  int personalMachines = 0,
+  int? personalFloor,
+  bool personalPreparedHere = false,
 }) {
   final guidance = deriveHomeGuidance(f);
   TileStatus tile(GuidanceItem item) => deriveTileStatus(
@@ -122,6 +130,10 @@ HomeViewModel _model(
     libraryMissingNames: libraryMissingNames,
     libraryNotFound: libraryNotFound,
     libraryElsewhereFrom: libraryElsewhereFrom,
+    personalMode: personalMode,
+    personalMachines: personalMachines,
+    personalFloor: personalFloor,
+    personalPreparedHere: personalPreparedHere,
     semanticConsent: semanticConsent,
     task: task ?? (f.installing ? HomeTask.installingApp : HomeTask.other),
     appTile: tile(GuidanceItem.app),
@@ -287,6 +299,44 @@ HomeViewModel homeScenario(String name) => switch (name) {
           ),
         ),
       // הספרייה v32 לכונן ריק: החסם שהבית מציג לפני הלחיצה.
+      // "רק המחשב שלי" במחשב המחובר: הגודל מהמייצא עצמו, והערה עם "שינוי".
+      'personalOnline' => _model(
+          const GuidanceFacts(
+              online: true, onlineApp: true, onlineLibrary: true),
+          onlineApp: '0.10.5',
+          onlineLibrary: 147,
+          appDownloadBytes: 96 * _mb,
+          libraryDownloadBytes: 90 * _mb,
+          driveFreeBytes: 29082 * _mb,
+          personalMode: true,
+          personalMachines: 1,
+          personalFloor: 145,
+        ),
+      // המייצא לא ענה (או עוד לא) — בלי מספר, לא 90 MB שמטעה.
+      'personalOnlineNoSize' => _model(
+          const GuidanceFacts(online: true, onlineLibrary: true),
+          installed: '0.10.4',
+          onlineLibrary: 147,
+          personalMode: true,
+          personalMachines: 2,
+          personalFloor: 145,
+        ),
+      'personalNoneRegistered' => _model(
+          const GuidanceFacts(online: true, onlineLibrary: true),
+          installed: null,
+          onlineLibrary: 147,
+          personalMode: true,
+        ),
+      // המחשב הלא מחובר נרשם מעצמו בהרצה הזו.
+      'personalPreparedHere' => _model(
+          const GuidanceFacts(online: false),
+          installed: '0.10.4',
+          drive: '0.10.4',
+          personalMode: true,
+          personalMachines: 1,
+          personalFloor: 146,
+          personalPreparedHere: true,
+        ),
       'downloadV32' => _model(
           const GuidanceFacts(online: true, onlineLibrary: true),
           installed: '0.10.4',

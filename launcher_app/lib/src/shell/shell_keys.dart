@@ -96,6 +96,19 @@ abstract final class ShellKeys {
   static const taskReindex = ValueKey('task.reindex');
   static const taskElevation = ValueKey('task.elevation');
   static const heroShowProgress = ValueKey('home.hero.showProgress');
+  static const personalAskDialog = ValueKey('personal.ask');
+  static const personalAskMultiple = ValueKey('personal.ask.multiple');
+  static const personalAskMine = ValueKey('personal.ask.mine');
+  static const personalAskConfirm = ValueKey('personal.ask.confirm');
+  static const personalPreparedHere = ValueKey('home.personal.preparedHere');
+  static const personalDownloadNote = ValueKey('home.personal.downloadNote');
+  static const settingsPersonalMultiple =
+      ValueKey('settings.personal.multiple');
+  static const settingsPersonalMine = ValueKey('settings.personal.mine');
+
+  /// "הסרה" של מחשב שנרשם, לפי המפתח שלו בקובץ ה-state.
+  static ValueKey<String> personalMachineRemove(String machineKey) =>
+      ValueKey('settings.personal.remove.$machineKey');
 
   /// אריח הבית שמוביל אל [section].
   static ValueKey<String> tile(ShellSection section) =>

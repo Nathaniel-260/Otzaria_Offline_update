@@ -744,14 +744,16 @@ DB version upwards, and **no full DB** (`personalReleases`). It exists because
 carrying ~1.5GB to update a machine already at v20 is what users objected to (forum
 post 33695). Four things hold it together:
 
-- **Default off, confirmed on enable.** Without the full DB the drive cannot serve
-  a machine that has no Otzaria, and `LibraryUpdatePlan.fullDownloadFallback` — the
-  recovery from a patch that does not fit — is `null`. The toggle warns first.
-- **The version is read only on an explicit click**
-  (`LibraryManager.captureLocalDbVersion()`, behind the button in `LibraryScreen`).
-  A routine `checkForUpdate` deliberately does not record it: the **online** machine
-  may hold its own newer Otzaria, and recording that would aim the download at v22
-  while the offline machine sat at v20, with no patch route at all.
+- **Default off; asked once per drive.** Without the full DB the drive cannot
+  serve a machine that has no Otzaria, and `fullDownloadFallback` is `null`. The
+  first-run question (§5.9) or Settings sets it; `personalModeAsked` travels with
+  the drive, and a drive already in the mode counts as answered.
+- **The version is never read by a routine check.** `captureLocalDbVersion()`
+  runs on a click, on the answer "only my computer" with Otzaria installed here,
+  or — only while no machine is registered — on the first machine with Otzaria
+  that runs the tool (`AppSession.registerIfUnclaimed`, maintainer 2026-10-26: the
+  answer is often given on the online PC). Otherwise the **online** machine's
+  own newer Otzaria would aim the download at v22 while the target sat at v20.
 - **One record per machine, and the lowest wins**
   (`LibraryStateStore.knownDbVersions`, keyed by `currentMachineKey()`). Someone who
   clicks on two machines gets a download serving both; `applyUpdate` raises that
@@ -764,7 +766,8 @@ post 33695). Four things hold it together:
   first seen). An entry not refreshed for 180 days (hostname-form keys, which orphan
   easily) or 365 days (machine-id keys) is ignored by `lowestKnownDbVersion` and
   pruned on the next write, so an orphan stops pinning the floor; a machine that
-  sat idle that long re-registers with the button.
+  sat idle that long re-registers with the button. Settings lists them
+  (`knownDbVersionsNames`, a separate map) with "remove".
   **The stamps are a logical clock, never compared with the local clock.** Offline
   machines have no time sync and their clocks are often years off (dead CMOS
   battery), so a reader measures age against the newest stamp in the file, and a
@@ -795,7 +798,9 @@ chain, every step of it**, instead of the per-edge verdict a mirror hands an unk
 machine; when it loses, the full DB is downloaded and the patches dropped. Hence a
 release shipping **only** a full DB is no longer invisible to personal mode (it used
 to be filtered out while the mode reported "up to date"), and the "turn personal
-update off and download again" message now fires only at a real dead end.
+update off and download again" message now fires only at a real dead end. The
+home's size in this mode comes only from that decision
+(`probeMirrorDownloadBytes`), or no number is shown.
 
 **Only the patches are per-release; `seforim.db.zst` is downloaded once**, from the
 highest version carrying one — the only full-DB asset `OfflineLibraryUpdateDiscovery` ever
@@ -2120,7 +2125,11 @@ advanced" (`OtzariaAdvancedPage`: reinstall and install folder act on this machi
 but not its channel change (`_setChannel`). Its tile and Settings link both `select`
 it, never stacking it on Settings. Details: `launcher_app/README.md`.
 
-**No dialog at startup except the crash prompt.** What used to pop up on launch is a
+**No dialog at startup except the crash prompt — and one exception.** The
+"several computers or only mine" question (§5.4) pops once per drive, after the
+first frame and queued behind the crash prompt in `DialogQueue`; it is skipped on a
+read-only drive or when safer mode is locked, and Esc asks again next launch
+(maintainer decision, 2026-10-26: a home row went unseen). Everything else is a
 row on the home page: the reports explainer, legacy report queues, the skipped
 auto-install, new plugins and updates, pending custom apps (marked seen only while
 their page is shown — `TickerMode`), a newer launcher ("עדכון זמין" in the status

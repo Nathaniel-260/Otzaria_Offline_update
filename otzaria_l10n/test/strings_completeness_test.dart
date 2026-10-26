@@ -160,6 +160,10 @@ const _spelledOne = {
   'plugins.updatesSentSnack#0',
   'plugins.updateAllPartlySentSnack#0',
   'plugins.updateAllStoppedSnack#0',
+  'libraryScreen.personalCardThisAndOthers#0',
+  'libraryScreen.personalCardOthers#0',
+  'libraryScreen.personalDownloadItem#0',
+  'libraryScreen.personalDownloadNote#0',
 };
 
 /// הזוגי העברי ("שתי דקות") — אותו כלל ב-2, בעברית בלבד.
@@ -169,6 +173,10 @@ const _spelledTwoInHebrew = {
   'task.pluginsWaiting#0',
   'task.libraryBody#0',
   'pages.libFullMeta#0',
+  'libraryScreen.personalCardThisAndOthers#0',
+  'libraryScreen.personalCardOthers#0',
+  'libraryScreen.personalDownloadItem#0',
+  'libraryScreen.personalDownloadNote#0',
 };
 
 /// המונה כמספר עומד בפני עצמו — "1" בתוך "ARG1" אינו נחשב.

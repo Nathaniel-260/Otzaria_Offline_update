@@ -25,6 +25,7 @@ import 'package:launcher_app/src/settings/settings_controller.dart';
 import 'package:launcher_app/src/shell/shell_keys.dart';
 import 'package:launcher_app/src/shell/shell_navigator.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
+import 'package:library_manager/library_manager.dart' show LibraryStateStore;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
@@ -298,9 +299,8 @@ final List<VisualState> _phase5bStates = [
   (
     name: 'dlg_personal',
     open: (t) async {
-      await _openSettingsAdvanced(t);
-      await _tapVisible(
-          t, find.text(stringsOf(_language).settings.personalModeTitle));
+      await _openSettings(t);
+      await _tapVisible(t, find.byKey(ShellKeys.settingsPersonalMine));
     },
   ),
   (
@@ -384,6 +384,32 @@ class _QuietCollector implements AppReportAttachmentsCollector {
       const AppReportAttachments(diagnostics: {}, errorLog: '');
 }
 
+/// עדכון אישי: השאלה בהפעלה הראשונה, ההגדרות עם המחשבים שנרשמו ודף הספרייה.
+Future<void> _closeQuestion(WidgetTester tester) async {
+  await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+  await tester.pump(const Duration(milliseconds: 400));
+}
+
+final List<VisualState> _personalStates = [
+  (name: 'personal_ask', open: (_) async {}),
+  (
+    name: 'personal_ask_chosen',
+    open: (t) async {
+      await t.tap(find.byKey(ShellKeys.personalAskMine));
+      await t.pump(const Duration(milliseconds: 300));
+    },
+  ),
+  (
+    name: 'personal_settings',
+    open: (t) async {
+      await _closeQuestion(t);
+      await _openSettings(t);
+      await _tapVisible(
+          t, find.text(stringsOf(_language).settings.personalGroupTitle));
+    },
+  ),
+];
+
 /// השלבים שמצלמים את ההגדרות עם דיווחי הכלי.
 const _appReportsPhases = {'phase5b'};
 
@@ -411,6 +437,7 @@ final Map<String, List<VisualState>> _statesByPhase = {
   'phase5b': _phase5bStates,
   // שלב 3 של הבית: "אוצריא — מתקדם" מהאריח ומההגדרות, ומצבי הבית החדשים.
   'stage3': _stage3States,
+  'personal': _personalStates,
 };
 
 /// השלבים שמצלמים את מצבי החנות.
@@ -425,6 +452,7 @@ Set<String> get _homeScenarioPhases => const {
       'stage2_home',
       'stage3',
       'fixbatch',
+      'personal',
     };
 
 /// מסכי המשימה מצולמים מהמודל — ראו `task_<scenario>`.
@@ -457,8 +485,19 @@ void main() {
     settings = SettingsController(dataDir: tempDir.path);
     // עברית במפורש: "כמו במחשב" במכונת הבדיקה היא אנגלית, וההגדרות מציבות
     // אותה ב-`AppL10n` בכל שמירה — וכך "Cancel" נכנס לדו-שיחים בצילום.
+    final personal = _phase == 'personal';
+    if (personal) {
+      final store = LibraryStateStore.inDir(p.join(tempDir.path, 'logs'));
+      await store.recordKnownDbVersion('YOSEF-LAPTOP|user', 145,
+          name: 'YOSEF-LAPTOP');
+      await store.recordKnownDbVersion(
+          await LibraryStateStore.currentMachineKey(), 146,
+          name: 'BEIT-MIDRASH');
+    }
     await settings.update(
       AppSettings(
+        personalModeAsked: !personal,
+        personalUpdateMode: personal,
         autoCheckUpdates: false,
         languagePreference: _english
             ? AppLanguagePreference.english
@@ -721,8 +760,8 @@ void main() {
         final file = '$name${advanced ? '_advanced' : ''}$suffix';
         testWidgets('$_phase/page_$file',
             skip: !_enabled ||
-                !{'phase3', 'phase2b2', 'phase3b', 'stage3'}.contains(_phase),
-            (tester) async {
+                !{'phase3', 'phase2b2', 'phase3b', 'stage3', 'personal'}
+                    .contains(_phase), (tester) async {
           await tester.runAsync(loadVisualFonts);
           WidgetsApp.debugAllowBannerOverride = false;
           try {

@@ -28,7 +28,8 @@ void main() {
     tempDir = Directory.systemTemp.createTempSync('report-lifecycle-');
     await AppLogger.init(tempDir.path);
     settings = SettingsController(dataDir: tempDir.path);
-    await settings.update(const AppSettings(autoCheckUpdates: false));
+    await settings.update(
+        const AppSettings(personalModeAsked: true, autoCheckUpdates: false));
   });
 
   tearDown(() async {

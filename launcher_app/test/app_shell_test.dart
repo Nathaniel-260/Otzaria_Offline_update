@@ -80,7 +80,8 @@ void main() {
     settings = SettingsController(dataDir: tempDir.path);
     // בדיקת התהליך הייתה מריצה כאן `tasklist` אמיתי (ואיתו טיימר תלוי
     // שמפיל את הבדיקה), ולכן היא מוזרקת.
-    await settings.update(const AppSettings(autoCheckUpdates: false));
+    await settings.update(
+        const AppSettings(personalModeAsked: true, autoCheckUpdates: false));
   });
 
   tearDown(() async {
@@ -260,6 +261,17 @@ void main() {
     await pumpShell(tester);
     await open(tester, ShellSection.settings);
 
+    await tester.scrollUntilVisible(
+      find.text(stringsOf().pages.advancedTitle),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(SettingsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pump();
     await tester.tap(find.text(stringsOf().pages.advancedTitle));
     await tester.pump();
     await tester.ensureVisible(find.byKey(const ValueKey('settings.faqEdit')));
@@ -492,7 +504,8 @@ void main() {
     addTearDown(() => HttpOverrides.global = null);
     // שמירת ההגדרות כותבת לדיסק — חייבת לרוץ מחוץ ל-fake-async.
     await tester.runAsync(
-      () => settings.update(const AppSettings(autoCheckUpdates: true)),
+      () => settings.update(
+          const AppSettings(personalModeAsked: true, autoCheckUpdates: true)),
     );
 
     await pumpShell(tester);
@@ -520,7 +533,8 @@ void main() {
     // הבדיקה המקומית כבויה כאן בכוונה: היא קוראת מהדיסק ולא מסתיימת בתוך
     // ה-fake-async, ואז מצב התהליך היה נקבע רק אחרי סיום הבדיקה.
     await tester.runAsync(
-      () => settings.update(const AppSettings(autoCheckUpdates: false)),
+      () => settings.update(
+          const AppSettings(personalModeAsked: true, autoCheckUpdates: false)),
     );
     final locator = _MutableLocator(isRunning: true);
 
@@ -968,6 +982,8 @@ void main() {
 
       final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
       expect(card, findsOneWidget);
+      await tester.ensureVisible(card);
+      await tester.pump();
       // שורה ולא כפתור: בכונן מוגן היא אינה לחיצה, והפירוט אומר למה.
       final row = tester.widget<AppRow>(
         find.descendant(of: card, matching: find.byType(AppRow)),
@@ -992,6 +1008,8 @@ void main() {
     await open(tester, ShellSection.settings);
 
     final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
+    await tester.ensureVisible(card);
+    await tester.pump();
     final t = stringsOf().readOnlyDrive;
     expect(
       find.descendant(
@@ -1018,6 +1036,7 @@ void main() {
 
     final card = find.byType(CustomAppsSettingsCard, skipOffstage: false);
     await tester.ensureVisible(card);
+    await tester.pump();
     await tester.tap(
       find.descendant(of: card, matching: find.byType(AppRow)),
     );
@@ -1220,7 +1239,10 @@ void main() {
     testWidgets('"בדוק שוב" בשגיאת התוכנה בודק את התוכנה בלבד', (tester) async {
       await tester.runAsync(
         () => settings.update(
-          const AppSettings(autoCheckUpdates: false, autoInstall: true),
+          const AppSettings(
+              personalModeAsked: true,
+              autoCheckUpdates: false,
+              autoInstall: true),
         ),
       );
       await pumpShell(tester);
@@ -1965,6 +1987,7 @@ void main() {
     Future<void> lockSettings(WidgetTester tester) => tester.runAsync(
           () => settings.update(
             AppSettings(
+              personalModeAsked: true,
               autoCheckUpdates: false,
               saferModeEnabled: true,
               saferModePassword: SaferModePassword.encode('1234'),
@@ -2012,6 +2035,7 @@ void main() {
       await tester.runAsync(
         () => settings.update(
           AppSettings(
+            personalModeAsked: true,
             autoCheckUpdates: false,
             saferModeEnabled: true,
             saferModePassword: SaferModePassword.encode('1234'),
@@ -2203,7 +2227,10 @@ void main() {
       // קובץ שנערך ביד יכול להדליק את המתג בלי סיסמה — וזה אינו נועל.
       await tester.runAsync(
         () => settings.update(
-          const AppSettings(autoCheckUpdates: false, saferModeEnabled: true),
+          const AppSettings(
+              personalModeAsked: true,
+              autoCheckUpdates: false,
+              saferModeEnabled: true),
         ),
       );
       await pumpShell(tester);

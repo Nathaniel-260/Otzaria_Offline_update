@@ -665,7 +665,7 @@ void main() {
             builder: (context, setState) => SettingsCard(
               children: [
                 SettingsActionTile.switchTile(
-                  title: he.settings.personalModeTitle,
+                  title: he.settings.autoCheckTitle,
                   value: value,
                   onChanged: (v) => setState(() => value = v),
                 ),
@@ -675,7 +675,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text(he.settings.personalModeTitle));
+      await tester.tap(find.text(he.settings.autoCheckTitle));
       await tester.pumpAndSettle();
       expect(value, isTrue);
 
@@ -690,7 +690,7 @@ void main() {
           SettingsCard(
             children: [
               SettingsActionTile.switchTile(
-                title: he.settings.personalModeTitle,
+                title: he.settings.autoCheckTitle,
                 value: false,
                 enabled: false,
                 onChanged: (v) => disabled = v,
@@ -699,7 +699,7 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.text(he.settings.personalModeTitle));
+      await tester.tap(find.text(he.settings.autoCheckTitle));
       await tester.pumpAndSettle();
       expect(disabled, isFalse);
     });
@@ -711,7 +711,7 @@ void main() {
             children: [
               SettingsActionTile.text(
                 icon: FluentIcons.arrow_download_24_regular,
-                title: he.settings.personalModeTitle,
+                title: he.settings.autoCheckTitle,
                 actions: [
                   ActionButton.neutral(
                       text: he.common.install, onPressed: () {}),
@@ -726,7 +726,7 @@ void main() {
       await tester.pumpWidget(wrap(SizedBox(width: 280, child: tile())));
       // בפריסה האנכית אין יותר ListTile — הכותרת מעל והפעולות מתחתיה.
       expect(find.byType(ListTile), findsNothing);
-      expect(find.text(he.settings.personalModeTitle), findsOneWidget);
+      expect(find.text(he.settings.autoCheckTitle), findsOneWidget);
       expect(find.text(he.common.install), findsOneWidget);
     });
 
@@ -1430,8 +1430,8 @@ void main() {
             ),
             SettingsActionTile.text(
               icon: FluentIcons.database_24_regular,
-              title: he.settings.personalModeTitle,
-              subtitle: he.settings.personalModeSubtitle,
+              title: he.settings.autoCheckTitle,
+              subtitle: he.settings.autoCheckSubtitle,
               actions: [
                 ActionButton.neutral(text: he.common.install, onPressed: () {}),
               ],

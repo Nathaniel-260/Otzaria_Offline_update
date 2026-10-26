@@ -430,7 +430,7 @@ List<Widget> _elsewhereActions(
   final s = context.strings.libraryScreen;
   return [
     ActionButton.neutral(
-      text: s.personalOtherMachineCaptureButton,
+      text: s.personalVersionButton,
       onPressed:
           m.readOnly || m.checkBlocked ? null : actions.onRegisterThisComputer,
     ),
@@ -892,6 +892,16 @@ class _Hero extends StatelessWidget {
             ...appNotes,
             ...libraryNotes,
             ..._syncOffNotes(context),
+            if (m.personalMode && m.personalMachines > 0)
+              _Note(
+                key: ShellKeys.personalDownloadNote,
+                FluentIcons.person_16_regular,
+                context.strings.libraryScreen.personalDownloadNote(
+                  m.personalMachines,
+                ),
+                link: context.strings.libraryScreen.personalChange,
+                onLink: actions.onOpenSettings,
+              ),
             if (hereToo)
               _Note(
                 FluentIcons.info_16_regular,
@@ -1060,7 +1070,7 @@ class _Hero extends StatelessWidget {
             body: _elsewhereBody(context, m, from),
             actions: [
               primary(
-                s.personalOtherMachineCaptureButton,
+                s.personalVersionButton,
                 m.readOnly || m.checkBlocked
                     ? null
                     : actions.onRegisterThisComputer,
@@ -1139,8 +1149,17 @@ class _Hero extends StatelessWidget {
   List<_Note> _libraryNotes(BuildContext context, {required bool failedShown}) {
     final g = context.strings.guide;
     final m = model;
-    if (failedShown && m.failedDownloads != null) return const [];
+    final prepared = [
+      if (m.personalPreparedHere)
+        _Note(
+          key: ShellKeys.personalPreparedHere,
+          FluentIcons.person_16_regular,
+          context.strings.libraryScreen.personalPreparedHere,
+        ),
+    ];
+    if (failedShown && m.failedDownloads != null) return prepared;
     return [
+      ...prepared,
       if (m.libraryMissingNames case final names?)
         _Note(
           key: ShellKeys.libraryMissingNotice,
@@ -1287,10 +1306,17 @@ class _Hero extends StatelessWidget {
   List<_Item> _downloadItems(BuildContext context) {
     final g = context.strings.guide;
     final m = model;
+    final s = context.strings.libraryScreen;
     final library = [
       if (m.onlineLibraryVersion != null)
         context.strings.pages.libVersion(m.onlineLibraryVersion!),
-      if (m.onlineCompanionNames != null) m.onlineCompanionNames!,
+      if (m.personalMode && m.onlineLibraryVersion != null)
+        switch (m.personalFloor) {
+          final floor? => s.personalDownloadItem(m.personalMachines, '$floor'),
+          null => s.personalDownloadItemNone,
+        }
+      else if (m.onlineCompanionNames != null)
+        m.onlineCompanionNames!,
     ];
     return [
       for (final item in _shownDownloads(g))
@@ -1649,6 +1675,11 @@ class _Tiles extends StatelessWidget {
           TileStatus.checking => (StatusKind.working, g.chipChecking, null),
           TileStatus.working => (StatusKind.working, g.chipUpdating, null),
           TileStatus.attention => (StatusKind.error, g.chipAttention, null),
+          TileStatus.preparedElsewhere => (
+              StatusKind.needsAction,
+              context.strings.libraryScreen.personalChipElsewhere,
+              FluentIcons.person_16_regular,
+            ),
           TileStatus.installHere => (
               StatusKind.needsAction,
               g.chipReadyToInstall,

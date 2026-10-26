@@ -94,6 +94,10 @@ class AppSettings {
   /// בלי המסד המלא אינו יכול לשרת מחשב שאין בו אוצריא בכלל.
   final bool personalUpdateMode;
 
+  /// השאלה "מחשבים מרובים או רק המחשב שלי" כבר נענתה בכונן הזה. נוסע עם
+  /// הכונן, ולכן היא נשאלת פעם אחת לכונן ולא לכל מחשב.
+  final bool personalModeAsked;
+
   final SemanticDownloadPreference semanticDownload;
 
   // ── התקנה אוטומטית מהתיקייה המקומית ─────────────────────────────────────
@@ -139,6 +143,7 @@ class AppSettings {
     this.syncLibrary = true,
     this.syncPlugins = true,
     this.personalUpdateMode = false,
+    this.personalModeAsked = false,
     this.semanticDownload = SemanticDownloadPreference.ask,
     this.autoInstall = false,
     this.preferAppPrerelease = false,
@@ -177,6 +182,7 @@ class AppSettings {
     bool? syncLibrary,
     bool? syncPlugins,
     bool? personalUpdateMode,
+    bool? personalModeAsked,
     SemanticDownloadPreference? semanticDownload,
     bool? autoInstall,
     bool? preferAppPrerelease,
@@ -193,6 +199,7 @@ class AppSettings {
       syncLibrary: syncLibrary ?? this.syncLibrary,
       syncPlugins: syncPlugins ?? this.syncPlugins,
       personalUpdateMode: personalUpdateMode ?? this.personalUpdateMode,
+      personalModeAsked: personalModeAsked ?? this.personalModeAsked,
       semanticDownload: semanticDownload ?? this.semanticDownload,
       autoInstall: autoInstall ?? this.autoInstall,
       preferAppPrerelease: preferAppPrerelease ?? this.preferAppPrerelease,
@@ -219,6 +226,7 @@ class AppSettings {
           'library': syncLibrary,
           'plugins': syncPlugins,
           'personalMode': personalUpdateMode,
+          'personalAsked': personalModeAsked,
           'semantic': semanticDownload.code,
         },
         'ui': {
@@ -290,6 +298,9 @@ class AppSettings {
           : mode;
     }
 
+    final personalMode =
+        flag(sync, 'personalMode', defaults.personalUpdateMode);
+
     return AppSettings(
       autoCheckUpdates: merged(
         'checkUpdates',
@@ -300,8 +311,9 @@ class AppSettings {
       syncApp: flag(sync, 'app', defaults.syncApp),
       syncLibrary: flag(sync, 'library', defaults.syncLibrary),
       syncPlugins: flag(sync, 'plugins', defaults.syncPlugins),
-      personalUpdateMode:
-          flag(sync, 'personalMode', defaults.personalUpdateMode),
+      personalUpdateMode: personalMode,
+      // כונן שכבר הפעיל עדכון אישי ענה על השאלה, גם לפני שהיא הייתה.
+      personalModeAsked: flag(sync, 'personalAsked', personalMode),
       semanticDownload: SemanticDownloadPreference.fromCode(sync['semantic']),
       autoInstall: merged(
         'install',

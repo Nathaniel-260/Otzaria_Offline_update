@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:library_manager/library_manager.dart' show RegisteredMachine;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
 
 import '../controllers/app_reports_controller.dart';
@@ -38,11 +39,13 @@ class SettingsScreen extends StatelessWidget {
     this.launcherUpdate,
     this.onOpenLauncherUpdate,
     this.onEditFaq,
-    this.onOpenLibrary,
     this.onOpenOtzariaAdvanced,
     this.otzariaChannelChoice = false,
     this.semanticConsentGranted,
     this.onEnableSemanticSearch,
+    this.personalMachines = const [],
+    this.onChoosePersonal,
+    this.onRemoveMachine,
   });
 
   final SettingsController controller;
@@ -78,9 +81,6 @@ class SettingsScreen extends StatelessWidget {
   /// דף העזרה במצב עריכה.
   final VoidCallback? onEditFaq;
 
-  /// דף הספרייה — שם רושמים את המחשב לעדכון למחשב מסוים.
-  final VoidCallback? onOpenLibrary;
-
   /// "אוצריא — מתקדם". `null` בבדיקות שאינן נוגעות בו.
   final VoidCallback? onOpenOtzariaAdvanced;
 
@@ -93,6 +93,16 @@ class SettingsScreen extends StatelessWidget {
 
   /// אותו אישור כמו בדף הספרייה; `null` בזמן משימה ארוכה.
   final VoidCallback? onEnableSemanticSearch;
+
+  /// המחשבים שנרשמו, מהגרסה הנמוכה — `LibraryModuleController.registeredMachines`.
+  final List<RegisteredMachine> personalMachines;
+
+  /// הבחירה בקבוצה — `AppSession.choosePersonalScope`, שגם רושם את המחשב
+  /// הזה. `null` בבדיקות: נשמרת ההגדרה בלבד.
+  final Future<void> Function(bool personal)? onChoosePersonal;
+
+  /// `null` בזמן משימה ארוכה.
+  final void Function(String machineKey)? onRemoveMachine;
 
   AppSettings get _s => controller.settings;
 
@@ -111,6 +121,8 @@ class SettingsScreen extends StatelessWidget {
             const SizedBox(height: 20),
             SectionLabel(t.groupGeneral, first: true),
             _general(context),
+            SectionLabel(t.personalGroupTitle),
+            ..._personalGroup(context),
             if (onOpenOtzariaAdvanced case final open?) ...[
               SectionLabel(context.strings.guide.tileApp),
               RowsCard(
@@ -435,23 +447,6 @@ class SettingsScreen extends StatelessWidget {
     return RowsCard(
       children: [
         ..._lockRows(context),
-        AppSwitchRow(
-          key: const ValueKey('settings.personal'),
-          title: t.personalModeTitle,
-          subtitle: t.personalModeSubtitle,
-          below: _s.personalUpdateMode && onOpenLibrary != null
-              ? Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: TextLink(
-                    text: t.personalModeRegisterLink,
-                    onTap: onOpenLibrary,
-                    style: AppTextStyles.rowSub,
-                  ),
-                )
-              : null,
-          value: _s.personalUpdateMode,
-          onChanged: (v) => _confirmPersonalMode(context, enabled: v),
-        ),
         if (onEditFaq case final edit?)
           AppRow(
             key: const ValueKey('settings.faqEdit'),
@@ -482,25 +477,101 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  /// הפעלה דורשת אישור באזהרה: הספרייה המלאה שבכונן נמחקת בהורדה הבאה.
-  Future<void> _confirmPersonalMode(
-    BuildContext context, {
-    required bool enabled,
-  }) async {
-    if (!enabled) {
-      await _set(_s.copyWith(personalUpdateMode: false));
-      return;
-    }
+  // ── בשביל איזה מחשב מורידים ──────────────────────────────────────────────
 
+  List<Widget> _personalGroup(BuildContext context) {
+    final t = context.strings.libraryScreen;
+    final personal = _s.personalUpdateMode;
+    return [
+      OptionCard(
+        key: ShellKeys.settingsPersonalMultiple,
+        icon: FluentIcons.laptop_multiple_24_regular,
+        title: t.personalAskMultiple,
+        description: t.personalAskMultipleBody,
+        selected: !personal,
+        onSelected: () => unawaited(_choosePersonal(context, personal: false)),
+      ),
+      const SizedBox(height: AppTokens.spaceSM),
+      OptionCard(
+        key: ShellKeys.settingsPersonalMine,
+        icon: FluentIcons.person_24_regular,
+        title: t.personalAskMine,
+        description: t.personalAskMineBody,
+        selected: personal,
+        onSelected: () => unawaited(_choosePersonal(context, personal: true)),
+      ),
+      if (personal) ...[
+        const SizedBox(height: AppTokens.spaceSM),
+        _machinesCard(context),
+      ],
+    ];
+  }
+
+  Widget _machinesCard(BuildContext context) {
     final t = context.strings.settings;
-    final approved = await showWarningDialog(
-      context: context,
-      title: t.personalModeDialogTitle,
-      content: t.personalModeDialogContent,
-      confirmText: t.personalModeDialogConfirm,
+    final machines = personalMachines;
+    const icon = IconTile(
+      icon: FluentIcons.desktop_24_regular,
+      size: _tile,
+      tone: _quiet,
     );
-    if (!approved) return;
-    await _set(_s.copyWith(personalUpdateMode: true));
+    if (machines.isEmpty) {
+      return RowsCard(
+        children: [
+          AppRow(leading: icon, title: t.personalMachinesNone),
+        ],
+      );
+    }
+    final floor = machines.first.version;
+    return RowsCard(
+      children: [
+        for (final machine in machines)
+          AppRow(
+            leading: icon,
+            title: machine.isThisMachine
+                ? t.personalMachineThis
+                : machine.name ?? t.personalMachineUnnamed,
+            subtitle: [
+              if (machine.isThisMachine && machine.name != null) machine.name!,
+              machines.length > 1 && machine.version == floor
+                  ? t.personalMachineFloor('${machine.version}')
+                  : t.personalMachineVersion('${machine.version}'),
+            ].join(' · '),
+            trailing: ActionButton.ghost(
+              key: ShellKeys.personalMachineRemove(machine.key),
+              text: t.personalMachineRemove,
+              onPressed: switch (onRemoveMachine) {
+                final remove? => () => remove(machine.key),
+                null => null,
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// "רק המחשב שלי" דורש אישור באזהרה: הספרייה המלאה שבכונן נמחקת בהורדה
+  /// הבאה. החזרה ל"מחשבים מרובים" אינה מוחקת דבר.
+  Future<void> _choosePersonal(
+    BuildContext context, {
+    required bool personal,
+  }) async {
+    if (personal == _s.personalUpdateMode) return;
+    if (personal) {
+      final t = context.strings.settings;
+      final approved = await showWarningDialog(
+        context: context,
+        title: t.personalModeDialogTitle,
+        content: t.personalModeDialogContent,
+        confirmText: t.personalModeDialogConfirm,
+      );
+      if (!approved) return;
+    }
+    final choose = onChoosePersonal;
+    if (choose != null) return choose(personal);
+    await _set(
+      _s.copyWith(personalUpdateMode: personal, personalModeAsked: true),
+    );
   }
 
   /// הנעילה בסיסמה. השורות יושבות **בתוך** המסך הנעול: מי שהגיע לכאן כבר

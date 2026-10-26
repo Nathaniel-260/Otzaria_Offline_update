@@ -84,6 +84,10 @@ class HomeViewModel {
     this.libraryCompanionsAbsent = false,
     this.libraryNotFound = false,
     this.libraryElsewhereFrom,
+    this.personalMode = false,
+    this.personalMachines = 0,
+    this.personalFloor,
+    this.personalPreparedHere = false,
     this.semanticConsent = false,
     this.appTile = TileStatus.upToDate,
     this.libraryTile = TileStatus.upToDate,
@@ -196,6 +200,15 @@ class HomeViewModel {
 
   /// הכונן הוכן למחשב אחר — הגרסה שממנה הוכן, או "לא ידוע".
   final String? libraryElsewhereFrom;
+
+  /// "רק המחשב שלי": כמה מחשבים נרשמו, והגרסה שממנה מורידים (`null` — אף
+  /// מחשב, ואז יורדת הספרייה המלאה).
+  final bool personalMode;
+  final int personalMachines;
+  final int? personalFloor;
+
+  /// `AppSession.preparedForThisMachine`.
+  final bool personalPreparedHere;
   final bool semanticConsent;
   final TileStatus appTile;
   final TileStatus libraryTile;
@@ -351,6 +364,10 @@ HomeViewModel homeViewModelOf(AppSession s) {
         library.status == LibraryModuleStatus.personalTargetElsewhere
             ? '${library.personalFromVersion ?? ''}'
             : null,
+    personalMode: settings.personalUpdateMode,
+    personalMachines: library.registeredMachines.length,
+    personalFloor: library.registeredMachines.firstOrNull?.version,
+    personalPreparedHere: s.preparedForThisMachine,
     // כשהגיבור כבר מציע את החיפוש החכם, ההודעה הייתה כפולה; בלי אוצריא אין
     // לאן לכתוב את ההסכמה.
     semanticConsent: s.semanticConsentUnanswered &&

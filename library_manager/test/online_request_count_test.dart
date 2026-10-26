@@ -422,6 +422,31 @@ void main() {
       },
     );
 
+    test('in personal mode the probe is the personal export, not the full '
+        'library', () async {
+      await online(() async {
+        github.libraryTo = 3;
+        await LibraryStateStore(
+          p.join(dataDir, 'library_state.json'),
+        ).recordKnownDbVersion(await LibraryStateStore.currentMachineKey(), 2);
+        final full = LibraryManager(dataDir: dataDir);
+        addTearDown(full.dispose);
+        final fullBytes = await full.probeMirrorDownloadBytes();
+        final manager = LibraryManager(
+          dataDir: dataDir,
+          personalUpdateMode: true,
+        );
+        addTearDown(manager.dispose);
+
+        final probed = await manager.probeMirrorDownloadBytes();
+        int? total;
+        await manager.downloadToMirror(onBytesProgress: (_, t) => total = t);
+
+        expect(probed, total);
+        expect(probed, lessThan(fullBytes!));
+      });
+    });
+
     test('a download stops a running probe before it exports', () async {
       await online(() async {
         final manager = LibraryManager(dataDir: dataDir);

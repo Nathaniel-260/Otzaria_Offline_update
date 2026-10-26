@@ -2460,7 +2460,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: notice,
-          matching: find.text(s.personalOtherMachineCaptureButton),
+          matching: find.text(s.personalVersionButton),
         ),
       );
       await tester.tap(
@@ -2497,7 +2497,7 @@ void main() {
           of: notice,
           matching: find.widgetWithText(
             ActionButton,
-            s.personalOtherMachineCaptureButton,
+            s.personalVersionButton,
           ),
         ),
       );
@@ -2569,6 +2569,13 @@ void main() {
         g.otzariaOpenIdleBody,
         he.pages.libNotFoundBody,
         he.libraryScreen.personalOtherMachineSubtitle('1'),
+        he.libraryScreen.personalPreparedHere,
+        he.libraryScreen.personalCardThis('1'),
+        he.libraryScreen.personalCardOthers(2, '1'),
+        he.libraryScreen.personalChipElsewhere,
+        he.libraryScreen.personalAskTitle,
+        he.libraryScreen.personalAskMineBody,
+        he.libraryScreen.personalAskMultipleBody,
         he.pages.libSemanticBody,
       ]) {
         expect(text, isNot(contains('אינטרנט')), reason: text);
@@ -2633,6 +2640,92 @@ void main() {
       expect(find.byKey(ShellKeys.welcome), findsOneWidget);
       expect(find.byKey(ShellKeys.elevationBanner), findsOneWidget);
       expect(find.byKey(ShellKeys.reportsIntroNotice), findsOneWidget);
+    });
+  });
+
+  group('רק המחשב שלי — הבית', () {
+    final l = he.libraryScreen;
+    Finder inList(String text) => find.descendant(
+          of: find.byKey(ShellKeys.heroItems),
+          matching: find.text(text),
+        );
+
+    testWidgets('במחשב המחובר: למי ההורדה, הגודל מהמייצא, ו"שינוי"', (
+      tester,
+    ) async {
+      final calls = <String>[];
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: homeScenario('personalOnline'),
+          actions: HomeActions(onOpenSettings: () => calls.add('settings')),
+        ),
+      );
+      expect(
+        inList(
+          '${he.pages.libVersion(147)} · ${l.personalDownloadItem(1, '145')}',
+        ),
+        findsOneWidget,
+      );
+      expect(inList(g.itemUpTo(formatBytes(90 << 20))), findsOneWidget);
+      expect(find.byKey(ShellKeys.personalDownloadNote), findsOneWidget);
+      await tester.tap(find.text(l.personalChange));
+      expect(calls, ['settings']);
+    });
+
+    testWidgets('בלי תשובה מהמייצא — בלי מספר לספרייה', (tester) async {
+      await pumpScreen(
+        tester,
+        HomePage(model: homeScenario('personalOnlineNoSize')),
+      );
+      expect(
+        inList(
+          '${he.pages.libVersion(147)} · ${l.personalDownloadItem(2, '145')}',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining(g.itemUpTo('')), findsNothing);
+      expect(find.text(l.personalDownloadNote(2)), findsOneWidget);
+    });
+
+    testWidgets('אף מחשב לא נרשם — הספרייה המלאה נאמרת מראש', (tester) async {
+      await pumpScreen(
+        tester,
+        HomePage(model: homeScenario('personalNoneRegistered')),
+      );
+      expect(
+        inList('${he.pages.libVersion(147)} · ${l.personalDownloadItemNone}'),
+        findsOneWidget,
+      );
+      expect(find.byKey(ShellKeys.personalDownloadNote), findsNothing);
+    });
+
+    testWidgets('במחשב שנרשם מעצמו — הערה שקטה, בלי "אינטרנט"', (tester) async {
+      await pumpScreen(
+        tester,
+        HomePage(model: homeScenario('personalPreparedHere')),
+      );
+      expect(find.byKey(ShellKeys.personalPreparedHere), findsOneWidget);
+      expect(find.text(l.personalPreparedHere), findsOneWidget);
+      expect(find.textContaining('אינטרנט'), findsNothing);
+    });
+
+    testWidgets('כונן שהוכן למחשב אחר — האריח אינו שגיאה', (tester) async {
+      await pumpScreen(
+          tester, HomePage(model: homeScenario('libraryElsewhere')));
+      final tile = find.byKey(ShellKeys.tile(ShellSection.library));
+      expect(
+        find.descendant(of: tile, matching: find.text(l.personalChipElsewhere)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tile, matching: find.text(g.chipAttention)),
+        findsNothing,
+      );
+      expect(
+        homeScenario('libraryElsewhere').libraryTile,
+        TileStatus.preparedElsewhere,
+      );
     });
   });
 }

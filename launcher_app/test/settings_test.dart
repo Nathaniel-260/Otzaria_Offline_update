@@ -83,6 +83,7 @@ void main() {
         'library',
         'plugins',
         'personalMode',
+        'personalAsked',
         'semantic',
         'ui',
         'language',
@@ -536,6 +537,25 @@ void main() {
         File(p.join(nested, 'launcher_settings.json')).existsSync(),
         isTrue,
       );
+    });
+  });
+
+  group('השאלה "מחשבים מרובים או רק המחשב שלי"', () {
+    test('כונן חדש עוד לא נשאל, והתשובה נשמרת ונקראת', () {
+      expect(const AppSettings().personalModeAsked, isFalse);
+      final answered = AppSettings.fromJson(
+        const AppSettings().copyWith(personalModeAsked: true).toJson(),
+      );
+      expect(answered.personalModeAsked, isTrue);
+      expect(answered.personalUpdateMode, isFalse);
+    });
+
+    test('כונן קיים שעדכון אישי פעיל בו נחשב כמי שענה', () {
+      final legacy = AppSettings.fromJson({
+        'sync': {'personalMode': true},
+      });
+      expect(legacy.personalModeAsked, isTrue);
+      expect(AppSettings.fromJson({'sync': {}}).personalModeAsked, isFalse);
     });
   });
 }

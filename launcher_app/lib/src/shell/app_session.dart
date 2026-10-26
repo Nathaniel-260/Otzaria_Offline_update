@@ -406,6 +406,7 @@ class AppSession extends ChangeNotifier {
 
     unawaited(_plugins.load());
     unawaited(_customApps.load());
+    unawaited(_library.refreshRegisteredMachines());
     if (s.autoCheckUpdates) {
       unawaited(_asCheck(checkAll));
     } else {
@@ -415,6 +416,7 @@ class AppSession extends ChangeNotifier {
         if (!isActive) return;
         unawaited(_asCheck(() async {
           await _otzaria.ensureChecked();
+          await registerIfUnclaimed();
           _markChecked();
         }).then((_) {
           _requestFeedbackSync();
@@ -422,10 +424,12 @@ class AppSession extends ChangeNotifier {
         }));
       });
     }
+    var crashCheck = Future<void>.value();
     if (appReports case final reports?) {
       reports.stateProvider = _reportState;
-      unawaited(_startReports(reports));
+      crashCheck = _startReports(reports);
     }
+    unawaited(_askPersonalScopeAfter(crashCheck));
     if (s.autoCheckUpdates) {
       unawaited(checkOnline());
     }
@@ -595,6 +599,63 @@ class AppSession extends ChangeNotifier {
     }
   }
 
+  /// המחשב הזה נרשם בהרצה הזו בלי לחיצה על "רישום" — הערה שקטה בבית.
+  bool get preparedForThisMachine => _preparedHere;
+  bool _preparedHere = false;
+
+  /// השאלה נשאלת פעם אחת לכונן (ההגדרה נוסעת איתו). כונן מוגן אינו יכול
+  /// לשמור תשובה, ובמצב נעול אסור לשנות הגדרות — בשניהם לא שואלים.
+  bool get shouldAskPersonalScope =>
+      !readOnly && !settings.settings.personalModeAsked && !saferMode.isLocked;
+
+  /// אחרי הפריים הראשון ואחרי שאלת הקריסה, באותו תור דיאלוגים. סגירה בלי
+  /// תשובה אינה נשמרת, ולכן השאלה חוזרת בהפעלה הבאה.
+  Future<void> _askPersonalScopeAfter(Future<void> before) async {
+    try {
+      await before;
+    } catch (_) {}
+    await _firstFrame.future;
+    if (!isActive || !shouldAskPersonalScope) return;
+    final answer = await prompts.runDialog(prompts.askPersonalScope);
+    if (answer == null || !isActive || !shouldAskPersonalScope) return;
+    await choosePersonalScope(personal: answer);
+  }
+
+  /// התשובה לשאלה, וגם הבחירה בהגדרות. "רק המחשב שלי" רושם את המחשב הזה
+  /// כשאוצריא מותקנת בו; אחרת נרשם המחשב הראשון שבו היא מותקנת.
+  Future<void> choosePersonalScope({required bool personal}) async {
+    await settings.update(
+      settings.settings.copyWith(
+        personalUpdateMode: personal,
+        personalModeAsked: true,
+      ),
+    );
+    if (personal) await _registerHereIfOtzariaInstalled();
+  }
+
+  Future<void> _registerHereIfOtzariaInstalled() async {
+    if (readOnly || !isActive) return;
+    if (_otzaria.currentVersion == null) await _otzaria.ensureChecked();
+    if (!isActive || _otzaria.currentVersion == null) return;
+    if (await _library.capturePersonalVersion() && isActive) {
+      _update(() => _preparedHere = true);
+    }
+  }
+
+  /// "רק המחשב שלי" נבחר במחשב בלי אוצריא: המחשב הראשון שבו היא מותקנת
+  /// והכלי רץ בו נרשם, כל עוד אף מחשב לא נרשם.
+  @visibleForTesting
+  Future<void> registerIfUnclaimed() async {
+    if (readOnly || !settings.settings.personalUpdateMode) return;
+    if (_otzaria.currentVersion == null) return;
+    if (!await _library.hasNoRegisteredMachine() || !isActive) return;
+    await _registerHereIfOtzariaInstalled();
+  }
+
+  /// "הסרה" בקבוצה שבהגדרות.
+  Future<void> forgetRegisteredMachine(String machineKey) =>
+      _library.forgetMachine(machineKey);
+
   bool get _needsElevation =>
       _library.needsElevation ||
       _otzaria.needsElevation ||
@@ -701,6 +762,8 @@ class AppSession extends ChangeNotifier {
     unawaited(_plugins.refreshInstalled());
 
     await _library.checkForUpdate();
+    if (!isActive) return;
+    await registerIfUnclaimed();
     if (!isActive) return;
     await _autoInstallIfEnabled();
     if (!isActive) return;
