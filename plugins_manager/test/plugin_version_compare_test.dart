@@ -81,11 +81,13 @@ void main() {
   });
 
   group('compareAppVersions', () {
-    test('משווה רק major.minor.patch, כמו אוצריא', () {
-      expect(compareAppVersions('0.9.97.2+800', '0.9.97'), 0);
-      expect(compareAppVersions('0.9.97.2', '0.9.97.9'), 0);
-      expect(compareAppVersions('0.9.98.1', '0.9.97'), 1);
-      expect(compareAppVersions('0.9.96', '0.9.97.5'), -1);
+    test('משווה גם את רכיב ה-hotfix, כמו אוצריא', () {
+      expect(compareAppVersions('0.9.98.1', '0.9.98'), 1);
+      expect(compareAppVersions('0.9.98.1+802', '0.9.98+801'), 1);
+      expect(compareAppVersions('0.9.98.1', '0.9.98.2'), -1);
+      expect(compareAppVersions('0.9.98.1', '0.9.99'), -1);
+      expect(compareAppVersions('0.9.98', '0.9.98.0'), 0);
+      expect(compareAppVersions('v0.9.98.1', '0.9.98.1+802'), 0);
       expect(compareAppVersions('1.0.0-beta.3', '1.0.0'), 0);
     });
   });

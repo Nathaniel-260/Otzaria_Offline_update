@@ -72,11 +72,22 @@ void main() {
       expect(isCompatibleWithApp(entry, '0.9.94+686'), isFalse);
     });
 
-    test('מקטע רביעי או סיומת עם נקודות בגרסת אוצריא אינם פוסלים', () {
-      expect(isCompatibleWithApp(entry, '0.9.99.2+800'), isTrue);
+    test('גרסת hotfix (רכיב רביעי) נבדקת מול הטווח כמו באוצריא', () {
+      expect(isCompatibleWithApp(entry, '0.9.99.2+800'), isFalse);
+      expect(isCompatibleWithApp(entry, '0.9.98.1'), isTrue);
       expect(isCompatibleWithApp(entry, '0.9.99-beta.4'), isTrue);
       expect(isCompatibleWithApp(entry, '0.9.95.0'), isTrue);
       expect(isCompatibleWithApp(entry, '0.9.100.1'), isFalse);
+    });
+
+    test('תוסף שדורש גרסת hotfix', () {
+      final hotfix = PluginVersionEntry.fromApi(
+        build('3.0.0', compatibleWith: '0.9.98.1', maxAppVersion: '0.9.98.1'),
+        '',
+      )!;
+      expect(isCompatibleWithApp(hotfix, '0.9.98+801'), isFalse);
+      expect(isCompatibleWithApp(hotfix, '0.9.98.1+802'), isTrue);
+      expect(isCompatibleWithApp(hotfix, '0.9.98.2'), isFalse);
     });
   });
 
@@ -166,6 +177,17 @@ void main() {
       expect(
           p.targetsFor(['0.9.80', '0.9.97']).map((e) => e.version), ['2.8.1']);
     });
+
+    test('גרסת hotfix ובסיס שלה נפתרות לבילדים שונים', () {
+      final hotfix = plugin([
+        build('3.0.0', compatibleWith: '0.9.98.1', isLatest: true),
+        build('2.9.0', compatibleWith: '0.9.97', maxAppVersion: '0.9.98'),
+      ]);
+      expect(
+        hotfix.targetsFor(['0.9.98.1+802', '0.9.98+801']).map((e) => e.version),
+        ['3.0.0', '2.9.0'],
+      );
+    });
   });
 
   group('lowestSupportedAppVersion', () {
@@ -176,6 +198,15 @@ void main() {
       ]);
 
       expect(p.lowestSupportedApp, '0.9.89');
+    });
+
+    test('רצפת hotfix גבוהה מרצפת הבסיס שלה', () {
+      final p = plugin([
+        build('2.0.0', compatibleWith: '0.9.98.1', isLatest: true),
+        build('1.0.0', compatibleWith: '0.9.98'),
+      ]);
+
+      expect(p.lowestSupportedApp, '0.9.98');
     });
 
     test('בילד בלי רצפה = אין מינימום בכלל', () {

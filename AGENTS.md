@@ -1377,9 +1377,10 @@ That directory walk is only the **fallback**: when Otzaria's own registry
 isolate. Directories outlive what Otzaria considers installed — an old release whose
 delete failed, a staged `.release-` from an interrupted install, a plugin whose
 uninstall removed the row but not the folder — and the walk reported all of them.
-App-range checks use `compareAppVersions` (major.minor.patch only, suffix stripped at
-the first `+`/`-`), exactly like Otzaria's `compareCoreVersions`, so a hotfix tag such
-as `0.9.97.2+800` is not above a `maxAppVersion` of `0.9.97`.
+App-range checks use `compareAppVersions` (every segment, suffix stripped at the
+first `+`/`-`), exactly like Otzaria's `compareCoreVersions` since Otzaria 9ea7bf7f:
+a hotfix `0.9.98.1` is above `maxAppVersion` `0.9.98` and meets `minAppVersion`
+`0.9.98.1`. Truncating to three parts again would install a plugin Otzaria rejects.
 
 **The mirror carries the plugin build that will *run*, not the newest one published.**
 Every build declares `compatibleWith` (minimum Otzaria version) and `maxAppVersion`,

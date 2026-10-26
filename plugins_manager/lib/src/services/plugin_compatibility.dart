@@ -1,5 +1,5 @@
 /// אותו כלל בחירה כמו `src/lib/pluginCompatibility.js` באתר, אבל גרסת אוצריא
-/// מושווית כמו `compareCoreVersions` של אוצריא (major.minor.patch, בלי סיומת).
+/// מושווית כמו `compareCoreVersions` של אוצריא (כל הרכיבים, בלי סיומת).
 library;
 
 import '../models/plugin_version_entry.dart';

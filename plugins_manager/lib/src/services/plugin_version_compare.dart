@@ -1,8 +1,9 @@
 int comparePluginVersions(String? a, String? b) =>
     _compare(_parts(a), _parts(b));
 
-int compareAppVersions(String? a, String? b) =>
-    _compare(_parts(a).take(3).toList(), _parts(b).take(3).toList());
+/// כל הרכיבים, כמו `compareCoreVersions` של אוצריא: `0.9.98.1` היא hotfix
+/// וחדשה מ-`0.9.98`, ולכן `maxAppVersion: 0.9.98` אינו כולל אותה.
+int compareAppVersions(String? a, String? b) => comparePluginVersions(a, b);
 
 int _compare(List<int> pa, List<int> pb) {
   final length = pa.length > pb.length ? pa.length : pb.length;
