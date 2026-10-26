@@ -925,6 +925,7 @@ class _Guide extends GuidanceStrings {
     required bool app,
     required bool library,
     required bool plugins,
+    bool libraryFilesOnly = false,
   }) {
     final off = [
       if (app) 'בתוכנה',
@@ -940,6 +941,9 @@ class _Guide extends GuidanceStrings {
     }
     if (app) {
       return 'באתר יש גרסה חדשה של התוכנה, אבל ההורדה שלה כבויה בהגדרות.';
+    }
+    if (library && libraryFilesOnly) {
+      return 'באתר יש קבצים חדשים לספרייה, אבל ההורדה שלהם כבויה בהגדרות.';
     }
     if (library) {
       return 'באתר יש גרסה חדשה של הספרייה, אבל ההורדה שלה כבויה בהגדרות.';

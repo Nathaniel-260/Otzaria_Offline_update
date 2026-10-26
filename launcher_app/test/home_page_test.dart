@@ -971,6 +971,46 @@ void main() {
       await tester.tap(find.text(g.changeInSettingsLink));
       expect(settings, 1);
     });
+
+    testWidgets('רק קבצים נלווים חדשים — לא "גרסה חדשה של הספרייה"', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        HomePage(
+          model: HomeViewModel(
+            guidance: deriveHomeGuidance(
+              const GuidanceFacts(
+                online: true,
+                onlineLibrary: true,
+                syncLibrary: false,
+              ),
+            ),
+            online: true,
+            installedVersion: '0.10.4',
+            onlineCompanionNames: 'התלמוד',
+            syncLibrary: false,
+          ),
+        ),
+      );
+      expect(
+        find.text(
+          g.syncOffOnlyNote(
+            app: false,
+            library: true,
+            plugins: false,
+            libraryFilesOnly: true,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          g.syncOffOnlyNote(app: false, library: true, plugins: false),
+        ),
+        findsNothing,
+      );
+    });
   });
 
   group('שורת התחתית', () {

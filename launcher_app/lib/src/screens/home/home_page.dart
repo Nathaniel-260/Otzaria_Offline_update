@@ -1197,7 +1197,12 @@ class _Hero extends StatelessWidget {
       _Note(
         FluentIcons.info_16_regular,
         quiet
-            ? g.syncOffOnlyNote(app: app, library: library, plugins: plugins)
+            ? g.syncOffOnlyNote(
+                app: app,
+                library: library,
+                plugins: plugins,
+                libraryFilesOnly: m.onlineLibraryVersion == null,
+              )
             : g.syncOffNote(app: app, library: library, plugins: plugins),
         key: quiet ? ShellKeys.homeSyncOffNote : null,
         link: g.changeInSettingsLink,

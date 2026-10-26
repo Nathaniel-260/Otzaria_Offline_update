@@ -514,10 +514,12 @@ abstract class GuidanceStrings {
   String get noSyncSelectionNote;
 
   /// כמו [syncOffNote], כשאין שום הורדה לצידה: יש חדש, וההורדה שלו כבויה.
+  /// [libraryFilesOnly] — בספרייה חדשים רק הקבצים הנלווים, לא גרסת המסד.
   String syncOffOnlyNote({
     required bool app,
     required bool library,
     required bool plugins,
+    bool libraryFilesOnly = false,
   });
 
   /// "הורדה" בזמן שמשימה אחרת (או הורדת עדכון של הכלי) רצה.

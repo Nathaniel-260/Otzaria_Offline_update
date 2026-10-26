@@ -28,6 +28,25 @@ void main() {
       contains('ההורדה שלהם'),
     );
     expect(
+      he.guide.syncOffOnlyNote(
+        app: false,
+        library: true,
+        plugins: false,
+        libraryFilesOnly: true,
+      ),
+      'באתר יש קבצים חדשים לספרייה, אבל ההורדה שלהם כבויה בהגדרות.',
+    );
+    expect(
+      en.guide.syncOffOnlyNote(
+        app: false,
+        library: true,
+        plugins: false,
+        libraryFilesOnly: true,
+      ),
+      'There are new library files online, but their download is turned off '
+      'in the settings.',
+    );
+    expect(
       he.guide.syncOffOnlyNote(app: true, library: true, plugins: true),
       'באתר יש חדש בתוכנה, בספרייה ובתוספים, אבל ההורדה שלהם כבויה בהגדרות.',
     );

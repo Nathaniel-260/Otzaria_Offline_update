@@ -958,6 +958,7 @@ class _Guide extends GuidanceStrings {
     required bool app,
     required bool library,
     required bool plugins,
+    bool libraryFilesOnly = false,
   }) {
     final off = [
       if (app) 'the program',
@@ -975,6 +976,10 @@ class _Guide extends GuidanceStrings {
           'off in the settings.';
     }
     if (off.isEmpty) return noSyncSelectionNote;
+    if (library && libraryFilesOnly) {
+      return 'There are new library files online, but their download is '
+          'turned off in the settings.';
+    }
     return 'There is a new version of ${off.single} online, but its download '
         'is turned off in the settings.';
   }

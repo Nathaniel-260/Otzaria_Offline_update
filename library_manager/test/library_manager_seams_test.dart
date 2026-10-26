@@ -495,6 +495,55 @@ void main() {
       expect(await peekAndBound(library), 1000 + 100 + 2 + 450);
     });
 
+    test(
+      'an edge whose files the names do not settle is never dropped',
+      () async {
+        releases = [
+          release('v8-20261011', {
+            'patch-v7-v8.db.zst.manifest.json': 2,
+            'patch-v7-v8.db.zst': 600 * mib,
+            // קובץ נוסף בשם הקשת — אולי ב-manifest, אולי לא: הגודל אינו ודאי.
+            'patch-v7-v8.db.zst.sig': 1,
+            'seforim.db.zst': 1800 * mib,
+          }),
+          release('v7-20261011', {
+            // ה-patch עוד עולה: המייצא לא יבנה קשת, ומבוי סתום אינו מוסר אותה.
+            'patch-v6-v7.db.zst.manifest.json': 2,
+            'seforim.db.zst': 1700 * mib,
+          }),
+        ];
+
+        expect(
+          await peekAndBound(manager()),
+          1800 * mib + 600 * mib + 1 + 2 + 2 + 450,
+        );
+      },
+    );
+
+    test(
+      'an older split full DB assembled on the drive means no bound',
+      () async {
+        releases = [
+          release('v8-20261011', {
+            'patch-v7-v8.db.zst.manifest.json': 2,
+            'patch-v7-v8.db.zst': 100,
+            'seforim.db.zst': 1000,
+          }),
+          release('v7-20261011', {
+            'patch-v6-v7.db.zst.manifest.json': 2,
+            'patch-v6-v7.db.zst': 50,
+            'seforim.db.zst.manifest.json': 3,
+          }),
+        ];
+        final library = manager();
+        expect(await peekAndBound(library), 1000 + 100 + 2 + 50 + 2 + 450);
+
+        // המייצא שומר את המורכב בשם הארכיון; גודלו רק במניפסט שברשת.
+        putOnDrive(library, 'v7-20261011', 'seforim.db.zst', 900);
+        expect(await peekAndBound(library), isNull);
+      },
+    );
+
     group('the v32 release history', () {
       // הנתונים האמיתיים (אוקטובר 2026), הערוץ היציב, רק נכסי המסד.
       const history = <String, Map<String, int>>{

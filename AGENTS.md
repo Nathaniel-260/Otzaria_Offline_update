@@ -605,16 +605,13 @@ previous answer, a failure included, until the new one (clearing it flashed
 "connected, up to date" offline). Smart search counts only in "always"
 (`onlineAnswerError`); Shabbat is unchecked, not failed.
 
-**The sizes in the home's download list are upper bounds known before the
-click.** `LibraryManager.peekedDownloadBytesBound` → `mirrorDownloadBytesBound`
-applies the exporter's rules that need only names and sizes: a patch slower than
-a DB swap (`ApplyTimeEstimate`, no credit), dead ends by `patch-vA-vB` names, and
-edges a manifest already on the drive rules out. Counting every patch showed 4.8GB
-for a 2.5GB download (v32); unknown edges count as valid, so stubs keep it ~3GB.
-An older full DB on the drive that may be reused is `null`. App:
-`OtzariaModuleController.onlineDownloadBytes`; plugins have none. No bound means
-no number — never `probeMirrorDownloadBytes` before a click: it runs the real
-export planning.
+**The home's download sizes are upper bounds known before the click.** Counting
+every patch showed 4.8GB for a 2.5GB download (v32), so `mirrorDownloadBytesBound`
+applies the exporter's rules that need no manifest (rules in `library_manager`
+README); it must never fall below the real download, and an older full DB the
+exporter may reuse means `null`. App: `OtzariaModuleController.onlineDownloadBytes`;
+plugins have none. No bound means no number — never `probeMirrorDownloadBytes`
+before a click: it runs the real export planning.
 
 **Filtered networks get their own messages and NetFree's CA.** A filter answers
 418 (or 403) and a NetFree MITM breaks TLS; both read as a bare "status 418" or a

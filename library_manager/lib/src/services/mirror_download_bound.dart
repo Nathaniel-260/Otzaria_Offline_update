@@ -1,19 +1,21 @@
 import 'package:seforim_library_updater/seforim_library_updater.dart';
 
-/// קשת לפי שם ה-manifest: הנכסים שלה (ה-manifest וקובצי ה-patch) וגודלם.
-typedef _Edge = ({int from, int to, List<ReleaseAsset> assets, int bytes});
+/// קשת: הנכסים שלה וגודלם. [sure] — קבציה ידועים (manifest בכונן, או קובץ
+/// יחיד בשם הקשת); רק קשת כזו מוסרת, אחרת החסם עלול לרדת מתחת להורדה.
+typedef _Edge = ({
+  int from,
+  int to,
+  List<ReleaseAsset> assets,
+  int bytes,
+  bool sure,
+});
 
 final RegExp _edgeName = RegExp(
   r'^patch-v(\d+)-v(\d+)\.db\.zst\.manifest\.json$',
 );
 
-/// חסם עליון לבייטים ש-`LibraryMirrorExporter.export` (לא אישי) יוריד, משמות
-/// וגדלים בלבד — בלי לשלוף אף manifest. `null` = אין חסם אמין.
-///
-/// מחיל מכללי המייצא את מה שאינו דורש manifest: פסילת קשת שה-manifest שלה כבר
-/// בכונן ואינו בר-החלה ([heldManifest]), הקשת האיטית ([ApplyTimeEstimate], בלי
-/// זיכוי — הנשא הוא החדש), ומבוי סתום. קשת שאיננו יודעים עליה נחשבת תקפה,
-/// ולכן הקשתות כאן הן על-קבוצה של האמיתיות והחסם אינו יורד מתחת להורדה.
+/// חסם עליון ל-`LibraryMirrorExporter.export` (לא אישי) משמות וגדלים, בלי רשת;
+/// `null` = אין חסם. הכללים — README, "מבנה".
 int? mirrorDownloadBytesBound({
   required List<LibraryRelease> relevant,
   required int supportedDbSchemaVersion,
@@ -48,6 +50,7 @@ int? mirrorDownloadBytesBound({
       final int from;
       final int to;
       final List<ReleaseAsset> files;
+      var sure = true;
       if (manifest != null) {
         final names = {for (final f in manifest.patchFiles) f.file};
         claimed.addAll(names);
@@ -74,6 +77,7 @@ int? mirrorDownloadBytesBound({
             )
             .toList();
         claimed.addAll(files.map((f) => f.name));
+        sure = files.length == 1 && files.single.name == base;
         (from, to) = (int.parse(match.group(1)!), int.parse(match.group(2)!));
       }
       edges.add((
@@ -86,6 +90,7 @@ int? mirrorDownloadBytesBound({
             manifestAsset,
             ...files,
           ].fold(0, (sum, a) => sum + (a.size > 0 ? a.size : 0)),
+          sure: sure,
         ),
       ));
     }
@@ -102,7 +107,8 @@ int? mirrorDownloadBytesBound({
     final fullSeconds = applyTime.fullRouteSeconds(newestFull.size);
     return [
       for (final entry in edges)
-        if (entry.$2.to > newestVersion ||
+        if (!entry.$2.sure ||
+            entry.$2.to > newestVersion ||
             !applyTime.isOutOfRange(
               applyTime.deltaRouteSeconds([entry.$2.bytes]),
               fullSeconds,
@@ -131,7 +137,9 @@ int? mirrorDownloadBytesBound({
     final reach = _maxReach([for (final e in kept) e.$2]);
     kept = [
       for (final entry in kept)
-        if ((reach[entry.$2.to] ?? entry.$2.to) >= newestVersion) entry,
+        if (!entry.$2.sure ||
+            (reach[entry.$2.to] ?? entry.$2.to) >= newestVersion)
+          entry,
     ];
   }
 

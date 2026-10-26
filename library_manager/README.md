@@ -408,6 +408,14 @@ otzaria://library/reindex
   דרך `ZSTD_decompressStream` של libzstd (ה-bindings של `zstandard_native`).
   זה המסלול הרגיל של ה-DB המלא: שיא הזיכרון הוא חוצצים בודדים ולא ~1.1GB.
   מחזיר `false` כשאין ספריית zstd לטעינה, ואז נופלים לחילוץ בזיכרון.
+- `services/mirror_download_bound.dart` — **החסם שלפני הלחיצה**
+  (`peekedDownloadBytesBound`): כמה הורדה לכונן תביא, משמות וגדלים בלבד, בלי
+  לשלוף manifest. מחיל מכללי המייצא רק את מה שאינו דורש manifest: קשת שהחלתה
+  איטית מהחלפת המסד (`ApplyTimeEstimate` של המייצא, בלי זיכוי — הנשא הוא החדש),
+  מבוי סתום לפי שמות `patch-vA-vB`, וקשת שה-manifest שלה כבר בכונן ואינו
+  בר-החלה. קשת לא ידועה נחשבת תקפה, ומוסרת רק כשקבציה ודאיים — manifest בכונן,
+  או קובץ יחיד בשם הקשת; אחרת היא נספרת כולה. מסד מלא ישן בכונן (גם מפוצל,
+  לפי קיום הארכיון המורכב) שהמייצא עשוי לבחור — `null`, ואין מספר.
 - `library_manager.dart` — האורקסטרטור. **מקור אחד בלבד:** `mirrorDir`
   (`<dataDir>/mirror/library`, לצד קובץ ההרצה). `downloadToMirror()` היא הפעולה
   היחידה שנוגעת ברשת; `checkForUpdate()` ו-`applyUpdate()` קוראות מהתיקייה

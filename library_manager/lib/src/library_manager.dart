@@ -756,6 +756,17 @@ class LibraryManager {
     final manifests = <(String, String), DeltaManifest>{};
     for (final release in relevant) {
       for (final asset in release.assets) {
+        // מסד מפוצל נשמר בשם הארכיון המורכב, וגודלו רק במניפסט שברשת: קיומו
+        // מספיק כדי שהמייצא עשוי לבחור בו.
+        final archive = asset.isSplitFullDbManifest
+            ? asset.splitArchiveName!
+            : null;
+        if (archive != null) {
+          if (await File(_mirrorAssetPath(release.tag, archive)).exists()) {
+            held.add((release.tag, asset.name));
+          }
+          continue;
+        }
         final file = File(_mirrorAssetPath(release.tag, asset.name));
         if (!await file.exists() || await file.length() != asset.size) {
           continue;
