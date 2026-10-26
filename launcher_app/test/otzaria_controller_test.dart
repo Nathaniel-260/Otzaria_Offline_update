@@ -457,7 +457,7 @@ void main() {
     );
 
     test('התקנה שהסתיימה ואוצריא לא נמצאה — הבית יציע בחירת תיקייה', () async {
-      writeAppMirror(stableTag: '1.0.0');
+      writeAppMirror(stableTag: '1.0.0', installerKind: hostInstallerKind);
       final c = OtzariaModuleController(
         dataDir: tempDir.path,
         runningLocator: const _NeverRunningLocator(),

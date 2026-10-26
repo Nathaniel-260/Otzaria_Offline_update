@@ -26,6 +26,7 @@ import 'package:launcher_app/src/shell/shell_navigator.dart';
 import 'package:launcher_app/src/widgets/widgets_exports.dart';
 import 'package:library_manager/library_manager.dart' show LibraryChangesNote;
 import 'package:otzaria_l10n/otzaria_l10n.dart';
+import 'package:otzaria_manager/otzaria_manager.dart';
 import 'package:path/path.dart' as p;
 import 'package:plugins_manager/plugins_manager.dart' show PluginsOnlineStatus;
 
@@ -1373,7 +1374,8 @@ void main() {
 
     setUp(() {
       tempDir = Directory.systemTemp.createTempSync('home_page_test');
-      otzaria = OtzariaModuleController(dataDir: tempDir.path);
+      otzaria = OtzariaModuleController(
+          dataDir: tempDir.path, platform: OtzariaTargetPlatform.windows);
       library = LibraryModuleController(dataDir: tempDir.path);
       plugins = PluginsModuleController(mirrorRootDir: tempDir.path);
       launcher = LauncherUpdateController(dataDir: tempDir.path);

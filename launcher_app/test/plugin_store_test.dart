@@ -1167,11 +1167,17 @@ void main() {
     await pumpScreen(tester, PluginsScreen(controller: plugins));
     await tester.pumpAndSettle();
 
-    expect(find.text(t.reloadRowTitle), findsNothing);
+    expect(
+        find.descendant(
+            of: find.byType(RowsCard), matching: find.text(t.reloadRowTitle)),
+        findsNothing);
     await tester.tap(find.text(stringsOf().pages.advancedTitle));
     await tester.pumpAndSettle();
 
-    expect(find.text(t.reloadRowTitle), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(RowsCard), matching: find.text(t.reloadRowTitle)),
+        findsOneWidget);
     expect(
       find.text(t.storeAppButton),
       StoreAppExportButton.isSupported ? findsOneWidget : findsNothing,
