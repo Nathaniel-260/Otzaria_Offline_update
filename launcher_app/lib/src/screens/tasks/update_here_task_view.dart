@@ -340,6 +340,9 @@ class UpdateHereTaskView extends StatelessWidget {
 
   String? _libraryDetail(BuildContext context) {
     final t = context.strings.task;
+    if (task.librarySemanticOnly) {
+      return context.strings.libraryDomain.companionSemanticName;
+    }
     return task.firstInstall
         ? t.libraryFull
         : task.libraryVersion == null
@@ -393,9 +396,10 @@ class UpdateHereTaskView extends StatelessWidget {
                 doneMark(),
               ),
           },
+        // הערה על שלב שדולג היא הסיבה (למשל חסימת החיפוש החכם), ולא "אחר כך".
         GuidanceItem.library => outcome == StageOutcome.skipped
             ? (
-                t.librarySkipped,
+                task.libraryNote ?? t.librarySkipped,
                 null,
                 quietMark(FluentIcons.subtract_circle_24_regular),
               )

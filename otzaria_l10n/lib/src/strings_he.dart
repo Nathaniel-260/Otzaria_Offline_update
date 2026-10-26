@@ -3222,6 +3222,10 @@ class _LibraryDomain extends LibraryDomainStrings {
       'השאלה לא תחזור במחשב הזה. אפשר להפעיל אחר כך בהגדרות של הכלי הזה; '
       'הביטול — בהגדרות של אוצריא.';
   @override
+  String get semanticConsentNotSaved =>
+      'לא הצלחתי לשמור את ההסכמה בהגדרות אוצריא — החיפוש החכם לא הותקן. אפשר '
+      'לנסות שוב.';
+  @override
   String get semanticConsentBlocked =>
       'שרת אוצריא חסם את שליחת נתוני האימון מהמחשב הזה, ולכן אי אפשר להפעיל '
       'כאן את החיפוש החכם.';

@@ -166,6 +166,7 @@ final class UpdateHereTask extends ShellTask {
     this.appVersion,
     this.libraryVersion,
     this.libraryMinutes,
+    this.librarySemanticOnly = false,
     this.account,
     this.outcomes = const {},
     this.libraryNote,
@@ -191,6 +192,9 @@ final class UpdateHereTask extends ShellTask {
 
   /// אומדן ההחלה של הספרייה, בדקות, כשידוע.
   final ({int low, int high})? libraryMinutes;
+
+  /// שלב הספרייה הוא רק החיפוש החכם (אחרי ההסכמה בחלון) — בלי גרסת מסד.
+  final bool librarySemanticOnly;
 
   /// החשבון שהכלי רץ בו כמנהל — במסך "משתמש אחר", כשידוע.
   final String? account;
@@ -237,6 +241,7 @@ final class UpdateHereTask extends ShellTask {
         appVersion: appVersion,
         libraryVersion: libraryVersion,
         libraryMinutes: libraryMinutes,
+        librarySemanticOnly: librarySemanticOnly,
         account: account,
         outcomes: outcomes ?? this.outcomes,
         libraryNote: libraryNote ?? this.libraryNote,
@@ -360,6 +365,7 @@ class ShellTasks extends ChangeNotifier {
     String? appVersion,
     int? libraryVersion,
     ({int low, int high})? libraryMinutes,
+    bool librarySemanticOnly = false,
     String? account,
     List<String> pluginNames = const [],
     UpdateHereRequest? request,
@@ -377,6 +383,7 @@ class ShellTasks extends ChangeNotifier {
       appVersion: appVersion,
       libraryVersion: libraryVersion,
       libraryMinutes: libraryMinutes,
+      librarySemanticOnly: librarySemanticOnly,
       account: account,
       plugins: [
         for (final name in pluginNames)

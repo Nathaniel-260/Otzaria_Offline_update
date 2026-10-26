@@ -95,8 +95,9 @@ abstract interface class UpdateHereHost {
   Future<bool?> askSemanticConsent();
   Future<void> declineSemanticConsent();
 
-  /// אחרי שאוצריא נסגרה: הכתיבה להגדרות שלה דורשת אותה סגורה.
-  Future<void> grantSemanticConsent();
+  /// אחרי שאוצריא נסגרה: הכתיבה להגדרות שלה דורשת אותה סגורה. מחזיר את מה
+  /// שיש לומר כשלא נכתבה (חסימת שרת, כשל) — במסך המשימה, לא בהודעה צפה.
+  Future<String?> grantSemanticConsent();
 }
 
 /// "עדכון כאן": הספרייה, התוכנה ואז התוספים; בהתקנה ראשונה התוכנה ואז הספרייה.
@@ -194,6 +195,7 @@ class UpdateHereFlow {
       libraryVersion: libraryUpdate ? library.targetVersion : null,
       libraryMinutes:
           libraryUpdate ? library.applyEstimate(full: fullLibrary) : null,
+      librarySemanticOnly: grantConsent && !libraryUpdate,
       account: hasApp && app.elevatedAsOtherUser ? app.adminAccount : null,
       pluginNames: stages.contains(GuidanceItem.plugins)
           ? plugins.deliverableUpdates
@@ -307,6 +309,7 @@ class UpdateHereFlow {
     bool full = false,
     bool grantConsent = false,
   }) async {
+    String? consentNote;
     if (first) {
       // מיקום המסד נגזר ממה שהאשף בחר — בודקים מחדש אחרי ההתקנה.
       await library.recheck();
@@ -333,11 +336,15 @@ class UpdateHereFlow {
       final closed = await _ensureClosed(ranAny: ranAny);
       if (closed != true) return closed;
       if (grantConsent) {
-        await host.grantSemanticConsent();
+        consentNote = await host.grantSemanticConsent();
         if (!host.isActive) return false;
         // הכתיבה נכשלה והחיפוש החכם היה כל מה שיש — אין מה להחיל.
         if (!full && !library.hasUpdateAvailable) {
-          _tasks.stageFinished(GuidanceItem.library, StageOutcome.skipped);
+          _tasks.stageFinished(
+            GuidanceItem.library,
+            StageOutcome.skipped,
+            note: consentNote,
+          );
           return true;
         }
       }
@@ -354,12 +361,15 @@ class UpdateHereFlow {
       ));
       return false;
     }
+    // שתי ההערות: הסיבה שהחיפוש החכם לא הותקן אינה נבלעת בהערת ההחלה.
+    final notes = [
+      if (result == LibraryApplyResult.appliedWithNote) library.applyNote,
+      consentNote,
+    ].nonNulls;
     _tasks.stageFinished(
       GuidanceItem.library,
       StageOutcome.done,
-      note: result == LibraryApplyResult.appliedWithNote
-          ? library.applyNote
-          : null,
+      note: notes.isEmpty ? null : notes.join('\n'),
     );
     return true;
   }

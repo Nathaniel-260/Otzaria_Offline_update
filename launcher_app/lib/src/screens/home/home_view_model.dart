@@ -343,8 +343,11 @@ HomeViewModel homeViewModelOf(AppSession s) {
         library.status == LibraryModuleStatus.personalTargetElsewhere
             ? '${library.personalFromVersion ?? ''}'
             : null,
-    // כשהגיבור כבר מציע את החיפוש החכם, ההודעה הייתה כפולה.
-    semanticConsent: s.semanticConsentUnanswered && !semanticOnlyHere(facts),
+    // כשהגיבור כבר מציע את החיפוש החכם, ההודעה הייתה כפולה; בלי אוצריא אין
+    // לאן לכתוב את ההסכמה.
+    semanticConsent: s.semanticConsentUnanswered &&
+        otzaria.currentVersion != null &&
+        !semanticOnlyHere(facts),
     onlineCheckedAt: latestOnlineCheck([
       if (settings.syncApp) (otzaria.onlineCheckedAt, otzaria.onlineCheckError),
       if (settings.downloadsLibrary)

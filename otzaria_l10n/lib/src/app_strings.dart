@@ -1787,6 +1787,9 @@ abstract class LibraryDomainStrings {
 
   /// השרת חסם את המפתח של המחשב הזה — הסכמה חדשה לא תעזור.
   String get semanticConsentBlocked;
+
+  /// ההסכמה לא נשמרה בהגדרות אוצריא (כשל כתיבה או חריג).
+  String get semanticConsentNotSaved;
   String get semanticFeedbackFailed;
   String companionChecking(String name);
   String companionDownloading(String name);

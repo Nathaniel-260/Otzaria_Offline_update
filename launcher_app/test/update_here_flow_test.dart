@@ -219,15 +219,17 @@ class _Host implements UpdateHereHost {
 
   /// כמו `_writeSemanticConsent`: הצלחה רושמת תשובה ובודקת מחדש.
   bool grantSucceeds = true;
+  String grantProblem = 'הכתיבה נכשלה';
   void Function()? onGranted;
 
   @override
-  Future<void> grantSemanticConsent() async {
+  Future<String?> grantSemanticConsent() async {
     grants++;
     log.add(running ? 'grant-while-open' : 'grant');
-    if (!grantSucceeds) return;
+    if (!grantSucceeds) return grantProblem;
     consentUnanswered = false;
     onGranted?.call();
+    return null;
   }
 }
 
@@ -817,13 +819,25 @@ void main() {
       expect(host.asks, 2);
     });
 
-    test('הכתיבה נכשלה — שלב הספרייה רץ בכל זאת', () async {
+    test('הסיבה אינה נבלעת בהערת ההחלה — שתיהן בשורה', () async {
+      host
+        ..consentAnswer = true
+        ..grantSucceeds = false;
+      library.noteAfterApply = 'כוון את אוצריא לתיקייה';
+      await flow.run(const [GuidanceItem.library]);
+      expect(task()!.libraryNote, contains('כוון את אוצריא לתיקייה'));
+      expect(task()!.libraryNote, contains(host.grantProblem));
+    });
+
+    test('הכתיבה נכשלה — שלב הספרייה רץ בכל זאת, עם הסיבה', () async {
       host
         ..consentAnswer = true
         ..grantSucceeds = false;
       await flow.run(both);
       expect(log, ['grant', 'library', 'app']);
       expect(host.consentUnanswered, isTrue);
+      expect(task()!.libraryNote, host.grantProblem);
+      expect(task()!.librarySemanticOnly, isFalse);
     });
 
     test('"המשך בלי" — נרשם, והעדכון רץ בלי לכתוב הסכמה', () async {
@@ -885,6 +899,7 @@ void main() {
         expect(await flow.run(const [GuidanceItem.library]), isTrue);
         expect(log, ['grant', 'library']);
         expect(task()!.libraryVersion, isNull);
+        expect(task()!.librarySemanticOnly, isTrue);
         expect(task()!.phase, UpdateHereTaskPhase.done);
       });
 
@@ -902,6 +917,8 @@ void main() {
         await flow.run(const [GuidanceItem.library]);
         expect(library.applies, 0);
         expect(task()!.outcomes[GuidanceItem.library], StageOutcome.skipped);
+        // הסיבה, ולא "אפשר להתקין אחר כך מדף הבית".
+        expect(task()!.libraryNote, host.grantProblem);
       });
 
       test('אחרי תשובה אין שלב בשבילו', () async {

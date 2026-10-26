@@ -1270,6 +1270,16 @@ void main() {
       expect(manager.checks, 3);
     });
 
+    test('בדיקה "טרייה" בזמן החלה חוזרת מיד, וההחלה בודקת בסופה', () async {
+      final gate = manager.applyGate = Completer<void>();
+      final apply = controller.update();
+      await controller.checkForUpdate(fresh: true);
+      expect(manager.checks, 1);
+      gate.complete();
+      await apply;
+      expect(manager.checks, 2);
+    });
+
     test('החלה שהמתינה לבדיקה שנכשלה משחררת את המסך', () async {
       final checkGate = manager.checkGate = Completer<void>();
       manager.checkError = StateError('drive');

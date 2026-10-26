@@ -484,6 +484,17 @@ void main() {
     });
   }
 
+  test('blockedByServer: a working key, or no key yet, is not blocked',
+      () async {
+    final transport = SearchFeedbackTransport(destination);
+    addTearDown(transport.close);
+    expect(await transport.blockedByServer(source), false);
+    final empty = p.join(temporary.path, 'fresh-otzaria', 'search_feedback');
+    await Directory(empty).create(recursive: true);
+    expect(await transport.blockedByServer(empty), false);
+    expect(await transport.resumeAfterConsent(source), true);
+  });
+
   test('blocked key cannot be resumed or collected', () async {
     identity.blocked = true;
     await SearchFeedbackIdentityStore(() async => Directory(source))

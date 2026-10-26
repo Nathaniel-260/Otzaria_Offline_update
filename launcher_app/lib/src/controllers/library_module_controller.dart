@@ -729,8 +729,8 @@ class LibraryModuleController extends ChangeNotifier
         .join(', ');
   }
 
-  /// [fresh] — בדיקה שמתחילה אחרי הקריאה: בדיקה שכבר רצה לא ראתה את מה
-  /// שנכתב זה עתה (למשל ההסכמה לחיפוש החכם).
+  /// [fresh] — לא מצטרף לבדיקה שכבר רצה (לא ראתה כתיבה של עכשיו). בזמן החלה
+  /// אין בדיקה, כמו תמיד: ההחלה בודקת בסופה.
   Future<void> checkForUpdate({bool fresh = false}) async {
     if (fresh) {
       try {

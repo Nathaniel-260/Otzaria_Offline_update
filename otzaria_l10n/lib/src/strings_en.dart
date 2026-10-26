@@ -3414,6 +3414,10 @@ class _LibraryDomain extends LibraryDomainStrings {
       'You will not be asked again on this computer. You can enable it later '
       'in the settings of this tool; revoking is done in Otzaria settings.';
   @override
+  String get semanticConsentNotSaved =>
+      "Couldn't save the consent in Otzaria settings, so smart search was not "
+      'installed. You can try again.';
+  @override
   String get semanticConsentBlocked =>
       "Otzaria's server has blocked training data from this computer, so smart "
       'search cannot be enabled here.';
